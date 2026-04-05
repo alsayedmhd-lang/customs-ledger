@@ -8,29 +8,37 @@ const __dirname = path.dirname(__filename);
 
 async function buildAll() {
   const distDir = path.resolve(__dirname, "dist");
+  
+  // تنظيف المجلد قبل البناء
   await rm(distDir, { recursive: true, force: true });
 
-  console.log("🚀 Starting Production Build...");
+  console.log("🚀 Starting FINAL Standalone Build...");
 
   await esbuild({
     entryPoints: [path.resolve(__dirname, "src/index.ts")],
     platform: "node",
-    bundle: true,
+    bundle: true,         // دمج كافة المكتبات (express, cors, etc.)
     format: "cjs",
     target: "node22",
     outfile: path.resolve(distDir, "index.cjs"),
+    
+    // ربط قاعدة البيانات المحلية
     alias: {
       "@workspace/db": path.resolve(__dirname, "../lib/db/src")
     },
-    // هذا السطر يخبر esbuild أن يتجاهل دمج المكتبات الموجودة في node_modules
-    // ويتركها ليتم تحميلها وقت التشغيل
-    packages: "external", 
+
+    // مصفوفة فارغة لضمان عدم استثناء أي مكتبة من الدمج
+    external: [], 
+
     minify: false,
     sourcemap: true,
     logLevel: "info",
+    define: {
+      "process.env.NODE_ENV": '"production"',
+    },
   });
   
-  console.log("✅ Build finished successfully!");
+  console.log("✅ Standalone build finished successfully!");
 }
 
 buildAll().catch((err) => {
