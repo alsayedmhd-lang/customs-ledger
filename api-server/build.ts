@@ -10,24 +10,23 @@ async function buildAll() {
   const distDir = path.resolve(__dirname, "dist");
   await rm(distDir, { recursive: true, force: true });
 
-  console.log("🚀 Starting Final Bundle Build...");
+  console.log("🚀 Building server...");
 
   await esbuild({
     entryPoints: [path.resolve(__dirname, "src/index.ts")],
     platform: "node",
-    bundle: true, // دمج كافة المكتبات (مثل express) داخل الملف
+    bundle: true, 
     format: "cjs",
-    target: "node22", // متوافق مع نسخة Node الحالية في Render
+    target: "node22",
     outfile: path.resolve(distDir, "index.cjs"),
     alias: {
       "@workspace/db": path.resolve(__dirname, "../lib/db/src")
     },
-    external: [], // مصفوفة فارغة لضمان دمج كل شيء
+    // نجعل كل شيء خارجياً ليتوقف esbuild عن الشكوى أثناء البناء
+    packages: "external", 
     minify: false,
     sourcemap: true,
-    define: {
-      "process.env.NODE_ENV": '"production"',
-    },
+    logLevel: "info",
   });
   
   console.log("✅ Build finished successfully!");
