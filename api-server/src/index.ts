@@ -12,9 +12,14 @@ if (Number.isNaN(port) || port <= 0) {
 
 // 2. إضافة "0.0.0.0" لضمان قبول الاتصالات الخارجية في Render
 app.listen(port, "0.0.0.0", async () => {
-  console.log(`🚀 Server listening on port ${port}`);
+  // --- رسالة التأكيد هنا ---
+  console.log(`🚀 Server is officially live!`);
+  console.log(`🌍 Access it at: https://customs-ledger-pro.onrender.com`);
+  console.log(`📡 Listening on port: ${port}`);
+  // -------------------------
   
   try {
+    console.log("⏳ Starting admin seeding...");
     await seedAdminUser();
     console.log("✅ Admin user seeding completed.");
   } catch (error) {
@@ -22,7 +27,6 @@ app.listen(port, "0.0.0.0", async () => {
     // لا نغلق السيرفر هنا لكي يستمر في العمل حتى لو فشل الـ seed
   }
 });
-
 
 
 
