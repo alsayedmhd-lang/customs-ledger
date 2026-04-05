@@ -1,0 +1,14 @@
+packages:
+  "react-hook-form": "Form state management for complex invoice and client forms"
+  "@hookform/resolvers": "Zod schema validation integration for forms"
+  "date-fns": "Date formatting and manipulation for invoices and statements"
+  "recharts": "Data visualization for the dashboard revenue charts"
+  "framer-motion": "Smooth page transitions, modals, and micro-interactions"
+  "clsx": "Utility for constructing className strings conditionally"
+  "tailwind-merge": "Utility for merging tailwind classes without style conflicts"
+
+images: []
+
+notes:
+  - "The app imports strictly from `@workspace/api-client-react` for TanStack hooks and schemas."
+  - "Print functionality uses standard window.print() combined with `@media print` CSS rules."
