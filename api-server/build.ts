@@ -69,9 +69,12 @@ async function buildAll() {
     external: externals, // الآن سيتم دمج @workspace/db تلقائياً
     logLevel: "info",
     // إضافة alias لضمان توجيه المسار للمجلد الصحيح أثناء البناء
-    alias: {
-      "@workspace/db": path.resolve(__dirname, "../lib/db/src/index.ts")
-    }
+  // ... داخل إعدادات esbuild في ملف build.ts
+  alias: {
+    "@workspace/db": path.resolve(__dirname, "../lib/db/src/index.ts")
+  },
+  external: externals,
+  // ...
   });
   console.log("Build finished successfully!");
 }
