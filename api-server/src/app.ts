@@ -1,4 +1,4 @@
-import express, { type Express, Request, Response } from "express"; // أضفنا Request و Response للوضوح
+import express, { type Express, type Request, type Response } from "express";
 import cors from "cors";
 import router from "./routes";
 
@@ -8,12 +8,12 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// *********** أضف هذا الجزء هنا ***********
+// 1. إضافة المسار الرئيسي قبل الـ Router لضمان ظهوره في المتصفح
 app.get("/", (req: Request, res: Response) => {
-  res.send("🚀 Customs Ledger API is running smoothly!");
+  res.status(200).send("🚀 Customs Ledger API is running smoothly!");
 });
-// *****************************************
 
+// 2. مسارات الـ API الأخرى
 app.use("/api", router);
 
 export default app;
