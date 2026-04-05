@@ -10,7 +10,7 @@ async function buildAll() {
   const distDir = path.resolve(__dirname, "dist");
   await rm(distDir, { recursive: true, force: true });
 
-  console.log("🚀 Starting Final Standalone Build...");
+  console.log("🚀 Starting Standalone Bundle Build...");
 
   await esbuild({
     entryPoints: [path.resolve(__dirname, "src/index.ts")],
@@ -22,8 +22,7 @@ async function buildAll() {
     alias: {
       "@workspace/db": path.resolve(__dirname, "../lib/db/src")
     },
-    // دمج كل المكتبات داخل ملف واحد لمنع خطأ "Cannot find module express"
-    external: [], 
+    external: [], // دمج كل شيء بما في ذلك express
     minify: false,
     sourcemap: true,
     logLevel: "info",
@@ -32,7 +31,7 @@ async function buildAll() {
     },
   });
   
-  console.log("✅ Build complete! File created at: dist/index.cjs");
+  console.log("✅ Build finished successfully!");
 }
 
 buildAll().catch((err) => {
