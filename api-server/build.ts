@@ -10,7 +10,7 @@ async function buildAll() {
   const distDir = path.resolve(__dirname, "dist");
   await rm(distDir, { recursive: true, force: true });
 
-  console.log("🚀 Starting Standalone Bundle Build...");
+  console.log("🚀 Starting Final Standalone Build...");
 
   await esbuild({
     entryPoints: [path.resolve(__dirname, "src/index.ts")],
@@ -22,7 +22,7 @@ async function buildAll() {
     alias: {
       "@workspace/db": path.resolve(__dirname, "../lib/db/src")
     },
-    external: [], // دمج كل شيء بما في ذلك express
+    external: [], 
     minify: false,
     sourcemap: true,
     logLevel: "info",
