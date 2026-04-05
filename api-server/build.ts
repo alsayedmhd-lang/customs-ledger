@@ -10,32 +10,27 @@ async function buildAll() {
   const distDir = path.resolve(__dirname, "dist");
   await rm(distDir, { recursive: true, force: true });
 
-  console.log("🚀 Starting Production Build (Full Bundle)...");
+  console.log("🚀 Starting Final Standalone Build...");
 
   await esbuild({
     entryPoints: [path.resolve(__dirname, "src/index.ts")],
     platform: "node",
-    bundle: true, // دمج كل شيء
+    bundle: true,
     format: "cjs",
     target: "node22",
     outfile: path.resolve(distDir, "index.cjs"),
-    // تحديد مسارات المكتبات يدوياً لـ esbuild
-    nodePaths: [path.resolve(__dirname, "../node_modules")], 
+    // تجاهل المكتبات الخارجية تماماً لضمان عدم حدوث خطأ أثناء البناء
+    packages: "external", 
     alias: {
       "@workspace/db": path.resolve(__dirname, "../lib/db/src"),
       "@workspace/api-zod": path.resolve(__dirname, "../lib/api-zod/src"),
     },
-    // استثناء المكتبات التي تحتوي على ملفات ثنائية (Binary) فقط
-    external: ["fsevents", "bcrypt"], 
     minify: false,
     sourcemap: true,
     logLevel: "info",
-    define: {
-      "process.env.NODE_ENV": '"production"',
-    },
   });
   
-  console.log("✅ Build finished successfully!");
+  console.log("✅ Build complete!");
 }
 
 buildAll().catch((err) => {
