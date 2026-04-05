@@ -6,9 +6,6 @@ import { rm, readFile } from "fs/promises";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// server deps to bundle to reduce openat(2) syscalls
-// which helps cold start times without risking some
-// packages that are not bundle compatible
 const allowlist = [
   "@google/generative-ai",
   "axios",
@@ -44,14 +41,19 @@ async function buildAll() {
   console.log("building server...");
   const pkgPath = path.resolve(__dirname, "package.json");
   const pkg = JSON.parse(await readFile(pkgPath, "utf-8"));
+  
   const allDeps = [
     ...Object.keys(pkg.dependencies || {}),
     ...Object.keys(pkg.devDependencies || {}),
   ];
+
+  // التعديل هنا: نقوم بدمج أي شيء يبدأ بـ workspace داخل الـ bundle
   const externals = allDeps.filter(
-    (dep) =>
-      !allowlist.includes(dep) &&
-      !(pkg.dependencies?.[dep]?.startsWith("workspace:")),
+    (dep) => {
+      const isWorkspace = pkg.dependencies?.[dep]?.startsWith("workspace:") || 
+                          pkg.devDependencies?.[dep]?.startsWith("workspace:");
+      return !allowlist.includes(dep) && !isWorkspace;
+    }
   );
 
   await esbuild({
@@ -64,9 +66,14 @@ async function buildAll() {
       "process.env.NODE_ENV": '"production"',
     },
     minify: true,
-    external: externals,
+    external: externals, // الآن سيتم دمج @workspace/db تلقائياً
     logLevel: "info",
+    // إضافة alias لضمان توجيه المسار للمجلد الصحيح أثناء البناء
+    alias: {
+      "@workspace/db": path.resolve(__dirname, "../lib/db/src/index.ts")
+    }
   });
+  console.log("Build finished successfully!");
 }
 
 buildAll().catch((err) => {
