@@ -22,6 +22,7 @@ async function buildAll() {
     alias: {
       "@workspace/db": path.resolve(__dirname, "../lib/db/src")
     },
+    // هذا السطر فارغ لضمان دمج express وكل شيء بالداخل
     external: [], 
     minify: false,
     sourcemap: true,
@@ -31,7 +32,7 @@ async function buildAll() {
     },
   });
   
-  console.log("✅ Build finished successfully!");
+  console.log("✅ Build complete!");
 }
 
 buildAll().catch((err) => {
