@@ -10,7 +10,7 @@ async function buildAll() {
   const distDir = path.resolve(__dirname, "dist");
   await rm(distDir, { recursive: true, force: true });
 
-  console.log("🚀 Starting Final Standalone Build...");
+  console.log("🚀 Starting Production Build...");
 
   await esbuild({
     entryPoints: [path.resolve(__dirname, "src/index.ts")],
@@ -19,11 +19,17 @@ async function buildAll() {
     format: "cjs",
     target: "node22",
     outfile: path.resolve(distDir, "index.cjs"),
+    
+    // تعريف المسارات الخاصة بالـ workspace لتضمينها في البناء
     alias: {
-      "@workspace/db": path.resolve(__dirname, "../lib/db/src")
+      "@workspace/db": path.resolve(__dirname, "../lib/db/src"),
+      "@workspace/api-zod": path.resolve(__dirname, "../lib/api-zod/src") // أضفت هذا بناءً على خطأ api-zod
     },
-    // هذا السطر فارغ لضمان دمج express وكل شيء بالداخل
-    external: [], 
+
+    // الحل السحري: إخبار esbuild أن يتجاهل كل المكتبات المثبتة عبر npm
+    // ويتركها ليتم سحبها من node_modules وقت التشغيل
+    packages: "external", 
+
     minify: false,
     sourcemap: true,
     logLevel: "info",
@@ -32,7 +38,7 @@ async function buildAll() {
     },
   });
   
-  console.log("✅ Build complete!");
+  console.log("✅ Build finished successfully!");
 }
 
 buildAll().catch((err) => {
