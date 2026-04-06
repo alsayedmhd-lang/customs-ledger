@@ -10,7 +10,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // 1. إضافة المسار الرئيسي قبل الـ Router لضمان ظهوره في المتصفح
 app.get("/", (req: Request, res: Response) => {
-  res.status(200).send("🚀 Customs Ledger API is running smoothly!");
+  res.status(200).send("🚀 Around The Worled Custom Clearance!");
 });
 
 // 2. مسارات الـ API الأخرى
