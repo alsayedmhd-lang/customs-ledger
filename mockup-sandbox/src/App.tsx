@@ -28,26 +28,27 @@ export default function App() {
   const isArabic = lang === "ar";
 
   function renderPage() {
-    switch (page) {
-      case "dashboard":
-        return <Dashboard />;
-      case "invoices":
-        return <Invoices />;
-      case "receipts":
-        return <Receipts />;
-      case "accounts":
-        return <Accounts />;
-      case "customers":
-        return <Customers />;
-      case "users":
-        return <Users />;
-      case "settings":
-        return <Settings />;
-      case "items":
-        return <Items />;
-      default:
-        return <Dashboard />;
-    }
+  switch (page) {
+    case "dashboard":
+      return <Dashboard lang={lang} />;
+    case "invoices":
+      return <Invoices lang={lang} />;
+    case "receipts":
+      return <Receipts lang={lang} />;
+    case "accounts":
+      return <Accounts lang={lang} />;
+    case "customers":
+      return <Customers lang={lang} />;
+    case "users":
+      return <Users lang={lang} />;
+    case "settings":
+      return <Settings lang={lang} />;
+    case "items":
+      return <Items lang={lang} />;
+    default:
+      return <Dashboard lang={lang} />;
+  }
+}
   }
 
   return (
