@@ -28,27 +28,26 @@ export default function App() {
   const isArabic = lang === "ar";
 
   function renderPage() {
-  switch (page) {
-    case "dashboard":
-      return <Dashboard lang={lang} />;
-    case "invoices":
-      return <Invoices lang={lang} />;
-    case "receipts":
-      return <Receipts lang={lang} />;
-    case "accounts":
-      return <Accounts lang={lang} />;
-    case "customers":
-      return <Customers lang={lang} />;
-    case "users":
-      return <Users lang={lang} />;
-    case "settings":
-      return <Settings lang={lang} />;
-    case "items":
-      return <Items lang={lang} />;
-    default:
-      return <Dashboard lang={lang} />;
-  }
-}
+    switch (page) {
+      case "dashboard":
+        return <Dashboard lang={lang} />;
+      case "invoices":
+        return <Invoices lang={lang} />;
+      case "receipts":
+        return <Receipts lang={lang} />;
+      case "accounts":
+        return <Accounts lang={lang} />;
+      case "customers":
+        return <Customers lang={lang} />;
+      case "users":
+        return <Users lang={lang} />;
+      case "settings":
+        return <Settings lang={lang} />;
+      case "items":
+        return <Items lang={lang} />;
+      default:
+        return <Dashboard lang={lang} />;
+    }
   }
 
   return (
@@ -73,7 +72,7 @@ export default function App() {
         <div
           style={{
             display: "flex",
-            justifyContent: isArabic ? "space-between" : "space-between",
+            justifyContent: "space-between",
             alignItems: "center",
             marginBottom: "20px",
             gap: "10px",
