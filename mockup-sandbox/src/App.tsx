@@ -63,10 +63,12 @@ export default function App() {
     >
       <div
         style={{
-          width: "240px",
-          background: "#0b1f4d",
+          width: "220px",
+          background: "#081f5c",
           color: "white",
           padding: "20px",
+          minHeight: "100vh",
+          boxShadow: "4px 0 20px rgba(0,0,0,0.08)",
         }}
       >
         <div
@@ -78,19 +80,28 @@ export default function App() {
             gap: "10px",
           }}
         >
-          <h2 style={{ margin: 0 }}>
+          <h2
+            style={{
+              margin: 0,
+              fontSize: "24px",
+              fontWeight: "bold",
+              textAlign: "center",
+              marginBottom: "0",
+            }}
+          >
             {isArabic ? "حول العالم" : "Around The World"}
           </h2>
 
           <button
             onClick={() => setLang(isArabic ? "en" : "ar")}
             style={{
-              border: "1px solid rgba(255,255,255,0.2)",
-              background: "#1d4ed8",
+              border: "none",
+              background: "#2563eb",
               color: "white",
-              borderRadius: "8px",
-              padding: "6px 10px",
+              borderRadius: "10px",
+              padding: "8px 14px",
               cursor: "pointer",
+              fontWeight: "bold",
             }}
           >
             {isArabic ? "EN" : "عربي"}
@@ -126,7 +137,7 @@ export default function App() {
           onClick={() => setPage("settings")}
         />
         <MenuButton
-          title={isArabic ? "نماذج البنود" : "Items"}
+          title={isArabic ? "نماذج البنود" : "Items Templates"}
           onClick={() => setPage("items")}
         />
       </div>
@@ -148,13 +159,15 @@ function MenuButton({
       onClick={onClick}
       style={{
         width: "100%",
-        marginBottom: "10px",
-        padding: "12px",
+        marginBottom: "12px",
+        padding: "14px",
         border: "none",
-        borderRadius: "10px",
+        borderRadius: "12px",
         background: "#1d4ed8",
         color: "white",
         cursor: "pointer",
+        fontSize: "17px",
+        fontWeight: "600",
       }}
     >
       {title}
