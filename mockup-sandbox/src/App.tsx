@@ -8,6 +8,7 @@ import Customers from "./pages/Customers";
 import Users from "./pages/Users";
 import Settings from "./pages/Settings";
 import Items from "./pages/Items";
+import Items from "./pages/Tarsh";
 
 type Page =
   | "dashboard"
@@ -17,7 +18,8 @@ type Page =
   | "customers"
   | "users"
   | "settings"
-  | "items";
+  | "items"
+  | "Tarsh";
 
 type Lang = "ar" | "en";
 
@@ -45,6 +47,8 @@ export default function App() {
         return <Settings lang={lang} />;
       case "items":
         return <Items lang={lang} />;
+      case "Tarsh":
+        return <Tarsh lang={lang} />;
       default:
         return <Dashboard lang={lang} />;
     }
@@ -138,6 +142,10 @@ export default function App() {
         />
         <MenuButton
           title={isArabic ? "نماذج البنود" : "Items Templates"}
+          onClick={() => setPage("items")}
+        />
+        <MenuButton
+          title={isArabic ? "سلة المحذوفات" : "Tarsh Templates"}
           onClick={() => setPage("items")}
         />
       </div>
