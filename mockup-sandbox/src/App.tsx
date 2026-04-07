@@ -1,10 +1,42 @@
+import { useState } from "react";
+
 export default function App() {
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [loggedIn, setLoggedIn] = useState(false);
+  const [error, setError] = useState("");
+
+  function handleLogin() {
+    if (username === "admin" && password === "admin123") {
+      setLoggedIn(true);
+      setError("");
+    } else {
+      setError("Invalid username or password");
+    }
+  }
+
+  if (loggedIn) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          background: "#f5f7fb",
+          padding: "40px",
+          fontFamily: "system-ui",
+        }}
+      >
+        <h1>Dashboard</h1>
+        <p>Welcome to Around The World Custom Clearance</p>
+      </div>
+    );
+  }
+
   return (
     <div
       style={{
         minHeight: "100vh",
         margin: 0,
-        fontFamily: "system-ui, Arial, sans-serif",
+        fontFamily: "system-ui",
         background: "#f5f7fb",
         display: "flex",
         alignItems: "center",
@@ -22,94 +54,64 @@ export default function App() {
           boxShadow: "0 10px 30px rgba(0,0,0,0.08)",
         }}
       >
-        <h1
-          style={{
-            margin: "0 0 8px 0",
-            fontSize: "28px",
-            color: "#1f2937",
-            textAlign: "center",
-          }}
-        >
+        <h1 style={{ textAlign: "center" }}>
           Around The World Custom Clearance
         </h1>
 
-        <p
-          style={{
-            margin: "0 0 24px 0",
-            color: "#6b7280",
-            textAlign: "center",
-          }}
-        >
-          Login to continue
-        </p>
+        <p style={{ textAlign: "center", color: "#666" }}>Login to continue</p>
 
-        <form style={{ display: "grid", gap: "16px" }}>
-          <div>
-            <label
-              style={{
-                display: "block",
-                marginBottom: "6px",
-                fontSize: "14px",
-                color: "#374151",
-              }}
-            >
-              Username
-            </label>
-            <input
-              type="text"
-              placeholder="Enter username"
-              style={{
-                width: "100%",
-                padding: "12px",
-                borderRadius: "10px",
-                border: "1px solid #d1d5db",
-                fontSize: "14px",
-                boxSizing: "border-box",
-              }}
-            />
-          </div>
+        <div style={{ marginTop: "20px" }}>
+          <input
+            type="text"
+            placeholder="Username"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            style={{
+              width: "100%",
+              padding: "12px",
+              marginBottom: "12px",
+              borderRadius: "10px",
+              border: "1px solid #ccc",
+              boxSizing: "border-box",
+            }}
+          />
 
-          <div>
-            <label
-              style={{
-                display: "block",
-                marginBottom: "6px",
-                fontSize: "14px",
-                color: "#374151",
-              }}
-            >
-              Password
-            </label>
-            <input
-              type="password"
-              placeholder="Enter password"
-              style={{
-                width: "100%",
-                padding: "12px",
-                borderRadius: "10px",
-                border: "1px solid #d1d5db",
-                fontSize: "14px",
-                boxSizing: "border-box",
-              }}
-            />
-          </div>
+          <input
+            type="password"
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            style={{
+              width: "100%",
+              padding: "12px",
+              marginBottom: "12px",
+              borderRadius: "10px",
+              border: "1px solid #ccc",
+              boxSizing: "border-box",
+            }}
+          />
+
+          {error && (
+            <p style={{ color: "red", fontSize: "14px" }}>
+              {error}
+            </p>
+          )}
 
           <button
-            type="button"
+            onClick={handleLogin}
             style={{
-              marginTop: "8px",
+              width: "100%",
               padding: "12px",
               border: "none",
               borderRadius: "10px",
               background: "#2563eb",
-              color: "#ffffff",
-              fontSize: "15px",
+              color: "#fff",
               cursor: "pointer",
             }}
           >
             Login
           </button>
-        </form>
+        </div>
       </div>
     </div>
   );
