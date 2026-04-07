@@ -1,8 +1,116 @@
 export default function App() {
   return (
-    <div style={{ padding: "40px", fontFamily: "system-ui" }}>
-      <h1>Around The World Custom Clearance</h1>
-      <p>Frontend is running successfully.</p>
+    <div
+      style={{
+        minHeight: "100vh",
+        margin: 0,
+        fontFamily: "system-ui, Arial, sans-serif",
+        background: "#f5f7fb",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "24px",
+      }}
+    >
+      <div
+        style={{
+          width: "100%",
+          maxWidth: "420px",
+          background: "#ffffff",
+          borderRadius: "16px",
+          padding: "32px",
+          boxShadow: "0 10px 30px rgba(0,0,0,0.08)",
+        }}
+      >
+        <h1
+          style={{
+            margin: "0 0 8px 0",
+            fontSize: "28px",
+            color: "#1f2937",
+            textAlign: "center",
+          }}
+        >
+          Around The World Custom Clearance
+        </h1>
+
+        <p
+          style={{
+            margin: "0 0 24px 0",
+            color: "#6b7280",
+            textAlign: "center",
+          }}
+        >
+          Login to continue
+        </p>
+
+        <form style={{ display: "grid", gap: "16px" }}>
+          <div>
+            <label
+              style={{
+                display: "block",
+                marginBottom: "6px",
+                fontSize: "14px",
+                color: "#374151",
+              }}
+            >
+              Username
+            </label>
+            <input
+              type="text"
+              placeholder="Enter username"
+              style={{
+                width: "100%",
+                padding: "12px",
+                borderRadius: "10px",
+                border: "1px solid #d1d5db",
+                fontSize: "14px",
+                boxSizing: "border-box",
+              }}
+            />
+          </div>
+
+          <div>
+            <label
+              style={{
+                display: "block",
+                marginBottom: "6px",
+                fontSize: "14px",
+                color: "#374151",
+              }}
+            >
+              Password
+            </label>
+            <input
+              type="password"
+              placeholder="Enter password"
+              style={{
+                width: "100%",
+                padding: "12px",
+                borderRadius: "10px",
+                border: "1px solid #d1d5db",
+                fontSize: "14px",
+                boxSizing: "border-box",
+              }}
+            />
+          </div>
+
+          <button
+            type="button"
+            style={{
+              marginTop: "8px",
+              padding: "12px",
+              border: "none",
+              borderRadius: "10px",
+              background: "#2563eb",
+              color: "#ffffff",
+              fontSize: "15px",
+              cursor: "pointer",
+            }}
+          >
+            Login
+          </button>
+        </form>
+      </div>
     </div>
   );
 }
