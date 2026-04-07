@@ -1,0 +1,14 @@
+type Props = {
+  lang: "ar" | "en";
+};
+
+export default function Trash({ lang }: Props) {
+  const isArabic = lang === "ar";
+
+  return (
+    <div style={{ padding: "40px" }}>
+      <h1>{isArabic ? "سلة المحذوفات" : "Trash"}</h1>
+      <p>{isArabic ? "هذه صفحة سلة المحذوفات" : "This is the Trash page"}</p>
+    </div>
+  );
+}
