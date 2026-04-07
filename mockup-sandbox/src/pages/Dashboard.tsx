@@ -36,6 +36,12 @@ export default function Dashboard({ lang }: Props) {
     },
   ];
 
+  const bars = [
+    { labelAr: "يناير", labelEn: "Jan", height: 90 },
+    { labelAr: "فبراير", labelEn: "Feb", height: 150 },
+    { labelAr: "مارس", labelEn: "Mar", height: 230 },
+  ];
+
   return (
     <div
       dir={isArabic ? "rtl" : "ltr"}
@@ -48,7 +54,7 @@ export default function Dashboard({ lang }: Props) {
     >
       <div
         style={{
-          background: "linear-gradient(135deg, #0f172a, #1d4ed8)",
+          background: "linear-gradient(135deg, #081f5c, #1d4ed8)",
           color: "white",
           borderRadius: "24px",
           padding: "28px",
@@ -59,9 +65,11 @@ export default function Dashboard({ lang }: Props) {
         <div style={{ fontSize: "14px", opacity: 0.9, marginBottom: "8px" }}>
           {isArabic ? "صباح الخير" : "Good Morning"}
         </div>
+
         <h1 style={{ margin: 0, fontSize: "36px", fontWeight: 800 }}>
           {isArabic ? "المدير" : "Manager"}
         </h1>
+
         <p style={{ marginTop: "10px", opacity: 0.9 }}>
           {isArabic
             ? "نظرة عامة على أنشطة التخليص الجمركي"
@@ -97,12 +105,27 @@ export default function Dashboard({ lang }: Props) {
                 marginBottom: "14px",
               }}
             />
-            <div style={{ color: "#6b7280", fontSize: "14px", marginBottom: "8px" }}>
+
+            <div
+              style={{
+                color: "#6b7280",
+                fontSize: "14px",
+                marginBottom: "8px",
+              }}
+            >
               {isArabic ? card.titleAr : card.titleEn}
             </div>
-            <div style={{ fontSize: "30px", fontWeight: 700, color: "#111827" }}>
+
+            <div
+              style={{
+                fontSize: "30px",
+                fontWeight: 700,
+                color: "#111827",
+              }}
+            >
               {card.value}
             </div>
+
             <div
               style={{
                 marginTop: "14px",
@@ -137,6 +160,7 @@ export default function Dashboard({ lang }: Props) {
             <h2 style={{ margin: 0, fontSize: "28px", color: "#111827" }}>
               {isArabic ? "الإيرادات الشهرية" : "Monthly Revenue"}
             </h2>
+
             <div style={{ color: "#6b7280", marginTop: "6px" }}>
               {isArabic ? "آخر 3 أشهر" : "Last 3 months"}
             </div>
@@ -154,11 +178,7 @@ export default function Dashboard({ lang }: Props) {
             borderTop: "1px solid #e5e7eb",
           }}
         >
-          {[
-            { labelAr: "يناير", labelEn: "Jan", height: 90 },
-            { labelAr: "فبراير", labelEn: "Feb", height: 150 },
-            { labelAr: "مارس", labelEn: "Mar", height: 230 },
-          ].map((bar) => (
+          {bars.map((bar) => (
             <div
               key={bar.labelAr}
               style={{
@@ -177,6 +197,7 @@ export default function Dashboard({ lang }: Props) {
                   borderRadius: "14px 14px 0 0",
                 }}
               />
+
               <div style={{ color: "#6b7280", fontSize: "14px" }}>
                 {isArabic ? bar.labelAr : bar.labelEn}
               </div>
