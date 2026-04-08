@@ -26,7 +26,7 @@ type Page =
 type Lang = "ar" | "en";
 
 const SIDEBAR_WIDTH = 260;
-const MOBILE_BREAKPOINT = 992;
+const MOBILE_BREAKPOINT = 768;
 
 export default function App() {
   const [lang, setLang] = useState<Lang>(() => {
@@ -59,9 +59,15 @@ export default function App() {
     const handleResize = () => {
       const mobile = window.innerWidth < MOBILE_BREAKPOINT;
       setIsMobile(mobile);
-      setSidebarOpen(!mobile);
+
+      if (mobile) {
+        setSidebarOpen(false);
+      } else {
+        setSidebarOpen(true);
+      }
     };
 
+    handleResize();
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
@@ -79,15 +85,16 @@ export default function App() {
       Tarsh: { ar: "سلة المحذوفات", en: "Trash" },
     };
 
-    if (page === "login") {
+    if (page === "Login") {
       return isArabic ? "تسجيل الدخول" : "Login";
     }
 
     return isArabic ? titles[page].ar : titles[page].en;
   }, [page, isArabic]);
 
-  function goToPage(nextPage: Exclude<Page, "login">) {
+  function goToPage(nextPage: Exclude<Page, "Login">) {
     setPage(nextPage);
+
     if (isMobile) {
       setSidebarOpen(false);
     }
@@ -100,6 +107,7 @@ export default function App() {
   function handleLoginSuccess() {
     localStorage.setItem("token", "logged_in");
     setPage("dashboard");
+
     if (!isMobile) {
       setSidebarOpen(true);
     }
@@ -159,7 +167,7 @@ export default function App() {
     }
   }
 
-  const sidebarSideStyle = isArabic
+  const sidebarPosition = isArabic
     ? { right: 0 as const, left: "auto" as const }
     : { left: 0 as const, right: "auto" as const };
 
@@ -204,7 +212,7 @@ export default function App() {
             position: "fixed",
             top: 0,
             bottom: 0,
-            ...sidebarSideStyle,
+            ...sidebarPosition,
             width: `${SIDEBAR_WIDTH}px`,
             maxWidth: "86vw",
             background: "linear-gradient(180deg, #081a4b 0%, #0b1f4d 100%)",
@@ -224,7 +232,14 @@ export default function App() {
             transition: "transform 0.28s ease",
           }}
         >
-          <div style={{ minHeight: 0, display: "flex", flexDirection: "column", flex: 1 }}>
+          <div
+            style={{
+              minHeight: 0,
+              display: "flex",
+              flexDirection: "column",
+              flex: 1,
+            }}
+          >
             <div
               style={{
                 padding: "22px 20px",
