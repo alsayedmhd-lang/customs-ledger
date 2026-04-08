@@ -92,7 +92,7 @@ export default function App() {
               textAlign: "center",
             }}
           >
-            {isArabic ? "حول العالم" : "Around The World"}
+            {isArabic ? "حول العالم للتخليص الجمركي" : "Around The World Custom Clearance"}
           </h2>
 
           <button
