@@ -149,7 +149,58 @@ export default function App() {
         />
       </div>
 
-      <div style={{ flex: 1, padding: "20px" }}>{renderPage()}</div>
+      <div style={{ flex: 1 }}>
+
+  <div
+    style={{
+      background: "white",
+      height: "64px",
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      padding: "0 24px",
+      borderBottom: "1px solid #e5e7eb",
+    }}
+  >
+    <div style={{ color: "#6b7280", fontSize: "14px" }}>
+      Wednesday, April 8, 2026
+    </div>
+
+    <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+      <button
+        onClick={() => setLang(isArabic ? "en" : "ar")}
+        style={{
+          border: "1px solid #d1d5db",
+          background: "white",
+          borderRadius: "10px",
+          padding: "6px 12px",
+          cursor: "pointer",
+          fontWeight: "bold",
+        }}
+      >
+        {isArabic ? "EN" : "عربي"}
+      </button>
+
+      <button
+        style={{
+          border: "none",
+          background: "#f3f4f6",
+          borderRadius: "50%",
+          width: "36px",
+          height: "36px",
+          cursor: "pointer",
+        }}
+      >
+        ⚙️
+      </button>
+    </div>
+  </div>
+
+  <div style={{ padding: "20px" }}>
+    {renderPage()}
+  </div>
+
+</div>
     </div>
   );
 }
