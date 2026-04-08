@@ -8,7 +8,7 @@ import Customers from "./pages/Customers";
 import Users from "./pages/Users";
 import Settings from "./pages/Settings";
 import Items from "./pages/Items";
-import Items from "./pages/Tarsh";
+import Tarsh from "./pages/Tarsh";
 
 type Page =
   | "dashboard"
