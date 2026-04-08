@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 
-import Login from "./pages/login";
+import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Invoices from "./pages/Invoices";
 import Receipts from "./pages/Receipts";
@@ -134,7 +134,7 @@ export default function App() {
 
   function renderPage() {
     switch (page) {
-      case "login":
+      case "Login":
         return <Login lang={lang} onLogin={handleLoginSuccess} />;
       case "dashboard":
         return <Dashboard lang={lang} />;
