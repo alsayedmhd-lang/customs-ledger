@@ -12,7 +12,7 @@ import Items from "./pages/Items";
 import Tarsh from "./pages/Tarsh";
 
 type Page =
-  | "login"
+  | "Login"
   | "dashboard"
   | "invoices"
   | "receipts"
