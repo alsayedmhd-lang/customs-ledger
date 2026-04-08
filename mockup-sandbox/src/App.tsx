@@ -55,28 +55,31 @@ export default function App() {
   }
 
   return (
-        <div
-          dir={isArabic ? "rtl" : "ltr"}
-          style={{
-            display: "flex",
-            flexDirection: isArabic ? "row-reverse" : "row",
-            height: "100vh",
-            overflow: "hidden",
-            background: "#f3f4f6",
-          }}
-        >
+    <div
+      dir={isArabic ? "rtl" : "ltr"}
+      style={{
+        display: "flex",
+        flexDirection: isArabic ? "row-reverse" : "row",
+        height: "100vh",
+        overflow: "hidden",
+        fontFamily:
+          "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+        background: "#f3f4f6",
+      }}
+    >
       <aside
         style={{
           width: "260px",
           minWidth: "260px",
+          height: "100vh",
           background: "linear-gradient(180deg, #081a4b 0%, #0b1f4d 100%)",
           color: "white",
-          minHeight: "100vh",
           display: "flex",
           flexDirection: "column",
           justifyContent: "space-between",
           boxShadow: "0 0 20px rgba(0,0,0,0.08)",
           flexShrink: 0,
+          overflow: "hidden",
         }}
       >
         <div>
@@ -135,7 +138,7 @@ export default function App() {
             </div>
           </div>
 
-          <div style={{ padding: "16px" }}>
+          <div style={{ padding: "16px", overflowY: "auto" }}>
             <MenuButton
               title={isArabic ? "لوحة التحكم" : "Dashboard"}
               active={page === "dashboard"}
@@ -269,6 +272,8 @@ export default function App() {
           display: "flex",
           flexDirection: "column",
           minWidth: 0,
+          height: "100vh",
+          overflow: "hidden",
         }}
       >
         <header
@@ -282,6 +287,7 @@ export default function App() {
             padding: "0 24px",
             borderBottom: "1px solid #e5e7eb",
             boxSizing: "border-box",
+            flexShrink: 0,
           }}
         >
           <div
@@ -317,6 +323,8 @@ export default function App() {
             flex: 1,
             padding: "20px",
             boxSizing: "border-box",
+            overflowY: "auto",
+            overflowX: "hidden",
           }}
         >
           {renderPage()}
