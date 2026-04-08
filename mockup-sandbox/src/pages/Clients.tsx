@@ -80,7 +80,6 @@ export default function Clients({ lang }: { lang: Lang }) {
       setLoading(false);
     }
   }
-
     useEffect(() => {
     void loadClients();
   }, []);
