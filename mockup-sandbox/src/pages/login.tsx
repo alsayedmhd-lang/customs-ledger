@@ -4,8 +4,10 @@ type Lang = "ar" | "en";
 
 export default function Login({
   lang,
+  onLogin,
 }: {
   lang: Lang;
+  onLogin: () => void;
 }) {
   const isArabic = lang === "ar";
 
@@ -13,11 +15,11 @@ export default function Login({
   const [password, setPassword] = useState("");
 
   function handleLogin() {
-    if (username && password) {
+    if (username.trim() && password.trim()) {
       localStorage.setItem("token", "logged_in");
-      window.location.reload();
+      onLogin();
     } else {
-      alert(isArabic ? "أدخل البيانات" : "Enter credentials");
+      alert(isArabic ? "أدخل اسم المستخدم وكلمة المرور" : "Enter username and password");
     }
   }
 
@@ -29,19 +31,20 @@ export default function Login({
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        background:
-          "linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%)",
+        background: "linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%)",
         padding: "20px",
+        boxSizing: "border-box",
       }}
     >
       <div
         style={{
           width: "100%",
-          maxWidth: "430px",
+          maxWidth: "420px",
           background: "white",
           borderRadius: "24px",
-          padding: "36px",
+          padding: "32px",
           boxShadow: "0 20px 50px rgba(0,0,0,0.18)",
+          boxSizing: "border-box",
         }}
       >
         <div
@@ -52,8 +55,8 @@ export default function Login({
         >
           <div
             style={{
-              fontSize: "48px",
-              marginBottom: "12px",
+              fontSize: "42px",
+              marginBottom: "10px",
             }}
           >
             ✈️
@@ -61,7 +64,7 @@ export default function Login({
 
           <div
             style={{
-              fontSize: "26px",
+              fontSize: "24px",
               fontWeight: 800,
               color: "#0f172a",
             }}
@@ -73,12 +76,10 @@ export default function Login({
             style={{
               color: "#64748b",
               marginTop: "6px",
-              fontSize: "14px",
+              fontSize: "13px",
             }}
           >
-            {isArabic
-              ? "نظام التخليص الجمركي"
-              : "Customs Clearance System"}
+            {isArabic ? "نظام التخليص الجمركي" : "Customs Clearance System"}
           </div>
         </div>
 
@@ -89,6 +90,8 @@ export default function Login({
               marginBottom: "8px",
               fontWeight: 700,
               color: "#334155",
+              fontSize: "13px",
+              textAlign: isArabic ? "right" : "left",
             }}
           >
             {isArabic ? "اسم المستخدم" : "Username"}
@@ -97,9 +100,10 @@ export default function Login({
           <input
             value={username}
             onChange={(e) => setUsername(e.target.value)}
+            placeholder={isArabic ? "أدخل اسم المستخدم" : "Enter username"}
             style={{
               width: "100%",
-              padding: "14px",
+              padding: "13px 14px",
               borderRadius: "12px",
               border: "1px solid #cbd5e1",
               fontSize: "14px",
@@ -116,6 +120,8 @@ export default function Login({
               marginBottom: "8px",
               fontWeight: 700,
               color: "#334155",
+              fontSize: "13px",
+              textAlign: isArabic ? "right" : "left",
             }}
           >
             {isArabic ? "كلمة المرور" : "Password"}
@@ -125,9 +131,10 @@ export default function Login({
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            placeholder={isArabic ? "أدخل كلمة المرور" : "Enter password"}
             style={{
               width: "100%",
-              padding: "14px",
+              padding: "13px 14px",
               borderRadius: "12px",
               border: "1px solid #cbd5e1",
               fontSize: "14px",
@@ -141,13 +148,13 @@ export default function Login({
           onClick={handleLogin}
           style={{
             width: "100%",
-            padding: "14px",
+            padding: "13px",
             border: "none",
             borderRadius: "14px",
             background: "#2563eb",
             color: "white",
             fontWeight: 700,
-            fontSize: "15px",
+            fontSize: "14px",
             cursor: "pointer",
           }}
         >
