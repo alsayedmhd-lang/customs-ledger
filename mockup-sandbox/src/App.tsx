@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import Dashboard from "./pages/Dashboard";
 import Invoices from "./pages/Invoices";
@@ -23,11 +23,102 @@ type Page =
 
 type Lang = "ar" | "en";
 
+const SIDEBAR_WIDTH = 260;
+const MOBILE_BREAKPOINT = 992;
+
 export default function App() {
   const [page, setPage] = useState<Page>("dashboard");
   const [lang, setLang] = useState<Lang>("ar");
+  const [isMobile, setIsMobile] = useState<boolean>(window.innerWidth < MOBILE_BREAKPOINT);
+  const [sidebarOpen, setSidebarOpen] = useState<boolean>(window.innerWidth >= MOBILE_BREAKPOINT);
 
   const isArabic = lang === "ar";
+
+  useEffect(() => {
+    const savedLang = localStorage.getItem("app_lang");
+    if (savedLang === "ar" || savedLang === "en") {
+      setLang(savedLang);
+      document.documentElement.lang = savedLang;
+      document.documentElement.dir = savedLang === "ar" ? "rtl" : "ltr";
+    } else {
+      document.documentElement.lang = "ar";
+      document.documentElement.dir = "rtl";
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem("app_lang", lang);
+    document.documentElement.lang = lang;
+    document.documentElement.dir = isArabic ? "rtl" : "ltr";
+  }, [lang, isArabic]);
+
+  useEffect(() => {
+    const handleResize = () => {
+      const mobile = window.innerWidth < MOBILE_BREAKPOINT;
+      setIsMobile(mobile);
+
+      if (mobile) {
+        setSidebarOpen(false);
+      } else {
+        setSidebarOpen(true);
+      }
+    };
+
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  const pageTitle = useMemo(() => {
+    const titles: Record<Page, { ar: string; en: string }> = {
+      dashboard: { ar: "لوحة التحكم", en: "Dashboard" },
+      invoices: { ar: "الفواتير", en: "Invoices" },
+      receipts: { ar: "سندات القبض", en: "Receipts" },
+      accounts: { ar: "كشف الحسابات", en: "Account Statements" },
+      customers: { ar: "العملاء", en: "Customers" },
+      users: { ar: "المستخدمون", en: "Users" },
+      settings: { ar: "الإعدادات", en: "Settings" },
+      items: { ar: "نماذج البنود", en: "Item Templates" },
+      Tarsh: { ar: "سلة المحذوفات", en: "Trash" },
+    };
+
+    return isArabic ? titles[page].ar : titles[page].en;
+  }, [page, isArabic]);
+
+  function goToPage(nextPage: Page) {
+    setPage(nextPage);
+    if (isMobile) setSidebarOpen(false);
+  }
+
+  function toggleLanguage() {
+    setLang((prev) => (prev === "ar" ? "en" : "ar"));
+  }
+
+  function handleSignOut() {
+    try {
+      localStorage.removeItem("token");
+      localStorage.removeItem("authToken");
+      localStorage.removeItem("access_token");
+      localStorage.removeItem("refresh_token");
+      localStorage.removeItem("user");
+      localStorage.removeItem("currentUser");
+      localStorage.removeItem("session");
+      localStorage.removeItem("admin");
+
+      sessionStorage.removeItem("token");
+      sessionStorage.removeItem("authToken");
+      sessionStorage.removeItem("access_token");
+      sessionStorage.removeItem("refresh_token");
+      sessionStorage.removeItem("user");
+      sessionStorage.removeItem("currentUser");
+      sessionStorage.removeItem("session");
+      sessionStorage.removeItem("admin");
+
+      window.location.href = "/login";
+    } catch (error) {
+      console.error("Sign out failed:", error);
+      window.location.reload();
+    }
+  }
 
   function renderPage() {
     switch (page) {
@@ -54,35 +145,60 @@ export default function App() {
     }
   }
 
+  const sidebarSideStyle = isArabic
+    ? { right: 0 as const, left: "auto" as const }
+    : { left: 0 as const, right: "auto" as const };
+
   return (
     <div
       dir={isArabic ? "rtl" : "ltr"}
       style={{
-        display: "flex",
-        flexDirection: isArabic ? "row-reverse" : "row",
-        height: "100vh",
-        overflow: "hidden",
+        minHeight: "100vh",
+        background: "#f3f4f6",
         fontFamily:
           "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-        background: "#f3f4f6",
+        position: "relative",
+        overflow: "hidden",
       }}
     >
+      {isMobile && sidebarOpen && (
+        <div
+          onClick={() => setSidebarOpen(false)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(15, 23, 42, 0.45)",
+            zIndex: 40,
+          }}
+        />
+      )}
+
       <aside
         style={{
-          width: "260px",
-          minWidth: "260px",
-          height: "100vh",
+          position: "fixed",
+          top: 0,
+          bottom: 0,
+          ...sidebarSideStyle,
+          width: `${SIDEBAR_WIDTH}px`,
+          maxWidth: "86vw",
           background: "linear-gradient(180deg, #081a4b 0%, #0b1f4d 100%)",
           color: "white",
           display: "flex",
           flexDirection: "column",
           justifyContent: "space-between",
-          boxShadow: "0 0 20px rgba(0,0,0,0.08)",
-          flexShrink: 0,
+          boxShadow: "0 10px 30px rgba(0,0,0,0.16)",
           overflow: "hidden",
+          zIndex: 50,
+          transform:
+            isMobile && !sidebarOpen
+              ? isArabic
+                ? "translateX(100%)"
+                : "translateX(-100%)"
+              : "translateX(0)",
+          transition: "transform 0.28s ease",
         }}
       >
-        <div>
+        <div style={{ minHeight: 0, display: "flex", flexDirection: "column", flex: 1 }}>
           <div
             style={{
               padding: "22px 20px",
@@ -138,67 +254,73 @@ export default function App() {
             </div>
           </div>
 
-          <div style={{ padding: "16px", overflowY: "auto" }}>
+          <div
+            style={{
+              padding: "16px",
+              overflowY: "auto",
+              flex: 1,
+            }}
+          >
             <MenuButton
               title={isArabic ? "لوحة التحكم" : "Dashboard"}
               active={page === "dashboard"}
-              onClick={() => setPage("dashboard")}
+              onClick={() => goToPage("dashboard")}
               isArabic={isArabic}
             />
 
             <MenuButton
               title={isArabic ? "الفواتير" : "Invoices"}
               active={page === "invoices"}
-              onClick={() => setPage("invoices")}
+              onClick={() => goToPage("invoices")}
               isArabic={isArabic}
             />
 
             <MenuButton
               title={isArabic ? "سندات القبض" : "Receipts"}
               active={page === "receipts"}
-              onClick={() => setPage("receipts")}
+              onClick={() => goToPage("receipts")}
               isArabic={isArabic}
             />
 
             <MenuButton
               title={isArabic ? "كشف الحسابات" : "Account Statements"}
               active={page === "accounts"}
-              onClick={() => setPage("accounts")}
+              onClick={() => goToPage("accounts")}
               isArabic={isArabic}
             />
 
             <MenuButton
               title={isArabic ? "العملاء" : "Customers"}
               active={page === "customers"}
-              onClick={() => setPage("customers")}
+              onClick={() => goToPage("customers")}
               isArabic={isArabic}
             />
 
             <MenuButton
               title={isArabic ? "المستخدمون" : "Users"}
               active={page === "users"}
-              onClick={() => setPage("users")}
+              onClick={() => goToPage("users")}
               isArabic={isArabic}
             />
 
             <MenuButton
               title={isArabic ? "الإعدادات" : "Settings"}
               active={page === "settings"}
-              onClick={() => setPage("settings")}
+              onClick={() => goToPage("settings")}
               isArabic={isArabic}
             />
 
             <MenuButton
               title={isArabic ? "نماذج البنود" : "Item Templates"}
               active={page === "items"}
-              onClick={() => setPage("items")}
+              onClick={() => goToPage("items")}
               isArabic={isArabic}
             />
 
             <MenuButton
               title={isArabic ? "سلة المحذوفات" : "Trash"}
               active={page === "Tarsh"}
-              onClick={() => setPage("Tarsh")}
+              onClick={() => goToPage("Tarsh")}
               isArabic={isArabic}
             />
           </div>
@@ -250,6 +372,7 @@ export default function App() {
           </div>
 
           <button
+            onClick={handleSignOut}
             style={{
               width: "100%",
               padding: "12px",
@@ -259,6 +382,7 @@ export default function App() {
               color: "white",
               cursor: "pointer",
               fontSize: "15px",
+              fontWeight: 700,
             }}
           >
             {isArabic ? "تسجيل الخروج" : "Sign Out"}
@@ -268,54 +392,118 @@ export default function App() {
 
       <main
         style={{
-          flex: 1,
+          minHeight: "100vh",
+          marginLeft: !isMobile && !isArabic ? `${SIDEBAR_WIDTH}px` : 0,
+          marginRight: !isMobile && isArabic ? `${SIDEBAR_WIDTH}px` : 0,
           display: "flex",
           flexDirection: "column",
           minWidth: 0,
-          height: "100vh",
-          overflow: "hidden",
+          transition: "margin 0.28s ease",
         }}
       >
         <header
           style={{
-            background: "white",
-            height: "72px",
+            position: "sticky",
+            top: 0,
+            zIndex: 20,
+            background: "rgba(255,255,255,0.95)",
+            backdropFilter: "blur(10px)",
+            minHeight: "72px",
             display: "flex",
-            justifyContent: "space-between",
             alignItems: "center",
-            flexDirection: isArabic ? "row-reverse" : "row",
-            padding: "0 24px",
+            justifyContent: "space-between",
+            padding: "14px 20px",
             borderBottom: "1px solid #e5e7eb",
-            boxSizing: "border-box",
-            flexShrink: 0,
+            gap: "12px",
+            flexWrap: "wrap",
           }}
         >
           <div
             style={{
-              color: "#6b7280",
-              fontSize: "14px",
-              textAlign: isArabic ? "right" : "left",
+              display: "flex",
+              alignItems: "center",
+              gap: "12px",
+              flexDirection: isArabic ? "row-reverse" : "row",
+              minWidth: 0,
             }}
           >
-            {isArabic ? "الأربعاء، 8 أبريل 2026" : "Wednesday, April 8, 2026"}
+            {isMobile && (
+              <button
+                onClick={() => setSidebarOpen(true)}
+                style={{
+                  border: "1px solid #dbe2ea",
+                  background: "white",
+                  color: "#0f172a",
+                  borderRadius: "12px",
+                  padding: "9px 12px",
+                  cursor: "pointer",
+                  fontWeight: 800,
+                  fontSize: "18px",
+                  lineHeight: 1,
+                }}
+                aria-label={isArabic ? "فتح القائمة" : "Open menu"}
+                title={isArabic ? "فتح القائمة" : "Open menu"}
+              >
+                ☰
+              </button>
+            )}
+
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                textAlign: isArabic ? "right" : "left",
+              }}
+            >
+              <div
+                style={{
+                  color: "#0f172a",
+                  fontSize: "20px",
+                  fontWeight: 800,
+                  lineHeight: 1.2,
+                }}
+              >
+                {pageTitle}
+              </div>
+
+              <div
+                style={{
+                  color: "#6b7280",
+                  fontSize: "14px",
+                  marginTop: "4px",
+                }}
+              >
+                {isArabic ? "الأربعاء، 8 أبريل 2026" : "Wednesday, April 8, 2026"}
+              </div>
+            </div>
           </div>
 
-          <button
-            onClick={() => setLang(isArabic ? "en" : "ar")}
+          <div
             style={{
-              border: "1px solid #cbd5e1",
-              background: "white",
-              color: "#0f172a",
-              borderRadius: "12px",
-              padding: "8px 14px",
-              cursor: "pointer",
-              fontWeight: 700,
-              fontSize: "14px",
-              minWidth: "96px",
+              display: "flex",
+              alignItems: "center",
+              gap: "10px",
+              flexDirection: isArabic ? "row-reverse" : "row",
             }}
           >
-            {isArabic ? "English" : "العربية"}
-          </button>
+            <button
+              onClick={toggleLanguage}
+              style={{
+                border: "1px solid #cbd5e1",
+                background: "white",
+                color: "#0f172a",
+                borderRadius: "12px",
+                padding: "10px 14px",
+                cursor: "pointer",
+                fontWeight: 700,
+                fontSize: "14px",
+                minWidth: "96px",
+                boxShadow: "0 4px 14px rgba(15, 23, 42, 0.04)",
+              }}
+            >
+              {isArabic ? "English" : "العربية"}
+            </button>
+          </div>
         </header>
 
         <div
@@ -323,7 +511,6 @@ export default function App() {
             flex: 1,
             padding: "20px",
             boxSizing: "border-box",
-            overflowY: "auto",
             overflowX: "hidden",
           }}
         >
@@ -361,7 +548,7 @@ function MenuButton({
         fontWeight: 700,
         textAlign: isArabic ? "right" : "left",
         boxShadow: active ? "0 8px 20px rgba(255,255,255,0.1)" : "none",
-        transition: "all 0.15s ease",
+        transition: "all 0.18s ease",
       }}
     >
       {title}
