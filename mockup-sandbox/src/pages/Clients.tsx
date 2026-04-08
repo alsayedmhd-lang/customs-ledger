@@ -173,39 +173,6 @@ export default function Clients({ lang }: { lang: Lang }) {
     }
   }
 
-  async function deleteClient(id: number) {
-    const confirmed = window.confirm(
-      isArabic ? "هل تريد حذف هذا العميل؟" : "Do you want to delete this client?"
-    );
-
-    if (!confirmed) return;
-
-    try {
-      setErrorMessage("");
-
-  const token = localStorage.getItem("token");
-  
-  const res = await fetch(getApiUrl(`/api/clients/${id}`), {
-    method: "DELETE",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
-
-      if (!res.ok && res.status !== 204) {
-        const text = await res.text();
-        throw new Error(text || "Failed to delete client");
-      }
-
-      await loadClients();
-    } catch (error) {
-      console.error(error);
-      setErrorMessage(
-        isArabic ? "تعذر حذف العميل" : "Failed to delete client"
-      );
-    }
-  }
-
   const filteredClients = clients.filter((client) => {
     const q = search.trim().toLowerCase();
 
