@@ -90,7 +90,6 @@ export default function App() {
               fontSize: "24px",
               fontWeight: "bold",
               textAlign: "center",
-              marginBottom: "0",
             }}
           >
             {isArabic ? "حول العالم" : "Around The World"}
@@ -145,7 +144,7 @@ export default function App() {
           onClick={() => setPage("items")}
         />
         <MenuButton
-          title={isArabic ? "سلة المحذوفات" : "Tarsh Templates"}
+          title={isArabic ? "سلة المحذوفات" : "Trash"}
           onClick={() => setPage("Tarsh")}
         />
       </div>
