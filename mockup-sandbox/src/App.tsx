@@ -146,7 +146,7 @@ export default function App() {
         />
         <MenuButton
           title={isArabic ? "سلة المحذوفات" : "Tarsh Templates"}
-          onClick={() => setPage("items")}
+          onClick={() => setPage("Tarsh")}
         />
       </div>
 
