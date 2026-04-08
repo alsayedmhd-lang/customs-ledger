@@ -478,7 +478,311 @@ export default function Invoices({ lang }: { lang: Lang }) {
 
     return styles[status] || styles.draft;
   }
+    function escapeHtml(value: string) {
+    return value
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")
+      .replaceAll('"', "&quot;")
+      .replaceAll("'", "&#039;");
+  }
 
+  function handlePrint(invoice: Invoice) {
+    const printWindow = window.open("", "_blank", "width=1000,height=900");
+
+    if (!printWindow) {
+      setErrorMessage(
+        isArabic
+          ? "تعذر فتح نافذة الطباعة. تحقق من السماح بالنوافذ المنبثقة."
+          : "Unable to open print window. Please allow pop-ups."
+      );
+      return;
+    }
+
+    const itemsRows = (invoice.items || [])
+      .map((item, index) => {
+        return `
+          <tr>
+            <td>${index + 1}</td>
+            <td>${escapeHtml(item.description || "")}</td>
+            <td>${Number(item.quantity || 0).toFixed(3)}</td>
+            <td>${formatCurrency(Number(item.unitPrice || 0))}</td>
+            <td>${formatCurrency(Number(item.total || 0))}</td>
+          </tr>
+        `;
+      })
+      .join("");
+
+    const html = `
+      <!DOCTYPE html>
+      <html lang="${isArabic ? "ar" : "en"}" dir="${isArabic ? "rtl" : "ltr"}">
+        <head>
+          <meta charset="UTF-8" />
+          <title>${escapeHtml(invoice.invoiceNumber)} - ${escapeHtml(invoice.clientName)}</title>
+          <style>
+            * { box-sizing: border-box; }
+            body {
+              margin: 0;
+              font-family: Arial, sans-serif;
+              background: #f3f4f6;
+              color: #0f172a;
+            }
+            .page {
+              width: 210mm;
+              min-height: 297mm;
+              margin: 0 auto;
+              background: white;
+              padding: 18mm 14mm;
+            }
+            .topbar {
+              display: flex;
+              justify-content: space-between;
+              align-items: flex-start;
+              gap: 20px;
+              border-bottom: 2px solid #0f172a;
+              padding-bottom: 14px;
+              margin-bottom: 18px;
+            }
+            .brand-title {
+              font-size: 28px;
+              font-weight: 800;
+              margin-bottom: 4px;
+            }
+            .brand-sub {
+              font-size: 14px;
+              color: #475569;
+            }
+            .invoice-box {
+              text-align: ${isArabic ? "left" : "right"};
+            }
+            .invoice-label {
+              font-size: 14px;
+              color: #64748b;
+              margin-bottom: 4px;
+            }
+            .invoice-number {
+              font-size: 24px;
+              font-weight: 800;
+              color: #2563eb;
+            }
+            .meta-grid {
+              display: grid;
+              grid-template-columns: repeat(2, minmax(0, 1fr));
+              gap: 14px;
+              margin-bottom: 18px;
+            }
+            .card {
+              border: 1px solid #e5e7eb;
+              border-radius: 12px;
+              padding: 12px;
+              background: #fff;
+            }
+            .card-title {
+              font-size: 13px;
+              color: #64748b;
+              margin-bottom: 8px;
+              font-weight: 700;
+            }
+            .line {
+              margin-bottom: 6px;
+              font-size: 14px;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-top: 10px;
+            }
+            thead th {
+              background: #f8fafc;
+              border: 1px solid #e5e7eb;
+              padding: 10px;
+              font-size: 13px;
+              text-align: start;
+            }
+            tbody td {
+              border: 1px solid #e5e7eb;
+              padding: 10px;
+              font-size: 13px;
+              vertical-align: top;
+            }
+            .summary {
+              margin-top: 18px;
+              margin-inline-start: auto;
+              width: 320px;
+              border: 1px solid #e5e7eb;
+              border-radius: 12px;
+              overflow: hidden;
+            }
+            .summary-row {
+              display: flex;
+              justify-content: space-between;
+              gap: 12px;
+              padding: 10px 12px;
+              border-bottom: 1px solid #e5e7eb;
+              font-size: 14px;
+            }
+            .summary-row:last-child {
+              border-bottom: none;
+              font-weight: 800;
+              background: #eff6ff;
+            }
+            .notes {
+              margin-top: 18px;
+              border: 1px solid #e5e7eb;
+              border-radius: 12px;
+              padding: 12px;
+            }
+            .notes-title {
+              font-size: 13px;
+              font-weight: 700;
+              color: #64748b;
+              margin-bottom: 8px;
+            }
+            .footer {
+              margin-top: 24px;
+              text-align: center;
+              font-size: 12px;
+              color: #64748b;
+            }
+            .toolbar {
+              width: 210mm;
+              margin: 16px auto 8px;
+              display: flex;
+              justify-content: flex-end;
+              gap: 10px;
+            }
+            .toolbar button {
+              border: none;
+              background: #2563eb;
+              color: white;
+              padding: 10px 16px;
+              border-radius: 10px;
+              cursor: pointer;
+              font-weight: 700;
+            }
+            .toolbar button.secondary {
+              background: #e2e8f0;
+              color: #0f172a;
+            }
+            @media print {
+              body { background: white; }
+              .toolbar { display: none; }
+              .page {
+                width: auto;
+                min-height: auto;
+                margin: 0;
+                padding: 0;
+              }
+              @page {
+                size: A4;
+                margin: 12mm;
+              }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="toolbar">
+            <button class="secondary" onclick="window.close()">
+              ${isArabic ? "إغلاق" : "Close"}
+            </button>
+            <button onclick="window.print()">
+              ${isArabic ? "طباعة" : "Print"}
+            </button>
+          </div>
+
+          <div class="page">
+            <div class="topbar">
+              <div>
+                <div class="brand-title">${isArabic ? "حول العالم" : "Around The World"}</div>
+                <div class="brand-sub">
+                  ${isArabic ? "للتخليص الجمركي" : "Customs Clearance"}
+                </div>
+              </div>
+
+              <div class="invoice-box">
+                <div class="invoice-label">${isArabic ? "رقم الفاتورة" : "Invoice Number"}</div>
+                <div class="invoice-number">${escapeHtml(invoice.invoiceNumber)}</div>
+              </div>
+            </div>
+
+            <div class="meta-grid">
+              <div class="card">
+                <div class="card-title">${isArabic ? "بيانات العميل" : "Client Details"}</div>
+                <div class="line"><strong>${isArabic ? "العميل:" : "Client:"}</strong> ${escapeHtml(invoice.clientName || "-")}</div>
+                <div class="line"><strong>${isArabic ? "تاريخ الإصدار:" : "Issue Date:"}</strong> ${escapeHtml(formatDate(invoice.issueDate))}</div>
+                <div class="line"><strong>${isArabic ? "تاريخ الاستحقاق:" : "Due Date:"}</strong> ${escapeHtml(formatDate(invoice.dueDate))}</div>
+                <div class="line"><strong>${isArabic ? "الحالة:" : "Status:"}</strong> ${escapeHtml(getStatusLabel(invoice.status))}</div>
+              </div>
+
+              <div class="card">
+                <div class="card-title">${isArabic ? "بيانات الشحنة" : "Shipment Details"}</div>
+                <div class="line"><strong>${isArabic ? "مرجع الشحنة:" : "Shipment Ref:"}</strong> ${escapeHtml(invoice.shipmentRef || "-")}</div>
+                <div class="line"><strong>${isArabic ? "بوليصة الشحن:" : "Bill of Lading:"}</strong> ${escapeHtml(invoice.billOfLading || "-")}</div>
+                <div class="line"><strong>${isArabic ? "منفذ الدخول:" : "Port of Entry:"}</strong> ${escapeHtml(invoice.portOfEntry || "-")}</div>
+                <div class="line"><strong>${isArabic ? "عدد الطرود:" : "Package Count:"}</strong> ${escapeHtml(invoice.packageCount != null ? String(invoice.packageCount) : "-")}</div>
+                <div class="line"><strong>${isArabic ? "وزن الشحنة:" : "Shipment Weight:"}</strong> ${escapeHtml(invoice.shipmentWeight != null ? String(invoice.shipmentWeight) : "-")}</div>
+              </div>
+            </div>
+
+            <table>
+              <thead>
+                <tr>
+                  <th style="width: 56px;">#</th>
+                  <th>${isArabic ? "الوصف" : "Description"}</th>
+                  <th style="width: 110px;">${isArabic ? "الكمية" : "Qty"}</th>
+                  <th style="width: 130px;">${isArabic ? "سعر الوحدة" : "Unit Price"}</th>
+                  <th style="width: 140px;">${isArabic ? "الإجمالي" : "Total"}</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${itemsRows || `
+                  <tr>
+                    <td colspan="5" style="text-align:center;color:#64748b;">
+                      ${isArabic ? "لا توجد بنود" : "No items"}
+                    </td>
+                  </tr>
+                `}
+              </tbody>
+            </table>
+
+            <div class="summary">
+              <div class="summary-row">
+                <span>${isArabic ? "المجموع الفرعي" : "Subtotal"}</span>
+                <strong>${escapeHtml(formatCurrency(invoice.subtotal || 0))}</strong>
+              </div>
+              <div class="summary-row">
+                <span>${isArabic ? "الضريبة" : "Tax"}</span>
+                <strong>${escapeHtml(formatCurrency(invoice.taxAmount || 0))}</strong>
+              </div>
+              <div class="summary-row">
+                <span>${isArabic ? "الدفعة المقدمة" : "Advance Payment"}</span>
+                <strong>${escapeHtml(formatCurrency(invoice.advancePayment || 0))}</strong>
+              </div>
+              <div class="summary-row">
+                <span>${isArabic ? "الإجمالي النهائي" : "Grand Total"}</span>
+                <strong>${escapeHtml(formatCurrency(invoice.total || 0))}</strong>
+              </div>
+            </div>
+
+            <div class="notes">
+              <div class="notes-title">${isArabic ? "ملاحظات" : "Notes"}</div>
+              <div>${escapeHtml(invoice.notes || (isArabic ? "لا توجد ملاحظات" : "No notes"))}</div>
+            </div>
+
+            <div class="footer">
+              ${isArabic
+                ? "تم إنشاء هذه الفاتورة بواسطة نظام حول العالم للتخليص الجمركي"
+                : "Generated by Around The World Customs Clearance System"}
+            </div>
+          </div>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.open();
+    printWindow.document.write(html);
+    printWindow.document.close();
+  }
   return (
     <div dir={isArabic ? "rtl" : "ltr"}>
       <div
