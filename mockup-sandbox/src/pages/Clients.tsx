@@ -49,40 +49,42 @@ export default function Clients({ lang }: { lang: Lang }) {
     notes: "",
   });
 
-  async function loadClients() {
-    try {
-      setLoading(true);
-      setErrorMessage("");
-      console.log("loadClients started");
-      console.log("API URL =", getApiUrl("/api/clients"));
-      const token = localStorage.getItem("token");
-      if (!token) {
-        throw new Error("No auth token found");
-      }
+async function loadClients() {
+  try {
+    console.log("STEP 1: loadClients started");
 
-      const res = await fetch(getApiUrl("/api/clients"), {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+    const token = localStorage.getItem("token");
+    console.log("STEP 2: token =", token);
 
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(text || `Failed to load clients: ${res.status}`);
-      }
-
-      const data = await res.json();
-      setClients(Array.isArray(data) ? data : []);
-    } catch (error) {
-      console.error(error);
-      setClients([]);
-      setErrorMessage(
-        isArabic ? "تعذر تحميل العملاء من الخادم" : "Failed to load clients from server"
-      );
-    } finally {
-      setLoading(false);
+    if (!token) {
+      throw new Error("No auth token");
     }
+
+    const url = `${getApiUrl()}/clients`;
+    console.log("STEP 3: fetch url =", url);
+
+    const res = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    console.log("STEP 4: status =", res.status);
+
+    const text = await res.text();
+    console.log("STEP 5: raw response =", text);
+
+    const data = JSON.parse(text);
+
+    setClients(Array.isArray(data) ? data : []);
+  } catch (error) {
+    console.error("LOAD CLIENTS ERROR:", error);
+    setClients([]);
+    setErrorMessage("تعذر تحميل العملاء من الخادم");
+  } finally {
+    setLoading(false);
   }
+}
 
   useEffect(() => {
     console.log("useEffect clients fired");
