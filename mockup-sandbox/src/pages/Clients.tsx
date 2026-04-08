@@ -1,3 +1,4 @@
+console.log("NEW CLIENTS FILE LOADED");
 import { useEffect, useState, type CSSProperties } from "react";
 
 type Lang = "ar" | "en";
