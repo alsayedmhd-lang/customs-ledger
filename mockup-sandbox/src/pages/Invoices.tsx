@@ -699,18 +699,24 @@ export default function Invoices({ lang }: { lang: Lang }) {
                             flexWrap: "wrap",
                           }}
                         >
-                          <button
-                            onClick={() => openEditModal(invoice)}
-                            style={secondaryButtonStyle}
-                          >
-                            {isArabic ? "تعديل" : "Edit"}
-                          </button>
-                          <button
-                            onClick={() => handleDelete(invoice.id)}
-                            style={dangerButtonStyle}
-                          >
-                            {isArabic ? "حذف" : "Delete"}
-                          </button>
+<button
+  onClick={() => handlePrint(invoice)}
+  style={secondaryButtonStyle}
+>
+  {isArabic ? "طباعة" : "Print"}
+</button>
+<button
+  onClick={() => openEditModal(invoice)}
+  style={secondaryButtonStyle}
+>
+  {isArabic ? "تعديل" : "Edit"}
+</button>
+<button
+  onClick={() => handleDelete(invoice.id)}
+  style={dangerButtonStyle}
+>
+  {isArabic ? "حذف" : "Delete"}
+</button>
                         </div>
                       </Td>
                     </tr>
