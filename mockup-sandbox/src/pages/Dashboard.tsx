@@ -43,15 +43,16 @@ export default function Dashboard({ lang }: Props) {
   ];
 
   return (
-    <div
-      dir={isArabic ? "rtl" : "ltr"}
-      style={{
-        padding: "24px",
-        fontFamily: "system-ui",
-        background: "#f3f4f6",
-        minHeight: "100vh",
-      }}
-    >
+      <div
+        dir={isArabic ? "rtl" : "ltr"}
+        style={{
+          padding: "24px",
+          fontFamily: "system-ui",
+          background: "#f3f4f6",
+          width: "100%",
+          boxSizing: "border-box",
+        }}
+      >
       <div
         style={{
           background: "linear-gradient(135deg, #081f5c, #1d4ed8)",
