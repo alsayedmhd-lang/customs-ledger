@@ -27,7 +27,7 @@ const API_BASE =
   ((import.meta as any)?.env?.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, "") || "";
 
 function getApiUrl(path: string) {
-  return `${API_BASE}${path}`;
+  return `https://customs-ledger-api.onrender.com${path}`;
 }
 
 export default function Clients({ lang }: { lang: Lang }) {
