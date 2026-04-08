@@ -6,7 +6,6 @@ import Dashboard from "./pages/Dashboard";
 import Invoices from "./pages/Invoices";
 import Receipts from "./pages/Receipts";
 import Accounts from "./pages/Accounts";
-import Customers from "./pages/Customers";
 import Users from "./pages/Users";
 import Settings from "./pages/Settings";
 import Items from "./pages/Items";
