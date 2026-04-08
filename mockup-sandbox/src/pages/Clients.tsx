@@ -52,13 +52,19 @@ export default function Clients({ lang }: { lang: Lang }) {
     try {
       setLoading(true);
       setErrorMessage("");
-
-      const res = await fetch(getApiUrl("/api/clients"));
-
+  
+      const token = localStorage.getItem("token");
+  
+      const res = await fetch(getApiUrl("/api/clients"), {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+  
       if (!res.ok) {
         throw new Error(`Failed to load clients: ${res.status}`);
       }
-
+  
       const data = await res.json();
       setClients(Array.isArray(data) ? data : []);
     } catch (error) {
@@ -86,20 +92,23 @@ export default function Clients({ lang }: { lang: Lang }) {
       setSaving(true);
       setErrorMessage("");
 
-      const res = await fetch(getApiUrl("/api/clients"), {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name: newClient.name.trim(),
-          email: newClient.email.trim() || null,
-          phone: newClient.phone.trim() || null,
-          address: newClient.address.trim() || null,
-          taxId: newClient.taxId.trim() || null,
-          notes: newClient.notes.trim() || null,
-        }),
-      });
+  const token = localStorage.getItem("token");
+  
+  const res = await fetch(getApiUrl("/api/clients"), {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      name: newClient.name.trim(),
+      email: newClient.email.trim() || null,
+      phone: newClient.phone.trim() || null,
+      address: newClient.address.trim() || null,
+      taxId: newClient.taxId.trim() || null,
+      notes: newClient.notes.trim() || null,
+    }),
+  });
 
       if (!res.ok) {
         const text = await res.text();
@@ -136,9 +145,14 @@ export default function Clients({ lang }: { lang: Lang }) {
     try {
       setErrorMessage("");
 
-      const res = await fetch(getApiUrl(`/api/clients/${id}`), {
-        method: "DELETE",
-      });
+  const token = localStorage.getItem("token");
+  
+  const res = await fetch(getApiUrl(`/api/clients/${id}`), {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
 
       if (!res.ok && res.status !== 204) {
         const text = await res.text();
