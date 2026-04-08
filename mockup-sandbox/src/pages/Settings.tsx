@@ -46,6 +46,7 @@ export default function Settings({ lang }: Props) {
             padding: "16px 20px",
             minWidth: "180px",
             boxShadow: "0 4px 14px rgba(0,0,0,0.06)",
+            textAlign: isArabic ? "right" : "left",
           }}
         >
           <div style={{ fontWeight: 700, marginBottom: "6px" }}>
@@ -60,127 +61,172 @@ export default function Settings({ lang }: Props) {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "1fr 250px",
+          gridTemplateColumns: "minmax(220px, 250px) minmax(0, 1fr)",
           gap: "20px",
           alignItems: "start",
         }}
       >
-        <div
-          style={{
-            background: "white",
-            borderRadius: "22px",
-            padding: "20px",
-            boxShadow: "0 4px 14px rgba(0,0,0,0.06)",
-          }}
-        >
-          <div
-            style={{
-              fontSize: "22px",
-              fontWeight: 800,
-              color: "#111827",
-              marginBottom: "18px",
-            }}
-          >
-            {isArabic ? "هوية الشركة" : "Company Identity"}
-          </div>
-
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr 1fr",
-              gap: "16px",
-            }}
-          >
-            <Field
-              label={isArabic ? "اسم الشركة (عربي)" : "Company Name (Arabic)"}
-              value="حول العالم للتخليص الجمركي"
+        {isArabic ? (
+          <>
+            <SidePanel
+              isArabic={isArabic}
+              activeSection={activeSection}
             />
-            <Field
-              label={isArabic ? "اسم الشركة (إنجليزي)" : "Company Name (English)"}
-              value="Around The World Customs Clearance"
+            <MainPanel isArabic={isArabic} />
+          </>
+        ) : (
+          <>
+            <MainPanel isArabic={isArabic} />
+            <SidePanel
+              isArabic={isArabic}
+              activeSection={activeSection}
             />
-            <Field
-              label={isArabic ? "الترجمة الثانوية (عربي)" : "Secondary Text (Arabic)"}
-              value="التخليص الجمركي"
-            />
-            <Field
-              label={isArabic ? "الترجمة الثانوية (إنجليزي)" : "Secondary Text (English)"}
-              value="Customs Clearance"
-            />
-            <Field
-              label={isArabic ? "الوصف (عربي)" : "Description (Arabic)"}
-              value="خدمات التخليص الجمركي والشحن"
-            />
-            <Field
-              label={isArabic ? "الوصف (إنجليزي)" : "Description (English)"}
-              value="Customs Clearance & Shipping Services"
-            />
-          </div>
-
-          <div
-            style={{
-              marginTop: "18px",
-              border: "1px solid #bfdbfe",
-              background: "#eff6ff",
-              color: "#2563eb",
-              borderRadius: "14px",
-              padding: "14px 16px",
-              fontSize: "14px",
-            }}
-          >
-            {isArabic
-              ? "جميع التغييرات تطبق فورًا في كامل البرنامج وصفحات الطباعة عند الحفظ دون الحاجة لإعادة تشغيل."
-              : "All changes are applied instantly across the app and print pages after saving, without restart."}
-          </div>
-        </div>
-
-        <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-          <div
-            style={{
-              background: "white",
-              borderRadius: "22px",
-              padding: "16px",
-              boxShadow: "0 4px 14px rgba(0,0,0,0.06)",
-            }}
-          >
-            <SectionButton
-              active={activeSection === "identity"}
-              title={isArabic ? "هوية الشركة" : "Company Identity"}
-            />
-            <SectionButton
-              active={activeSection === "contact"}
-              title={isArabic ? "التواصل" : "Contact"}
-            />
-            <SectionButton
-              active={activeSection === "legal"}
-              title={isArabic ? "القانونية" : "Legal"}
-            />
-            <SectionButton
-              active={activeSection === "notifications"}
-              title={isArabic ? "الإشعارات" : "Notifications"}
-            />
-            <SectionButton
-              active={activeSection === "printing"}
-              title={isArabic ? "الطباعة" : "Printing"}
-            />
-          </div>
-
-          <button
-            style={{
-              border: "none",
-              background: "#2563eb",
-              color: "white",
-              borderRadius: "14px",
-              padding: "14px 16px",
-              cursor: "pointer",
-              fontWeight: 700,
-              boxShadow: "0 8px 18px rgba(37,99,235,0.25)",
-            }}
-          >
-            {isArabic ? "حفظ التغييرات" : "Save Changes"}
-          </button>
-        </div>
+          </>
+        )}
       </div>
+    </div>
+  );
+}
+
+function MainPanel({ isArabic }: { isArabic: boolean }) {
+  return (
+    <div
+      style={{
+        background: "white",
+        borderRadius: "22px",
+        padding: "20px",
+        boxShadow: "0 4px 14px rgba(0,0,0,0.06)",
+      }}
+    >
+      <div
+        style={{
+          fontSize: "22px",
+          fontWeight: 800,
+          color: "#111827",
+          marginBottom: "18px",
+          textAlign: isArabic ? "right" : "left",
+        }}
+      >
+        {isArabic ? "هوية الشركة" : "Company Identity"}
+      </div>
+
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "1fr 1fr",
+          gap: "16px",
+        }}
+      >
+        <Field
+          isArabic={isArabic}
+          label={isArabic ? "اسم الشركة (عربي)" : "Company Name (Arabic)"}
+          value="حول العالم للتخليص الجمركي"
+        />
+        <Field
+          isArabic={isArabic}
+          label={isArabic ? "اسم الشركة (إنجليزي)" : "Company Name (English)"}
+          value="Around The World Customs Clearance"
+        />
+        <Field
+          isArabic={isArabic}
+          label={isArabic ? "الترجمة الثانوية (عربي)" : "Secondary Text (Arabic)"}
+          value="التخليص الجمركي"
+        />
+        <Field
+          isArabic={isArabic}
+          label={isArabic ? "الترجمة الثانوية (إنجليزي)" : "Secondary Text (English)"}
+          value="Customs Clearance"
+        />
+        <Field
+          isArabic={isArabic}
+          label={isArabic ? "الوصف (عربي)" : "Description (Arabic)"}
+          value="خدمات التخليص الجمركي والشحن"
+        />
+        <Field
+          isArabic={isArabic}
+          label={isArabic ? "الوصف (إنجليزي)" : "Description (English)"}
+          value="Customs Clearance & Shipping Services"
+        />
+      </div>
+
+      <div
+        style={{
+          marginTop: "18px",
+          border: "1px solid #bfdbfe",
+          background: "#eff6ff",
+          color: "#2563eb",
+          borderRadius: "14px",
+          padding: "14px 16px",
+          fontSize: "14px",
+          textAlign: isArabic ? "right" : "left",
+        }}
+      >
+        {isArabic
+          ? "جميع التغييرات تطبق فورًا في كامل البرنامج وصفحات الطباعة عند الحفظ دون الحاجة لإعادة تشغيل."
+          : "All changes are applied instantly across the app and print pages after saving, without restart."}
+      </div>
+    </div>
+  );
+}
+
+function SidePanel({
+  isArabic,
+  activeSection,
+}: {
+  isArabic: boolean;
+  activeSection: Section;
+}) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+      <div
+        style={{
+          background: "white",
+          borderRadius: "22px",
+          padding: "16px",
+          boxShadow: "0 4px 14px rgba(0,0,0,0.06)",
+        }}
+      >
+        <SectionButton
+          isArabic={isArabic}
+          active={activeSection === "identity"}
+          title={isArabic ? "هوية الشركة" : "Company Identity"}
+        />
+        <SectionButton
+          isArabic={isArabic}
+          active={activeSection === "contact"}
+          title={isArabic ? "التواصل" : "Contact"}
+        />
+        <SectionButton
+          isArabic={isArabic}
+          active={activeSection === "legal"}
+          title={isArabic ? "القانونية" : "Legal"}
+        />
+        <SectionButton
+          isArabic={isArabic}
+          active={activeSection === "notifications"}
+          title={isArabic ? "الإشعارات" : "Notifications"}
+        />
+        <SectionButton
+          isArabic={isArabic}
+          active={activeSection === "printing"}
+          title={isArabic ? "الطباعة" : "Printing"}
+        />
+      </div>
+
+      <button
+        style={{
+          border: "none",
+          background: "#2563eb",
+          color: "white",
+          borderRadius: "14px",
+          padding: "14px 16px",
+          cursor: "pointer",
+          fontWeight: 700,
+          boxShadow: "0 8px 18px rgba(37,99,235,0.25)",
+        }}
+      >
+        {isArabic ? "حفظ التغييرات" : "Save Changes"}
+      </button>
     </div>
   );
 }
@@ -188,9 +234,11 @@ export default function Settings({ lang }: Props) {
 function Field({
   label,
   value,
+  isArabic,
 }: {
   label: string;
   value: string;
+  isArabic: boolean;
 }) {
   return (
     <div>
@@ -199,6 +247,7 @@ function Field({
           fontSize: "14px",
           color: "#6b7280",
           marginBottom: "8px",
+          textAlign: isArabic ? "right" : "left",
         }}
       >
         {label}
@@ -215,6 +264,8 @@ function Field({
           background: "#f8fafc",
           fontSize: "14px",
           boxSizing: "border-box",
+          textAlign: isArabic ? "right" : "left",
+          direction: isArabic ? "rtl" : "ltr",
         }}
       />
     </div>
@@ -224,15 +275,17 @@ function Field({
 function SectionButton({
   title,
   active,
+  isArabic,
 }: {
   title: string;
   active: boolean;
+  isArabic: boolean;
 }) {
   return (
     <button
       style={{
         width: "100%",
-        textAlign: "start",
+        textAlign: isArabic ? "right" : "left",
         border: "none",
         borderRadius: "12px",
         padding: "12px 14px",
