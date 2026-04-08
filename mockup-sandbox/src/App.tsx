@@ -157,6 +157,7 @@ export default function App() {
         background: "#f3f4f6",
         fontFamily:
           "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+        fontSize: "14px"
         position: "relative",
         overflow: "hidden",
       }}
