@@ -1,10 +1,11 @@
 import path from "path";
 import { fileURLToPath } from "url";
-import { build as esbuild } from "esbuild";
+import { build } from "esbuild";
 import { rm } from "fs/promises";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const repoRoot = path.resolve(__dirname, "..");
 
 async function buildAll() {
   const distDir = path.resolve(__dirname, "dist");
@@ -12,17 +13,17 @@ async function buildAll() {
 
   console.log("🚀 Starting Final Standalone Build...");
 
-  await esbuild({
+  await build({
+    absWorkingDir: repoRoot,
     entryPoints: [path.resolve(__dirname, "src/index.ts")],
     platform: "node",
     bundle: true,
     format: "cjs",
     target: "node22",
     outfile: path.resolve(distDir, "index.cjs"),
-    packages: "external",
     alias: {
-      "@workspace/db": path.resolve(__dirname, "../lib/db/src"),
-      "@workspace/api-zod": path.resolve(__dirname, "../lib/api-zod/src"),
+      "@workspace/db": path.resolve(repoRoot, "lib/db/src"),
+      "@workspace/api-zod": path.resolve(repoRoot, "lib/api-zod/src"),
     },
     minify: false,
     sourcemap: true,
