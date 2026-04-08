@@ -52,7 +52,8 @@ export default function Clients({ lang }: { lang: Lang }) {
     try {
       setLoading(true);
       setErrorMessage("");
-
+      console.log("loadClients started");
+      console.log("API URL =", getApiUrl("/api/clients"));
       const token = localStorage.getItem("token");
       if (!token) {
         throw new Error("No auth token found");
@@ -83,6 +84,7 @@ export default function Clients({ lang }: { lang: Lang }) {
   }
 
   useEffect(() => {
+    console.log("useEffect clients fired");
     void loadClients();
   }, []);
 
