@@ -2,7 +2,12 @@ type Props = {
   lang: "ar" | "en";
 };
 
-type Section = "identity" | "contact" | "legal" | "notifications" | "printing";
+type Section =
+  | "identity"
+  | "contact"
+  | "legal"
+  | "notifications"
+  | "printing";
 
 export default function Settings({ lang }: Props) {
   const isArabic = lang === "ar";
@@ -16,63 +21,41 @@ export default function Settings({ lang }: Props) {
         fontFamily: "system-ui",
         background: "#f3f4f6",
         minHeight: "100vh",
+        boxSizing: "border-box",
       }}
     >
       <div
         style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "flex-start",
-          gap: "20px",
-          flexWrap: "wrap",
           marginBottom: "24px",
+          textAlign: isArabic ? "right" : "left",
         }}
       >
-        <div style={{ textAlign: isArabic ? "right" : "left" }}>
-          <h1 style={{ margin: 0, fontSize: "42px", color: "#111827" }}>
-            {isArabic ? "إعدادات البرنامج" : "App Settings"}
-          </h1>
-          <p style={{ marginTop: "8px", color: "#6b7280" }}>
-            {isArabic
-              ? "تحكم كامل في هوية الشركة وإعدادات الطباعة"
-              : "Full control over company identity and printing settings"}
-          </p>
-        </div>
+        <h1 style={{ margin: 0, fontSize: "42px", color: "#111827" }}>
+          {isArabic ? "إعدادات البرنامج" : "App Settings"}
+        </h1>
 
-        <div
-          style={{
-            background: "white",
-            borderRadius: "18px",
-            padding: "16px 20px",
-            minWidth: "180px",
-            boxShadow: "0 4px 14px rgba(0,0,0,0.06)",
-            textAlign: isArabic ? "right" : "left",
-          }}
-        >
-          <div style={{ fontWeight: 700, marginBottom: "6px" }}>
-            {isArabic ? "المدير" : "Admin"}
-          </div>
-          <div style={{ color: "#6b7280", fontSize: "14px" }}>
-            {isArabic ? "مدير" : "Administrator"}
-          </div>
-        </div>
+        <p style={{ marginTop: "8px", color: "#6b7280" }}>
+          {isArabic
+            ? "تحكم كامل في هوية الشركة وإعدادات الطباعة"
+            : "Full control over company identity and printing settings"}
+        </p>
       </div>
 
       <div
         style={{
           display: "flex",
           flexDirection: isArabic ? "row-reverse" : "row",
-          gap: "20px",
           alignItems: "flex-start",
+          gap: "20px",
           flexWrap: "wrap",
         }}
       >
-        <div style={{ flex: 1, minWidth: "320px" }}>
-          <MainPanel isArabic={isArabic} />
-        </div>
-
         <div style={{ width: "280px", minWidth: "260px" }}>
           <SidePanel isArabic={isArabic} activeSection={activeSection} />
+        </div>
+
+        <div style={{ flex: 1, minWidth: "320px" }}>
+          <MainPanel isArabic={isArabic} />
         </div>
       </div>
     </div>
@@ -104,7 +87,7 @@ function MainPanel({ isArabic }: { isArabic: boolean }) {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "1fr 1fr",
+          gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
           gap: "16px",
         }}
       >
@@ -125,7 +108,9 @@ function MainPanel({ isArabic }: { isArabic: boolean }) {
         />
         <Field
           isArabic={isArabic}
-          label={isArabic ? "الترجمة الثانوية (إنجليزي)" : "Secondary Text (English)"}
+          label={
+            isArabic ? "الترجمة الثانوية (إنجليزي)" : "Secondary Text (English)"
+          }
           value="Customs Clearance"
         />
         <Field
@@ -169,6 +154,24 @@ function SidePanel({
 }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+      <div
+        style={{
+          background: "white",
+          borderRadius: "18px",
+          padding: "16px 20px",
+          boxShadow: "0 4px 14px rgba(0,0,0,0.06)",
+          textAlign: isArabic ? "right" : "left",
+        }}
+      >
+        <div style={{ fontWeight: 700, marginBottom: "6px", color: "#111827" }}>
+          {isArabic ? "المدير" : "Admin"}
+        </div>
+
+        <div style={{ color: "#6b7280", fontSize: "14px" }}>
+          {isArabic ? "مدير النظام" : "Administrator"}
+        </div>
+      </div>
+
       <div
         style={{
           background: "white",
