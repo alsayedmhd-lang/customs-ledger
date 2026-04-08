@@ -54,69 +54,7 @@ export default function App() {
     }
   }
 
-  function formatDate() {
-    return isArabic ? "الأربعاء، 8 أبريل 2026" : "Wednesday, April 8, 2026";
-  }
-
-  return (
-    <div
-      dir={isArabic ? "rtl" : "ltr"}
-      style={{
-        display: "flex",
-        minHeight: "100vh",
-        fontFamily: "system-ui",
-        background: "#f3f4f6",
-      }}
-    >
-      {isArabic ? (
-        <>
-          <main style={{ flex: 1, display: "flex", flexDirection: "column" }}>
-            <TopBar
-              isArabic={isArabic}
-              formatDate={formatDate}
-              setLang={setLang}
-            />
-            <div style={{ flex: 1, padding: "20px" }}>{renderPage()}</div>
-          </main>
-
-          <Sidebar
-            isArabic={isArabic}
-            page={page}
-            setPage={setPage}
-          />
-        </>
-      ) : (
-        <>
-          <Sidebar
-            isArabic={isArabic}
-            page={page}
-            setPage={setPage}
-          />
-
-          <main style={{ flex: 1, display: "flex", flexDirection: "column" }}>
-            <TopBar
-              isArabic={isArabic}
-              formatDate={formatDate}
-              setLang={setLang}
-            />
-            <div style={{ flex: 1, padding: "20px" }}>{renderPage()}</div>
-          </main>
-        </>
-      )}
-    </div>
-  );
-}
-
-function Sidebar({
-  isArabic,
-  page,
-  setPage,
-}: {
-  isArabic: boolean;
-  page: Page;
-  setPage: (page: Page) => void;
-}) {
-  return (
+  const sidebar = (
     <aside
       style={{
         width: "260px",
@@ -126,7 +64,7 @@ function Sidebar({
         display: "flex",
         flexDirection: "column",
         justifyContent: "space-between",
-        boxShadow: "4px 0 20px rgba(0,0,0,0.08)",
+        boxShadow: "0 0 20px rgba(0,0,0,0.08)",
       }}
     >
       <div>
@@ -201,7 +139,7 @@ function Sidebar({
             isArabic={isArabic}
           />
           <MenuButton
-            title={isArabic ? "الحسابات" : "Accounts"}
+            title={isArabic ? "كشف الحسابات" : "Account Statements"}
             active={page === "accounts"}
             onClick={() => setPage("accounts")}
             isArabic={isArabic}
@@ -225,7 +163,7 @@ function Sidebar({
             isArabic={isArabic}
           />
           <MenuButton
-            title={isArabic ? "نماذج البنود" : "Items Templates"}
+            title={isArabic ? "نماذج البنود" : "Item Templates"}
             active={page === "items"}
             onClick={() => setPage("items")}
             isArabic={isArabic}
@@ -298,104 +236,94 @@ function Sidebar({
       </div>
     </aside>
   );
-}
 
-function TopBar({
-  isArabic,
-  formatDate,
-  setLang,
-}: {
-  isArabic: boolean;
-  formatDate: () => string;
-  setLang: (lang: Lang) => void;
-}) {
+  const content = (
+    <main style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+      <header
+        style={{
+          background: "white",
+          height: "72px",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          padding: "0 24px",
+          borderBottom: "1px solid #e5e7eb",
+        }}
+      >
+        <div style={{ color: "#6b7280", fontSize: "14px" }}>
+          {isArabic ? "الأربعاء، 8 أبريل 2026" : "Wednesday, April 8, 2026"}
+        </div>
+
+        <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+          <div
+            style={{
+              border: "1px solid #d1d5db",
+              background: "white",
+              borderRadius: "12px",
+              padding: "4px",
+              display: "flex",
+              gap: "4px",
+            }}
+          >
+            <button
+              onClick={() => setLang("ar")}
+              style={{
+                border: "none",
+                background: isArabic ? "#e5efff" : "transparent",
+                color: isArabic ? "#2563eb" : "#111827",
+                borderRadius: "8px",
+                padding: "6px 10px",
+                cursor: "pointer",
+                fontWeight: 700,
+              }}
+            >
+              عربي
+            </button>
+
+            <button
+              onClick={() => setLang("en")}
+              style={{
+                border: "none",
+                background: !isArabic ? "#e5efff" : "transparent",
+                color: !isArabic ? "#2563eb" : "#111827",
+                borderRadius: "8px",
+                padding: "6px 10px",
+                cursor: "pointer",
+                fontWeight: 700,
+              }}
+            >
+              EN
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <div style={{ flex: 1, padding: "20px" }}>{renderPage()}</div>
+    </main>
+  );
+
   return (
-    <header
+    <div
+      dir={isArabic ? "rtl" : "ltr"}
       style={{
-        background: "white",
-        height: "72px",
         display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        padding: "0 24px",
-        borderBottom: "1px solid #e5e7eb",
+        minHeight: "100vh",
+        fontFamily: "system-ui",
+        background: "#f3f4f6",
       }}
     >
-      <div style={{ color: "#6b7280", fontSize: "14px" }}>{formatDate()}</div>
-
-      <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
-        <div
-          style={{
-            border: "1px solid #d1d5db",
-            background: "white",
-            borderRadius: "12px",
-            padding: "4px",
-            display: "flex",
-            gap: "4px",
-          }}
-        >
-          <button
-            onClick={() => setLang("ar")}
-            style={{
-              border: "none",
-              background: isArabic ? "#e5efff" : "transparent",
-              color: isArabic ? "#2563eb" : "#111827",
-              borderRadius: "8px",
-              padding: "6px 10px",
-              cursor: "pointer",
-              fontWeight: 700,
-            }}
-          >
-            عربي
-          </button>
-
-          <button
-            onClick={() => setLang("en")}
-            style={{
-              border: "none",
-              background: !isArabic ? "#e5efff" : "transparent",
-              color: !isArabic ? "#2563eb" : "#111827",
-              borderRadius: "8px",
-              padding: "6px 10px",
-              cursor: "pointer",
-              fontWeight: 700,
-            }}
-          >
-            EN
-          </button>
-        </div>
-
-        <button
-          style={{
-            border: "none",
-            background: "#f3f4f6",
-            borderRadius: "50%",
-            width: "40px",
-            height: "40px",
-            cursor: "pointer",
-            fontSize: "18px",
-          }}
-        >
-          ⚙️
-        </button>
-
-        <div
-          style={{
-            width: "40px",
-            height: "40px",
-            borderRadius: "50%",
-            background: "#3b82f6",
-            color: "white",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontWeight: 700,
-          }}
-        >
-          ا
-        </div>
-      </div>
-    </header>
+      {isArabic ? (
+        <>
+          {content}
+          {sidebar}
+        </>
+      ) : (
+        <>
+          {sidebar}
+          {content}
+        </>
+      )}
+    </div>
   );
 }
 
