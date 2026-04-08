@@ -151,7 +151,7 @@ export default function App() {
       case "accounts":
         return <Accounts lang={lang} />;
       case "customers":
-        return <Customers lang={lang} />;
+        return <Clients lang={lang} />;
       case "users":
         return <Users lang={lang} />;
       case "settings":
