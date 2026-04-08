@@ -80,7 +80,10 @@ export default function Clients({ lang }: { lang: Lang }) {
       setLoading(false);
     }
   }
-  
+
+    useEffect(() => {
+    void loadClients();
+  }, []);
   async function createClient() {
     if (!newClient.name.trim()) {
       setErrorMessage(isArabic ? "اسم العميل مطلوب" : "Client name is required");
