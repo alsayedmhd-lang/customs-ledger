@@ -12,7 +12,7 @@ import Items from "./pages/Items";
 import Tarsh from "./pages/Tarsh";
 
 type Page =
-  | "Login"
+  | "login"
   | "dashboard"
   | "invoices"
   | "receipts"
@@ -47,7 +47,8 @@ export default function App() {
   });
 
   const isArabic = lang === "ar";
-  const isLoggedIn = page !== "login";
+  const showSidebar = page !== "login";
+  const showHeader = true;
 
   useEffect(() => {
     document.documentElement.lang = lang;
@@ -72,30 +73,24 @@ export default function App() {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-    const pageTitle = useMemo(() => {
-      const titles: Partial<Record<Page, { ar: string; en: string }>> = {
-        dashboard: { ar: "لوحة التحكم", en: "Dashboard" },
-        invoices: { ar: "الفواتير", en: "Invoices" },
-        receipts: { ar: "سندات القبض", en: "Receipts" },
-        accounts: { ar: "كشف الحسابات", en: "Account Statements" },
-        customers: { ar: "العملاء", en: "Customers" },
-        users: { ar: "المستخدمون", en: "Users" },
-        settings: { ar: "الإعدادات", en: "Settings" },
-        items: { ar: "نماذج البنود", en: "Item Templates" },
-        Tarsh: { ar: "سلة المحذوفات", en: "Trash" },
-        login: { ar: "تسجيل الدخول", en: "Login" },
-      };
-    
-      const currentTitle = titles[page];
-    
-      if (!currentTitle) {
-        return isArabic ? "لوحة التحكم" : "Dashboard";
-      }
-    
-      return isArabic ? currentTitle.ar : currentTitle.en;
-    }, [page, isArabic]);
+  const pageTitle = useMemo(() => {
+    const titles: Record<Page, { ar: string; en: string }> = {
+      login: { ar: "تسجيل الدخول", en: "Login" },
+      dashboard: { ar: "لوحة التحكم", en: "Dashboard" },
+      invoices: { ar: "الفواتير", en: "Invoices" },
+      receipts: { ar: "سندات القبض", en: "Receipts" },
+      accounts: { ar: "كشف الحسابات", en: "Account Statements" },
+      customers: { ar: "العملاء", en: "Customers" },
+      users: { ar: "المستخدمون", en: "Users" },
+      settings: { ar: "الإعدادات", en: "Settings" },
+      items: { ar: "نماذج البنود", en: "Item Templates" },
+      Tarsh: { ar: "سلة المحذوفات", en: "Trash" },
+    };
 
-  function goToPage(nextPage: Exclude<Page, "Login">) {
+    return isArabic ? titles[page].ar : titles[page].en;
+  }, [page, isArabic]);
+
+  function goToPage(nextPage: Exclude<Page, "login">) {
     setPage(nextPage);
 
     if (isMobile) {
@@ -145,7 +140,7 @@ export default function App() {
 
   function renderPage() {
     switch (page) {
-      case "Login":
+      case "login":
         return <Login lang={lang} onLogin={handleLoginSuccess} />;
       case "dashboard":
         return <Dashboard lang={lang} />;
@@ -174,7 +169,7 @@ export default function App() {
     ? { right: 0 as const, left: "auto" as const }
     : { left: 0 as const, right: "auto" as const };
 
-  const mainMargins = isLoggedIn
+  const mainMargins = showSidebar
     ? {
         marginLeft: !isMobile && !isArabic ? `${SIDEBAR_WIDTH}px` : 0,
         marginRight: !isMobile && isArabic ? `${SIDEBAR_WIDTH}px` : 0,
@@ -197,7 +192,7 @@ export default function App() {
         overflow: "hidden",
       }}
     >
-      {isLoggedIn && isMobile && sidebarOpen && (
+      {showSidebar && isMobile && sidebarOpen && (
         <div
           onClick={() => setSidebarOpen(false)}
           style={{
@@ -209,7 +204,7 @@ export default function App() {
         />
       )}
 
-      {isLoggedIn && (
+      {showSidebar && (
         <aside
           style={{
             position: "fixed",
@@ -311,56 +306,48 @@ export default function App() {
                 onClick={() => goToPage("dashboard")}
                 isArabic={isArabic}
               />
-
               <MenuButton
                 title={isArabic ? "الفواتير" : "Invoices"}
                 active={page === "invoices"}
                 onClick={() => goToPage("invoices")}
                 isArabic={isArabic}
               />
-
               <MenuButton
                 title={isArabic ? "سندات القبض" : "Receipts"}
                 active={page === "receipts"}
                 onClick={() => goToPage("receipts")}
                 isArabic={isArabic}
               />
-
               <MenuButton
                 title={isArabic ? "كشف الحسابات" : "Account Statements"}
                 active={page === "accounts"}
                 onClick={() => goToPage("accounts")}
                 isArabic={isArabic}
               />
-
               <MenuButton
                 title={isArabic ? "العملاء" : "Customers"}
                 active={page === "customers"}
                 onClick={() => goToPage("customers")}
                 isArabic={isArabic}
               />
-
               <MenuButton
                 title={isArabic ? "المستخدمون" : "Users"}
                 active={page === "users"}
                 onClick={() => goToPage("users")}
                 isArabic={isArabic}
               />
-
               <MenuButton
                 title={isArabic ? "الإعدادات" : "Settings"}
                 active={page === "settings"}
                 onClick={() => goToPage("settings")}
                 isArabic={isArabic}
               />
-
               <MenuButton
                 title={isArabic ? "نماذج البنود" : "Item Templates"}
                 active={page === "items"}
                 onClick={() => goToPage("items")}
                 isArabic={isArabic}
               />
-
               <MenuButton
                 title={isArabic ? "سلة المحذوفات" : "Trash"}
                 active={page === "Tarsh"}
@@ -376,45 +363,6 @@ export default function App() {
               borderTop: "1px solid rgba(255,255,255,0.08)",
             }}
           >
-            <div
-              style={{
-                background: "rgba(255,255,255,0.08)",
-                borderRadius: "16px",
-                padding: "14px",
-                marginBottom: "12px",
-                display: "flex",
-                alignItems: "center",
-                gap: "12px",
-                flexDirection: isArabic ? "row-reverse" : "row",
-                textAlign: isArabic ? "right" : "left",
-              }}
-            >
-              <div
-                style={{
-                  width: "38px",
-                  height: "38px",
-                  borderRadius: "50%",
-                  background: "#3b82f6",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontWeight: 700,
-                  flexShrink: 0,
-                }}
-              >
-                {isArabic ? "ا" : "A"}
-              </div>
-
-              <div>
-                <div style={{ fontWeight: 700 }}>
-                  {isArabic ? "المدير" : "Admin"}
-                </div>
-                <div style={{ fontSize: "12px", opacity: 0.75 }}>
-                  {isArabic ? "مدير" : "Administrator"}
-                </div>
-              </div>
-            </div>
-
             <button
               onClick={handleSignOut}
               style={{
@@ -445,7 +393,7 @@ export default function App() {
           transition: "margin 0.28s ease",
         }}
       >
-        {isLoggedIn && (
+        {showHeader && (
           <header
             style={{
               position: "sticky",
@@ -472,7 +420,7 @@ export default function App() {
                 minWidth: 0,
               }}
             >
-              {isMobile && (
+              {showSidebar && isMobile && (
                 <button
                   onClick={() => setSidebarOpen(true)}
                   style={{
@@ -486,8 +434,6 @@ export default function App() {
                     fontSize: "18px",
                     lineHeight: 1,
                   }}
-                  aria-label={isArabic ? "فتح القائمة" : "Open menu"}
-                  title={isArabic ? "فتح القائمة" : "Open menu"}
                 >
                   ☰
                 </button>
@@ -523,39 +469,29 @@ export default function App() {
               </div>
             </div>
 
-            <div
+            <button
+              onClick={toggleLanguage}
               style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "10px",
-                flexDirection: isArabic ? "row-reverse" : "row",
+                border: "1px solid #cbd5e1",
+                background: "white",
+                color: "#0f172a",
+                borderRadius: "12px",
+                padding: "10px 14px",
+                cursor: "pointer",
+                fontWeight: 700,
+                fontSize: "13px",
+                minWidth: "96px",
               }}
             >
-              <button
-                onClick={toggleLanguage}
-                style={{
-                  border: "1px solid #cbd5e1",
-                  background: "white",
-                  color: "#0f172a",
-                  borderRadius: "12px",
-                  padding: "10px 14px",
-                  cursor: "pointer",
-                  fontWeight: 700,
-                  fontSize: "13px",
-                  minWidth: "96px",
-                  boxShadow: "0 4px 14px rgba(15, 23, 42, 0.04)",
-                }}
-              >
-                {isArabic ? "English" : "العربية"}
-              </button>
-            </div>
+              {isArabic ? "English" : "العربية"}
+            </button>
           </header>
         )}
 
         <div
           style={{
             flex: 1,
-            padding: isLoggedIn ? "20px" : "0",
+            padding: page === "login" ? "0" : "20px",
             boxSizing: "border-box",
             overflowX: "hidden",
           }}
