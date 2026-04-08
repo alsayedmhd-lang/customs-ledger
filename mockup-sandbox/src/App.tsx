@@ -79,6 +79,8 @@ export default function App() {
               display: "flex",
               alignItems: "center",
               gap: "12px",
+              flexDirection: isArabic ? "row-reverse" : "row",
+              textAlign: isArabic ? "right" : "left",
             }}
           >
             <div
@@ -192,6 +194,8 @@ export default function App() {
             display: "flex",
             alignItems: "center",
             gap: "12px",
+            flexDirection: isArabic ? "row-reverse" : "row",
+            textAlign: isArabic ? "right" : "left",
           }}
         >
           <div
@@ -206,7 +210,7 @@ export default function App() {
               fontWeight: 700,
             }}
           >
-            ا
+            {isArabic ? "ا" : "A"}
           </div>
 
           <div>
@@ -246,74 +250,57 @@ export default function App() {
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
+          flexDirection: isArabic ? "row-reverse" : "row",
           padding: "0 24px",
           borderBottom: "1px solid #e5e7eb",
+          boxSizing: "border-box",
         }}
       >
-        <div style={{ color: "#6b7280", fontSize: "14px" }}>
+        <div
+          style={{
+            color: "#6b7280",
+            fontSize: "14px",
+            textAlign: isArabic ? "right" : "left",
+          }}
+        >
           {isArabic ? "الأربعاء، 8 أبريل 2026" : "Wednesday, April 8, 2026"}
         </div>
 
-        <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
-          <div
-            style={{
-              border: "1px solid #d1d5db",
-              background: "white",
-              borderRadius: "12px",
-              padding: "4px",
-              display: "flex",
-              gap: "4px",
-            }}
-          >
-            <button
-              onClick={() => setLang("ar")}
-              style={{
-                border: "none",
-                background: isArabic ? "#e5efff" : "transparent",
-                color: isArabic ? "#2563eb" : "#111827",
-                borderRadius: "8px",
-                padding: "6px 10px",
-                cursor: "pointer",
-                fontWeight: 700,
-              }}
-            >
-              عربي
-            </button>
-
-            <button
-              onClick={() => setLang("en")}
-              style={{
-                border: "none",
-                background: !isArabic ? "#e5efff" : "transparent",
-                color: !isArabic ? "#2563eb" : "#111827",
-                borderRadius: "8px",
-                padding: "6px 10px",
-                cursor: "pointer",
-                fontWeight: 700,
-              }}
-            >
-              EN
-            </button>
-          </div>
-        </div>
+        <button
+          onClick={() => setLang(isArabic ? "en" : "ar")}
+          style={{
+            border: "1px solid #cbd5e1",
+            background: "white",
+            color: "#0f172a",
+            borderRadius: "12px",
+            padding: "8px 14px",
+            cursor: "pointer",
+            fontWeight: 700,
+            fontSize: "14px",
+            minWidth: "96px",
+          }}
+        >
+          {isArabic ? "English" : "العربية"}
+        </button>
       </header>
 
       <div style={{ flex: 1, padding: "20px" }}>{renderPage()}</div>
     </main>
   );
 
-return (
-  <div
-    style={{
-      display: "flex",
-      flexDirection: isArabic ? "row-reverse" : "row",
-      minHeight: "100vh",
-      fontFamily: "system-ui",
-      background: "#f3f4f6",
-    }}
-  >
-    {sidebar}
-    {content}
+  return (
+    <div
+      dir={isArabic ? "rtl" : "ltr"}
+      style={{
+        display: "flex",
+        flexDirection: isArabic ? "row-reverse" : "row",
+        minHeight: "100vh",
+        fontFamily: "system-ui",
+        background: "#f3f4f6",
+      }}
+    >
+      {sidebar}
+      {content}
     </div>
   );
 }
