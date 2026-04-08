@@ -19,8 +19,6 @@ async function buildAll() {
     format: "cjs",
     target: "node22",
     outfile: path.resolve(distDir, "index.cjs"),
-    // تجاهل المكتبات الخارجية تماماً لضمان عدم حدوث خطأ أثناء البناء
-    packages: "external", 
     alias: {
       "@workspace/db": path.resolve(__dirname, "../lib/db/src"),
       "@workspace/api-zod": path.resolve(__dirname, "../lib/api-zod/src"),
@@ -29,7 +27,7 @@ async function buildAll() {
     sourcemap: true,
     logLevel: "info",
   });
-  
+
   console.log("✅ Build complete!");
 }
 
