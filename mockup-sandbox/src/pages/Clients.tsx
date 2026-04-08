@@ -52,22 +52,23 @@ export default function Clients({ lang }: { lang: Lang }) {
     try {
       setLoading(true);
       setErrorMessage("");
-  
+
       const token = localStorage.getItem("token");
       if (!token) {
         throw new Error("No auth token found");
       }
-  
+
       const res = await fetch(getApiUrl("/api/clients"), {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
-  
+
       if (!res.ok) {
-        throw new Error(`Failed to load clients: ${res.status}`);
+        const text = await res.text();
+        throw new Error(text || `Failed to load clients: ${res.status}`);
       }
-  
+
       const data = await res.json();
       setClients(Array.isArray(data) ? data : []);
     } catch (error) {
@@ -80,24 +81,26 @@ export default function Clients({ lang }: { lang: Lang }) {
       setLoading(false);
     }
   }
-    useEffect(() => {
+
+  useEffect(() => {
     void loadClients();
   }, []);
+
   async function createClient() {
     if (!newClient.name.trim()) {
       setErrorMessage(isArabic ? "اسم العميل مطلوب" : "Client name is required");
       return;
     }
-  
+
     try {
       setSaving(true);
       setErrorMessage("");
-  
+
       const token = localStorage.getItem("token");
       if (!token) {
         throw new Error("No auth token found");
       }
-  
+
       const res = await fetch(getApiUrl("/api/clients"), {
         method: "POST",
         headers: {
@@ -113,12 +116,12 @@ export default function Clients({ lang }: { lang: Lang }) {
           notes: newClient.notes.trim() || null,
         }),
       });
-  
+
       if (!res.ok) {
         const text = await res.text();
         throw new Error(text || "Failed to create client");
       }
-  
+
       setNewClient({
         name: "",
         email: "",
@@ -127,7 +130,7 @@ export default function Clients({ lang }: { lang: Lang }) {
         taxId: "",
         notes: "",
       });
-  
+
       await loadClients();
     } catch (error) {
       console.error(error);
@@ -138,34 +141,34 @@ export default function Clients({ lang }: { lang: Lang }) {
       setSaving(false);
     }
   }
-  
+
   async function deleteClient(id: number) {
     const confirmed = window.confirm(
       isArabic ? "هل تريد حذف هذا العميل؟" : "Do you want to delete this client?"
     );
-  
+
     if (!confirmed) return;
-  
+
     try {
       setErrorMessage("");
-  
+
       const token = localStorage.getItem("token");
       if (!token) {
         throw new Error("No auth token found");
       }
-  
+
       const res = await fetch(getApiUrl(`/api/clients/${id}`), {
         method: "DELETE",
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
-  
+
       if (!res.ok && res.status !== 204) {
         const text = await res.text();
         throw new Error(text || "Failed to delete client");
       }
-  
+
       await loadClients();
     } catch (error) {
       console.error(error);
