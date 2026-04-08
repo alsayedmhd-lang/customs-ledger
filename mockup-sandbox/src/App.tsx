@@ -302,27 +302,18 @@ export default function App() {
     </main>
   );
 
-  return (
-    <div
-      dir={isArabic ? "rtl" : "ltr"}
-      style={{
-        display: "flex",
-        minHeight: "100vh",
-        fontFamily: "system-ui",
-        background: "#f3f4f6",
-      }}
-    >
-      {isArabic ? (
-        <>
-          {content}
-          {sidebar}
-        </>
-      ) : (
-        <>
-          {sidebar}
-          {content}
-        </>
-      )}
+return (
+  <div
+    style={{
+      display: "flex",
+      flexDirection: isArabic ? "row-reverse" : "row",
+      minHeight: "100vh",
+      fontFamily: "system-ui",
+      background: "#f3f4f6",
+    }}
+  >
+    {sidebar}
+    {content}
     </div>
   );
 }
