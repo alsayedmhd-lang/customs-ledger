@@ -53,7 +53,7 @@ export default function Clients({ lang }: { lang: Lang }) {
       setLoading(true);
       setErrorMessage("");
 
-      const res = await fetch(getApiUrl("/clients"));
+      const res = await fetch(getApiUrl("/api/clients"));
 
       if (!res.ok) {
         throw new Error(`Failed to load clients: ${res.status}`);
@@ -86,7 +86,7 @@ export default function Clients({ lang }: { lang: Lang }) {
       setSaving(true);
       setErrorMessage("");
 
-      const res = await fetch(getApiUrl("/clients"), {
+      const res = await fetch(getApiUrl("/api/clients"), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -136,7 +136,7 @@ export default function Clients({ lang }: { lang: Lang }) {
     try {
       setErrorMessage("");
 
-      const res = await fetch(getApiUrl(`/clients/${id}`), {
+      const res = await fetch(getApiUrl(`/api/clients/${id}`), {
         method: "DELETE",
       });
 
