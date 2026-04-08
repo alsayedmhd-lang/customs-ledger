@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "NODE_ENV=development tsx ./src/index.ts",
-    "build": "tsx ./build.ts",
+    "start": "tsx ./src/index.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
@@ -21,8 +21,7 @@
     "jsonwebtoken": "^9.0.3",
     "nodemailer": "^8.0.4",
     "pg": "^8.16.3",
-    "esbuild": "^0.27.3",
-    "tsx": "catalog:"
+    "tsx": "^4.21.0"
   },
   "devDependencies": {
     "@types/bcryptjs": "^3.0.0",
@@ -32,7 +31,7 @@
     "@types/express": "^5.0.6",
     "@types/express-session": "^1.18.2",
     "@types/jsonwebtoken": "^9.0.10",
-    "@types/node": "catalog:",
+    "@types/node": "^24.0.0",
     "@types/nodemailer": "^7.0.11"
   }
 }
