@@ -55,16 +55,16 @@ export default function App() {
   }
 
   return (
-    <div
-      dir={isArabic ? "rtl" : "ltr"}
-      style={{
-        display: "flex",
-        flexDirection: isArabic ? "row-reverse" : "row",
-        minHeight: "100vh",
-        fontFamily: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-        background: "#f3f4f6",
-      }}
-    >
+        <div
+          dir={isArabic ? "rtl" : "ltr"}
+          style={{
+            display: "flex",
+            flexDirection: isArabic ? "row-reverse" : "row",
+            height: "100vh",
+            overflow: "hidden",
+            background: "#f3f4f6",
+          }}
+        >
       <aside
         style={{
           width: "260px",
