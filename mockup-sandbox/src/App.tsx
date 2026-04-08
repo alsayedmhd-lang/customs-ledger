@@ -72,25 +72,28 @@ export default function App() {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  const pageTitle = useMemo(() => {
-    const titles: Record<Exclude<Page, "login">, { ar: string; en: string }> = {
-      dashboard: { ar: "لوحة التحكم", en: "Dashboard" },
-      invoices: { ar: "الفواتير", en: "Invoices" },
-      receipts: { ar: "سندات القبض", en: "Receipts" },
-      accounts: { ar: "كشف الحسابات", en: "Account Statements" },
-      customers: { ar: "العملاء", en: "Customers" },
-      users: { ar: "المستخدمون", en: "Users" },
-      settings: { ar: "الإعدادات", en: "Settings" },
-      items: { ar: "نماذج البنود", en: "Item Templates" },
-      Tarsh: { ar: "سلة المحذوفات", en: "Trash" },
-    };
-
-    if (page === "Login") {
-      return isArabic ? "تسجيل الدخول" : "Login";
-    }
-
-    return isArabic ? titles[page].ar : titles[page].en;
-  }, [page, isArabic]);
+    const pageTitle = useMemo(() => {
+      const titles: Partial<Record<Page, { ar: string; en: string }>> = {
+        dashboard: { ar: "لوحة التحكم", en: "Dashboard" },
+        invoices: { ar: "الفواتير", en: "Invoices" },
+        receipts: { ar: "سندات القبض", en: "Receipts" },
+        accounts: { ar: "كشف الحسابات", en: "Account Statements" },
+        customers: { ar: "العملاء", en: "Customers" },
+        users: { ar: "المستخدمون", en: "Users" },
+        settings: { ar: "الإعدادات", en: "Settings" },
+        items: { ar: "نماذج البنود", en: "Item Templates" },
+        Tarsh: { ar: "سلة المحذوفات", en: "Trash" },
+        login: { ar: "تسجيل الدخول", en: "Login" },
+      };
+    
+      const currentTitle = titles[page];
+    
+      if (!currentTitle) {
+        return isArabic ? "لوحة التحكم" : "Dashboard";
+      }
+    
+      return isArabic ? currentTitle.ar : currentTitle.en;
+    }, [page, isArabic]);
 
   function goToPage(nextPage: Exclude<Page, "Login">) {
     setPage(nextPage);
