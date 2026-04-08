@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 
-import login from "./pages/login";
+import Login from "./pages/login";
 import Dashboard from "./pages/Dashboard";
 import Invoices from "./pages/Invoices";
 import Receipts from "./pages/Receipts";
@@ -80,7 +80,7 @@ export default function App() {
     };
 
     if (page === "login") {
-      return isArabic ? "تسجيل الدخول" : "login";
+      return isArabic ? "تسجيل الدخول" : "Login";
     }
 
     return isArabic ? titles[page].ar : titles[page].en;
@@ -135,7 +135,7 @@ export default function App() {
   function renderPage() {
     switch (page) {
       case "login":
-        return <login lang={lang} onLogin={handleLoginSuccess} />;
+        return <Login lang={lang} onLogin={handleLoginSuccess} />;
       case "dashboard":
         return <Dashboard lang={lang} />;
       case "invoices":
