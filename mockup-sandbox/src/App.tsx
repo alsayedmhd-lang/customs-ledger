@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 
+import Clients from "./pages/Clients";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Invoices from "./pages/Invoices";
