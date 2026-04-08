@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 
+import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Invoices from "./pages/Invoices";
 import Receipts from "./pages/Receipts";
@@ -11,6 +12,7 @@ import Items from "./pages/Items";
 import Tarsh from "./pages/Tarsh";
 
 type Page =
+  | "login"
   | "dashboard"
   | "invoices"
   | "receipts"
@@ -27,7 +29,7 @@ const SIDEBAR_WIDTH = 260;
 const MOBILE_BREAKPOINT = 992;
 
 export default function App() {
-  const [page, setPage] = useState<Page>("dashboard");
+  const [page, setPage] = useState<Page>("login");
   const [lang, setLang] = useState<Lang>("ar");
   const [isMobile, setIsMobile] = useState<boolean>(window.innerWidth < MOBILE_BREAKPOINT);
   const [sidebarOpen, setSidebarOpen] = useState<boolean>(window.innerWidth >= MOBILE_BREAKPOINT);
@@ -103,7 +105,7 @@ export default function App() {
       localStorage.removeItem("currentUser");
       localStorage.removeItem("session");
       localStorage.removeItem("admin");
-
+  
       sessionStorage.removeItem("token");
       sessionStorage.removeItem("authToken");
       sessionStorage.removeItem("access_token");
@@ -112,16 +114,19 @@ export default function App() {
       sessionStorage.removeItem("currentUser");
       sessionStorage.removeItem("session");
       sessionStorage.removeItem("admin");
-
-      window.location.href = "/login";
+  
+      setSidebarOpen(false);
+      setPage("login");
     } catch (error) {
       console.error("Sign out failed:", error);
-      window.location.reload();
+      setPage("login");
     }
   }
 
   function renderPage() {
     switch (page) {
+      case "login":
+        return <Login lang={lang} />;
       case "dashboard":
         return <Dashboard lang={lang} />;
       case "invoices":
@@ -150,18 +155,18 @@ export default function App() {
     : { left: 0 as const, right: "auto" as const };
 
   return (
-    <div
-      dir={isArabic ? "rtl" : "ltr"}
-      style={{
-        minHeight: "100vh",
-        background: "#f3f4f6",
-        fontFamily:
-          "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-        fontSize: "14px"
-        position: "relative",
-        overflow: "hidden",
-      }}
-    >
+      <div
+        dir={isArabic ? "rtl" : "ltr"}
+        style={{
+          minHeight: "100vh",
+          background: "#f3f4f6",
+          fontFamily:
+            "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+          fontSize: "14px",
+          position: "relative",
+          overflow: "hidden",
+        }}
+      >
       {isMobile && sidebarOpen && (
         <div
           onClick={() => setSidebarOpen(false)}
