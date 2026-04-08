@@ -28,7 +28,7 @@ export default function Settings({ lang }: Props) {
           marginBottom: "24px",
         }}
       >
-        <div>
+        <div style={{ textAlign: isArabic ? "right" : "left" }}>
           <h1 style={{ margin: 0, fontSize: "42px", color: "#111827" }}>
             {isArabic ? "إعدادات البرنامج" : "App Settings"}
           </h1>
@@ -60,29 +60,20 @@ export default function Settings({ lang }: Props) {
 
       <div
         style={{
-          display: "grid",
-          gridTemplateColumns: "minmax(220px, 250px) minmax(0, 1fr)",
+          display: "flex",
+          flexDirection: isArabic ? "row-reverse" : "row",
           gap: "20px",
-          alignItems: "start",
+          alignItems: "flex-start",
+          flexWrap: "wrap",
         }}
       >
-        {isArabic ? (
-          <>
-            <SidePanel
-              isArabic={isArabic}
-              activeSection={activeSection}
-            />
-            <MainPanel isArabic={isArabic} />
-          </>
-        ) : (
-          <>
-            <MainPanel isArabic={isArabic} />
-            <SidePanel
-              isArabic={isArabic}
-              activeSection={activeSection}
-            />
-          </>
-        )}
+        <div style={{ flex: 1, minWidth: "320px" }}>
+          <MainPanel isArabic={isArabic} />
+        </div>
+
+        <div style={{ width: "280px", minWidth: "260px" }}>
+          <SidePanel isArabic={isArabic} activeSection={activeSection} />
+        </div>
       </div>
     </div>
   );
