@@ -165,99 +165,165 @@ router.post("/auth/register", async (req, res) => {
 });
 
 // ── Login (Step 1) ────────────────────────────────────────────────────────────
+router.post("/auth/login", async (req, res) => {
+  try {
+    const { username, password } = req.body as { username: string; password: string };
 
-  router.post("/auth/login", async (req, res) => {
-    try {
-      const { username, password } = req.body as { username: string; password: string };
-  
-      if (!username || !password) {
-        return res.status(400).json({ message: "اسم المستخدم وكلمة السر مطلوبان" });
-      }
-  
-      const normalizedUsername = username.trim().toLowerCase();
-  
-      const [user] = await db
-        .select()
-        .from(usersTable)
-        .where(eq(usersTable.username, normalizedUsername))
-        .limit(1);
-  
-      if (!user) {
-        return res.status(401).json({ message: "اسم المستخدم أو كلمة السر غير صحيحة" });
-      }
-  
-      if (!user.passwordHash) {
-        console.error("[AUTH LOGIN] Missing passwordHash for user:", user.id, user.username);
-        return res.status(500).json({ message: "بيانات الحساب غير مكتملة" });
-      }
-  
-      const valid = await bcrypt.compare(password, user.passwordHash);
-      if (!valid) {
-        return res.status(401).json({ message: "اسم المستخدم أو كلمة السر غير صحيحة" });
-      }
-  
-      if (user.pendingApproval) {
-        return res.status(403).json({
-          message: "حسابك في انتظار تفعيل من قبل المدير — الرجاء المحاولة لاحقاً",
-          pendingApproval: true,
-        });
-      }
-  
-      if (!user.isActive) {
-        return res.status(403).json({ message: "تم إيقاف حسابك — تواصل مع المدير" });
-      }
-  
-      const code = generateOTP();
-      const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
-  
-      await db
-        .delete(otpCodesTable)
-        .where(and(eq(otpCodesTable.userId, user.id), isNull(otpCodesTable.usedAt)));
-  
-      await db.insert(otpCodesTable).values({
-        userId: user.id,
-        code,
-        expiresAt,
-      });
-  
-      let sent = false;
-  
-      if (user.email) {
-        try {
-          sent = await sendOTPEmail(user.email, code, user.displayName);
-        } catch (err) {
-          console.error("[OTP] Email error:", err);
-        }
-      }
-  
-      if (user.phone && user.whatsappApiKey) {
-        try {
-          const waSent = await sendOTPWhatsApp(
-            user.phone,
-            code,
-            user.displayName,
-            user.whatsappApiKey,
-          );
-          if (waSent) sent = true;
-        } catch (err) {
-          console.error("[OTP] WhatsApp error:", err);
-        }
-      }
-  
-      const otpToken = signOtpToken(user.id);
-  
-      return res.json({
-        requiresOtp: true,
-        otpToken,
-        maskedEmail: user.email ? maskEmail(user.email) : null,
-        maskedPhone: user.phone ? maskPhone(user.phone) : null,
-        visibleCode: !sent ? code : undefined,
-      });
-    } catch (error) {
-      console.error("[AUTH LOGIN ERROR]", error);
-      return res.status(500).json({ message: "حدث خطأ داخلي أثناء تسجيل الدخول" });
+    if (!username || !password) {
+      return res.status(400).json({ message: "اسم المستخدم وكلمة السر مطلوبان" });
     }
-  });
+
+    const normalizedUsername = username.trim().toLowerCase();
+
+    const [user] = await db
+      .select()
+      .from(usersTable)
+      .where(eq(usersTable.username, normalizedUsername))
+      .limit(1);
+
+    if (!user) {
+      return res.status(401).json({ message: "اسم المستخدم أو كلمة السر غير صحيحة" });
+    }
+
+    if (!user.passwordHash) {
+      console.error("[AUTH LOGIN] Missing passwordHash");
+      return res.status(500).json({ message: "بيانات الحساب غير مكتملة" });
+    }
+
+    const valid = await bcrypt.compare(password, user.passwordHash);
+
+    if (!valid) {
+      return res.status(401).json({ message: "اسم المستخدم أو كلمة السر غير صحيحة" });
+    }
+
+    if (user.pendingApproval) {
+      return res.status(403).json({
+        message: "حسابك في انتظار تفعيل من قبل المدير",
+        pendingApproval: true,
+      });
+    }
+
+    if (!user.isActive) {
+      return res.status(403).json({ message: "تم إيقاف الحساب" });
+    }
+
+    const code = generateOTP();
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+
+    await db
+      .delete(otpCodesTable)
+      .where(and(eq(otpCodesTable.userId, user.id), isNull(otpCodesTable.usedAt)));
+
+    await db.insert(otpCodesTable).values({
+      userId: user.id,
+      code,
+      expiresAt,
+    });
+
+    const otpToken = signOtpToken(user.id);
+
+    return res.json({
+      requiresOtp: true,
+      otpToken,
+      visibleCode: code,
+    });
+  } catch (error) {
+    console.error("[AUTH LOGIN ERROR]", error);
+    return res.status(500).json({ message: "حدث خطأ داخلي أثناء تسجيل الدخول" });
+  }
+});
+  // router.post("/auth/login", async (req, res) => {
+  //   try {
+  //     const { username, password } = req.body as { username: string; password: string };
+  
+  //     if (!username || !password) {
+  //       return res.status(400).json({ message: "اسم المستخدم وكلمة السر مطلوبان" });
+  //     }
+  
+  //     const normalizedUsername = username.trim().toLowerCase();
+  
+  //     const [user] = await db
+  //       .select()
+  //       .from(usersTable)
+  //       .where(eq(usersTable.username, normalizedUsername))
+  //       .limit(1);
+  
+  //     if (!user) {
+  //       return res.status(401).json({ message: "اسم المستخدم أو كلمة السر غير صحيحة" });
+  //     }
+  
+  //     if (!user.passwordHash) {
+  //       console.error("[AUTH LOGIN] Missing passwordHash for user:", user.id, user.username);
+  //       return res.status(500).json({ message: "بيانات الحساب غير مكتملة" });
+  //     }
+  
+  //     const valid = await bcrypt.compare(password, user.passwordHash);
+  //     if (!valid) {
+  //       return res.status(401).json({ message: "اسم المستخدم أو كلمة السر غير صحيحة" });
+  //     }
+  
+  //     if (user.pendingApproval) {
+  //       return res.status(403).json({
+  //         message: "حسابك في انتظار تفعيل من قبل المدير — الرجاء المحاولة لاحقاً",
+  //         pendingApproval: true,
+  //       });
+  //     }
+  
+  //     if (!user.isActive) {
+  //       return res.status(403).json({ message: "تم إيقاف حسابك — تواصل مع المدير" });
+  //     }
+  
+  //     const code = generateOTP();
+  //     const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+  
+  //     await db
+  //       .delete(otpCodesTable)
+  //       .where(and(eq(otpCodesTable.userId, user.id), isNull(otpCodesTable.usedAt)));
+  
+  //     await db.insert(otpCodesTable).values({
+  //       userId: user.id,
+  //       code,
+  //       expiresAt,
+  //     });
+  
+  //     let sent = false;
+  
+  //     if (user.email) {
+  //       try {
+  //         sent = await sendOTPEmail(user.email, code, user.displayName);
+  //       } catch (err) {
+  //         console.error("[OTP] Email error:", err);
+  //       }
+  //     }
+  
+  //     if (user.phone && user.whatsappApiKey) {
+  //       try {
+  //         const waSent = await sendOTPWhatsApp(
+  //           user.phone,
+  //           code,
+  //           user.displayName,
+  //           user.whatsappApiKey,
+  //         );
+  //         if (waSent) sent = true;
+  //       } catch (err) {
+  //         console.error("[OTP] WhatsApp error:", err);
+  //       }
+  //     }
+  
+  //     const otpToken = signOtpToken(user.id);
+  
+  //     return res.json({
+  //       requiresOtp: true,
+  //       otpToken,
+  //       maskedEmail: user.email ? maskEmail(user.email) : null,
+  //       maskedPhone: user.phone ? maskPhone(user.phone) : null,
+  //       visibleCode: !sent ? code : undefined,
+  //     });
+  //   } catch (error) {
+  //     console.error("[AUTH LOGIN ERROR]", error);
+  //     return res.status(500).json({ message: "حدث خطأ داخلي أثناء تسجيل الدخول" });
+  //   }
+  // });
 
 // ── Verify OTP (Step 2) ───────────────────────────────────────────────────────
 
