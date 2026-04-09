@@ -14,14 +14,33 @@ export default function Login({
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
 
-  function handleLogin() {
-    if (username.trim() && password.trim()) {
-      localStorage.setItem("token", "logged_in");
+async function handleLogin() {
+  if (!username.trim() || !password.trim()) {
+    alert(isArabic ? "أدخل اسم المستخدم وكلمة المرور" : "Enter username and password");
+    return;
+  }
+
+  try {
+    const res = await fetch("https://customs-ledger-api.onrender.com/api/auth/login", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ username, password }),
+    });
+
+    const data = await res.json();
+
+    if (res.ok && data.token) {
+      localStorage.setItem("token", data.token);
       onLogin();
     } else {
-      alert(isArabic ? "أدخل اسم المستخدم وكلمة المرور" : "Enter username and password");
+      alert(data.message || "Login failed");
     }
+  } catch (err) {
+    alert(isArabic ? "فشل الاتصال بالسيرفر" : "Server connection failed");
   }
+}
 
   return (
     <div
