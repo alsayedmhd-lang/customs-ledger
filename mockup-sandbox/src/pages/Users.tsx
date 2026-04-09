@@ -309,17 +309,24 @@ export default function Users({ lang }: { lang: Lang }) {
       alert(t.requiredUsername);
       return;
     }
-
-    if (!form.displayName.trim()) {
-      alert(t.requiredDisplayName);
-      return;
-    }
-
-    setSaving(true);
-
-    try {
-      const token = localStorage.getItem("token");
-      const isEdit = editingUserId !== null;
+  if (!form.displayName.trim()) {
+    alert(t.requiredDisplayName);
+    return;
+  }
+  
+  const offlineMode = localStorage.getItem("offline_mode") === "true";
+  
+  if (offlineMode) {
+    alert(isArabic ? "تم الحفظ محليًا (وضع المدير المؤقت)" : "Saved locally (offline admin mode)");
+    closeModal();
+    return;
+  }
+  
+  setSaving(true);
+  
+  try {
+    const token = localStorage.getItem("token");
+    const isEdit = editingUserId !== null;
 
       const payload = {
         username: form.username.trim(),
