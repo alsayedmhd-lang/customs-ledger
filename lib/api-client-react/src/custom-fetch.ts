@@ -19,8 +19,6 @@ function resolveMethod(input: RequestInfo | URL, explicitMethod?: string): strin
   return "GET";
 }
 
-// Use loose check for URL — some runtimes (e.g. React Native) polyfill URL
-// differently, so `instanceof URL` can fail.
 function isUrl(input: RequestInfo | URL): input is URL {
   return typeof URL !== "undefined" && input instanceof URL;
 }
@@ -29,6 +27,18 @@ function resolveUrl(input: RequestInfo | URL): string {
   if (typeof input === "string") return input;
   if (isUrl(input)) return input.toString();
   return input.url;
+}
+
+function resolveApiUrl(input: RequestInfo | URL): RequestInfo | URL {
+  if (typeof input !== "string") return input;
+
+  const baseUrl = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
+
+  if (!baseUrl) return input;
+  if (/^https?:\/\//i.test(input)) return input;
+  if (!input.startsWith("/")) return input;
+
+  return `${baseUrl}${input}`;
 }
 
 function mergeHeaders(...sources: Array<HeadersInit | undefined>): Headers {
@@ -64,12 +74,6 @@ function isTextMediaType(mediaType: string | null): boolean {
   );
 }
 
-// Use strict equality: in browsers, `response.body` is `null` when the
-// response genuinely has no content.  In React Native, `response.body` is
-// always `undefined` because the ReadableStream API is not implemented —
-// even when the response carries a full payload readable via `.text()` or
-// `.json()`.  Loose equality (`== null`) matches both `null` and `undefined`,
-// which causes every React Native response to be treated as empty.
 function hasNoBody(response: Response, method: string): boolean {
   if (method === "HEAD") return true;
   if (NO_BODY_STATUS.has(response.status)) return true;
@@ -211,7 +215,6 @@ async function parseErrorBody(response: Response, method: string): Promise<unkno
 
   const mediaType = getMediaType(response.headers);
 
-  // Fall back to text when blob() is unavailable (e.g. some React Native builds).
   if (mediaType && !isJsonMediaType(mediaType) && !isTextMediaType(mediaType)) {
     return typeof response.blob === "function" ? response.blob() : response.text();
   }
@@ -287,11 +290,17 @@ export async function customFetch<T = unknown>(
     throw new TypeError(`customFetch: ${method} requests cannot have a body.`);
   }
 
-  // Attach JWT token from sessionStorage if available (clears on browser close)
-  const authToken = typeof sessionStorage !== "undefined" ? sessionStorage.getItem("auth_token") : null;
-  const authHeader: HeadersInit | undefined = authToken ? { Authorization: `Bearer ${authToken}` } : undefined;
+  const authToken =
+    typeof sessionStorage !== "undefined" ? sessionStorage.getItem("auth_token") : null;
+  const authHeader: HeadersInit | undefined = authToken
+    ? { Authorization: `Bearer ${authToken}` }
+    : undefined;
 
-  const headers = mergeHeaders(isRequest(input) ? input.headers : undefined, authHeader, headersInit);
+  const headers = mergeHeaders(
+    isRequest(input) ? input.headers : undefined,
+    authHeader,
+    headersInit,
+  );
 
   if (
     typeof init.body === "string" &&
@@ -305,9 +314,10 @@ export async function customFetch<T = unknown>(
     headers.set("accept", DEFAULT_JSON_ACCEPT);
   }
 
-  const requestInfo = { method, url: resolveUrl(input) };
+  const finalInput = resolveApiUrl(input);
+  const requestInfo = { method, url: resolveUrl(finalInput) };
 
-  const response = await fetch(input, { ...init, method, headers });
+  const response = await fetch(finalInput, { ...init, method, headers });
 
   if (!response.ok) {
     const errorData = await parseErrorBody(response, method);
