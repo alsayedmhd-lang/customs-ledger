@@ -237,7 +237,7 @@ router.post("/auth/login", async (req, res) => {
         message: "حدث خطأ أثناء تسجيل الدخول",
       });
     }
-});
+  });
   // router.post("/auth/login", async (req, res) => {
   //   try {
   //     const { username, password } = req.body as { username: string; password: string };
