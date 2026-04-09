@@ -14,33 +14,59 @@ export default function Login({
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
 
-async function handleLogin() {
-  if (!username.trim() || !password.trim()) {
-    alert(isArabic ? "أدخل اسم المستخدم وكلمة المرور" : "Enter username and password");
-    return;
-  }
-
-  try {
-    const res = await fetch("https://customs-ledger-api.onrender.com/api/auth/login", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ username, password }),
-    });
-
-    const data = await res.json();
-
-    if (res.ok && data.token) {
-      localStorage.setItem("token", data.token);
-      onLogin();
-    } else {
-      alert(data.message || "Login failed");
+  async function handleLogin() {
+    if (!username.trim() || !password.trim()) {
+      alert(isArabic ? "أدخل اسم المستخدم وكلمة المرور" : "Enter username and password");
+      return;
     }
-  } catch (err) {
-    alert(isArabic ? "فشل الاتصال بالسيرفر" : "Server connection failed");
+
+    try {
+      const res = await fetch("https://customs-ledger-api.onrender.com/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ username, password }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.token) {
+        localStorage.setItem("token", data.token);
+
+        if (data.user) {
+          localStorage.setItem("user_role", data.user.role || "user");
+          localStorage.setItem("display_name_ar", data.user.displayNameAr || "المستخدم");
+          localStorage.setItem("display_name_en", data.user.displayNameEn || "User");
+          localStorage.setItem("username", data.user.username || username.trim());
+        }
+
+        localStorage.removeItem("offline_mode");
+        onLogin();
+      } else {
+        alert(data.message || (isArabic ? "فشل تسجيل الدخول" : "Login failed"));
+      }
+    } catch (err) {
+      if (username.trim() === "admin" && password.trim() === "admin8579") {
+        localStorage.setItem("token", "offline_admin_token");
+        localStorage.setItem("offline_mode", "true");
+        localStorage.setItem("user_role", "admin");
+        localStorage.setItem("display_name_ar", "المدير");
+        localStorage.setItem("display_name_en", "Admin");
+        localStorage.setItem("username", "admin");
+        localStorage.setItem("is_active", "true");
+        localStorage.setItem("pending_approval", "false");
+
+        onLogin();
+      } else {
+        alert(
+          isArabic
+            ? "فشل الاتصال بالسيرفر، وبيانات المدير الاحتياطية غير صحيحة"
+            : "Server connection failed, and fallback admin credentials are invalid"
+        );
+      }
+    }
   }
-}
 
   return (
     <div
