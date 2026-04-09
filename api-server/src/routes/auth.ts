@@ -208,26 +208,31 @@ router.post("/auth/login", async (req, res) => {
       return res.status(403).json({ message: "تم إيقاف الحساب" });
     }
 
-    const code = generateOTP();
-    const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
-
-    await db
-      .delete(otpCodesTable)
-      .where(and(eq(otpCodesTable.userId, user.id), isNull(otpCodesTable.usedAt)));
-
-    await db.insert(otpCodesTable).values({
-      userId: user.id,
-      code,
-      expiresAt,
-    });
-
-    const otpToken = signOtpToken(user.id);
-
-    return res.json({
-      requiresOtp: true,
-      otpToken,
-      visibleCode: code,
-    });
+const token = signToken({
+  userId: user.id,
+  username: user.username,
+  role: user.role,
+  });
+  
+  const permissions =
+    user.role === "admin"
+      ? DEFAULT_PERMISSIONS
+      : (user.permissions ?? DEFAULT_PERMISSIONS);
+  
+  return res.json({
+    token,
+    user: {
+      id: user.id,
+      username: user.username,
+      displayName: user.displayName,
+      displayNameAr: user.displayNameAr ?? null,
+      displayNameEn: user.displayNameEn ?? null,
+      role: user.role,
+      permissions,
+      phone: user.phone ?? null,
+      email: user.email ?? null,
+    },
+  });
     } catch (error) {
       console.error("[AUTH LOGIN ERROR FULL]");
       console.error(error);
