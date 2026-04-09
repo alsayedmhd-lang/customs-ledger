@@ -165,6 +165,7 @@ router.post("/auth/register", async (req, res) => {
 });
 
 // ── Login (Step 1) ────────────────────────────────────────────────────────────
+
 router.post("/auth/login", async (req, res) => {
   try {
     const { username, password } = req.body as { username: string; password: string };
