@@ -238,6 +238,7 @@ export default function Invoices({ lang }: { lang: Lang }) {
 
   function openEditModal(invoice: Invoice) {
     setEditingInvoiceId(invoice.id);
+  
     setForm({
       clientId: String(invoice.clientId ?? ""),
       clientName: invoice.clientName || "",
@@ -271,6 +272,7 @@ export default function Invoices({ lang }: { lang: Lang }) {
               },
             ],
     });
+  
     setErrorMessage("");
     setShowModal(true);
   }
