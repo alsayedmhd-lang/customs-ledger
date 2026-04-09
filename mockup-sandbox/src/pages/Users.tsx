@@ -656,16 +656,7 @@ const deleteButtonStyle: React.CSSProperties = {
   padding: "8px 12px",
   cursor: "pointer",
   fontWeight: 700,
-};ean;
-  canDeleteReceipts?: boolean;
-  canEditClients?: boolean;
-  canDeleteClients?: boolean;
-  canManageTemplates?: boolean;
-  canViewStatements?: boolean;
-  canViewAccounting?: boolean;
-  canCustomizePrintContact?: boolean;
 };
-
 type UserRow = {
   id: number;
   username: string;
