@@ -84,9 +84,12 @@ export function CompanySettingsProvider({ children }: { children: ReactNode }) {
   const refresh = async () => {
     try {
       const token = sessionStorage.getItem("auth_token");
+      if (!token) return;
+  
       const res = await fetch(`${API_BASE}/company-settings`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        headers: { Authorization: `Bearer ${token}` },
       });
+  
       if (res.ok) {
         const data = await res.json();
         const merged = { ...DEFAULT_SETTINGS, ...data };
