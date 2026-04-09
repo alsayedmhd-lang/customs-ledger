@@ -5,20 +5,7 @@ type Lang = "ar" | "en";
 type UserPermissions = {
   canEditInvoices?: boolean;
   canDeleteInvoices?: boolean;
-  canEditReceipts?: boolimport React, { useEffect, useMemo, useState } from "react";
-
-type Lang = "ar" | "en";
-
-type Client = {
-  id: number;
-  name: string;
-  companyName?: string;
-  phone?: string;
-  email?: string;
-  taxNumber?: string;
-  city?: string;
-  isActive?: boolean;
-  createdAt?: string;
+  canEditReceipts?: boolean;
 };
 
 type ClientForm = {
