@@ -149,35 +149,52 @@ export default function Clients({
       createdAt: raw.createdAt ?? raw.created_at ?? "",
     };
   }
-
+  
   async function loadClients() {
     setLoading(true);
     setError("");
 
     try {
       const token = localStorage.getItem("token");
-
+      const offlineMode = localStorage.getItem("offline_mode") === "true";
+    
+      function getAuthHeaders() {
+        if (offlineMode) {
+          return {
+            "Content-Type": "application/json",
+          };
+        }
+    
+        return {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        };
+      }
+    
       const res = await fetch(`${API_BASE}/api/clients`, {
         method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
+        headers: getAuthHeaders(),
       });
-
-      if (res.status === 401) {
+    
+      if (res.status === 401 && !offlineMode) {
         setError(text.unauthorized);
         setClients([]);
         setLoading(false);
         return;
       }
-
+    
+      if (offlineMode) {
+        setClients([]);
+        setLoading(false);
+        return;
+      }
+    
       const data = await res.json();
-
+    
       if (!res.ok) {
         throw new Error(data?.message || text.failedLoad);
       }
-
+    
       const list = Array.isArray(data)
         ? data
         : Array.isArray(data?.data)
@@ -185,15 +202,22 @@ export default function Clients({
         : Array.isArray(data?.clients)
         ? data.clients
         : [];
-
+    
       setClients(list.map(normalizeClient));
     } catch (err) {
-      setError(text.failedLoad);
-      setClients([]);
+      const offlineMode = localStorage.getItem("offline_mode") === "true";
+    
+      if (offlineMode) {
+        setClients([]);
+        setError("");
+      } else {
+        setError(text.failedLoad);
+        setClients([]);
+      }
     } finally {
       setLoading(false);
     }
-  }
+      }
 
   useEffect(() => {
     loadClients();
