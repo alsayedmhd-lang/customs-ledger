@@ -319,8 +319,11 @@ export default function Clients({
 
       const data = await res.json().catch(() => null);
 
-      if (res.status === 401) {
-        alert(text.unauthorized);
+      const token = localStorage.getItem("token");
+      const offlineMode = localStorage.getItem("offline_mode") === "true";
+      
+      if (!token && !offlineMode) {
+        alert("انتهت صلاحية الجلسة، الرجاء تسجيل الدخول مجددًا");
         return;
       }
 
