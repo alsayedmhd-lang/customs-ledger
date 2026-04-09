@@ -330,11 +330,11 @@ export default function Invoices({ lang }: { lang: Lang }) {
   }
 
   async function handleSubmit() {
-    if (!form.clientId || !form.issueDate) {
+    if (!form.clientName.trim() || !form.issueDate) {
       setErrorMessage(
         isArabic
-          ? "العميل وتاريخ الإصدار مطلوبان"
-          : "Client and issue date are required"
+          ? "اسم العميل وتاريخ الإصدار مطلوبان"
+          : "Client name and issue date are required"
       );
       return;
     }
@@ -355,17 +355,18 @@ export default function Invoices({ lang }: { lang: Lang }) {
     }
 
     const payload = {
-      clientId: Number(form.clientId),
+      clientId: form.clientId ? Number(form.clientId) : null,
+      clientName: form.clientName.trim(),
       issueDate: form.issueDate,
       dueDate: form.dueDate || null,
       status: form.status || "draft",
-      taxRate: form.taxRate || "0",
-      advancePayment: form.advancePayment || "0",
+      taxRate: Number(form.taxRate || 0),
+      advancePayment: Number(form.advancePayment || 0),
       notes: form.notes || null,
       shipmentRef: form.shipmentRef || null,
       billOfLading: form.billOfLading || null,
-      packageCount: form.packageCount || null,
-      shipmentWeight: form.shipmentWeight || null,
+      packageCount: form.packageCount ? Number(form.packageCount) : null,
+      shipmentWeight: form.shipmentWeight ? Number(form.shipmentWeight) : null,
       portOfEntry: form.portOfEntry || null,
       items: cleanedItems,
     };
