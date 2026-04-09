@@ -228,10 +228,15 @@ router.post("/auth/login", async (req, res) => {
       otpToken,
       visibleCode: code,
     });
-  } catch (error) {
-    console.error("[AUTH LOGIN ERROR]", error);
-    return res.status(500).json({ message: "حدث خطأ داخلي أثناء تسجيل الدخول" });
-  }
+    } catch (error) {
+      console.error("[AUTH LOGIN ERROR FULL]");
+      console.error(error);
+      console.error(JSON.stringify(error, null, 2));
+    
+      return res.status(500).json({
+        message: "حدث خطأ أثناء تسجيل الدخول",
+      });
+    }
 });
   // router.post("/auth/login", async (req, res) => {
   //   try {
