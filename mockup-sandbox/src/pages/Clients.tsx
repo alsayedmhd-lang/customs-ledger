@@ -60,7 +60,7 @@ async function loadClients() {
       throw new Error("No auth token");
     }
 
-    const url = `${getApiUrl()}/clients`;
+    const url = getApiUrl("/api/clients");
     console.log("STEP 3: fetch url =", url);
 
     const res = await fetch(url, {
