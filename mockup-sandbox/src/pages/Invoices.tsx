@@ -231,6 +231,7 @@ export default function Invoices({ lang }: { lang: Lang }) {
     setEditingInvoiceId(invoice.id);
     setForm({
       clientId: String(invoice.clientId ?? ""),
+      clientName: invoice.clientName || "",
       issueDate: invoice.issueDate ? String(invoice.issueDate).slice(0, 10) : "",
       dueDate: invoice.dueDate ? String(invoice.dueDate).slice(0, 10) : "",
       status: invoice.status || "draft",
