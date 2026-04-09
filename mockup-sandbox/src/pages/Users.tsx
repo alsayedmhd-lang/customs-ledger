@@ -5,7 +5,671 @@ type Lang = "ar" | "en";
 type UserPermissions = {
   canEditInvoices?: boolean;
   canDeleteInvoices?: boolean;
-  canEditReceipts?: boolean;
+  canEditReceipts?: boolimport React, { useEffect, useMemo, useState } from "react";
+
+type Lang = "ar" | "en";
+
+type Client = {
+  id: number;
+  name: string;
+  companyName?: string;
+  phone?: string;
+  email?: string;
+  taxNumber?: string;
+  city?: string;
+  isActive?: boolean;
+  createdAt?: string;
+};
+
+type ClientForm = {
+  name: string;
+  companyName: string;
+  phone: string;
+  email: string;
+  taxNumber: string;
+  city: string;
+  isActive: boolean;
+};
+
+const API_BASE = "https://customs-ledger-api.onrender.com";
+
+const emptyForm: ClientForm = {
+  name: "",
+  companyName: "",
+  phone: "",
+  email: "",
+  taxNumber: "",
+  city: "",
+  isActive: true,
+};
+
+export default function Clients({ lang = "ar" }: { lang?: Lang }) {
+  const isArabic = lang === "ar";
+
+  const text = {
+    title: isArabic ? "العملاء" : "Clients",
+    subtitle: isArabic ? "إدارة قاعدة بيانات العملاء" : "Manage clients database",
+    add: isArabic ? "إضافة عميل" : "Add Client",
+    edit: isArabic ? "تعديل" : "Edit",
+    delete: isArabic ? "حذف" : "Delete",
+    save: isArabic ? "حفظ" : "Save",
+    cancel: isArabic ? "إلغاء" : "Cancel",
+    close: isArabic ? "إغلاق" : "Close",
+    refresh: isArabic ? "تحديث" : "Refresh",
+    loading: isArabic ? "جاري التحميل..." : "Loading...",
+    search: isArabic ? "بحث عن عميل..." : "Search client...",
+    noData: isArabic ? "لا يوجد عملاء" : "No clients found",
+    unauthorized: isArabic ? "انتهت صلاحية الجلسة، الرجاء تسجيل الدخول مجددًا" : "Session expired, please login again",
+    failedLoad: isArabic ? "فشل تحميل العملاء" : "Failed to load clients",
+    failedSave: isArabic ? "فشل حفظ العميل" : "Failed to save client",
+    failedDelete: isArabic ? "فشل حذف العميل" : "Failed to delete client",
+    savedOffline: isArabic ? "تم الحفظ محليًا (وضع المدير المؤقت)" : "Saved locally (offline admin mode)",
+    confirmDelete: isArabic ? "هل تريد حذف هذا العميل؟" : "Do you want to delete this client?",
+    requiredName: isArabic ? "اسم العميل مطلوب" : "Client name is required",
+    name: isArabic ? "اسم العميل" : "Client Name",
+    company: isArabic ? "الشركة" : "Company",
+    phone: isArabic ? "الهاتف" : "Phone",
+    email: isArabic ? "البريد الإلكتروني" : "Email",
+    taxNumber: isArabic ? "الرقم الضريبي" : "Tax Number",
+    city: isArabic ? "المدينة" : "City",
+    status: isArabic ? "الحالة" : "Status",
+    actions: isArabic ? "الإجراءات" : "Actions",
+    active: isArabic ? "نشط" : "Active",
+    inactive: isArabic ? "غير نشط" : "Inactive",
+  };
+
+  const [clients, setClients] = useState<Client[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [search, setSearch] = useState("");
+
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [form, setForm] = useState<ClientForm>(emptyForm);
+
+  function normalizeClient(raw: any): Client {
+    return {
+      id: Number(raw.id),
+      name: raw.name ?? "",
+      companyName: raw.companyName ?? raw.company_name ?? "",
+      phone: raw.phone ?? "",
+      email: raw.email ?? "",
+      taxNumber: raw.taxNumber ?? raw.tax_number ?? "",
+      city: raw.city ?? "",
+      isActive:
+        typeof raw.isActive === "boolean"
+          ? raw.isActive
+          : typeof raw.is_active === "boolean"
+          ? raw.is_active
+          : true,
+      createdAt: raw.createdAt ?? raw.created_at ?? "",
+    };
+  }
+
+  async function loadClients() {
+    setLoading(true);
+    setError("");
+
+    try {
+      const token = localStorage.getItem("token");
+      const offlineMode = localStorage.getItem("offline_mode") === "true";
+
+      if (offlineMode) {
+        setClients([]);
+        setError("");
+        return;
+      }
+
+      const res = await fetch(`${API_BASE}/api/clients`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+
+      if (res.status === 401) {
+        setError(text.unauthorized);
+        setClients([]);
+        return;
+      }
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data?.message || text.failedLoad);
+      }
+
+      const list = Array.isArray(data)
+        ? data
+        : Array.isArray(data?.data)
+        ? data.data
+        : Array.isArray(data?.clients)
+        ? data.clients
+        : [];
+
+      setClients(list.map(normalizeClient));
+    } catch {
+      const offlineMode = localStorage.getItem("offline_mode") === "true";
+      if (offlineMode) {
+        setClients([]);
+        setError("");
+      } else {
+        setClients([]);
+        setError(text.failedLoad);
+      }
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    loadClients();
+  }, [lang]);
+
+  const filteredClients = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return clients;
+
+    return clients.filter((c) =>
+      [c.name, c.companyName, c.phone, c.email, c.taxNumber, c.city]
+        .filter(Boolean)
+        .some((v) => String(v).toLowerCase().includes(q))
+    );
+  }, [clients, search]);
+
+  function openAdd() {
+    setEditingId(null);
+    setForm(emptyForm);
+    setModalOpen(true);
+  }
+
+  function openEdit(client: Client) {
+    setEditingId(client.id);
+    setForm({
+      name: client.name || "",
+      companyName: client.companyName || "",
+      phone: client.phone || "",
+      email: client.email || "",
+      taxNumber: client.taxNumber || "",
+      city: client.city || "",
+      isActive: client.isActive ?? true,
+    });
+    setModalOpen(true);
+  }
+
+  function closeModal() {
+    setModalOpen(false);
+    setEditingId(null);
+    setForm(emptyForm);
+  }
+
+  function updateForm<K extends keyof ClientForm>(key: K, value: ClientForm[K]) {
+    setForm((prev) => ({ ...prev, [key]: value }));
+  }
+
+  async function handleSave() {
+    if (!form.name.trim()) {
+      alert(text.requiredName);
+      return;
+    }
+
+    const offlineMode = localStorage.getItem("offline_mode") === "true";
+
+    if (offlineMode) {
+      const localClient: Client = {
+        id: editingId ?? Date.now(),
+        name: form.name.trim(),
+        companyName: form.companyName.trim(),
+        phone: form.phone.trim(),
+        email: form.email.trim(),
+        taxNumber: form.taxNumber.trim(),
+        city: form.city.trim(),
+        isActive: form.isActive,
+        createdAt: new Date().toISOString(),
+      };
+
+      if (editingId !== null) {
+        setClients((prev) => prev.map((c) => (c.id === editingId ? localClient : c)));
+      } else {
+        setClients((prev) => [localClient, ...prev]);
+      }
+
+      setSaving(false);
+      alert(text.savedOffline);
+      closeModal();
+      return;
+    }
+
+    setSaving(true);
+
+    try {
+      const token = localStorage.getItem("token");
+      const isEdit = editingId !== null;
+
+      const payload = {
+        name: form.name.trim(),
+        companyName: form.companyName.trim(),
+        phone: form.phone.trim(),
+        email: form.email.trim(),
+        taxNumber: form.taxNumber.trim(),
+        city: form.city.trim(),
+        isActive: form.isActive,
+      };
+
+      const res = await fetch(
+        isEdit ? `${API_BASE}/api/clients/${editingId}` : `${API_BASE}/api/clients`,
+        {
+          method: isEdit ? "PUT" : "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify(payload),
+        }
+      );
+
+      const data = await res.json().catch(() => null);
+
+      if (res.status === 401) {
+        alert(text.unauthorized);
+        return;
+      }
+
+      if (!res.ok) {
+        throw new Error(data?.message || text.failedSave);
+      }
+
+      await loadClients();
+      closeModal();
+    } catch {
+      alert(text.failedSave);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDelete(id: number) {
+    if (!window.confirm(text.confirmDelete)) return;
+
+    const offlineMode = localStorage.getItem("offline_mode") === "true";
+
+    if (offlineMode) {
+      setClients((prev) => prev.filter((c) => c.id !== id));
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem("token");
+
+      const res = await fetch(`${API_BASE}/api/clients/${id}`, {
+        method: "DELETE",
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+
+      if (res.status === 401) {
+        alert(text.unauthorized);
+        return;
+      }
+
+      if (!res.ok) {
+        throw new Error(text.failedDelete);
+      }
+
+      setClients((prev) => prev.filter((c) => c.id !== id));
+    } catch {
+      alert(text.failedDelete);
+    }
+  }
+
+  const cardStyle: React.CSSProperties = {
+    background: "#fff",
+    borderRadius: 20,
+    border: "1px solid #e5e7eb",
+    boxShadow: "0 6px 18px rgba(0,0,0,0.05)",
+  };
+
+  return (
+    <div
+      dir={isArabic ? "rtl" : "ltr"}
+      style={{
+        minHeight: "100vh",
+        background: "#f3f4f6",
+        padding: 24,
+        boxSizing: "border-box",
+      }}
+    >
+      <div style={{ maxWidth: 1400, margin: "0 auto" }}>
+        <div
+          style={{
+            ...cardStyle,
+            padding: 24,
+            marginBottom: 18,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: 16,
+            flexWrap: "wrap",
+          }}
+        >
+          <div>
+            <div style={{ fontSize: 36, fontWeight: 900, color: "#111827" }}>{text.title}</div>
+            <div style={{ marginTop: 6, color: "#6b7280" }}>{text.subtitle}</div>
+          </div>
+
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <button onClick={loadClients} style={secondaryButtonStyle}>
+              {text.refresh}
+            </button>
+            <button onClick={openAdd} style={primaryButtonStyle}>
+              + {text.add}
+            </button>
+          </div>
+        </div>
+
+        <div style={{ ...cardStyle, padding: 18, marginBottom: 18 }}>
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={text.search}
+            style={{
+              width: "100%",
+              maxWidth: 420,
+              height: 46,
+              borderRadius: 12,
+              border: "1px solid #d1d5db",
+              outline: "none",
+              padding: "0 14px",
+              fontSize: 14,
+              boxSizing: "border-box",
+              background: "#fff",
+            }}
+          />
+        </div>
+
+        <div style={{ ...cardStyle, overflow: "hidden" }}>
+          {loading ? (
+            <div style={stateStyle}>{text.loading}</div>
+          ) : error ? (
+            <div style={{ ...stateStyle, color: "#dc2626" }}>{error}</div>
+          ) : filteredClients.length === 0 ? (
+            <div style={stateStyle}>{text.noData}</div>
+          ) : (
+            <div style={{ overflowX: "auto" }}>
+              <table
+                style={{
+                  width: "100%",
+                  borderCollapse: "collapse",
+                  minWidth: 900,
+                }}
+              >
+                <thead>
+                  <tr style={{ background: "#f8fafc" }}>
+                    <th style={thStyle}>{text.name}</th>
+                    <th style={thStyle}>{text.company}</th>
+                    <th style={thStyle}>{text.phone}</th>
+                    <th style={thStyle}>{text.email}</th>
+                    <th style={thStyle}>{text.taxNumber}</th>
+                    <th style={thStyle}>{text.city}</th>
+                    <th style={thStyle}>{text.status}</th>
+                    <th style={thStyle}>{text.actions}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredClients.map((client) => (
+                    <tr key={client.id} style={{ borderTop: "1px solid #e5e7eb" }}>
+                      <td style={tdStyle}>{client.name || "—"}</td>
+                      <td style={tdStyle}>{client.companyName || "—"}</td>
+                      <td style={tdStyle}>{client.phone || "—"}</td>
+                      <td style={tdStyle}>{client.email || "—"}</td>
+                      <td style={tdStyle}>{client.taxNumber || "—"}</td>
+                      <td style={tdStyle}>{client.city || "—"}</td>
+                      <td style={tdStyle}>
+                        <span
+                          style={{
+                            display: "inline-block",
+                            padding: "6px 12px",
+                            borderRadius: 999,
+                            fontSize: 12,
+                            fontWeight: 700,
+                            background: client.isActive ? "#dcfce7" : "#fee2e2",
+                            color: client.isActive ? "#15803d" : "#dc2626",
+                          }}
+                        >
+                          {client.isActive ? text.active : text.inactive}
+                        </span>
+                      </td>
+                      <td style={tdStyle}>
+                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                          <button onClick={() => openEdit(client)} style={miniButtonStyle}>
+                            {text.edit}
+                          </button>
+                          <button onClick={() => handleDelete(client.id)} style={deleteButtonStyle}>
+                            {text.delete}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {modalOpen && (
+        <div
+          onClick={closeModal}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(15,23,42,0.45)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 20,
+            zIndex: 1000,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: "100%",
+              maxWidth: 820,
+              background: "#fff",
+              borderRadius: 24,
+              padding: 24,
+              boxSizing: "border-box",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: 16,
+                marginBottom: 18,
+              }}
+            >
+              <div style={{ fontSize: 24, fontWeight: 900, color: "#111827" }}>
+                {editingId ? text.edit : text.add}
+              </div>
+
+              <button onClick={closeModal} style={secondaryButtonStyle}>
+                {text.close}
+              </button>
+            </div>
+
+            <div style={gridStyle}>
+              <Field label={text.name}>
+                <input value={form.name} onChange={(e) => updateForm("name", e.target.value)} style={inputStyle} />
+              </Field>
+
+              <Field label={text.company}>
+                <input value={form.companyName} onChange={(e) => updateForm("companyName", e.target.value)} style={inputStyle} />
+              </Field>
+
+              <Field label={text.phone}>
+                <input value={form.phone} onChange={(e) => updateForm("phone", e.target.value)} style={inputStyle} />
+              </Field>
+
+              <Field label={text.email}>
+                <input value={form.email} onChange={(e) => updateForm("email", e.target.value)} style={inputStyle} />
+              </Field>
+
+              <Field label={text.taxNumber}>
+                <input value={form.taxNumber} onChange={(e) => updateForm("taxNumber", e.target.value)} style={inputStyle} />
+              </Field>
+
+              <Field label={text.city}>
+                <input value={form.city} onChange={(e) => updateForm("city", e.target.value)} style={inputStyle} />
+              </Field>
+
+              <Field label={text.status}>
+                <select
+                  value={form.isActive ? "active" : "inactive"}
+                  onChange={(e) => updateForm("isActive", e.target.value === "active")}
+                  style={inputStyle}
+                >
+                  <option value="active">{text.active}</option>
+                  <option value="inactive">{text.inactive}</option>
+                </select>
+              </Field>
+            </div>
+
+            <div
+              style={{
+                display: "flex",
+                gap: 10,
+                justifyContent: isArabic ? "flex-start" : "flex-end",
+                flexWrap: "wrap",
+                marginTop: 20,
+              }}
+            >
+              <button onClick={closeModal} style={secondaryButtonStyle}>
+                {text.cancel}
+              </button>
+              <button onClick={handleSave} style={primaryButtonStyle} disabled={saving}>
+                {saving ? text.loading : text.save}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Field({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <label
+        style={{
+          display: "block",
+          marginBottom: 8,
+          color: "#374151",
+          fontSize: 13,
+          fontWeight: 700,
+        }}
+      >
+        {label}
+      </label>
+      {children}
+    </div>
+  );
+}
+
+const stateStyle: React.CSSProperties = {
+  padding: "34px 20px",
+  textAlign: "center",
+  color: "#6b7280",
+  fontWeight: 600,
+};
+
+const thStyle: React.CSSProperties = {
+  textAlign: "start",
+  padding: "14px 12px",
+  color: "#6b7280",
+  fontWeight: 700,
+};
+
+const tdStyle: React.CSSProperties = {
+  padding: "16px 12px",
+  textAlign: "start",
+  color: "#111827",
+};
+
+const gridStyle: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+  gap: 14,
+};
+
+const inputStyle: React.CSSProperties = {
+  width: "100%",
+  height: 46,
+  borderRadius: 12,
+  border: "1px solid #d1d5db",
+  outline: "none",
+  padding: "0 14px",
+  fontSize: 14,
+  boxSizing: "border-box",
+  background: "#fff",
+};
+
+const primaryButtonStyle: React.CSSProperties = {
+  height: 46,
+  borderRadius: 14,
+  border: "none",
+  background: "#2563eb",
+  color: "#fff",
+  padding: "0 18px",
+  cursor: "pointer",
+  fontSize: 14,
+  fontWeight: 700,
+};
+
+const secondaryButtonStyle: React.CSSProperties = {
+  height: 46,
+  borderRadius: 14,
+  border: "1px solid #d1d5db",
+  background: "#fff",
+  color: "#374151",
+  padding: "0 16px",
+  cursor: "pointer",
+  fontSize: 14,
+  fontWeight: 700,
+};
+
+const miniButtonStyle: React.CSSProperties = {
+  border: "1px solid #d1d5db",
+  background: "#f8fafc",
+  color: "#334155",
+  borderRadius: 10,
+  padding: "8px 12px",
+  cursor: "pointer",
+  fontWeight: 700,
+};
+
+const deleteButtonStyle: React.CSSProperties = {
+  border: "1px solid #fecaca",
+  background: "#fff1f2",
+  color: "#dc2626",
+  borderRadius: 10,
+  padding: "8px 12px",
+  cursor: "pointer",
+  fontWeight: 700,
+};ean;
   canDeleteReceipts?: boolean;
   canEditClients?: boolean;
   canDeleteClients?: boolean;
