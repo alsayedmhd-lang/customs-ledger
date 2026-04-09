@@ -4,6 +4,7 @@ packages:
   - lib/*
   - lib/integrations/*
   - scripts
+  - customs-accounting
 
 autoInstallPeers: false
 
