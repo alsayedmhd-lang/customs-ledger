@@ -44,6 +44,7 @@ type Client = {
 
 type InvoiceForm = {
   clientId: string;
+  clientName: string;
   issueDate: string;
   dueDate: string;
   status: string;
@@ -55,7 +56,14 @@ type InvoiceForm = {
   packageCount: string;
   shipmentWeight: string;
   portOfEntry: string;
-  items: InvoiceItem[];
+  items: {
+    id?: number;
+    invoiceId?: number;
+    description: string;
+    quantity: number;
+    unitPrice: number;
+    total: number;
+  }[];
 };
 
 const API_BASE =
@@ -81,7 +89,8 @@ function getAuthHeaders(): Record<string, string> {
 function createDefaultForm(): InvoiceForm {
   return {
     clientId: "",
-    issueDate: new Date().toISOString().slice(0, 10),
+    clientName: "",
+    issueDate: "",
     dueDate: "",
     status: "draft",
     taxRate: "0",
