@@ -1,4 +1,5 @@
 console.log("NEW CLIENTS FILE LOADED");
+
 import { useEffect, useState, type CSSProperties } from "react";
 
 type Lang = "ar" | "en";
@@ -23,9 +24,6 @@ type NewClientForm = {
   taxId: string;
   notes: string;
 };
-
-const API_BASE =
-  ((import.meta as any)?.env?.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, "") || "";
 
 function getApiUrl(path: string) {
   return `https://customs-ledger-api.onrender.com${path}`;
@@ -52,6 +50,8 @@ export default function Clients({ lang }: { lang: Lang }) {
 async function loadClients() {
   try {
     console.log("STEP 1: loadClients started");
+    setLoading(true);
+    setErrorMessage("");
 
     const token = localStorage.getItem("token");
     console.log("STEP 2: token =", token);
@@ -75,17 +75,17 @@ async function loadClients() {
     console.log("STEP 5: raw response =", text);
 
     const data = JSON.parse(text);
-
     setClients(Array.isArray(data) ? data : []);
   } catch (error) {
     console.error("LOAD CLIENTS ERROR:", error);
     setClients([]);
-    setErrorMessage("تعذر تحميل العملاء من الخادم");
+    setErrorMessage(
+      isArabic ? "تعذر تحميل العملاء من الخادم" : "Failed to load clients from server"
+    );
   } finally {
     setLoading(false);
   }
 }
-
   useEffect(() => {
     console.log("useEffect clients fired");
     void loadClients();
