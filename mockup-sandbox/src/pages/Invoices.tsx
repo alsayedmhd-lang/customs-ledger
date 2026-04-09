@@ -1124,18 +1124,29 @@ export default function Invoices({ lang }: { lang: Lang }) {
               }}
             >
               <Field label={isArabic ? "العميل" : "Client"}>
-                <select
-                  value={form.clientId}
-                  onChange={(e) => updateForm("clientId", e.target.value)}
+                <input
+                  type="text"
+                  list="clients-list"
+                  value={form.clientName}
+                  onChange={(e) => {
+                    const value = e.target.value;
+              
+                    const matchedClient = clients.find(
+                      (client) => String(client.name || "").trim() === value.trim()
+                    );
+              
+                    updateForm("clientName", value);
+                    updateForm("clientId", matchedClient ? String(matchedClient.id) : "");
+                  }}
+                  placeholder={isArabic ? "اكتب اسم العميل أو اختر من القائمة" : "Type client name or choose from list"}
                   style={inputStyle}
-                >
-                  <option value="">{isArabic ? "اختر العميل" : "Select client"}</option>
+                />
+              
+                <datalist id="clients-list">
                   {clients.map((client) => (
-                    <option key={client.id} value={client.id}>
-                      {client.name}
-                    </option>
+                    <option key={client.id} value={client.name} />
                   ))}
-                </select>
+                </datalist>
               </Field>
 
               <Field label={isArabic ? "تاريخ الإصدار" : "Issue Date"}>
