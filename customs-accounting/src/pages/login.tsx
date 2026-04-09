@@ -6,7 +6,7 @@ import { Eye, EyeOff, ShieldCheck, RefreshCw, ArrowRight, ArrowLeft, LogIn, User
 import { motion, AnimatePresence } from "framer-motion";
 
 const LOGO = `${import.meta.env.BASE_URL}logo_nobg.png`;
-const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
 
 function OtpInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const inputs = useRef<(HTMLInputElement | null)[]>([]);
