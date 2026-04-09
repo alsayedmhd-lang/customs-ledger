@@ -317,6 +317,7 @@ export default function Users({ lang }: { lang: Lang }) {
   const offlineMode = localStorage.getItem("offline_mode") === "true";
   
   if (offlineMode) {
+    setSaving(false);
     alert(isArabic ? "تم الحفظ محليًا (وضع المدير المؤقت)" : "Saved locally (offline admin mode)");
     closeModal();
     return;
