@@ -494,16 +494,16 @@ export default function InvoiceForm() {
               </select>
             </div>
 
-            <div>
-              <label className={labelCls}>
-                {isAR ? "اسم المستورد / المصدر" : "Importer / Exporter Name"}
-              </label>
-              <input
-                {...register("importerExporterName")}
-                placeholder={isAR ? "ادخل الاسم" : "Enter the name"}
-                className={inputCls}
-              />
-            </div>
+            <div className="col-span-2 md:col-span-2">
+            <label className={labelCls}>
+              {isAR ? "اسم المستورد / المصدر" : "Importer / Exporter Name"}
+            </label>
+            <input
+              {...register("importerExporterName")}
+              placeholder={isAR ? "ادخل الاسم" : "Enter the name"}
+              className={inputCls}
+            />
+          </div>
           </div>
         </div>
 
