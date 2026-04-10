@@ -59,7 +59,8 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-const API_BASE = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
+const API_BASE = "https://workspaceapi-server-production-0e1f.up.railway.app";
+// const API_BASE = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [token, setToken] = useState<string | null>(() => sessionStorage.getItem("auth_token"));
