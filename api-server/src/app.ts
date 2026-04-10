@@ -1,5 +1,5 @@
 import express, { type Express, type Request, type Response } from "express";
-import cors, { type CorsOptionsDelegate } from "cors";
+import cors from "cors";
 import router from "./routes";
 
 const app: Express = express();
@@ -10,32 +10,34 @@ const allowedOrigins = [
   "http://localhost:3000",
 ];
 
-const corsOptions: CorsOptionsDelegate<Request> = (req, callback) => {
-  const origin = req.header("Origin");
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin) {
+        return callback(null, true);
+      }
 
-  if (!origin || allowedOrigins.includes(origin)) {
-    callback(null, {
-      origin: true,
-      credentials: true,
-      methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-      allowedHeaders: ["Content-Type", "Authorization"],
-    });
-    return;
-  }
+      const isExactAllowed = allowedOrigins.includes(origin);
+      const isVercelPreview =
+        /^https:\/\/customs-ledger-front-.*\.vercel\.app$/.test(origin);
 
-  callback(null, {
-    origin: false,
-  });
-};
+      if (isExactAllowed || isVercelPreview) {
+        return callback(null, true);
+      }
 
-app.use(cors(corsOptions));
-app.options(/.*/, cors(corsOptions));
+      return callback(new Error(`CORS blocked for origin: ${origin}`));
+    },
+    credentials: true,
+  }),
+);
+
+app.options("*", cors());
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 app.get("/", (_req: Request, res: Response) => {
-  res.status(200).send("🚀 Around The World Custom Clearance API");
+  res.status(200).send("🚀 Around The World Custom Clearance!");
 });
 
 app.use("/api", router);
