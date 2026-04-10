@@ -10,29 +10,26 @@ const allowedOrigins = [
   "http://localhost:3000",
 ];
 
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      if (!origin) {
-        return callback(null, true);
-      }
+const corsOptions: cors.CorsOptions = {
+  origin: (origin, callback) => {
+    if (!origin) {
+      return callback(null, true);
+    }
 
-      const isExactAllowed = allowedOrigins.includes(origin);
-      const isVercelPreview = origin.includes("vercel.app");
-      // const isVercelPreview =
-      //   /^https:\/\/customs-ledger-front.*\.vercel\.app$/.test(origin);
+    const isExactAllowed = allowedOrigins.includes(origin);
+    const isVercelPreview = origin.includes("vercel.app");
 
-      if (isExactAllowed || isVercelPreview) {
-        return callback(null, true);
-      }
+    if (isExactAllowed || isVercelPreview) {
+      return callback(null, true);
+    }
 
-      return callback(new Error(`CORS blocked for origin: ${origin}`));
-    },
-    credentials: true,
-  }),
-);
+    return callback(new Error(`CORS blocked for origin: ${origin}`));
+  },
+  credentials: true,
+};
 
-app.options("*", cors());
+app.use(cors(corsOptions));
+app.options(/.*/, cors(corsOptions));
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
