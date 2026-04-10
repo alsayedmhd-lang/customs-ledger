@@ -18,9 +18,9 @@ app.use(
       }
 
       const isExactAllowed = allowedOrigins.includes(origin);
-
-      const isVercelPreview =
-        /^https:\/\/customs-ledger-front.*\.vercel\.app$/.test(origin);
+      const isVercelPreview = origin.includes("vercel.app");
+      // const isVercelPreview =
+      //   /^https:\/\/customs-ledger-front.*\.vercel\.app$/.test(origin);
 
       if (isExactAllowed || isVercelPreview) {
         return callback(null, true);
