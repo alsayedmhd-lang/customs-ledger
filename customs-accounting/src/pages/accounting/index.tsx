@@ -11,8 +11,8 @@ import { formatCurrency } from "@/lib/utils";
 import { useLanguage } from "@/lib/language-context";
 import { useAuth } from "@/lib/auth-context";
 
-const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
-
+const API_BASE =
+  (import.meta.env.VITE_API_BASE_URL || "https://workspaceapi-server-production-0e1f.up.railway.app").replace(/\/$/, "");
 interface AccountingRow {
   id: number;
   invoiceNumber: string;
