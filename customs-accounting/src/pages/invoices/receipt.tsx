@@ -9,9 +9,28 @@ import { useCompanySettings } from "@/lib/company-settings-context";
 import { useAuth } from "@/lib/auth-context";
 
 // ── Number to English words ───────────────────────────────────────────────────
-const engOnes = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine",
-  "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen",
-  "Seventeen", "Eighteen", "Nineteen"];
+const engOnes = [
+  "",
+  "One",
+  "Two",
+  "Three",
+  "Four",
+  "Five",
+  "Six",
+  "Seven",
+  "Eight",
+  "Nine",
+  "Ten",
+  "Eleven",
+  "Twelve",
+  "Thirteen",
+  "Fourteen",
+  "Fifteen",
+  "Sixteen",
+  "Seventeen",
+  "Eighteen",
+  "Nineteen",
+];
 const engTens = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
 
 function threeDigitsEn(n: number): string {
@@ -23,7 +42,10 @@ function threeDigitsEn(n: number): string {
   const parts: string[] = [];
   if (h > 0) parts.push(engOnes[h] + " Hundred");
   if (r < 20 && r > 0) parts.push(engOnes[r]);
-  else { if (t > 0) parts.push(engTens[t]); if (o > 0) parts.push(engOnes[o]); }
+  else {
+    if (t > 0) parts.push(engTens[t]);
+    if (o > 0) parts.push(engOnes[o]);
+  }
   return parts.join(" ");
 }
 
@@ -43,9 +65,28 @@ function numberToEnglishWords(amount: number): string {
 }
 
 // ── Number to Arabic words ────────────────────────────────────────────────────
-const ones = ["", "واحد", "اثنان", "ثلاثة", "أربعة", "خمسة", "ستة", "سبعة", "ثمانية", "تسعة",
-  "عشرة", "أحد عشر", "اثنا عشر", "ثلاثة عشر", "أربعة عشر", "خمسة عشر", "ستة عشر",
-  "سبعة عشر", "ثمانية عشر", "تسعة عشر"];
+const ones = [
+  "",
+  "واحد",
+  "اثنان",
+  "ثلاثة",
+  "أربعة",
+  "خمسة",
+  "ستة",
+  "سبعة",
+  "ثمانية",
+  "تسعة",
+  "عشرة",
+  "أحد عشر",
+  "اثنا عشر",
+  "ثلاثة عشر",
+  "أربعة عشر",
+  "خمسة عشر",
+  "ستة عشر",
+  "سبعة عشر",
+  "ثمانية عشر",
+  "تسعة عشر",
+];
 const tens = ["", "", "عشرون", "ثلاثون", "أربعون", "خمسون", "ستون", "سبعون", "ثمانون", "تسعون"];
 const hundreds = ["", "مئة", "مئتان", "ثلاثمئة", "أربعمئة", "خمسمئة", "ستمئة", "سبعمئة", "ثمانمئة", "تسعمئة"];
 
@@ -89,7 +130,7 @@ function numberToArabicWords(amount: number): string {
 
 const STATUS_AR: Record<string, string> = {
   draft: "مسودة",
-  issued: "فاتورة نقدا / على الحساب",
+  issued: "فاتورة نقداً على الحساب",
   paid: "مدفوعة",
   cancelled: "ملغاة",
 };
@@ -107,24 +148,36 @@ export default function InvoiceReceipt() {
   const printEmail = canCustomize && user?.email ? user.email : settings.email;
 
   const [showStamp, setShowStamp] = useState<boolean>(() => {
-    try { return localStorage.getItem("invoice_show_stamp") !== "false"; }
-    catch { return true; }
+    try {
+      return localStorage.getItem("invoice_show_stamp") !== "false";
+    } catch {
+      return true;
+    }
   });
 
   function toggleStamp(val: boolean) {
     setShowStamp(val);
-    try { localStorage.setItem("invoice_show_stamp", val ? "true" : "false"); } catch {}
+    try {
+      localStorage.setItem("invoice_show_stamp", val ? "true" : "false");
+    } catch {}
   }
 
   useEffect(() => {
     if (!invoice) return;
     const prev = document.title;
     document.title = `${invoice.invoiceNumber} - ${invoice.clientName}`;
-    return () => { document.title = prev; };
+    return () => {
+      document.title = prev;
+    };
   }, [invoice]);
 
-  if (isLoading) return <div className="p-8 text-center">{isAR ? "جارٍ تحميل الفاتورة..." : "Loading invoice..."}</div>;
-  if (!invoice) return <div className="p-8 text-center text-red-600">{isAR ? "الفاتورة غير موجودة" : "Invoice not found"}</div>;
+  if (isLoading) {
+    return <div className="p-8 text-center">{isAR ? "جارٍ تحميل الفاتورة..." : "Loading invoice..."}</div>;
+  }
+
+  if (!invoice) {
+    return <div className="p-8 text-center text-red-600">{isAR ? "الفاتورة غير موجودة" : "Invoice not found"}</div>;
+  }
 
   const invNum = invoice.invoiceNumber;
   const amountWords = numberToArabicWords(invoice.total);
@@ -138,13 +191,15 @@ export default function InvoiceReceipt() {
           body { margin: 0; }
         }
       `}</style>
-      {/* Controls - hidden on print */}
+
       <div className="print:hidden flex items-center gap-3 p-6 max-w-4xl mx-auto flex-wrap" dir={isAR ? "rtl" : "ltr"}>
         <Link href={`/invoices/${invoice.id}/edit`}>
           <button className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-700 hover:bg-gray-50 font-medium">
-            {isAR ? <ArrowRight className="w-4 h-4" /> : <ArrowLeft className="w-4 h-4" />} {isAR ? "العودة للتعديل" : "Back to Edit"}
+            {isAR ? <ArrowRight className="w-4 h-4" /> : <ArrowLeft className="w-4 h-4" />}
+            {isAR ? "العودة للتعديل" : "Back to Edit"}
           </button>
         </Link>
+
         <button
           onClick={() => window.print()}
           className="flex items-center gap-2 px-5 py-2 bg-blue-700 text-white rounded-lg font-medium hover:bg-blue-800"
@@ -152,19 +207,20 @@ export default function InvoiceReceipt() {
           <Printer className="w-4 h-4" />
           {isAR ? "طباعة الفاتورة" : "Print Invoice"}
         </button>
+
         <Link href={`/accounting?invoice=${encodeURIComponent(invoice.invoiceNumber)}`}>
           <button className="flex items-center gap-2 px-4 py-2 border border-emerald-400 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-medium">
             <Calculator className="w-4 h-4" />
             {isAR ? "حساب الفاتورة" : "Calculate Invoice"}
           </button>
         </Link>
-        {/* Stamp toggle */}
+
         {settings.showStampOnInvoices && (
           <label className="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg bg-white cursor-pointer select-none hover:bg-gray-50">
             <input
               type="checkbox"
               checked={showStamp}
-              onChange={e => toggleStamp(e.target.checked)}
+              onChange={(e) => toggleStamp(e.target.checked)}
               className="w-4 h-4 accent-blue-700"
             />
             <Stamp className="w-4 h-4 text-gray-500" />
@@ -173,13 +229,11 @@ export default function InvoiceReceipt() {
         )}
       </div>
 
-      {/* ── A4 Invoice ────────────────────────────────────────────────────── */}
       <div
         id="invoice-print"
         className="max-w-4xl mx-auto print:max-w-none print:w-full print:mx-0 bg-white shadow-xl print:shadow-none border border-gray-200 print:border-none relative overflow-hidden"
         style={{ fontFamily: "'Cairo', 'Arial', sans-serif" }}
       >
-        {/* ══ WATERMARK ═══════════════════════════════════════════════════ */}
         {settings.showWatermark && (
           <div
             className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none select-none"
@@ -200,53 +254,50 @@ export default function InvoiceReceipt() {
             </div>
           </div>
         )}
-        {/* ══ LETTERHEAD / شعار ══════════════════════════════════════════ */}
+
         <div className="border-b-4 border-double border-gray-800 pb-3 pt-4 px-6">
           <div className="flex items-start justify-between">
-            {/* Right: Arabic company name */}
             <div className="text-right">
-              <div className="text-2xl font-black text-gray-900 leading-tight">{settings.nameAr.split(" ").slice(0, 2).join(" ")}</div>
+              <div className="text-2xl font-black text-gray-900 leading-tight">
+                {settings.nameAr.split(" ").slice(0, 2).join(" ")}
+              </div>
               <div className="text-lg font-bold text-gray-700">{settings.subtitleAr}</div>
               <div className="text-xs text-gray-500 mt-1">{settings.nameEn}</div>
               <div className="text-xs text-gray-500">{settings.taglineAr}</div>
             </div>
 
-            {/* Center: Company Logo */}
             <div className="flex flex-col items-center justify-center">
-              <img
-                src={logoSrc}
-                alt={settings.nameAr}
-                className="h-24 w-auto object-contain"
-              />
+              <img src={logoSrc} alt={settings.nameAr} className="h-24 w-auto object-contain" />
             </div>
 
-            {/* Left: English company name */}
             <div className="text-left">
-              <div className="text-2xl font-black text-gray-900 leading-tight">{settings.nameEn.split(" ").slice(0, 3).join(" ").toUpperCase()}</div>
+              <div className="text-2xl font-black text-gray-900 leading-tight">
+                {settings.nameEn.split(" ").slice(0, 3).join(" ").toUpperCase()}
+              </div>
               <div className="text-lg font-bold text-gray-700">{settings.subtitleEn}</div>
               <div className="text-xs text-gray-500 mt-1">{printEmail}</div>
-              <div className="text-xs text-gray-500">Tel: {printPhone} · {settings.poBox} {settings.address}</div>
+              <div className="text-xs text-gray-500">
+                Tel: {printPhone} · {settings.poBox} {settings.address}
+              </div>
             </div>
           </div>
         </div>
 
-        {/* ══ INVOICE META ════════════════════════════════════════════════ */}
         <div className="flex items-stretch border-b-2 border-gray-700 bg-gray-50" dir="ltr">
-          {/* Left: Invoice No + barcode */}
-          <div className="flex flex-col justify-center px-6 py-3" style={{ width: "40%", borderRight: "1px solid #d1d5db" }}>
+          <div className="flex flex-col justify-center px-6 py-2.5" style={{ width: "40%", borderRight: "1px solid #d1d5db" }}>
             <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Invoice No</div>
             <div className="font-mono font-black text-blue-800 text-xl leading-none">{invNum}</div>
-            <div className="mt-2">
-              <Barcode value={invNum} format="CODE128" width={1.2} height={32} fontSize={0} margin={0} displayValue={false} />
+            <div className="mt-1.5">
+              <Barcode value={invNum} format="CODE128" width={1.2} height={28} fontSize={0} margin={0} displayValue={false} />
               <div className="text-center text-[9px] font-mono text-gray-500">{invNum}</div>
             </div>
           </div>
-          {/* Right: Title centered */}
-          <div className="flex-1 flex flex-col items-center justify-center px-6 py-3">
-            <div className="text-2xl font-black text-gray-900 leading-tight" dir="rtl">
-              فاتورة نقداً / على الحساب
+
+          <div className="flex-1 flex flex-col items-center justify-center px-6 py-2.5">
+            <div className="text-[30px] font-black text-gray-900 leading-tight" dir="rtl">
+              فاتورة نقداً على الحساب
             </div>
-            <div className="mt-1.5 flex items-center gap-3 text-sm text-gray-500 font-semibold">
+            <div className="mt-1 flex items-center gap-2.5 text-sm text-gray-500 font-semibold">
               <span>INVOICE CASH / CREDIT</span>
               <span className="w-1 h-1 rounded-full bg-gray-400 inline-block" />
               <span dir="rtl">{STATUS_AR[invoice.status] ?? invoice.status}</span>
@@ -254,57 +305,79 @@ export default function InvoiceReceipt() {
           </div>
         </div>
 
-        {/* ══ INFO GRID (no table borders — label/value style) ═════════════ */}
         <div className="border-b-2 border-gray-700" dir="ltr">
-          {/* Rows 1–4 */}
           {([
             [
-              { label: "Customer / العميل",       value: invoice.clientName,              mono: false },
-              { label: "Inv. Date",                value: invoice.issueDate,               mono: true  },
+              { label: "Customer / العميل", value: invoice.clientName, mono: false },
+              { label: "Inv. Date", value: invoice.issueDate, mono: true },
             ],
             [
-              { label: "Sales Man / المندوب",     value: (invoice as any).salesMan ?? "—", mono: false },
-              { label: "B.L / M AWB",              value: invoice.billOfLading ?? "—",      mono: true  },
+              { label: "Sales Man / المندوب", value: (invoice as any).salesMan ?? "—", mono: false },
+              { label: "B.L / M AWB", value: invoice.billOfLading ?? "—", mono: true },
             ],
             [
-              { label: "منفذ الدخول / Port",      value: invoice.portOfEntry ?? "—",       mono: false },
-              { label: "Wight / الوزن",             value: invoice.shipmentWeight != null ? `${invoice.shipmentWeight} Kg` : "—", mono: true },
+              { label: "منفذ الدخول / Port", value: invoice.portOfEntry ?? "—", mono: false },
+              {
+                label: "Wight / الوزن",
+                value: invoice.shipmentWeight != null ? `${invoice.shipmentWeight} Kg` : "—",
+                mono: true,
+              },
             ],
             [
-              { label: "PeC No / عدد الطرود",     value: invoice.packageCount != null ? `${invoice.packageCount} Pec` : "—", mono: false },
-              { label: "BAIAN No / رقم البيان",   value: invoice.shipmentRef ?? "—",       mono: true  },
+              {
+                label: "PeC No / عدد الطرود",
+                value: invoice.packageCount != null ? `${invoice.packageCount} Pec` : "—",
+                mono: false,
+              },
+              { label: "BAIAN No / رقم البيان", value: invoice.shipmentRef ?? "—", mono: true },
             ],
           ] as { label: string; value: string; mono: boolean }[][]).map((row, ri) => (
-            <div key={ri} className="grid grid-cols-2 border-b border-dashed border-gray-200">
+            <div key={ri} className="grid grid-cols-2 border-b border-dashed border-gray-200 last:border-b-0">
               {row.map((cell, ci) => (
-                <div key={ci} className={`px-5 py-2.5 ${ci === 0 ? "border-r border-dashed border-gray-200" : ""}`}>
-                  <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">{cell.label}</div>
-                  <div className={`text-sm font-bold text-gray-900 ${cell.mono ? "font-mono" : ""}`}>{cell.value}</div>
+                <div
+                  key={ci}
+                  className={`px-5 py-1.5 ${ci === 0 ? "border-r border-dashed border-gray-200" : ""}`}
+                >
+                  <div className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-0 leading-tight">
+                    {cell.label}
+                  </div>
+                  <div className={`text-[13px] leading-tight font-bold text-gray-900 ${cell.mono ? "font-mono" : ""}`}>
+                    {cell.value}
+                  </div>
                 </div>
               ))}
             </div>
           ))}
 
-          {/* Row 5: IMP/EXP + barcode */}
           <div className="grid grid-cols-2">
-            <div className="px-5 py-2.5 border-r border-dashed border-gray-200">
-              <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">IMP / EXP</div>
-              <div className="text-sm font-bold text-gray-900">{(invoice as any).impExp ?? "—"}</div>
+            <div className="px-5 py-1.5 border-r border-dashed border-gray-200">
+              <div className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-0 leading-tight">
+                IMP / EXP
+              </div>
+              <div className="text-[13px] leading-tight font-bold text-gray-900">{(invoice as any).impExp ?? "—"}</div>
               {invoice.dueDate && (
-                <div className="text-[10px] text-gray-400 mt-1">
+                <div className="text-[9px] text-gray-400 mt-0.5 leading-tight">
                   Due Date : <span className="font-mono text-gray-600">{invoice.dueDate}</span>
                 </div>
               )}
             </div>
-            <div className="px-5 py-1.5 flex items-center">
+
+            <div className="px-5 py-1 flex items-center">
               {invoice.shipmentRef && (
-                <Barcode value={invoice.shipmentRef} format="CODE128" width={1.2} height={34} fontSize={9} margin={0} displayValue={true} />
+                <Barcode
+                  value={invoice.shipmentRef}
+                  format="CODE128"
+                  width={1.1}
+                  height={26}
+                  fontSize={8}
+                  margin={0}
+                  displayValue={true}
+                />
               )}
             </div>
           </div>
         </div>
 
-        {/* ══ ITEMS TABLE ═════════════════════════════════════════════════ */}
         <div className="px-6 pt-3">
           <table className="w-full text-sm border-collapse">
             <thead>
@@ -332,7 +405,7 @@ export default function InvoiceReceipt() {
                   </td>
                 </tr>
               ))}
-              {/* Empty filler rows for short invoices */}
+
               {invoice.items.length < 5 &&
                 Array.from({ length: 5 - invoice.items.length }).map((_, i) => (
                   <tr key={`empty-${i}`} className="border-b border-dashed border-gray-200">
@@ -347,7 +420,6 @@ export default function InvoiceReceipt() {
           </table>
         </div>
 
-        {/* ══ TOTALS ══════════════════════════════════════════════════════ */}
         <div className="px-6 pb-2">
           <div className="border-t-2 border-gray-700 pt-2 space-y-1">
             <TotalRow label="إجمالي الفاتورة / Invoice Amount" value={invoice.subtotal} />
@@ -357,6 +429,7 @@ export default function InvoiceReceipt() {
             {(invoice as any).advancePayment > 0 && (
               <TotalRow label="الدفعة المقدمة / Advance Payment" value={(invoice as any).advancePayment} negative />
             )}
+
             <div className="flex justify-between items-center border-t-2 border-double border-gray-700 pt-2 mt-1">
               <span className="font-black text-base text-gray-800">الإجمالي الكلي / Grand Total</span>
               <span className="font-black font-mono text-base text-gray-900">
@@ -365,7 +438,6 @@ export default function InvoiceReceipt() {
             </div>
           </div>
 
-          {/* Amount in words — Arabic RTL + English LTR */}
           <div className="border border-gray-300 bg-gray-50 rounded px-3 py-2 mt-3">
             <div className="text-sm text-right" dir="rtl">
               <span className="font-bold text-gray-600">المبلغ كتابةً : </span>
@@ -377,27 +449,27 @@ export default function InvoiceReceipt() {
             </div>
           </div>
 
-          {/* Notes */}
           {invoice.notes && (
             <div className="mt-3 text-xs text-gray-500 border-t border-dashed border-gray-300 pt-2">
-              <span className="font-bold">ملاحظات: </span>{invoice.notes}
+              <span className="font-bold">ملاحظات: </span>
+              {invoice.notes}
             </div>
           )}
         </div>
 
-        {/* ══ SIGNATURES / STAMP ══════════════════════════════════════════ */}
         <div className="relative grid grid-cols-2 gap-4 px-6 pb-4 pt-6 border-t border-gray-300 mt-4">
           <div className="text-center">
             <div className="h-16 border-b-2 border-gray-400" />
             <p className="text-xs text-gray-500 mt-1 font-bold">توقيع المستلم</p>
             <p className="text-xs text-gray-400">Received By</p>
           </div>
+
           <div className="text-center">
             <div className="h-16 border-b-2 border-gray-400" />
             <p className="text-xs text-gray-500 mt-1 font-bold">توقيع المحاسب</p>
             <p className="text-xs text-gray-400">Accountant</p>
           </div>
-          {/* Stamp — absolute overlay, does not affect layout */}
+
           {settings.showStampOnInvoices && showStamp && (
             <div
               className="absolute inset-0 flex items-center justify-center pointer-events-none"
@@ -413,18 +485,26 @@ export default function InvoiceReceipt() {
           )}
         </div>
 
-        {/* ══ FOOTER ══════════════════════════════════════════════════════ */}
         <div className="border-t-4 border-double border-gray-700 px-6 py-3 bg-gray-50">
           <div className="flex items-center justify-between text-xs text-gray-600">
             <span>✉ {printEmail}</span>
-            <span className="font-bold text-gray-800">{settings.nameAr} · {settings.nameEn.split(" ").slice(0, 3).join(" ")} C.C</span>
-            <span>{settings.poBox} {settings.address} · ☎ {printPhone}</span>
+            <span className="font-bold text-gray-800">
+              {settings.nameAr} · {settings.nameEn.split(" ").slice(0, 3).join(" ")} C.C
+            </span>
+            <span>
+              {settings.poBox} {settings.address} · ☎ {printPhone}
+            </span>
           </div>
-          {settings.footerText && (
-            <div className="text-center text-xs text-gray-500 mt-1">{settings.footerText}</div>
-          )}
+
+          {settings.footerText && <div className="text-center text-xs text-gray-500 mt-1">{settings.footerText}</div>}
+
           <div className="text-center text-xs text-gray-400 mt-1">
-            طُبعت في: {new Date().toLocaleDateString("ar-EG-u-nu-latn", { year: "numeric", month: "long", day: "numeric" })}
+            طُبعت في:{" "}
+            {new Date().toLocaleDateString("ar-EG-u-nu-latn", {
+              year: "numeric",
+              month: "long",
+              day: "numeric",
+            })}
             {" — "}رقم الفاتورة: {invNum}
           </div>
         </div>
@@ -433,13 +513,21 @@ export default function InvoiceReceipt() {
   );
 }
 
-// ── Helper Components ─────────────────────────────────────────────────────────
-function TotalRow({ label, value, negative }: { label: string; value: number; negative?: boolean }) {
+function TotalRow({
+  label,
+  value,
+  negative,
+}: {
+  label: string;
+  value: number;
+  negative?: boolean;
+}) {
   return (
     <div className="flex justify-between items-center text-sm">
       <span className="text-gray-700">{label}</span>
       <span className={`font-mono font-bold ${negative ? "text-green-700" : "text-gray-800"}`}>
-        {negative ? "- " : ""}{formatNumber(value, 2)}
+        {negative ? "- " : ""}
+        {formatNumber(value, 2)}
       </span>
     </div>
   );
