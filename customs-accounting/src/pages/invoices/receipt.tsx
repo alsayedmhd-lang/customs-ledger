@@ -391,12 +391,8 @@ const importerExporterName =
               <div className="text-[13px] leading-tight font-bold text-gray-900">
                 {impExpValue}
               </div>
-
-              <div className="text-[9px] font-bold text-gray-400 mt-1 mb-0 leading-tight">
-                اسم المستورد / المصدر
-              </div>
               
-              <div className="text-[13px] leading-tight font-bold text-gray-900">
+              <div className="text-[13px] leading-tight font-bold text-gray-900 mt-1">
                 {importerExporterName}
               </div>
 
