@@ -6,8 +6,8 @@ import {
   FileText, ReceiptText, UserCog, PackageSearch, Shield, Mail, Phone, UserCheck, Clock, KeyRound
 } from "lucide-react";
 
-const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
-
+const API_BASE =
+  (import.meta.env.VITE_API_BASE_URL || "https://workspaceapi-server-production-0e1f.up.railway.app").replace(/\/$/, "");
 interface AppUser {
   id: number;
   username: string;
