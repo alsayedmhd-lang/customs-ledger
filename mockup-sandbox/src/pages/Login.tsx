@@ -2,6 +2,9 @@ import { useState } from "react";
 
 type Lang = "ar" | "en";
 
+const API_BASE =
+  (import.meta.env.VITE_API_BASE_URL || "https://workspaceapi-server-production-0e1f.up.railway.app").replace(/\/$/, "");
+
 export default function Login({
   lang,
   onLogin,
@@ -21,7 +24,7 @@ export default function Login({
     }
 
     try {
-      const res = await fetch("https://customs-ledger-api.onrender.com/api/auth/login", {
+      const res = await fetch(`${API_BASE}/api/auth/login`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -46,7 +49,7 @@ export default function Login({
       } else {
         alert(data.message || (isArabic ? "فشل تسجيل الدخول" : "Login failed"));
       }
-    } catch (err) {
+    } catch (_err) {
       if (username.trim() === "admin" && password.trim() === "admin8579") {
         localStorage.setItem("token", "offline_admin_token");
         localStorage.setItem("offline_mode", "true");
