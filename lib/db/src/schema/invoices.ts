@@ -39,6 +39,7 @@ export const invoicesTable = pgTable("invoices", {
   packageCount: integer("package_count"),
   shipmentWeight: numeric("shipment_weight", { precision: 10, scale: 3 }),
   portOfEntry: text("port_of_entry"),
+  importerExporterName: text("importer_exporter_name"),
   advancePayment: numeric("advance_payment", { precision: 12, scale: 2 }).notNull().default("0"),
   createdBy: integer("created_by").references(() => usersTable.id, { onDelete: "set null" }),
   deletedAt: timestamp("deleted_at"),
