@@ -32,7 +32,8 @@ function resolveUrl(input: RequestInfo | URL): string {
 function resolveApiUrl(input: RequestInfo | URL): RequestInfo | URL {
   if (typeof input !== "string") return input;
 
-  const baseUrl = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
+  const baseUrl = "https://workspaceapi-server-production-0e1f.up.railway.app"
+  // const baseUrl = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
 
   if (!baseUrl) return input;
   if (/^https?:\/\//i.test(input)) return input;
