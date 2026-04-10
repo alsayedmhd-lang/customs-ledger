@@ -35,32 +35,39 @@ const engTens = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy
 
 function threeDigitsEn(n: number): string {
   if (n === 0) return "";
+
   const h = Math.floor(n / 100);
   const r = n % 100;
   const t = Math.floor(r / 10);
   const o = r % 10;
   const parts: string[] = [];
+
   if (h > 0) parts.push(engOnes[h] + " Hundred");
-  if (r < 20 && r > 0) parts.push(engOnes[r]);
-  else {
+  if (r < 20 && r > 0) {
+    parts.push(engOnes[r]);
+  } else {
     if (t > 0) parts.push(engTens[t]);
     if (o > 0) parts.push(engOnes[o]);
   }
+
   return parts.join(" ");
 }
 
 function numberToEnglishWords(amount: number): string {
   const total = Math.round(amount);
   if (total === 0) return "Zero Qatari Riyals Only";
+
   const billions = Math.floor(total / 1_000_000_000);
   const millions = Math.floor((total % 1_000_000_000) / 1_000_000);
   const thousands = Math.floor((total % 1_000_000) / 1_000);
   const remainder = total % 1_000;
+
   const parts: string[] = [];
   if (billions > 0) parts.push(threeDigitsEn(billions) + " Billion");
   if (millions > 0) parts.push(threeDigitsEn(millions) + " Million");
   if (thousands > 0) parts.push(threeDigitsEn(thousands) + " Thousand");
   if (remainder > 0) parts.push(threeDigitsEn(remainder));
+
   return parts.join(" ") + " Qatari Riyals Only";
 }
 
@@ -92,39 +99,50 @@ const hundreds = ["", "مئة", "مئتان", "ثلاثمئة", "أربعمئة"
 
 function threeDigits(n: number): string {
   if (n === 0) return "";
+
   const h = Math.floor(n / 100);
   const r = n % 100;
   const t = Math.floor(r / 10);
   const o = r % 10;
   const parts: string[] = [];
+
   if (h > 0) parts.push(hundreds[h]);
-  if (r < 20 && r > 0) parts.push(ones[r]);
-  else {
+  if (r < 20 && r > 0) {
+    parts.push(ones[r]);
+  } else {
     if (t > 0) parts.push(tens[t]);
     if (o > 0) parts.push(ones[o]);
   }
+
   return parts.join(" و");
 }
 
 function numberToArabicWords(amount: number): string {
   const total = Math.round(amount);
   if (total === 0) return "صفر ريال قطري فقط";
+
   const billions = Math.floor(total / 1_000_000_000);
   const millions = Math.floor((total % 1_000_000_000) / 1_000_000);
   const thousands = Math.floor((total % 1_000_000) / 1_000);
   const remainder = total % 1_000;
+
   const parts: string[] = [];
+
   if (billions === 1) parts.push("مليار");
   else if (billions === 2) parts.push("ملياران");
   else if (billions > 2) parts.push(threeDigits(billions) + " مليارات");
+
   if (millions === 1) parts.push("مليون");
   else if (millions === 2) parts.push("مليونان");
   else if (millions > 2) parts.push(threeDigits(millions) + " ملايين");
+
   if (thousands === 1) parts.push("ألف");
   else if (thousands === 2) parts.push("ألفان");
   else if (thousands > 2 && thousands < 11) parts.push(threeDigits(thousands) + " آلاف");
   else if (thousands >= 11) parts.push(threeDigits(thousands) + " ألف");
+
   if (remainder > 0) parts.push(threeDigits(remainder));
+
   return "ريال قطري " + parts.join(" و") + " فقط لا غير";
 }
 
@@ -183,6 +201,19 @@ export default function InvoiceReceipt() {
   const amountWords = numberToArabicWords(invoice.total);
   const amountWordsEn = numberToEnglishWords(invoice.total);
 
+  const salesManName =
+    (user as any)?.username ||
+    (user as any)?.name ||
+    (user as any)?.fullName ||
+    (invoice as any).salesMan ||
+    "—";
+
+  const impExpValue = (invoice as any).impExp || "—";
+  const importerExporterName =
+    (invoice as any).importerExporterName ||
+    (invoice as any).importerExporter ||
+    "—";
+
   return (
     <div className="min-h-screen bg-gray-100 print:bg-white" dir="rtl">
       <style>{`
@@ -192,6 +223,7 @@ export default function InvoiceReceipt() {
         }
       `}</style>
 
+      {/* Controls - hidden on print */}
       <div className="print:hidden flex items-center gap-3 p-6 max-w-4xl mx-auto flex-wrap" dir={isAR ? "rtl" : "ltr"}>
         <Link href={`/invoices/${invoice.id}/edit`}>
           <button className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-700 hover:bg-gray-50 font-medium">
@@ -229,11 +261,13 @@ export default function InvoiceReceipt() {
         )}
       </div>
 
+      {/* ── A4 Invoice ────────────────────────────────────────────────────── */}
       <div
         id="invoice-print"
         className="max-w-4xl mx-auto print:max-w-none print:w-full print:mx-0 bg-white shadow-xl print:shadow-none border border-gray-200 print:border-none relative overflow-hidden"
         style={{ fontFamily: "'Cairo', 'Arial', sans-serif" }}
       >
+        {/* ══ WATERMARK ═══════════════════════════════════════════════════ */}
         {settings.showWatermark && (
           <div
             className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none select-none"
@@ -255,6 +289,7 @@ export default function InvoiceReceipt() {
           </div>
         )}
 
+        {/* ══ LETTERHEAD / شعار ══════════════════════════════════════════ */}
         <div className="border-b-4 border-double border-gray-800 pb-3 pt-4 px-6">
           <div className="flex items-start justify-between">
             <div className="text-right">
@@ -283,6 +318,7 @@ export default function InvoiceReceipt() {
           </div>
         </div>
 
+        {/* ══ INVOICE META ════════════════════════════════════════════════ */}
         <div className="flex items-stretch border-b-2 border-gray-700 bg-gray-50" dir="ltr">
           <div className="flex flex-col justify-center px-6 py-2.5" style={{ width: "40%", borderRight: "1px solid #d1d5db" }}>
             <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Invoice No</div>
@@ -305,6 +341,7 @@ export default function InvoiceReceipt() {
           </div>
         </div>
 
+        {/* ══ INFO GRID ═══════════════════════════════════════════════════ */}
         <div className="border-b-2 border-gray-700" dir="ltr">
           {([
             [
@@ -312,7 +349,7 @@ export default function InvoiceReceipt() {
               { label: "Inv. Date", value: invoice.issueDate, mono: true },
             ],
             [
-              { label: "Sales Man / المندوب", value: (invoice as any).salesMan ?? "—", mono: false },
+              { label: "Sales Man / المندوب", value: salesManName, mono: false },
               { label: "B.L / M AWB", value: invoice.billOfLading ?? "—", mono: true },
             ],
             [
@@ -334,10 +371,7 @@ export default function InvoiceReceipt() {
           ] as { label: string; value: string; mono: boolean }[][]).map((row, ri) => (
             <div key={ri} className="grid grid-cols-2 border-b border-dashed border-gray-200 last:border-b-0">
               {row.map((cell, ci) => (
-                <div
-                  key={ci}
-                  className={`px-5 py-1.5 ${ci === 0 ? "border-r border-dashed border-gray-200" : ""}`}
-                >
+                <div key={ci} className={`px-5 py-1.5 ${ci === 0 ? "border-r border-dashed border-gray-200" : ""}`}>
                   <div className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-0 leading-tight">
                     {cell.label}
                   </div>
@@ -349,12 +383,23 @@ export default function InvoiceReceipt() {
             </div>
           ))}
 
+          {/* Row 5: IMP/EXP + importer/exporter name + barcode */}
           <div className="grid grid-cols-2">
             <div className="px-5 py-1.5 border-r border-dashed border-gray-200">
               <div className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-0 leading-tight">
                 IMP / EXP
               </div>
-              <div className="text-[13px] leading-tight font-bold text-gray-900">{(invoice as any).impExp ?? "—"}</div>
+              <div className="text-[13px] leading-tight font-bold text-gray-900">
+                {impExpValue}
+              </div>
+
+              <div className="text-[9px] font-bold text-gray-400 mt-1 mb-0 leading-tight">
+                اسم المستورد / المصدر
+              </div>
+              <div className="text-[13px] leading-tight font-bold text-gray-900">
+                {importerExporterName}
+              </div>
+
               {invoice.dueDate && (
                 <div className="text-[9px] text-gray-400 mt-0.5 leading-tight">
                   Due Date : <span className="font-mono text-gray-600">{invoice.dueDate}</span>
@@ -378,6 +423,7 @@ export default function InvoiceReceipt() {
           </div>
         </div>
 
+        {/* ══ ITEMS TABLE ═════════════════════════════════════════════════ */}
         <div className="px-6 pt-3">
           <table className="w-full text-sm border-collapse">
             <thead>
@@ -420,6 +466,7 @@ export default function InvoiceReceipt() {
           </table>
         </div>
 
+        {/* ══ TOTALS ══════════════════════════════════════════════════════ */}
         <div className="px-6 pb-2">
           <div className="border-t-2 border-gray-700 pt-2 space-y-1">
             <TotalRow label="إجمالي الفاتورة / Invoice Amount" value={invoice.subtotal} />
@@ -457,6 +504,7 @@ export default function InvoiceReceipt() {
           )}
         </div>
 
+        {/* ══ SIGNATURES / STAMP ══════════════════════════════════════════ */}
         <div className="relative grid grid-cols-2 gap-4 px-6 pb-4 pt-6 border-t border-gray-300 mt-4">
           <div className="text-center">
             <div className="h-16 border-b-2 border-gray-400" />
@@ -485,6 +533,7 @@ export default function InvoiceReceipt() {
           )}
         </div>
 
+        {/* ══ FOOTER ══════════════════════════════════════════════════════ */}
         <div className="border-t-4 border-double border-gray-700 px-6 py-3 bg-gray-50">
           <div className="flex items-center justify-between text-xs text-gray-600">
             <span>✉ {printEmail}</span>
@@ -496,7 +545,9 @@ export default function InvoiceReceipt() {
             </span>
           </div>
 
-          {settings.footerText && <div className="text-center text-xs text-gray-500 mt-1">{settings.footerText}</div>}
+          {settings.footerText && (
+            <div className="text-center text-xs text-gray-500 mt-1">{settings.footerText}</div>
+          )}
 
           <div className="text-center text-xs text-gray-400 mt-1">
             طُبعت في:{" "}
@@ -513,6 +564,7 @@ export default function InvoiceReceipt() {
   );
 }
 
+// ── Helper Components ─────────────────────────────────────────────────────────
 function TotalRow({
   label,
   value,
