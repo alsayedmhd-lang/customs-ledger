@@ -244,7 +244,7 @@ export default function InvoiceReceipt() {
           {/* Right: Title centered */}
           <div className="flex-1 flex flex-col items-center justify-center px-6 py-3">
             <div className="text-2xl font-black text-gray-900 leading-tight" dir="rtl">
-              فاتورة نقداً / إلى الحساب
+              فاتورة نقداً / على الحساب
             </div>
             <div className="mt-1.5 flex items-center gap-3 text-sm text-gray-500 font-semibold">
               <span>INVOICE CASH / CREDIT</span>
