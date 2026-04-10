@@ -201,18 +201,17 @@ export default function InvoiceReceipt() {
   const amountWords = numberToArabicWords(invoice.total);
   const amountWordsEn = numberToEnglishWords(invoice.total);
 
-  const salesManName =
-    (user as any)?.username ||
-    (user as any)?.name ||
-    (user as any)?.fullName ||
-    (invoice as any).salesMan ||
-    "—";
+const salesManName =
+  (user as any)?.username ||
+  (user as any)?.name ||
+  (user as any)?.fullName ||
+  (invoice as any).salesMan ||
+  "—";
 
-  const impExpValue = (invoice as any).impExp || "—";
-  const importerExporterName =
-    (invoice as any).importerExporterName ||
-    (invoice as any).importerExporter ||
-    "—";
+const impExpValue = (invoice as any).impExp || "—";
+
+const importerExporterName =
+  (invoice as any).importerExporterName || "—";
 
   return (
     <div className="min-h-screen bg-gray-100 print:bg-white" dir="rtl">
@@ -396,6 +395,7 @@ export default function InvoiceReceipt() {
               <div className="text-[9px] font-bold text-gray-400 mt-1 mb-0 leading-tight">
                 اسم المستورد / المصدر
               </div>
+              
               <div className="text-[13px] leading-tight font-bold text-gray-900">
                 {importerExporterName}
               </div>
