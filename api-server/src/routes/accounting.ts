@@ -5,6 +5,11 @@ import { requireAuth } from "../middleware/auth";
 
 const router: IRouter = Router();
 
+function toNumber(value: unknown): number {
+  const n = parseFloat(String(value ?? "0"));
+  return Number.isFinite(n) ? n : 0;
+}
+
 router.get("/accounting", requireAuth, async (req, res) => {
   try {
     const isAdmin = req.user!.role === "admin" || req.user!.role === "supervisor";
@@ -21,8 +26,7 @@ router.get("/accounting", requireAuth, async (req, res) => {
         clientId: invoicesTable.clientId,
         clientName: clientsTable.name,
         issueDate: invoicesTable.issueDate,
-        subtotal: invoicesTable.subtotal,
-        taxAmount: invoicesTable.taxAmount,
+        total: invoicesTable.total,
         accId: invoiceAccountingTable.id,
         payments: invoiceAccountingTable.payments,
         transportation: invoiceAccountingTable.transportation,
@@ -46,36 +50,69 @@ router.get("/accounting", requireAuth, async (req, res) => {
         invoiceNumber: r.invoiceNumber,
         clientName: r.clientName,
         issueDate: r.issueDate,
-        total: parseFloat(r.subtotal ?? "0") + parseFloat(r.taxAmount ?? "0"),
-        payments: parseFloat(r.payments ?? "0"),
-        transportation: parseFloat(r.transportation ?? "0"),
+        total: toNumber(r.total),
+        payments: toNumber(r.payments),
+        transportation: toNumber(r.transportation),
         driverName: r.driverName ?? "",
         unloadLocation: r.unloadLocation ?? "",
-        labor: parseFloat(r.labor ?? "0"),
-        otherExpenses: parseFloat(r.otherExpenses ?? "0"),
+        labor: toNumber(r.labor),
+        otherExpenses: toNumber(r.otherExpenses),
         transportationPaid: r.transportationPaid ?? false,
         laborPaid: r.laborPaid ?? false,
         otherExpensesPaid: r.otherExpensesPaid ?? false,
       }))
     );
   } catch (err) {
-    console.error(err);
+    console.error("[GET /accounting ERROR]", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });
 
-router.patch("/accounting/:invoiceId", async (req, res) => {
+router.patch("/accounting/:invoiceId", requireAuth, async (req, res) => {
   try {
     const invoiceId = parseInt(req.params.invoiceId);
     const {
-      payments, transportation, driverName, unloadLocation,
-      labor, otherExpenses,
-      transportationPaid, laborPaid, otherExpensesPaid,
+      payments,
+      transportation,
+      driverName,
+      unloadLocation,
+      labor,
+      otherExpenses,
+      transportationPaid,
+      laborPaid,
+      otherExpensesPaid,
     } = req.body;
+
+    if (Number.isNaN(invoiceId)) {
+      return res.status(400).json({ error: "Invalid invoice id" });
+    }
+
+    const isAdmin = req.user!.role === "admin" || req.user!.role === "supervisor";
+    const userId = req.user!.userId;
+
+    const invoiceWhere = isAdmin
+      ? and(eq(invoicesTable.id, invoiceId), isNull(invoicesTable.deletedAt))
+      : and(
+          eq(invoicesTable.id, invoiceId),
+          eq(invoicesTable.createdBy, userId),
+          isNull(invoicesTable.deletedAt)
+        );
+
+    const [invoice] = await db
+      .select({ id: invoicesTable.id })
+      .from(invoicesTable)
+      .where(invoiceWhere)
+      .limit(1);
+
+    if (!invoice) {
+      return res.status(404).json({ error: "Invoice not found" });
+    }
 
     const toNum = (v: unknown) =>
       v !== undefined && v !== null && v !== "" ? String(parseFloat(String(v))) : "0";
-    const toStr = (v: unknown) => (v !== undefined && v !== null ? String(v) : null);
+
+    const toStr = (v: unknown) => (v !== undefined && v !== null && String(v).trim() !== "" ? String(v) : null);
+
     const toBool = (v: unknown) => (v === true || v === "true" ? true : false);
 
     const existing = await db
@@ -117,7 +154,7 @@ router.patch("/accounting/:invoiceId", async (req, res) => {
 
     res.json({ ok: true });
   } catch (err) {
-    console.error(err);
+    console.error("[PATCH /accounting/:invoiceId ERROR]", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });
