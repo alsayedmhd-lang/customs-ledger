@@ -14,7 +14,7 @@ if (Number.isNaN(port) || port <= 0) {
 app.listen(port, "0.0.0.0", async () => {
   // --- رسالة التأكيد هنا ---
   console.log(`🚀 Server is officially live!`);
-  console.log(`🌍 Access it at: https://customs-ledger-pro.onrender.com`);
+  console.log(`🌍 Access it at: http://0.0.0.0:${port}`);
   console.log(`📡 Listening on port: ${port}`);
   // -------------------------
   
