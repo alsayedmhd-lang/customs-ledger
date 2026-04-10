@@ -20,31 +20,44 @@ import {
   arrayMove,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { 
-  useListClients, 
-  useListInvoiceItemTemplates, 
-  useCreateInvoice, 
-  useGetInvoice, 
+import {
+  useListClients,
+  useListInvoiceItemTemplates,
+  useCreateInvoice,
+  useGetInvoice,
   useUpdateInvoice,
   getListInvoicesQueryKey,
-  CreateInvoiceRequestStatus
+  CreateInvoiceRequestStatus,
 } from "@workspace/api-client-react";
 import { formatCurrency } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/lib/language-context";
-import { ArrowRight, ArrowLeft, Plus, Trash2, Save, FileText, Ship, Calculator, StickyNote, Printer, GripVertical } from "lucide-react";
+import {
+  ArrowRight,
+  ArrowLeft,
+  Plus,
+  Trash2,
+  Save,
+  FileText,
+  Ship,
+  Calculator,
+  StickyNote,
+  Printer,
+  GripVertical,
+} from "lucide-react";
 
 const itemSchema = z.object({
   description: z.string().min(1, "الوصف مطلوب"),
   quantity: z.coerce.number().min(0.01),
-  unitPrice: z.coerce.number().min(0)
+  unitPrice: z.coerce.number().min(0),
 });
 
 const formSchema = z.object({
   clientId: z.coerce.number().min(1, "العميل مطلوب"),
   issueDate: z.string().min(1, "التاريخ مطلوب"),
   dueDate: z.string().optional().nullable(),
-  status: z.enum(['draft', 'issued', 'paid', 'cancelled']),
+  status: z.enum(["draft", "issued", "paid", "cancelled"]),
+  importerExporterName: z.string().optional().nullable(),
   taxRate: z.coerce.number().min(0),
   advancePayment: z.coerce.number().min(0),
   shipmentRef: z.string().optional().nullable(),
@@ -53,20 +66,22 @@ const formSchema = z.object({
   shipmentWeight: z.coerce.number().optional().nullable(),
   portOfEntry: z.string().optional().nullable(),
   notes: z.string().optional().nullable(),
-  items: z.array(itemSchema).min(1, "يجب إضافة بند واحد على الأقل")
+  items: z.array(itemSchema).min(1, "يجب إضافة بند واحد على الأقل"),
 });
 
 const STATUS_LABELS: Record<string, { ar: string; en: string }> = {
-  draft:     { ar: "مسودة",  en: "Draft" },
-  issued:    { ar: "صادرة",  en: "Issued" },
-  paid:      { ar: "مدفوعة", en: "Paid" },
-  cancelled: { ar: "ملغاة",  en: "Cancelled" },
+  draft: { ar: "مسودة", en: "Draft" },
+  issued: { ar: "صادرة", en: "Issued" },
+  paid: { ar: "مدفوعة", en: "Paid" },
+  cancelled: { ar: "ملغاة", en: "Cancelled" },
 };
 
 type InvoiceFormValues = z.infer<typeof formSchema>;
 
-const inputCls = "w-full px-3 py-1.5 text-sm bg-background border border-border rounded-lg outline-none focus:ring-2 focus:ring-primary/20 transition-colors";
-const labelCls = "block text-xs font-semibold text-muted-foreground mb-1 uppercase tracking-wide";
+const inputCls =
+  "w-full px-3 py-1.5 text-sm bg-background border border-border rounded-lg outline-none focus:ring-2 focus:ring-primary/20 transition-colors";
+const labelCls =
+  "block text-xs font-semibold text-muted-foreground mb-1 uppercase tracking-wide";
 
 interface SortableRowProps {
   id: string;
@@ -80,22 +95,37 @@ interface SortableRowProps {
   isAR: boolean;
 }
 
-function SortableRow({ id, index, register, watch, remove, applyTemplate, templates, canRemove, isAR }: SortableRowProps) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+function SortableRow({
+  id,
+  index,
+  register,
+  watch,
+  remove,
+  applyTemplate,
+  templates,
+  canRemove,
+  isAR,
+}: SortableRowProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id });
 
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : 1,
     zIndex: isDragging ? 10 : undefined,
-    position: isDragging ? "relative" as const : undefined,
+    position: isDragging ? ("relative" as const) : undefined,
   };
 
   const qty = Number(watch(`items.${index}.quantity`) || 0);
   const price = Number(watch(`items.${index}.unitPrice`) || 0);
 
   return (
-    <tr ref={setNodeRef} style={style} className="hover:bg-muted/20 transition-colors bg-background">
+    <tr
+      ref={setNodeRef}
+      style={style}
+      className="hover:bg-muted/20 transition-colors bg-background"
+    >
       <td className="px-2 py-2 text-center">
         <button
           type="button"
@@ -107,6 +137,7 @@ function SortableRow({ id, index, register, watch, remove, applyTemplate, templa
           <GripVertical className="w-4 h-4" />
         </button>
       </td>
+
       <td className="px-3 py-2">
         <select
           onChange={(e) => applyTemplate(index, e.target.value)}
@@ -114,10 +145,13 @@ function SortableRow({ id, index, register, watch, remove, applyTemplate, templa
         >
           <option value="">{isAR ? "اختر..." : "Pick..."}</option>
           {templates?.map((t: any) => (
-            <option key={t.id} value={t.id}>{t.description.substring(0, 22)}</option>
+            <option key={t.id} value={t.id}>
+              {t.description.substring(0, 22)}
+            </option>
           ))}
         </select>
       </td>
+
       <td className="px-3 py-2">
         <input
           {...register(`items.${index}.description`)}
@@ -125,23 +159,29 @@ function SortableRow({ id, index, register, watch, remove, applyTemplate, templa
           placeholder={isAR ? "وصف الخدمة..." : "Service description..."}
         />
       </td>
+
       <td className="px-3 py-2">
         <input
-          type="number" step="0.01"
+          type="number"
+          step="0.01"
           {...register(`items.${index}.quantity`)}
           className="w-full px-2 py-1 text-sm bg-background border border-border rounded-md outline-none focus:ring-2 focus:ring-primary/20 text-end"
         />
       </td>
+
       <td className="px-3 py-2">
         <input
-          type="number" step="0.01"
+          type="number"
+          step="0.01"
           {...register(`items.${index}.unitPrice`)}
           className="w-full px-2 py-1 text-sm bg-background border border-border rounded-md outline-none focus:ring-2 focus:ring-primary/20 text-end"
         />
       </td>
+
       <td className="px-4 py-2 text-end font-mono text-sm font-semibold text-foreground">
         {formatCurrency(qty * price)}
       </td>
+
       <td className="px-2 py-2 text-center">
         {canRemove && (
           <button
@@ -167,8 +207,10 @@ export default function InvoiceForm() {
 
   const { data: clients } = useListClients();
   const { data: templates } = useListInvoiceItemTemplates();
-  const { data: existingInvoice } = useGetInvoice(invoiceId, { query: { enabled: isEdit } });
-  
+  const { data: existingInvoice } = useGetInvoice(invoiceId, {
+    query: { enabled: isEdit },
+  });
+
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -180,10 +222,17 @@ export default function InvoiceForm() {
         setLocation("/invoices");
       },
       onError: (err: any) => {
-        const msg = err?.data?.error || err?.message || (isAR ? "حدث خطأ" : "An error occurred");
-        toast({ title: isAR ? "خطأ" : "Error", description: msg, variant: "destructive" });
-      }
-    }
+        const msg =
+          err?.data?.error ||
+          err?.message ||
+          (isAR ? "حدث خطأ" : "An error occurred");
+        toast({
+          title: isAR ? "خطأ" : "Error",
+          description: msg,
+          variant: "destructive",
+        });
+      },
+    },
   });
 
   const updateMut = useUpdateInvoice({
@@ -194,44 +243,79 @@ export default function InvoiceForm() {
         setLocation("/invoices");
       },
       onError: (err: any) => {
-        const msg = err?.data?.error || err?.message || (isAR ? "حدث خطأ" : "An error occurred");
-        toast({ title: isAR ? "خطأ" : "Error", description: msg, variant: "destructive" });
-      }
-    }
+        const msg =
+          err?.data?.error ||
+          err?.message ||
+          (isAR ? "حدث خطأ" : "An error occurred");
+        toast({
+          title: isAR ? "خطأ" : "Error",
+          description: msg,
+          variant: "destructive",
+        });
+      },
+    },
   });
 
-  const { register, control, handleSubmit, watch, setValue, reset, getValues, formState: { errors } } = useForm<InvoiceFormValues>({
+  const {
+    register,
+    control,
+    handleSubmit,
+    watch,
+    setValue,
+    reset,
+    getValues,
+    formState: { errors },
+  } = useForm<InvoiceFormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       clientId: 0,
-      issueDate: new Date().toISOString().split('T')[0],
-      status: 'draft',
+      issueDate: new Date().toISOString().split("T")[0],
+      dueDate: "",
+      status: "draft",
+      importerExporterName: "",
       taxRate: 0,
       advancePayment: 0,
-      items: [{ description: '', quantity: 1, unitPrice: 0 }]
-    }
+      shipmentRef: "",
+      billOfLading: "",
+      packageCount: undefined,
+      shipmentWeight: undefined,
+      portOfEntry: "",
+      notes: "",
+      items: [{ description: "", quantity: 1, unitPrice: 0 }],
+    },
   });
 
-  const { fields, append, remove, move } = useFieldArray({ control, name: "items" });
+  const { fields, append, remove, move } = useFieldArray({
+    control,
+    name: "items",
+  });
 
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+  );
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     if (over && active.id !== over.id) {
-      const oldIndex = fields.findIndex(f => f.id === active.id);
-      const newIndex = fields.findIndex(f => f.id === over.id);
+      const oldIndex = fields.findIndex((f) => f.id === active.id);
+      const newIndex = fields.findIndex((f) => f.id === over.id);
+
       if (oldIndex !== -1 && newIndex !== -1) {
-        // Snapshot values BEFORE moving
         const snapshot = getValues("items");
         const reordered = arrayMove([...snapshot], oldIndex, newIndex);
-        // Move the field metadata (keeps DOM elements alive, no remount)
+
         move(oldIndex, newIndex);
-        // Explicitly sync every field value so uncontrolled inputs stay correct
+
         reordered.forEach((item, i) => {
-          setValue(`items.${i}.description`, item.description, { shouldDirty: true });
-          setValue(`items.${i}.quantity`, item.quantity, { shouldDirty: true });
-          setValue(`items.${i}.unitPrice`, item.unitPrice, { shouldDirty: true });
+          setValue(`items.${i}.description`, item.description, {
+            shouldDirty: true,
+          });
+          setValue(`items.${i}.quantity`, item.quantity, {
+            shouldDirty: true,
+          });
+          setValue(`items.${i}.unitPrice`, item.unitPrice, {
+            shouldDirty: true,
+          });
         });
       }
     }
@@ -241,18 +325,26 @@ export default function InvoiceForm() {
     if (isEdit && existingInvoice) {
       reset({
         clientId: existingInvoice.clientId,
-        issueDate: existingInvoice.issueDate.split('T')[0],
-        dueDate: existingInvoice.dueDate ? existingInvoice.dueDate.split('T')[0] : "",
+        issueDate: existingInvoice.issueDate.split("T")[0],
+        dueDate: existingInvoice.dueDate
+          ? existingInvoice.dueDate.split("T")[0]
+          : "",
         status: existingInvoice.status as any,
+        importerExporterName:
+          (existingInvoice as any).importerExporterName ?? "",
         taxRate: existingInvoice.taxRate,
         advancePayment: (existingInvoice as any).advancePayment ?? 0,
-        shipmentRef: existingInvoice.shipmentRef,
-        billOfLading: existingInvoice.billOfLading,
+        shipmentRef: existingInvoice.shipmentRef ?? "",
+        billOfLading: existingInvoice.billOfLading ?? "",
         packageCount: existingInvoice.packageCount,
         shipmentWeight: existingInvoice.shipmentWeight,
-        portOfEntry: existingInvoice.portOfEntry,
-        notes: existingInvoice.notes,
-        items: existingInvoice.items.map(i => ({ description: i.description, quantity: i.quantity, unitPrice: i.unitPrice }))
+        portOfEntry: existingInvoice.portOfEntry ?? "",
+        notes: existingInvoice.notes ?? "",
+        items: existingInvoice.items.map((i) => ({
+          description: i.description,
+          quantity: i.quantity,
+          unitPrice: i.unitPrice,
+        })),
       });
     }
   }, [isEdit, existingInvoice, reset]);
@@ -261,7 +353,11 @@ export default function InvoiceForm() {
   const taxRateWatch = watch("taxRate") || 0;
   const advancePaymentWatch = watch("advancePayment") || 0;
 
-  const subtotal = itemsWatch.reduce((acc, item) => acc + (Number(item.quantity || 0) * Number(item.unitPrice || 0)), 0);
+  const subtotal = itemsWatch.reduce(
+    (acc, item) =>
+      acc + Number(item.quantity || 0) * Number(item.unitPrice || 0),
+    0
+  );
   const taxAmount = subtotal * (Number(taxRateWatch) / 100);
   const total = subtotal + taxAmount - Number(advancePaymentWatch);
 
@@ -275,7 +371,7 @@ export default function InvoiceForm() {
 
   const applyTemplate = (index: number, templateIdStr: string) => {
     if (!templateIdStr) return;
-    const template = templates?.find(t => t.id === parseInt(templateIdStr));
+    const template = templates?.find((t) => t.id === parseInt(templateIdStr));
     if (template) {
       setValue(`items.${index}.description`, template.description);
       setValue(`items.${index}.unitPrice`, template.defaultUnitPrice);
@@ -290,26 +386,37 @@ export default function InvoiceForm() {
       dir={isRTL ? "rtl" : "ltr"}
       className="max-w-4xl mx-auto space-y-4 pb-24"
     >
-      {/* Header */}
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <button
             onClick={() => setLocation("/invoices")}
             className="p-2 bg-card border border-border/50 rounded-xl hover:bg-muted transition-colors"
           >
-            {isAR ? <ArrowRight className="w-4 h-4" /> : <ArrowLeft className="w-4 h-4" />}
+            {isAR ? (
+              <ArrowRight className="w-4 h-4" />
+            ) : (
+              <ArrowLeft className="w-4 h-4" />
+            )}
           </button>
+
           <div>
             <h1 className="text-xl font-bold leading-tight">
               {isEdit
-                ? `${isAR ? "تعديل" : "Edit"} ${existingInvoice?.invoiceNumber || ""}`
-                : isAR ? "إنشاء فاتورة جديدة" : "New Invoice"}
+                ? `${isAR ? "تعديل" : "Edit"} ${
+                    existingInvoice?.invoiceNumber || ""
+                  }`
+                : isAR
+                ? "إنشاء فاتورة جديدة"
+                : "New Invoice"}
             </h1>
             <p className="text-xs text-muted-foreground mt-0.5">
-              {isAR ? "أدخل بيانات الفاتورة ثم احفظ" : "Fill in the details and save"}
+              {isAR
+                ? "أدخل بيانات الفاتورة ثم احفظ"
+                : "Fill in the details and save"}
             </p>
           </div>
         </div>
+
         {isEdit && invoiceId && (
           <Link href={`/invoices/${invoiceId}/receipt`}>
             <button className="flex items-center gap-1.5 px-3 py-2 bg-slate-700 text-white text-sm font-medium rounded-xl hover:bg-slate-600 transition-colors shadow-sm">
@@ -321,8 +428,6 @@ export default function InvoiceForm() {
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-
-        {/* ── Section 1: Core Details ── */}
         <div className="bg-card rounded-2xl border border-border/50 shadow-sm overflow-hidden">
           <div className="flex items-center gap-2 px-4 py-3 border-b border-border/40 bg-primary/5">
             <FileText className="w-4 h-4 text-primary" />
@@ -330,39 +435,78 @@ export default function InvoiceForm() {
               {isAR ? "البيانات الأساسية" : "Basic Details"}
             </h2>
           </div>
+
           <div className="p-4 grid grid-cols-2 md:grid-cols-4 gap-3">
             <div className="col-span-2 md:col-span-2">
               <label className={labelCls}>{isAR ? "العميل" : "Client"}</label>
               <select {...register("clientId")} className={inputCls}>
-                <option value={0}>{isAR ? "اختر العميل..." : "Select client..."}</option>
-                {clients?.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                <option value={0}>
+                  {isAR ? "اختر العميل..." : "Select client..."}
+                </option>
+                {clients?.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
               </select>
-              {errors.clientId && <p className="text-xs text-destructive mt-0.5">{errors.clientId.message}</p>}
+              {errors.clientId && (
+                <p className="text-xs text-destructive mt-0.5">
+                  {errors.clientId.message}
+                </p>
+              )}
             </div>
 
             <div>
-              <label className={labelCls}>{isAR ? "تاريخ الإصدار" : "Issue Date"}</label>
-              <input type="date" {...register("issueDate")} className={inputCls} />
-              {errors.issueDate && <p className="text-xs text-destructive mt-0.5">{errors.issueDate.message}</p>}
+              <label className={labelCls}>
+                {isAR ? "تاريخ الإصدار" : "Issue Date"}
+              </label>
+              <input
+                type="date"
+                {...register("issueDate")}
+                className={inputCls}
+              />
+              {errors.issueDate && (
+                <p className="text-xs text-destructive mt-0.5">
+                  {errors.issueDate.message}
+                </p>
+              )}
             </div>
 
             <div>
-              <label className={labelCls}>{isAR ? "تاريخ الاستحقاق" : "Due Date"}</label>
-              <input type="date" {...register("dueDate")} className={inputCls} />
+              <label className={labelCls}>
+                {isAR ? "تاريخ الاستحقاق" : "Due Date"}
+              </label>
+              <input
+                type="date"
+                {...register("dueDate")}
+                className={inputCls}
+              />
             </div>
 
             <div>
               <label className={labelCls}>{isAR ? "الحالة" : "Status"}</label>
               <select {...register("status")} className={inputCls}>
-                {Object.values(CreateInvoiceRequestStatus).map(s => (
-                  <option key={s} value={s}>{STATUS_LABELS[s]?.[lang] || s}</option>
+                {Object.values(CreateInvoiceRequestStatus).map((s) => (
+                  <option key={s} value={s}>
+                    {STATUS_LABELS[s]?.[lang] || s}
+                  </option>
                 ))}
               </select>
+            </div>
+
+            <div>
+              <label className={labelCls}>
+                {isAR ? "اسم المستورد / المصدر" : "Importer / Exporter Name"}
+              </label>
+              <input
+                {...register("importerExporterName")}
+                placeholder={isAR ? "ادخل الاسم" : "Enter the name"}
+                className={inputCls}
+              />
             </div>
           </div>
         </div>
 
-        {/* ── Section 2: Shipment Info ── */}
         <div className="bg-card rounded-2xl border border-border/50 shadow-sm overflow-hidden">
           <div className="flex items-center gap-2 px-4 py-3 border-b border-border/40 bg-blue-500/5">
             <Ship className="w-4 h-4 text-blue-500" />
@@ -370,31 +514,71 @@ export default function InvoiceForm() {
               {isAR ? "بيانات الشحنة" : "Shipment Info"}
             </h2>
           </div>
+
           <div className="p-4 grid grid-cols-2 md:grid-cols-4 gap-3">
             <div>
-              <label className={labelCls}>{isAR ? "رقم البيان" : "Shipment Ref"}</label>
-              <input {...register("shipmentRef")} placeholder={isAR ? "مثال: 123456" : "e.g. 123456"} className={inputCls} />
+              <label className={labelCls}>
+                {isAR ? "رقم البيان" : "Shipment Ref"}
+              </label>
+              <input
+                {...register("shipmentRef")}
+                placeholder={isAR ? "مثال: 123456" : "e.g. 123456"}
+                className={inputCls}
+              />
             </div>
+
             <div>
-              <label className={labelCls}>{isAR ? "رقم البوليصة B/L" : "Bill of Lading"}</label>
-              <input {...register("billOfLading")} placeholder="MSKU1234567" className={inputCls} />
+              <label className={labelCls}>
+                {isAR ? "رقم البوليصة B/L" : "Bill of Lading"}
+              </label>
+              <input
+                {...register("billOfLading")}
+                placeholder="MSKU1234567"
+                className={inputCls}
+              />
             </div>
+
             <div>
-              <label className={labelCls}>{isAR ? "ميناء الدخول" : "Port of Entry"}</label>
-              <input {...register("portOfEntry")} placeholder={isAR ? "مثال: ميناء حمد" : "e.g. Hamad Port"} className={inputCls} />
+              <label className={labelCls}>
+                {isAR ? "ميناء الدخول" : "Port of Entry"}
+              </label>
+              <input
+                {...register("portOfEntry")}
+                placeholder={isAR ? "مثال: ميناء حمد" : "e.g. Hamad Port"}
+                className={inputCls}
+              />
             </div>
+
             <div>
-              <label className={labelCls}>{isAR ? "عدد الطرود" : "Packages"}</label>
-              <input type="number" min="0" step="1" {...register("packageCount")} placeholder="50" className={inputCls} />
+              <label className={labelCls}>
+                {isAR ? "عدد الطرود" : "Packages"}
+              </label>
+              <input
+                type="number"
+                min="0"
+                step="1"
+                {...register("packageCount")}
+                placeholder="50"
+                className={inputCls}
+              />
             </div>
+
             <div>
-              <label className={labelCls}>{isAR ? "الوزن (كجم)" : "Weight (kg)"}</label>
-              <input type="number" min="0" step="0.001" {...register("shipmentWeight")} placeholder="1250.000" className={inputCls} />
+              <label className={labelCls}>
+                {isAR ? "الوزن (كجم)" : "Weight (kg)"}
+              </label>
+              <input
+                type="number"
+                min="0"
+                step="0.001"
+                {...register("shipmentWeight")}
+                placeholder="1250.000"
+                className={inputCls}
+              />
             </div>
           </div>
         </div>
 
-        {/* ── Section 3: Line Items ── */}
         <div className="bg-card rounded-2xl border border-border/50 shadow-sm overflow-hidden">
           <div className="flex items-center justify-between px-4 py-3 border-b border-border/40 bg-green-500/5">
             <div className="flex items-center gap-2">
@@ -403,9 +587,12 @@ export default function InvoiceForm() {
                 {isAR ? "بنود الفاتورة" : "Line Items"}
               </h2>
             </div>
+
             <button
               type="button"
-              onClick={() => append({ description: '', quantity: 1, unitPrice: 0 })}
+              onClick={() =>
+                append({ description: "", quantity: 1, unitPrice: 0 })
+              }
               className="text-xs font-semibold text-primary hover:bg-primary/10 px-2.5 py-1.5 rounded-lg transition-colors flex items-center gap-1"
             >
               <Plus className="w-3.5 h-3.5" />
@@ -413,21 +600,39 @@ export default function InvoiceForm() {
             </button>
           </div>
 
-          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead className="bg-muted/30 text-muted-foreground text-xs">
                   <tr>
                     <th className="px-2 py-2 w-8"></th>
-                    <th className="px-4 py-2 font-semibold text-start w-36">{isAR ? "نموذج" : "Template"}</th>
-                    <th className="px-4 py-2 font-semibold text-start">{isAR ? "الوصف" : "Description"}</th>
-                    <th className="px-4 py-2 font-semibold text-start w-20">{isAR ? "الكمية" : "Qty"}</th>
-                    <th className="px-4 py-2 font-semibold text-start w-28">{isAR ? "سعر الوحدة" : "Unit Price"}</th>
-                    <th className="px-4 py-2 font-semibold text-end w-28">{isAR ? "الإجمالي" : "Total"}</th>
+                    <th className="px-4 py-2 font-semibold text-start w-36">
+                      {isAR ? "نموذج" : "Template"}
+                    </th>
+                    <th className="px-4 py-2 font-semibold text-start">
+                      {isAR ? "الوصف" : "Description"}
+                    </th>
+                    <th className="px-4 py-2 font-semibold text-start w-20">
+                      {isAR ? "الكمية" : "Qty"}
+                    </th>
+                    <th className="px-4 py-2 font-semibold text-start w-28">
+                      {isAR ? "سعر الوحدة" : "Unit Price"}
+                    </th>
+                    <th className="px-4 py-2 font-semibold text-end w-28">
+                      {isAR ? "الإجمالي" : "Total"}
+                    </th>
                     <th className="px-3 py-2 w-10"></th>
                   </tr>
                 </thead>
-                <SortableContext items={fields.map(f => f.id)} strategy={verticalListSortingStrategy}>
+
+                <SortableContext
+                  items={fields.map((f) => f.id)}
+                  strategy={verticalListSortingStrategy}
+                >
                   <tbody className="divide-y divide-border/40">
                     {fields.map((field, index) => (
                       <SortableRow
@@ -448,80 +653,108 @@ export default function InvoiceForm() {
               </table>
             </div>
           </DndContext>
+
           {errors.items && (
-            <p className="text-xs text-destructive px-4 py-2 border-t border-border/40">{errors.items.message}</p>
+            <p className="text-xs text-destructive px-4 py-2 border-t border-border/40">
+              {errors.items.message}
+            </p>
           )}
         </div>
 
-        {/* ── Section 4: Notes + Totals ── */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-
-          {/* Notes */}
           <div className="bg-card rounded-2xl border border-border/50 shadow-sm overflow-hidden">
             <div className="flex items-center gap-2 px-4 py-3 border-b border-border/40 bg-amber-500/5">
               <StickyNote className="w-4 h-4 text-amber-500" />
-              <h3 className="text-sm font-bold">{isAR ? "ملاحظات" : "Notes"}</h3>
+              <h3 className="text-sm font-bold">
+                {isAR ? "ملاحظات" : "Notes"}
+              </h3>
             </div>
+
             <div className="p-3">
               <textarea
                 {...register("notes")}
                 rows={5}
                 className="w-full px-3 py-2 text-sm bg-background border border-border rounded-xl outline-none focus:ring-2 focus:ring-primary/20 resize-none"
-                placeholder={isAR ? "شروط الدفع، تعليمات التحويل، إلخ..." : "Payment terms, notes..."}
+                placeholder={
+                  isAR
+                    ? "شروط الدفع، تعليمات التحويل، إلخ..."
+                    : "Payment terms, notes..."
+                }
               />
             </div>
           </div>
 
-          {/* Totals */}
           <div className="bg-card rounded-2xl border border-border/50 shadow-sm overflow-hidden">
             <div className="flex items-center gap-2 px-4 py-3 border-b border-border/40 bg-primary/5">
               <Calculator className="w-4 h-4 text-primary" />
-              <h3 className="text-sm font-bold">{isAR ? "الملخص المالي" : "Financial Summary"}</h3>
+              <h3 className="text-sm font-bold">
+                {isAR ? "الملخص المالي" : "Financial Summary"}
+              </h3>
             </div>
+
             <div className="p-4 space-y-3">
               <div className="flex justify-between items-center text-sm text-muted-foreground">
                 <span>{isAR ? "المجموع الجزئي" : "Subtotal"}</span>
-                <span className="font-mono font-medium text-foreground">{formatCurrency(subtotal)}</span>
+                <span className="font-mono font-medium text-foreground">
+                  {formatCurrency(subtotal)}
+                </span>
               </div>
 
               <div className="flex justify-between items-center text-sm">
                 <div className="flex items-center gap-2">
-                  <span className="text-muted-foreground">{isAR ? "الضريبة %" : "Tax %"}</span>
+                  <span className="text-muted-foreground">
+                    {isAR ? "الضريبة %" : "Tax %"}
+                  </span>
                   <input
-                    type="number" step="0.01"
+                    type="number"
+                    step="0.01"
                     {...register("taxRate")}
                     className="w-16 px-2 py-1 text-sm bg-background border border-border rounded-lg outline-none focus:border-primary text-end"
                   />
                 </div>
-                <span className="font-mono text-muted-foreground">{formatCurrency(taxAmount)}</span>
+                <span className="font-mono text-muted-foreground">
+                  {formatCurrency(taxAmount)}
+                </span>
               </div>
 
               <div className="flex justify-between items-center text-sm">
                 <div className="flex items-center gap-2">
-                  <span className="text-muted-foreground">{isAR ? "دفعة مقدمة" : "Advance"}</span>
+                  <span className="text-muted-foreground">
+                    {isAR ? "دفعة مقدمة" : "Advance"}
+                  </span>
                   <input
-                    type="number" step="0.01" min="0"
+                    type="number"
+                    step="0.01"
+                    min="0"
                     {...register("advancePayment")}
                     className="w-24 px-2 py-1 text-sm bg-background border border-border rounded-lg outline-none focus:border-primary text-end"
                     placeholder="0.00"
                   />
                 </div>
-                <span className="font-mono text-green-600 font-medium">− {formatCurrency(Number(advancePaymentWatch))}</span>
+                <span className="font-mono text-green-600 font-medium">
+                  − {formatCurrency(Number(advancePaymentWatch))}
+                </span>
               </div>
 
               <div className="pt-3 border-t border-border/50 flex justify-between items-center">
-                <span className="text-base font-bold">{isAR ? "الصافي المستحق" : "Net Due"}</span>
-                <span className="text-lg font-bold font-mono text-primary">{formatCurrency(total)}</span>
+                <span className="text-base font-bold">
+                  {isAR ? "الصافي المستحق" : "Net Due"}
+                </span>
+                <span className="text-lg font-bold font-mono text-primary">
+                  {formatCurrency(total)}
+                </span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* ── Floating Action Bar ── */}
         <div className="fixed bottom-4 left-1/2 -translate-x-1/2 w-[calc(100%-2rem)] max-w-md bg-card/90 backdrop-blur-md border border-border/60 px-4 py-3 rounded-2xl shadow-2xl flex items-center justify-between gap-3 z-40">
           <p className="text-xs text-muted-foreground hidden sm:block truncate">
-            {isAR ? "تأكد من اكتمال الحقول المطلوبة" : "Fill all required fields"}
+            {isAR
+              ? "تأكد من اكتمال الحقول المطلوبة"
+              : "Fill all required fields"}
           </p>
+
           <div className="flex gap-2 ms-auto">
             <button
               type="button"
@@ -530,6 +763,7 @@ export default function InvoiceForm() {
             >
               {isAR ? "إلغاء" : "Cancel"}
             </button>
+
             <button
               type="submit"
               disabled={createMut.isPending || updateMut.isPending}
@@ -537,12 +771,15 @@ export default function InvoiceForm() {
             >
               <Save className="w-4 h-4" />
               {isEdit
-                ? (isAR ? "حفظ التغييرات" : "Save Changes")
-                : (isAR ? "إنشاء الفاتورة" : "Create Invoice")}
+                ? isAR
+                  ? "حفظ التغييرات"
+                  : "Save Changes"
+                : isAR
+                ? "إنشاء الفاتورة"
+                : "Create Invoice"}
             </button>
           </div>
         </div>
-
       </form>
     </motion.div>
   );
