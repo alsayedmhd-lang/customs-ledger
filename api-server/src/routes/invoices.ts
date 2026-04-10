@@ -77,7 +77,22 @@ router.get("/invoices", requireAuth, async (req, res) => {
 
 router.post("/invoices", requireAuth, async (req, res) => {
   try {
-    const { clientId, issueDate, dueDate, status, taxRate, advancePayment, notes, shipmentRef, billOfLading, packageCount, shipmentWeight, portOfEntry, items } = req.body;
+    const {
+      clientId,
+      issueDate,
+      dueDate,
+      status,
+      taxRate,
+      advancePayment,
+      notes,
+      shipmentRef,
+      billOfLading,
+      packageCount,
+      shipmentWeight,
+      portOfEntry,
+      importerExporterName,
+      items,
+    } = req.body;
 
     if (!clientId || !issueDate || !items || !Array.isArray(items)) {
       res.status(400).json({ error: "clientId, issueDate, and items are required" });
@@ -93,7 +108,7 @@ router.post("/invoices", requireAuth, async (req, res) => {
     const parsedTaxRate = parseFloat(taxRate ?? "0") || 0;
     const parsedAdvancePayment = parseFloat(advancePayment ?? "0") || 0;
     const subtotal = items.reduce((sum: number, item: { quantity: number; unitPrice: number }) => {
-      return sum + (parseFloat(String(item.quantity)) * parseFloat(String(item.unitPrice)));
+      return sum + parseFloat(String(item.quantity)) * parseFloat(String(item.unitPrice));
     }, 0);
     const taxAmount = subtotal * (parsedTaxRate / 100);
     const total = subtotal + taxAmount - parsedAdvancePayment;
@@ -122,6 +137,7 @@ router.post("/invoices", requireAuth, async (req, res) => {
             packageCount: packageCount ? parseInt(packageCount) : null,
             shipmentWeight: shipmentWeight ? parseFloat(shipmentWeight).toFixed(3) : null,
             portOfEntry: portOfEntry ?? null,
+            importerExporterName: importerExporterName ?? null,
             createdBy: req.user!.userId,
           })
           .returning();
@@ -130,9 +146,9 @@ router.post("/invoices", requireAuth, async (req, res) => {
       } catch (insertErr: any) {
         // 23505 = unique_violation in PostgreSQL
         if (insertErr?.cause?.code === "23505" || insertErr?.code === "23505") {
-          continue; // retry with the next generated number
+          continue;
         }
-        throw insertErr; // re-throw non-duplicate errors
+        throw insertErr;
       }
     }
 
@@ -203,7 +219,22 @@ router.get("/invoices/:id", async (req, res) => {
 router.put("/invoices/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
-    const { clientId, issueDate, dueDate, status, taxRate, advancePayment, notes, shipmentRef, billOfLading, packageCount, shipmentWeight, portOfEntry, items } = req.body;
+    const {
+      clientId,
+      issueDate,
+      dueDate,
+      status,
+      taxRate,
+      advancePayment,
+      notes,
+      shipmentRef,
+      billOfLading,
+      packageCount,
+      shipmentWeight,
+      portOfEntry,
+      importerExporterName,
+      items,
+    } = req.body;
 
     const [client] = await db.select().from(clientsTable).where(eq(clientsTable.id, clientId));
     if (!client) {
@@ -212,10 +243,13 @@ router.put("/invoices/:id", async (req, res) => {
     }
 
     const parsedTaxRate = parseFloat(taxRate ?? "0") || 0;
-    const effectiveAdvancePayment = status === "paid" ? 0 : (parseFloat(advancePayment ?? "0") || 0);
-    const subtotal = (items ?? []).reduce((sum: number, item: { quantity: number; unitPrice: number }) => {
-      return sum + (parseFloat(String(item.quantity)) * parseFloat(String(item.unitPrice)));
-    }, 0);
+    const effectiveAdvancePayment = status === "paid" ? 0 : parseFloat(advancePayment ?? "0") || 0;
+    const subtotal = (items ?? []).reduce(
+      (sum: number, item: { quantity: number; unitPrice: number }) => {
+        return sum + parseFloat(String(item.quantity)) * parseFloat(String(item.unitPrice));
+      },
+      0
+    );
     const taxAmount = subtotal * (parsedTaxRate / 100);
     const total = subtotal + taxAmount - effectiveAdvancePayment;
 
@@ -237,6 +271,7 @@ router.put("/invoices/:id", async (req, res) => {
         packageCount: packageCount ? parseInt(packageCount) : null,
         shipmentWeight: shipmentWeight ? parseFloat(shipmentWeight).toFixed(3) : null,
         portOfEntry: portOfEntry ?? null,
+        importerExporterName: importerExporterName ?? null,
         updatedAt: new Date(),
       })
       .where(and(eq(invoicesTable.id, id), isNull(invoicesTable.deletedAt)))
@@ -313,6 +348,7 @@ export function formatInvoice(inv: typeof invoicesTable.$inferSelect, clientName
     packageCount: inv.packageCount ?? null,
     shipmentWeight: inv.shipmentWeight ? parseFloat(inv.shipmentWeight) : null,
     portOfEntry: inv.portOfEntry ?? null,
+    importerExporterName: inv.importerExporterName ?? null,
     createdBy: inv.createdBy ?? null,
     deletedAt: inv.deletedAt ? inv.deletedAt.toISOString() : null,
     createdAt: inv.createdAt.toISOString(),
