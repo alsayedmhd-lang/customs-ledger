@@ -17,5 +17,6 @@ export interface CreateInvoiceRequest {
   notes?: string | null;
   shipmentRef?: string | null;
   portOfEntry?: string | null;
+  importerExporterName?: string | null;
   items: CreateInvoiceItemRequest[];
 }
