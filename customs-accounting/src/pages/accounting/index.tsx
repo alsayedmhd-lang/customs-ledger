@@ -18,6 +18,7 @@ interface AccountingRow {
   invoiceNumber: string;
   clientName: string;
   issueDate: string;
+  subtotal: number;
   total: number;
   payments: number;
   transportation: number;
