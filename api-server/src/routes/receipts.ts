@@ -138,7 +138,7 @@ export function formatReceipt(
     amount: parseFloat(r.amount ?? "0"),
     paymentMethod: r.paymentMethod,
     notes: r.notes ?? null,
-    receivedAt: r.receivedAt,
+    receivedAt: r.receiptDate,
     deletedAt: r.deletedAt ?? null,
   };
 }
