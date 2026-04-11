@@ -207,10 +207,13 @@ const salesManName =
   (user as any)?.displayNameAr ||
   "-";
 
-const impExpValue = (invoice as any).impExp || "—";
+const impExpValue =
+  (invoice as any).importerExporterName ||
+  (invoice as any).impExp ||
+  "-";
 
-const importerExporterName =
-  (invoice as any).importerExporterName || "—";
+// const importerExporterName =
+//   (invoice as any).importerExporterName || "—";
 
   return (
     <div className="min-h-screen bg-gray-100 print:bg-white" dir="rtl">
