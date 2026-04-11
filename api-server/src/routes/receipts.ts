@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db, receiptsTable, clientsTable, invoicesTable } from "@workspace/db";
-import { eq, desc, isNull, isNotNull, and } from "drizzle-orm";
+import { eq, desc, isNull, and } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth";
 
 const router: IRouter = Router();
@@ -60,10 +60,56 @@ router.get("/receipts", requireAuth, async (req, res) => {
   }
 });
 
+// Create receipt
+router.post("/receipts", requireAuth, async (req, res) => {
+  try {
+    const receiptNumber = await generateReceiptNumber();
+
+    const [receipt] = await db
+      .insert(receiptsTable)
+      .values({
+        receiptNumber,
+        clientId: req.body.clientId,
+        invoiceId: req.body.invoiceId || null,
+        amount: req.body.amount,
+        paymentMethod: req.body.paymentMethod,
+        notes: req.body.notes || null,
+        receivedAt: req.body.receivedAt,
+      })
+      .returning();
+
+    const [client] = await db
+      .select()
+      .from(clientsTable)
+      .where(eq(clientsTable.id, receipt.clientId));
+
+    const invoiceNumber = receipt.invoiceId
+      ? (
+          await db
+            .select()
+            .from(invoicesTable)
+            .where(eq(invoicesTable.id, receipt.invoiceId))
+        )[0]?.invoiceNumber || null
+      : null;
+
+    res.status(201).json(
+      formatReceipt(
+        receipt,
+        client?.nameEn || client?.nameAr || "",
+        invoiceNumber,
+      ),
+    );
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // Soft delete receipt (move to trash)
 router.delete("/receipts/:id", requireAuth, async (req, res) => {
   try {
     const id = parseInt(req.params.id);
+
     await db
       .update(receiptsTable)
       .set({ deletedAt: new Date() })
