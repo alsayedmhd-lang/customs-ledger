@@ -350,8 +350,8 @@ export default function App() {
               />
               <MenuButton
                 title={isArabic ? "سلة المحذوفات" : "Trash"}
-                active={page === "Tarsh"}
-                onClick={() => goToPage("Tarsh")}
+                active={page === "Trash"}
+                onClick={() => goToPage("Trash")}
                 isArabic={isArabic}
               />
             </div>
