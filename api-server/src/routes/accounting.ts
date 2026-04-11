@@ -50,7 +50,6 @@ router.get("/accounting", requireAuth, async (req, res) => {
         invoiceNumber: r.invoiceNumber,
         clientName: r.clientName,
         issueDate: r.issueDate,
-        subtotal: toNumber(r.subtotal),
         total: toNumber(r.total),
         payments: toNumber(r.payments),
         transportation: toNumber(r.transportation),
