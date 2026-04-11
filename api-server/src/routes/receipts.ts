@@ -69,9 +69,9 @@ router.post("/receipts", requireAuth, async (req, res) => {
       .insert(receiptsTable)
       .values({
         receiptNumber,
-        clientId: req.body.clientId,
-        invoiceId: req.body.invoiceId || null,
-        amount: req.body.amount,
+        clientId: Number(req.body.clientId),
+        invoiceId: req.body.invoiceId ? Number(req.body.invoiceId) : null,
+        amount: String(req.body.amount),
         paymentMethod: req.body.paymentMethod,
         notes: req.body.notes || null,
         receivedAt: req.body.receivedAt,
