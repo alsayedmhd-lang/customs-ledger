@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 
 type Props = {
   lang: "ar" | "en";
@@ -6,11 +6,23 @@ type Props = {
 
 type Tab = "invoices" | "receipts";
 
+type TrashItem = {
+  id: string;
+  client: string;
+  dateAr: string;
+  dateEn: string;
+  total: string;
+  statusAr: string;
+  statusEn: string;
+  deletedAtAr: string;
+  deletedAtEn: string;
+};
+
 export default function Tarsh({ lang }: Props) {
   const isArabic = lang === "ar";
   const [tab, setTab] = useState<Tab>("invoices");
 
-  const deletedInvoices = [
+  const deletedInvoices: TrashItem[] = [
     {
       id: "INV-2026-0006",
       client: "VERONA READY MADE",
@@ -24,7 +36,7 @@ export default function Tarsh({ lang }: Props) {
     },
   ];
 
-  const deletedReceipts = [
+  const deletedReceipts: TrashItem[] = [
     {
       id: "RCP-2026-0001",
       client: "Buzwair Industrial Gases Factory",
@@ -45,9 +57,10 @@ export default function Tarsh({ lang }: Props) {
       dir={isArabic ? "rtl" : "ltr"}
       style={{
         padding: "24px",
-        fontFamily: "system-ui",
+        fontFamily: "system-ui, sans-serif",
         background: "#f3f4f6",
         minHeight: "100vh",
+        boxSizing: "border-box",
       }}
     >
       <div
@@ -80,34 +93,34 @@ export default function Tarsh({ lang }: Props) {
                 alignItems: "center",
                 justifyContent: "center",
                 fontSize: "20px",
+                flexShrink: 0,
               }}
             >
               🗑️
             </div>
 
-            <h1 style={{ margin: 0, fontSize: "42px", color: "#111827" }}>
+            <h1
+              style={{
+                margin: 0,
+                fontSize: "32px",
+                color: "#111827",
+                lineHeight: 1.2,
+              }}
+            >
               {isArabic ? "سلة المحذوفات" : "Trash"}
             </h1>
           </div>
 
-          <p style={{ marginTop: "8px", color: "#6b7280" }}>
+          <p style={{ margin: 0, color: "#6b7280" }}>
             {isArabic
               ? `${currentItems.length} عنصر محذوف`
-              : `${currentItems.length} deleted item`}
+              : `${currentItems.length} deleted item${
+                  currentItems.length === 1 ? "" : "s"
+                }`}
           </p>
         </div>
 
-        <button
-          style={{
-            border: "none",
-            background: "#ef4444",
-            color: "white",
-            borderRadius: "14px",
-            padding: "12px 16px",
-            cursor: "pointer",
-            fontWeight: 700,
-          }}
-        >
+        <button type="button" style={emptyTrashButtonStyle}>
           {isArabic ? "إفراغ السلة" : "Empty Trash"}
         </button>
       </div>
@@ -137,16 +150,7 @@ export default function Tarsh({ lang }: Props) {
       </div>
 
       {currentItems.length === 0 ? (
-        <div
-          style={{
-            background: "white",
-            borderRadius: "22px",
-            padding: "80px 24px",
-            minHeight: "350px",
-            boxShadow: "0 4px 14px rgba(0,0,0,0.06)",
-            textAlign: "center",
-          }}
-        >
+        <div style={emptyStateCardStyle}>
           <div
             style={{
               fontSize: "64px",
@@ -157,26 +161,18 @@ export default function Tarsh({ lang }: Props) {
             📄
           </div>
 
-          <p style={{ color: "#6b7280", fontSize: "18px" }}>
+          <p style={{ color: "#6b7280", fontSize: "18px", margin: 0 }}>
             {isArabic
               ? tab === "invoices"
                 ? "لا توجد فواتير محذوفة"
                 : "لا توجد سندات قبض محذوفة"
               : tab === "invoices"
-              ? "No deleted invoices"
-              : "No deleted receipts"}
+                ? "No deleted invoices"
+                : "No deleted receipts"}
           </p>
         </div>
       ) : (
-        <div
-          style={{
-            background: "white",
-            borderRadius: "22px",
-            padding: "0",
-            overflow: "hidden",
-            boxShadow: "0 4px 14px rgba(0,0,0,0.06)",
-          }}
-        >
+        <div style={tableCardStyle}>
           <div style={{ overflowX: "auto" }}>
             <table
               style={{
@@ -186,15 +182,21 @@ export default function Tarsh({ lang }: Props) {
               }}
             >
               <thead>
-                <tr style={{ color: "#6b7280", fontSize: "14px", background: "#f8fafc" }}>
+                <tr
+                  style={{
+                    color: "#6b7280",
+                    fontSize: "14px",
+                    background: "#f8fafc",
+                  }}
+                >
                   <th style={thStyle}>
                     {tab === "invoices"
                       ? isArabic
                         ? "رقم الفاتورة"
                         : "Invoice No."
                       : isArabic
-                      ? "رقم السند"
-                      : "Receipt No."}
+                        ? "رقم السند"
+                        : "Receipt No."}
                   </th>
                   <th style={thStyle}>{isArabic ? "العميل" : "Client"}</th>
                   <th style={thStyle}>{isArabic ? "التاريخ" : "Date"}</th>
@@ -225,17 +227,7 @@ export default function Tarsh({ lang }: Props) {
                     </td>
 
                     <td style={tdStyle}>
-                      <span
-                        style={{
-                          display: "inline-block",
-                          padding: "6px 12px",
-                          borderRadius: "999px",
-                          fontSize: "13px",
-                          fontWeight: 600,
-                          background: "#e5e7eb",
-                          color: "#475569",
-                        }}
-                      >
+                      <span style={statusBadgeStyle}>
                         {isArabic ? item.statusAr : item.statusEn}
                       </span>
                     </td>
@@ -245,12 +237,18 @@ export default function Tarsh({ lang }: Props) {
                     </td>
 
                     <td style={tdStyle}>
-                      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                        <button style={restoreButtonStyle}>
+                      <div
+                        style={{
+                          display: "flex",
+                          gap: "8px",
+                          flexWrap: "wrap",
+                        }}
+                      >
+                        <button type="button" style={restoreButtonStyle}>
                           {isArabic ? "استعادة" : "Restore"}
                         </button>
 
-                        <button style={deleteButtonStyle}>
+                        <button type="button" style={deleteButtonStyle}>
                           {isArabic ? "حذف نهائي" : "Delete Permanently"}
                         </button>
                       </div>
@@ -279,6 +277,7 @@ function TabButton({
 }) {
   return (
     <button
+      type="button"
       onClick={onClick}
       style={{
         border: "none",
@@ -300,13 +299,14 @@ function TabButton({
           height: "22px",
           borderRadius: "999px",
           background: active ? "#ef4444" : "#e2e8f0",
-          color: active ? "white" : "#475569",
+          color: active ? "#ffffff" : "#475569",
           display: "inline-flex",
           alignItems: "center",
           justifyContent: "center",
           fontSize: "12px",
           fontWeight: 700,
           padding: "0 6px",
+          boxSizing: "border-box",
         }}
       >
         {count}
@@ -319,12 +319,51 @@ const thStyle: React.CSSProperties = {
   textAlign: "start",
   padding: "16px 14px",
   fontWeight: 700,
+  whiteSpace: "nowrap",
 };
 
 const tdStyle: React.CSSProperties = {
   textAlign: "start",
   padding: "16px 14px",
   color: "#111827",
+  verticalAlign: "middle",
+};
+
+const tableCardStyle: React.CSSProperties = {
+  background: "#ffffff",
+  borderRadius: "22px",
+  padding: "0",
+  overflow: "hidden",
+  boxShadow: "0 4px 14px rgba(0,0,0,0.06)",
+};
+
+const emptyStateCardStyle: React.CSSProperties = {
+  background: "#ffffff",
+  borderRadius: "22px",
+  padding: "80px 24px",
+  minHeight: "350px",
+  boxShadow: "0 4px 14px rgba(0,0,0,0.06)",
+  textAlign: "center",
+};
+
+const emptyTrashButtonStyle: React.CSSProperties = {
+  border: "none",
+  background: "#ef4444",
+  color: "#ffffff",
+  borderRadius: "14px",
+  padding: "12px 16px",
+  cursor: "pointer",
+  fontWeight: 700,
+};
+
+const statusBadgeStyle: React.CSSProperties = {
+  display: "inline-block",
+  padding: "6px 12px",
+  borderRadius: "999px",
+  fontSize: "13px",
+  fontWeight: 600,
+  background: "#e5e7eb",
+  color: "#475569",
 };
 
 const restoreButtonStyle: React.CSSProperties = {
