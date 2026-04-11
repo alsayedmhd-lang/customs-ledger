@@ -482,7 +482,7 @@ export default function AccountingPage() {
                 {/* ─ column group labels ─ */}
                 <tr className="text-[10px] bg-muted/20 border-b border-border/40 sticky top-[33px] z-20">
                   <td colSpan={4} />
-                  <td className="px-2 py-1 text-blue-400 text-center border-r border-border/40">مدفوعات العميل</td>
+                  <td className="px-2 py-1 text-blue-400 text-center border-r border-border/40">مدفوعاتي</td>
                   <td colSpan={4} className="px-2 py-1 text-orange-400 text-center border-r border-border/40">مجموعة النقليات</td>
                   <td colSpan={2} className="px-2 py-1 text-purple-400 text-center border-r border-border/40">مجموعة العمال</td>
                   <td colSpan={2} className="px-2 py-1 text-red-400 text-center border-r border-border/40">مجموعة أخرى</td>
