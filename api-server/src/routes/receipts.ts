@@ -96,7 +96,7 @@ router.get("/receipts/trash", requireAuth, async (req, res) => {
 });
 
 // Soft delete receipt (move to trash)
-router.delete("/receipts/:id", async (req, res) => {
+router.delete("/receipts/:id", requireAuth, async (req, res) => {
   try {
     const id = parseInt(req.params.id);
     await db
