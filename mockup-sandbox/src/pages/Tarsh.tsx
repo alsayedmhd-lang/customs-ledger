@@ -18,7 +18,7 @@ type TrashItem = {
   deletedAtEn: string;
 };
 
-export default function Tarsh({ lang }: Props) {
+export default function Trash({ lang }: Props) {
   const isArabic = lang === "ar";
   const [tab, setTab] = useState<Tab>("invoices");
 
