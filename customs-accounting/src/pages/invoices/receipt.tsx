@@ -202,11 +202,13 @@ export default function InvoiceReceipt() {
   const amountWordsEn = numberToEnglishWords(invoice.total);
 
 const salesManName =
-  (user as any)?.username ||
-  (user as any)?.name ||
-  (user as any)?.fullName ||
   (invoice as any).salesMan ||
-  "—";
+  (invoice as any).createdByUsername ||
+  (invoice as any).createdBy ||
+  (user as any)?.fullName ||
+  (user as any)?.name ||
+  (user as any)?.username ||
+  "-";
 
 const impExpValue = (invoice as any).impExp || "—";
 
