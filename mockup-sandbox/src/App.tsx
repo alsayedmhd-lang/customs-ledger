@@ -9,7 +9,7 @@ import Accounts from "./pages/Accounts";
 import Users from "./pages/Users";
 import Settings from "./pages/Settings";
 import Items from "./pages/Items";
-import Tarsh from "./pages/Tarsh";
+import Trash from "./pages/Trash";
 
 type Page =
   | "login"
@@ -21,7 +21,7 @@ type Page =
   | "users"
   | "settings"
   | "items"
-  | "Tarsh";
+  | "Trash";
 
 type Lang = "ar" | "en";
 
