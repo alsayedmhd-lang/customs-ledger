@@ -516,7 +516,7 @@ export default function AccountingPage() {
                           </span>
                         </Link>
                       </td>
-                      <td className="px-3 py-1.5 whitespace-nowrap font-semibold text-foreground">{formatCurrency(row.total)}</td>
+                      <td className="px-3 py-1.5 whitespace-nowrap font-semibold text-foreground">{formatCurrency(row.subtotal)}</td>
                       <td className="px-3 py-1.5 whitespace-nowrap max-w-[120px] truncate" title={row.clientName}>{row.clientName}</td>
                       <td className="px-3 py-1.5 whitespace-nowrap text-muted-foreground">{new Date(row.issueDate).toLocaleDateString("ar-EG")}</td>
 
