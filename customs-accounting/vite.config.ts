@@ -10,7 +10,7 @@ const basePath = process.env.BASE_PATH || "/";
 export default defineConfig({
   base: basePath,
   define: {
-    "import.meta.env.VITE_API_BASE_URL": JSON.stringify("https://customs-ledger-api.onrender.com"),
+    "import.meta.env.VITE_API_BASE_URL": JSON.stringify("https://workspaceapi-server-production-0e1f.up.railway.app"),
   },
   plugins: [
     react(),
