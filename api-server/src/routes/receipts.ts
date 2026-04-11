@@ -74,8 +74,7 @@ router.post("/receipts", requireAuth, async (req, res) => {
         amount: String(req.body.amount),
         paymentMethod: req.body.paymentMethod,
         notes: req.body.notes || null,
-        receiptDate: req.body.receivedAt,
-        createdBy: req.user!.userId,
+        receiptDate: req.body.receiptDate || req.body.receivedAt,
       })
       .returning();
 
