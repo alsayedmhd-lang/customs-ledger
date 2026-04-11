@@ -36,7 +36,8 @@ type ClientForm = {
   isActive: boolean;
 };
 
-const API_BASE = "https://customs-ledger-api.onrender.com";
+const API_BASE =
+  (import.meta.env.VITE_API_BASE_URL || "https://workspaceapi-server-production-0e1f.up.railway.app").replace(/\/$/, "");
 
 const emptyForm: ClientForm = {
   name: "",
