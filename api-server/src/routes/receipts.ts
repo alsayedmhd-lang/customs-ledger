@@ -141,5 +141,34 @@ export function formatReceipt(
     deletedAt: r.deletedAt ?? null,
   };
 }
+router.get("/receipts/:id", requireAuth, async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+
+    const rows = await db
+      .select()
+      .from(receiptsTable)
+      .leftJoin(clientsTable, eq(receiptsTable.clientId, clientsTable.id))
+      .leftJoin(invoicesTable, eq(receiptsTable.invoiceId, invoicesTable.id))
+      .where(eq(receiptsTable.id, id));
+
+    if (!rows.length) {
+      return res.status(404).json({ error: "Receipt not found" });
+    }
+
+    const row = rows[0];
+
+    res.json(
+      formatReceipt(
+        row.receipts,
+        row.clients?.nameEn || row.clients?.nameAr || "",
+        row.invoices?.invoiceNumber || null,
+      ),
+    );
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
 
 export default router;
