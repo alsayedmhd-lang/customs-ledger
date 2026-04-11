@@ -331,7 +331,7 @@ export default function TrashPage() {
                     <tr key={rec.id} className="hover:bg-muted/20 transition-colors">
                       <td className={`${tdCls} font-mono font-bold text-primary`}>{rec.receiptNumber}</td>
                       <td className={`${tdCls} font-medium`}>{rec.clientName}</td>
-                      <td className={`${tdCls} text-muted-foreground`}>{formatDate(rec.receiptDate)}</td>
+                      <td className={`${tdCls} text-muted-foreground`}>{formatDate(rec.receivedAt)}</td>
                       <td className={`${tdCls} font-semibold`}>{formatCurrency(rec.amount)}</td>
                       <td className={`${tdCls} text-muted-foreground`}>{methodLabels[rec.paymentMethod] ?? rec.paymentMethod}</td>
                       <td className={`${tdCls} text-muted-foreground text-xs`}>{timeSince(rec.deletedAt)}</td>
