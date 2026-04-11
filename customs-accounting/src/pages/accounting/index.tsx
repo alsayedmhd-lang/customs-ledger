@@ -73,6 +73,8 @@ function rowToEdit(row: AccountingRow): RowEdit {
     laborPaid: row.laborPaid ?? false,
     otherExpensesPaid: row.otherExpensesPaid ?? false,
   };
+function p(v: string) {
+  return parseFloat(v) || 0;
 }
 
 function calcIncome(row: AccountingRow, e: RowEdit) {
