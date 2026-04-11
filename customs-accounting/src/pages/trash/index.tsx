@@ -17,7 +17,7 @@ import { formatCurrency, formatDate } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import { useLanguage } from "@/lib/language-context";
 
-const API_BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
 
 function authFetch(url: string, options: RequestInit = {}) {
   const token = sessionStorage.getItem("auth_token");
@@ -45,7 +45,7 @@ type TrashReceipt = {
   id: number;
   receiptNumber: string;
   clientName: string;
-  receiptDate: string;
+  receivedAt: string;
   amount: number;
   paymentMethod: string;
   deletedAt: string;
