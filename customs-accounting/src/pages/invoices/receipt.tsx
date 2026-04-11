@@ -203,11 +203,8 @@ export default function InvoiceReceipt() {
 
 const salesManName =
   (invoice as any).salesMan ||
-  (user as any)?.englishName ||
-  (user as any)?.nameEn ||
-  (user as any)?.fullNameEn ||
-  (user as any)?.fullName ||
-  (user as any)?.name ||
+  (user as any)?.displayNameEn ||
+  (user as any)?.displayNameAr ||
   "-";
 
 const impExpValue = (invoice as any).impExp || "—";
