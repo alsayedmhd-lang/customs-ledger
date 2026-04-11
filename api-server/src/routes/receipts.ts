@@ -60,41 +60,6 @@ router.get("/receipts", requireAuth, async (req, res) => {
   }
 });
 
-// List deleted receipts (trash)
-router.get("/receipts/trash", requireAuth, async (req, res) => {
-  try {
-    const isAdmin = req.user!.role === "admin" || req.user!.role === "supervisor";
-    const userId = req.user!.userId;
-
-    const filters = [isNotNull(receiptsTable.deletedAt)];
-
-    if (!isAdmin) {
-      filters.push(eq(invoicesTable.createdBy, userId));
-    }
-
-    const rows = await db
-      .select()
-      .from(receiptsTable)
-      .leftJoin(clientsTable, eq(receiptsTable.clientId, clientsTable.id))
-      .leftJoin(invoicesTable, eq(receiptsTable.invoiceId, invoicesTable.id))
-      .where(and(...filters))
-      .orderBy(desc(receiptsTable.deletedAt));
-
-    const data = rows.map((row) =>
-      formatReceipt(
-        row.receipts,
-        row.clients?.nameEn || row.clients?.nameAr || "",
-        row.invoices?.invoiceNumber || null,
-      ),
-    );
-
-    res.json(data);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
-
 // Soft delete receipt (move to trash)
 router.delete("/receipts/:id", requireAuth, async (req, res) => {
   try {
