@@ -211,10 +211,7 @@ const impExpValue =
   (invoice as any).importerExporterName ||
   (invoice as any).impExp ||
   "-";
-
-// const importerExporterName =
-//   (invoice as any).importerExporterName || "—";
-
+  
   return (
     <div className="min-h-screen bg-gray-100 print:bg-white" dir="rtl">
       <style>{`
@@ -395,7 +392,6 @@ const impExpValue =
               </div>
               
               <div className="text-[13px] leading-tight font-bold text-gray-900 mt-1">
-                {importerExporterName}
               </div>
 
               {invoice.dueDate && (
