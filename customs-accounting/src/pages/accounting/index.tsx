@@ -461,7 +461,7 @@ export default function AccountingPage() {
                   <th className="px-3 py-2.5 text-right font-semibold text-muted-foreground whitespace-nowrap">العميل</th>
                   <th className="px-3 py-2.5 text-right font-semibold text-muted-foreground whitespace-nowrap">التاريخ</th>
                   {/* ─ payments ─ */}
-                  <th className="px-2 py-2.5 text-right font-semibold text-blue-500 whitespace-nowrap border-r border-border/40">المدفوعات</th>
+                  <th className="px-2 py-2.5 text-right font-semibold text-blue-500 whitespace-nowrap border-r border-border/40"> مدفوعاتي </th>
                   {/* ─ transport group ─ */}
                   <th className="px-2 py-2.5 text-right font-semibold text-orange-500 whitespace-nowrap border-r border-border/40">النقليات</th>
                   <th className="px-2 py-2.5 text-center font-semibold text-orange-400 whitespace-nowrap" title="تسديد النقليات">✓</th>
