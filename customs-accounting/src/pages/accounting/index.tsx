@@ -73,25 +73,24 @@ function rowToEdit(row: AccountingRow): RowEdit {
     laborPaid: row.laborPaid ?? false,
     otherExpensesPaid: row.otherExpensesPaid ?? false,
   };
-function p(v: string) {
-  return parseFloat(v) || 0;
-}
+const parseNum = (v: string | number | null | undefined) =>
+  Number.parseFloat(String(v ?? "")) || 0;
 
 function calcIncome(row: AccountingRow, e: RowEdit) {
-  return row.total - p(e.payments)
-    - (e.transportationPaid ? p(e.transportation) : 0)
-    - (e.laborPaid ? p(e.labor) : 0)
-    - (e.otherExpensesPaid ? p(e.otherExpenses) : 0);
+  return row.total - parseNum(e.payments)
+    - (e.transportationPaid ? parseNum(e.transportation) : 0)
+    - (e.laborPaid ? parseNum(e.labor) : 0)
+    - (e.otherExpensesPaid ? parseNum(e.otherExpenses) : 0);
 }
 
 function isDirty(row: AccountingRow, e: RowEdit) {
   return (
-    p(e.payments) !== row.payments ||
-    p(e.transportation) !== row.transportation ||
+    parseNum(e.payments) !== row.payments ||
+    parseNum(e.transportation) !== row.transportation ||
     (e.driverName ?? "") !== (row.driverName ?? "") ||
     (e.unloadLocation ?? "") !== (row.unloadLocation ?? "") ||
-    p(e.labor) !== row.labor ||
-    p(e.otherExpenses) !== row.otherExpenses ||
+    parseNum(e.labor) !== row.labor ||
+    parseNum(e.otherExpenses) !== row.otherExpenses ||
     e.transportationPaid !== (row.transportationPaid ?? false) ||
     e.laborPaid !== (row.laborPaid ?? false) ||
     e.otherExpensesPaid !== (row.otherExpensesPaid ?? false)
@@ -235,7 +234,7 @@ export default function AccountingPage() {
   }), [rows, search, clientFilter, driverFilter, locationFilter, dateFrom, dateTo, edits]);
 
   const totalInvoices = useMemo(() => filtered.reduce((s, r) => s + r.total, 0), [filtered]);
-  const totalPayments = useMemo(() => filtered.reduce((s, r) => s + p(getEdit(r).payments), 0), [filtered, getEdit]);
+  const totalPayments = useMemo(() => filtered.reduce((s, r) => s + parseNum(getEdit(r).payments), 0), [filtered, getEdit]);
   const totalTransportation = useMemo(() => filtered.reduce((s, r) => { const e = getEdit(r); return s + (!e.transportationPaid ? p(e.transportation) : 0); }, 0), [filtered, getEdit]);
   const totalLabor = useMemo(() => filtered.reduce((s, r) => { const e = getEdit(r); return s + (!e.laborPaid ? p(e.labor) : 0); }, 0), [filtered, getEdit]);
   const totalOther = useMemo(() => filtered.reduce((s, r) => { const e = getEdit(r); return s + (!e.otherExpensesPaid ? p(e.otherExpenses) : 0); }, 0), [filtered, getEdit]);
