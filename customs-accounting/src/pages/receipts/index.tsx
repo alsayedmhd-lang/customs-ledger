@@ -176,7 +176,7 @@ export default function ReceiptsList() {
                   className="border-b border-border/50 last:border-0 hover:bg-muted/30 transition-colors"
                 >
                   <td className="px-4 py-3 font-mono font-semibold text-primary">{receipt.receiptNumber}</td>
-                  <td className="px-4 py-3 font-medium">{receipt.clientName}</td>
+                  <td className="px-4 py-3 font-medium">TEST-CLIENT</td>
                   <td className="px-4 py-3 text-muted-foreground">
                     {receipt.invoiceNumber ? (
                       <span className="font-mono text-xs bg-muted px-2 py-1 rounded">{receipt.invoiceNumber}</span>
