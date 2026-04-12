@@ -3,7 +3,8 @@ import { useParams, Link } from "wouter";
 import { useGetReceipt } from "@workspace/api-client-react";
 import { Printer, ArrowRight, ArrowLeft, Stamp } from "lucide-react";
 import Barcode from "react-barcode";
-import { formatNumber } from "@/lib/utils";
+import { formatNumber, formatDate } from "@/lib/utils";
+// import { formatNumber } from "@/lib/utils";
 import { useLanguage } from "@/lib/language-context";
 import { useCompanySettings } from "@/lib/company-settings-context";
 import { useAuth } from "@/lib/auth-context";
@@ -239,7 +240,8 @@ export default function ReceiptPrint() {
               {/* التاريخ */}
               <tr>
                 <td className="px-3 py-1.5 font-bold text-gray-700 text-right bg-gray-50 border-l border-gray-200">التاريخ</td>
-                <td className="px-3 py-1.5 font-semibold text-gray-900 text-center border-l border-gray-200">{receipt.receiptDate}</td>
+                <td className="px-3 py-1.5 font-semibold text-gray-900 text-center border-l border-gray-200">{formatDate(receipt.receivedAt)}</td>
+            {/* <td className="px-3 py-1.5 font-semibold text-gray-900 text-center border-l border-gray-200">{receipt.receiptDate}</td> */}
                 <td className="px-3 py-1.5 font-bold text-gray-400 text-left bg-gray-50 tracking-wide">Date</td>
               </tr>
             </tbody>
