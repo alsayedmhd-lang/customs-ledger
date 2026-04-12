@@ -48,17 +48,10 @@ router.get("/receipts", requireAuth, async (req, res) => {
     const data = rows.map((row) =>
       formatReceipt(
         row.receipts,
-        JSON.stringify(row),
+        row.clients?.nameEn || row.clients?.nameAr || row.clients?.name || "",
         row.invoices?.invoiceNumber || null,
       ),
     );
-    // const data = rows.map((row) =>
-    //   formatReceipt(
-    //     row.receipts,
-    //     row.clients?.nameEn || row.clients?.nameAr || row.clients?.name || "",
-    //     row.invoices?.invoiceNumber || null,
-    //   ),
-    // );
 
     res.json(data);
   } catch (err) {
