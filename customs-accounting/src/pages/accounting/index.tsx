@@ -78,7 +78,8 @@ function rowToEdit(row: AccountingRow): RowEdit {
 function p(v: string) { return parseFloat(v) || 0; }
 
 function calcIncome(row: AccountingRow, e: RowEdit) {
-  return row.total - p(e.payments)
+  return row.subtotal - p(e.payments)
+  // return row.total - p(e.payments)
     - (e.transportationPaid ? p(e.transportation) : 0)
     - (e.laborPaid ? p(e.labor) : 0)
     - (e.otherExpensesPaid ? p(e.otherExpenses) : 0);
