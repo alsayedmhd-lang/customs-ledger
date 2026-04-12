@@ -191,7 +191,8 @@ export default function ReceiptsList() {
                       {paymentMethodLabel[receipt.paymentMethod] ?? receipt.paymentMethod}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-muted-foreground">{formatDate(receipt.receiptDate)}</td>
+                  <td className="px-4 py-3 text-muted-foreground">{formatDate(receipt.receivedAt)}</td>
+             {/* <td className="px-4 py-3 text-muted-foreground">{formatDate(receipt.receiptDate)}</td> */}
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
                       <Link href={`/receipts/${receipt.id}/print`}>
