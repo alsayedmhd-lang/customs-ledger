@@ -73,24 +73,25 @@ function rowToEdit(row: AccountingRow): RowEdit {
     laborPaid: row.laborPaid ?? false,
     otherExpensesPaid: row.otherExpensesPaid ?? false,
   };
-const parseNum = (v: string | number | null | undefined) =>
-  Number.parseFloat(String(v ?? "")) || 0;
+}
+
+function p(v: string) { return parseFloat(v) || 0; }
 
 function calcIncome(row: AccountingRow, e: RowEdit) {
-  return row.total - parseNum(e.payments)
-    - (e.transportationPaid ? parseNum(e.transportation) : 0)
-    - (e.laborPaid ? parseNum(e.labor) : 0)
-    - (e.otherExpensesPaid ? parseNum(e.otherExpenses) : 0);
+  return row.total - p(e.payments)
+    - (e.transportationPaid ? p(e.transportation) : 0)
+    - (e.laborPaid ? p(e.labor) : 0)
+    - (e.otherExpensesPaid ? p(e.otherExpenses) : 0);
 }
 
 function isDirty(row: AccountingRow, e: RowEdit) {
   return (
-    parseNum(e.payments) !== row.payments ||
-    parseNum(e.transportation) !== row.transportation ||
+    p(e.payments) !== row.payments ||
+    p(e.transportation) !== row.transportation ||
     (e.driverName ?? "") !== (row.driverName ?? "") ||
     (e.unloadLocation ?? "") !== (row.unloadLocation ?? "") ||
-    parseNum(e.labor) !== row.labor ||
-    parseNum(e.otherExpenses) !== row.otherExpenses ||
+    p(e.labor) !== row.labor ||
+    p(e.otherExpenses) !== row.otherExpenses ||
     e.transportationPaid !== (row.transportationPaid ?? false) ||
     e.laborPaid !== (row.laborPaid ?? false) ||
     e.otherExpensesPaid !== (row.otherExpensesPaid ?? false)
@@ -234,7 +235,7 @@ export default function AccountingPage() {
   }), [rows, search, clientFilter, driverFilter, locationFilter, dateFrom, dateTo, edits]);
 
   const totalInvoices = useMemo(() => filtered.reduce((s, r) => s + r.total, 0), [filtered]);
-  const totalPayments = useMemo(() => filtered.reduce((s, r) => s + parseNum(getEdit(r).payments), 0), [filtered, getEdit]);
+  const totalPayments = useMemo(() => filtered.reduce((s, r) => s + p(getEdit(r).payments), 0), [filtered, getEdit]);
   const totalTransportation = useMemo(() => filtered.reduce((s, r) => { const e = getEdit(r); return s + (!e.transportationPaid ? p(e.transportation) : 0); }, 0), [filtered, getEdit]);
   const totalLabor = useMemo(() => filtered.reduce((s, r) => { const e = getEdit(r); return s + (!e.laborPaid ? p(e.labor) : 0); }, 0), [filtered, getEdit]);
   const totalOther = useMemo(() => filtered.reduce((s, r) => { const e = getEdit(r); return s + (!e.otherExpensesPaid ? p(e.otherExpenses) : 0); }, 0), [filtered, getEdit]);
@@ -462,7 +463,7 @@ export default function AccountingPage() {
                   <th className="px-3 py-2.5 text-right font-semibold text-muted-foreground whitespace-nowrap">العميل</th>
                   <th className="px-3 py-2.5 text-right font-semibold text-muted-foreground whitespace-nowrap">التاريخ</th>
                   {/* ─ payments ─ */}
-                  <th className="px-2 py-2.5 text-right font-semibold text-blue-500 whitespace-nowrap border-r border-border/40"> مدفوعاتي </th>
+                  <th className="px-2 py-2.5 text-right font-semibold text-blue-500 whitespace-nowrap border-r border-border/40">المدفوعات</th>
                   {/* ─ transport group ─ */}
                   <th className="px-2 py-2.5 text-right font-semibold text-orange-500 whitespace-nowrap border-r border-border/40">النقليات</th>
                   <th className="px-2 py-2.5 text-center font-semibold text-orange-400 whitespace-nowrap" title="تسديد النقليات">✓</th>
