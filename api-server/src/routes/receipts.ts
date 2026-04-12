@@ -32,7 +32,7 @@ router.get("/receipts", requireAuth, async (req, res) => {
         .select()
         .from(receiptsTable)
         .leftJoin(invoicesTable, eq(receiptsTable.invoiceId, invoicesTable.id))
-        .leftJoin(clientsTable, eq(invoicesTable.clientId, clientsTable.id))
+        .leftJoin(clientsTable, eq(receiptsTable.clientId, clientsTable.id))
         .where(buildFilters([eq(invoicesTable.clientId, clientId)]))
         .orderBy(desc(receiptsTable.id));
     } else {
@@ -40,7 +40,7 @@ router.get("/receipts", requireAuth, async (req, res) => {
         .select()
         .from(receiptsTable)
         .leftJoin(invoicesTable, eq(receiptsTable.invoiceId, invoicesTable.id))
-        .leftJoin(clientsTable, eq(invoicesTable.clientId, clientsTable.id))
+        .leftJoin(clientsTable, eq(receiptsTable.clientId, clientsTable.id))
         .where(buildFilters())
         .orderBy(desc(receiptsTable.id));
     }
@@ -164,7 +164,7 @@ router.get("/receipts/:id", requireAuth, async (req, res) => {
       .select()
       .from(receiptsTable)
       .leftJoin(invoicesTable, eq(receiptsTable.invoiceId, invoicesTable.id))
-      .leftJoin(clientsTable, eq(invoicesTable.clientId, clientsTable.id))
+      .leftJoin(clientsTable, eq(receiptsTable.clientId, clientsTable.id))
       .where(eq(receiptsTable.id, id));
 
     if (!rows.length) {
