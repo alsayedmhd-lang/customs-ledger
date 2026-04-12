@@ -65,11 +65,23 @@ router.post("/receipts", requireAuth, async (req, res) => {
   try {
     const receiptNumber = await generateReceiptNumber();
 
+    const clientId =
+      req.body.clientId
+        ? Number(req.body.clientId)
+        : req.body.invoiceId
+          ? (
+              await db
+                .select()
+                .from(invoicesTable)
+                .where(eq(invoicesTable.id, Number(req.body.invoiceId)))
+            )[0]?.clientId ?? null
+          : null;
+
     const [receipt] = await db
       .insert(receiptsTable)
       .values({
         receiptNumber,
-        clientId: Number(req.body.clientId),
+        clientId,
         invoiceId: req.body.invoiceId ? Number(req.body.invoiceId) : null,
         amount: String(req.body.amount),
         paymentMethod: req.body.paymentMethod,
@@ -78,10 +90,12 @@ router.post("/receipts", requireAuth, async (req, res) => {
       })
       .returning();
 
-    const [client] = await db
-      .select()
-      .from(clientsTable)
-      .where(eq(clientsTable.id, receipt.clientId));
+    const [client] = receipt.clientId
+      ? await db
+          .select()
+          .from(clientsTable)
+          .where(eq(clientsTable.id, receipt.clientId))
+      : [];
 
     const invoiceNumber = receipt.invoiceId
       ? (
