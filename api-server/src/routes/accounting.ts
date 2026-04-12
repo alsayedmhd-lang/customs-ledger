@@ -26,7 +26,7 @@ router.get("/accounting", requireAuth, async (req, res) => {
         clientId: invoicesTable.clientId,
         clientName: clientsTable.name,
         issueDate: invoicesTable.issueDate,
-        total: invoicesTable.subtotal,
+        total: invoicesTable.total,
         accId: invoiceAccountingTable.id,
         payments: invoiceAccountingTable.payments,
         transportation: invoiceAccountingTable.transportation,
