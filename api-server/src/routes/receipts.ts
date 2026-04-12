@@ -48,7 +48,7 @@ router.get("/receipts", requireAuth, async (req, res) => {
     const data = rows.map((row) =>
       formatReceipt(
         row.receipts,
-        row.clients?.nameEn || row.clients?.nameAr || row.clients?.name || "",
+        row.clients?.name || "",
         row.invoices?.invoiceNumber || null,
       ),
     );
@@ -109,7 +109,7 @@ router.post("/receipts", requireAuth, async (req, res) => {
     res.status(201).json(
       formatReceipt(
         receipt,
-        client?.nameEn || client?.nameAr || client?.name || "",
+        client?.name || "",
         invoiceNumber,
       ),
     );
@@ -176,7 +176,7 @@ router.get("/receipts/:id", requireAuth, async (req, res) => {
     res.json(
       formatReceipt(
         row.receipts,
-        row.clients?.nameEn || row.clients?.nameAr || row.clients?.name || "",
+        row.clients?.name || "",
         row.invoices?.invoiceNumber || null,
       ),
     );
