@@ -328,26 +328,29 @@ const impExpValue =
           </div>
 
           <div className="flex-1 flex flex-col items-center justify-center px-6 py-2.5">
-          <div
-            className="font-black text-gray-900 leading-tight"
-            dir={isAR ? "rtl" : "ltr"}
-            style={{ fontSize: `${company.invoiceTitleFontSize || 30}px` }}
-          >
-          {isAR
-            ? company.invoiceCreditTitleAr || "فاتورة نقدًا / على الحساب"
-            : company.invoiceCreditTitleEn || "Cash / Credit Invoice"}
-          </div>
+            <div
+              className="font-black text-gray-900 leading-tight"
+              dir={isAR ? "rtl" : "ltr"}
+              style={{ fontSize: `${company.invoiceTitleFontSize || 30}px` }}
+            >
+              {invoice.paymentType === "cash"
+                ? company.invoiceCashTitleAr || "فاتورة نقدًا"
+                : company.invoiceCreditTitleAr || "فاتورة على الحساب"}
+            </div>
+          
             <div className="mt-1 flex items-center gap-2.5 text-sm text-gray-500 font-semibold">
               <span>
                 {invoice.paymentType === "cash"
                   ? company.invoiceCashTitleEn || "Cash Invoice"
                   : company.invoiceCreditTitleEn || "Credit Invoice"}
               </span>
+          
               <span className="w-1 h-1 rounded-full bg-gray-400 inline-block" />
+          
               <span dir="rtl">{STATUS_AR[invoice.status] ?? invoice.status}</span>
             </div>
           </div>
-        </div>
+          </div>
 
         {/* ══ INFO GRID ═══════════════════════════════════════════════════ */}
         <div className="border-b-2 border-gray-700" dir="ltr">
