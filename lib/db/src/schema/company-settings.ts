@@ -1,4 +1,4 @@
-import { pgTable, serial, text, boolean, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, boolean, timestamp, integer } from "drizzle-orm/pg-core";
 
 export const companySettingsTable = pgTable("company_settings", {
   id: serial("id").primaryKey(),
@@ -28,7 +28,7 @@ export const companySettingsTable = pgTable("company_settings", {
   invoiceCashTitleEn: text("invoice_cash_title_en"),
   invoiceCreditTitleAr: text("invoice_credit_title_ar"),
   invoiceCreditTitleEn: text("invoice_credit_title_en"),
-  invoiceTitleFontSize: text("invoice_title_font_size"),
+  invoiceTitleFontSize: integer("invoice_title_font_size").default(25),
   
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
