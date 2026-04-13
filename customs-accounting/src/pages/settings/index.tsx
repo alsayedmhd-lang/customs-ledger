@@ -64,7 +64,7 @@ export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<TabId>("identity");
 
   useEffect(() => {
-    setForm({ ...DEFAULT_SETTINGS, ...settings });
+    setForm(settings);
     setLogoPreview(settings.logoBase64 || null);
     setStampPreview(settings.stampBase64 || null);
     setWatermarkPreview(settings.watermarkBase64 || null);
