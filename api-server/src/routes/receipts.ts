@@ -54,15 +54,22 @@ router.get("/receipts", requireAuth, async (req, res) => {
           .where(eq(clientsTable.id, Number(row.receipts.clientId)));
     
         let clientName = client?.name || "";
+        let invoiceClient: typeof client | undefined = undefined;
     
         if (!clientName && row.invoices?.clientId) {
-          const [invoiceClient] = await db
+          [invoiceClient] = await db
             .select()
             .from(clientsTable)
             .where(eq(clientsTable.id, Number(row.invoices.clientId)));
     
           clientName = invoiceClient?.name || "";
         }
+    
+        console.log("ROW RECEIPT CLIENT ID:", row.receipts.clientId);
+        console.log("ROW INVOICE CLIENT ID:", row.invoices?.clientId);
+        console.log("CLIENT OBJECT:", client);
+        console.log("INVOICE CLIENT OBJECT:", invoiceClient);
+        console.log("FINAL CLIENT NAME:", clientName);
     
         return formatReceipt(
           row.receipts,
