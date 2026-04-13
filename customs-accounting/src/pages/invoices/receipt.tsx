@@ -245,7 +245,7 @@ const impExpValue =
           </button>
         </Link>
 
-        {settings.showStampOnInvoices && (
+        {company.showStampOnInvoices && (
           <label className="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg bg-white cursor-pointer select-none hover:bg-gray-50">
             <input
               type="checkbox"
@@ -266,7 +266,7 @@ const impExpValue =
         style={{ fontFamily: "'Cairo', 'Arial', sans-serif" }}
       >
         {/* ══ WATERMARK ═══════════════════════════════════════════════════ */}
-        {settings.showWatermark && (
+        {company.showWatermark && (
           <div
             className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none select-none"
             style={{ opacity: 0.07, zIndex: 0 }}
@@ -275,13 +275,13 @@ const impExpValue =
             <img src={watermarkSrc} alt="" className="w-72 object-contain mb-4" />
             <div className="text-center leading-tight">
               <div className="text-5xl font-black text-blue-800" style={{ fontFamily: "'Cairo', sans-serif" }}>
-                {settings.nameAr}
+                {company.nameAr}
               </div>
               <div className="text-3xl font-black text-blue-800 mt-2" style={{ fontFamily: "'Arial', sans-serif" }}>
-                {settings.nameEn.split(" ").slice(0, 3).join(" ")}
+                {company.nameEn.split(" ").slice(0, 3).join(" ")}
               </div>
               <div className="text-2xl font-bold text-blue-800" style={{ fontFamily: "'Arial', sans-serif" }}>
-                {settings.subtitleEn}
+                {company.subtitleEn}
               </div>
             </div>
           </div>
@@ -292,25 +292,25 @@ const impExpValue =
           <div className="flex items-start justify-between">
             <div className="text-right">
               <div className="text-2xl font-black text-gray-900 leading-tight">
-                {settings.nameAr.split(" ").slice(0, 2).join(" ")}
+                {company.nameAr.split(" ").slice(0, 2).join(" ")}
               </div>
-              <div className="text-lg font-bold text-gray-700">{settings.subtitleAr}</div>
-              <div className="text-xs text-gray-500 mt-1">{settings.nameEn}</div>
-              <div className="text-xs text-gray-500">{settings.taglineAr}</div>
+              <div className="text-lg font-bold text-gray-700">{company.subtitleAr}</div>
+              <div className="text-xs text-gray-500 mt-1">{company.nameEn}</div>
+              <div className="text-xs text-gray-500">{company.taglineAr}</div>
             </div>
 
             <div className="flex flex-col items-center justify-center">
-              <img src={logoSrc} alt={settings.nameAr} className="h-24 w-auto object-contain" />
+              <img src={logoSrc} alt={company.nameAr} className="h-24 w-auto object-contain" />
             </div>
 
             <div className="text-left">
               <div className="text-2xl font-black text-gray-900 leading-tight">
-                {settings.nameEn.split(" ").slice(0, 3).join(" ").toUpperCase()}
+                {company.nameEn.split(" ").slice(0, 3).join(" ").toUpperCase()}
               </div>
-              <div className="text-lg font-bold text-gray-700">{settings.subtitleEn}</div>
+              <div className="text-lg font-bold text-gray-700">{company.subtitleEn}</div>
               <div className="text-xs text-gray-500 mt-1">{printEmail}</div>
               <div className="text-xs text-gray-500">
-                Tel: {printPhone} · {settings.poBox} {settings.address}
+                Tel: {printPhone} · {company.poBox} {company.address}
               </div>
             </div>
           </div>
@@ -520,7 +520,7 @@ const impExpValue =
             <p className="text-xs text-gray-400">Accountant</p>
           </div>
 
-          {settings.showStampOnInvoices && showStamp && (
+          {company.showStampOnInvoices && showStamp && (
             <div
               className="absolute inset-0 flex items-center justify-center pointer-events-none"
               style={{ zIndex: 2 }}
@@ -540,15 +540,15 @@ const impExpValue =
           <div className="flex items-center justify-between text-xs text-gray-600">
             <span>✉ {printEmail}</span>
             <span className="font-bold text-gray-800">
-              {settings.nameAr} · {settings.nameEn.split(" ").slice(0, 3).join(" ")} C.C
+              {company.nameAr} · {company.nameEn.split(" ").slice(0, 3).join(" ")} C.C
             </span>
             <span>
-              {settings.poBox} {settings.address} · ☎ {printPhone}
+              {company.poBox} {company.address} · ☎ {printPhone}
             </span>
           </div>
 
-          {settings.footerText && (
-            <div className="text-center text-xs text-gray-500 mt-1">{settings.footerText}</div>
+          {company.footerText && (
+            <div className="text-center text-xs text-gray-500 mt-1">{company.footerText}</div>
           )}
 
           <div className="text-center text-xs text-gray-400 mt-1">
