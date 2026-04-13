@@ -328,17 +328,15 @@ const impExpValue =
           </div>
 
           <div className="flex-1 flex flex-col items-center justify-center px-6 py-2.5">
-            //----------------------------------------------------
           <div
             className="font-black text-gray-900 leading-tight"
             dir={isAR ? "rtl" : "ltr"}
             style={{ fontSize: `${company.invoiceTitleFontSize || 30}px` }}
           >
-            {isAR
-              ? company.invoiceCreditTitleAr || "فاتورة على الحساب"
-              : company.invoiceCreditTitleEn || "Credit Invoice"}
+          {isAR
+            ? company.invoiceCreditTitleAr || "فاتورة نقدًا / على الحساب"
+            : company.invoiceCreditTitleEn || "Cash / Credit Invoice"}
           </div>
-            //-------------------------------------------------------------
             <div className="mt-1 flex items-center gap-2.5 text-sm text-gray-500 font-semibold">
               <span>INVOICE CASH / CREDIT</span>
               <span className="w-1 h-1 rounded-full bg-gray-400 inline-block" />
