@@ -51,7 +51,7 @@ export default function SettingsPage() {
   const { lang, isRTL } = useLanguage();
   const isAR = lang === "ar";
   const { display, update: updateDisplay } = useDisplaySettings();
-  const { settings, refresh, logoSrc, stampSrc, watermarkSrc } = useCompanySettings();
+  const { settings, refresh, setSettings, logoSrc, stampSrc, watermarkSrc } = useCompanySettings();
   const { toast } = useToast();
   const [form, setForm] = useState<CompanySettings>({ ...DEFAULT_SETTINGS });
   const [saving, setSaving] = useState(false);
@@ -116,7 +116,8 @@ export default function SettingsPage() {
     
         const saved = await res.json();
         setForm(saved);
-    
+        setSettings(saved);
+        localStorage.setItem("company_settings", JSON.stringify(saved));
         toast({
           title: isAR
             ? "✅ تم الحفظ بنجاح — التغييرات مفعلة الآن"
