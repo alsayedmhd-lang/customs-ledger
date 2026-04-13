@@ -101,9 +101,15 @@ export function CompanySettingsProvider({ children }: { children: ReactNode }) {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
   
-      if (res.ok) {
+        if (res.ok) {
         const data = await res.json();
-        const merged = { ...DEFAULT_SETTINGS, ...data };
+      
+        const merged = {
+          ...DEFAULT_SETTINGS,
+          ...settings,
+          ...data,
+        };
+      
         setSettings(merged);
         localStorage.setItem(LS_KEY, JSON.stringify(merged));
       }
