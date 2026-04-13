@@ -57,7 +57,6 @@ export default function ReceiptsList() {
 
   const { data: receipts, isLoading } = useListReceipts();
   const { data: clients } = useListClients();   // اضافة السطر --------------------------
-  console.log("RECEIPTS DATA:", receipts);   // تم اضافته زائد للتجربة//----------------------
   const deleteReceiptMutation = useDeleteReceipt();
   const queryClient = useQueryClient();
   const { toast } = useToast();
