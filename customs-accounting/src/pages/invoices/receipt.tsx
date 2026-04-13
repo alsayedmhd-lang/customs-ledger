@@ -157,13 +157,13 @@ export default function InvoiceReceipt() {
   const { id } = useParams<{ id: string }>();
   const { data: invoice, isLoading } = useGetInvoice(parseInt(id || "0"));
   const { currencySymbol, lang } = useLanguage();
+  const { settings: company, logoSrc, stampSrc, watermarkSrc } = useCompanySettings();
   const isAR = lang === "ar";
-  const { settings, logoSrc, stampSrc, watermarkSrc } = useCompanySettings();
   const { user } = useAuth();
 
   const canCustomize = user?.permissions?.canCustomizePrintContact;
-  const printPhone = canCustomize && user?.phone ? user.phone : settings.phone;
-  const printEmail = canCustomize && user?.email ? user.email : settings.email;
+  const printPhone = canCustomize && user?.phone ? user.phone : company.phone;
+  const printEmail = canCustomize && user?.email ? user.email : company.email;
 
   const [showStamp, setShowStamp] = useState<boolean>(() => {
     try {
