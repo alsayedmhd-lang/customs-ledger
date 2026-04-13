@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
-import { useListReceipts, useDeleteReceipt, getListReceiptsQueryKey } from "@workspace/api-client-react";
+import { useListReceipts, useListClients, useDeleteReceipt, getListReceiptsQueryKey } from "@workspace/api-client-react";
+// import { useListReceipts, useDeleteReceipt, getListReceiptsQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -55,22 +56,30 @@ export default function ReceiptsList() {
   const hidden = <span className="tracking-widest opacity-35 font-mono">••••••</span>;
 
   const { data: receipts, isLoading } = useListReceipts();
+  const { data: clients } = useListClients();   // اضافة السطر --------------------------
   console.log("RECEIPTS DATA:", receipts);   // تم اضافته زائد للتجربة//----------------------
   const deleteReceiptMutation = useDeleteReceipt();
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  const paymentMethodLabel: Record<string, string> = {
-    cash: t("cash"),
-    transfer: t("transfer"),
-    check: t("check"),
-  };
+const paymentMethodLabel: Record<string, string> = {
+  cash: t("cash"),
+  transfer: t("transfer"),
+  check: t("check"),
+};
+
+const getClientName = (receipt: { clientName?: string | null; clientId?: number | null }) => {
+  if (receipt.clientName && receipt.clientName.trim()) return receipt.clientName;
+
+  const client = (clients ?? []).find((c) => c.id === receipt.clientId);
+  return client?.name || "لا يوجد";
+};
 
   const filtered = (receipts ?? []).filter((r) => {
     const q = search.toLowerCase();
     return (
       (r.receiptNumber ?? "").toLowerCase().includes(q) ||
-      (r.clientName ?? "").toLowerCase().includes(q) ||
+      getClientName(r).toLowerCase().includes(q) ||
       (r.invoiceNumber?.toLowerCase().includes(q) ?? false) ||
       (r.notes?.toLowerCase().includes(q) ?? false)
     );
@@ -214,7 +223,7 @@ export default function ReceiptsList() {
                     </td>
 
                     <td className="px-4 py-3 font-medium">
-                      {receipt.clientName || "-"}
+                      {getClientName(receipt)}
                     </td>
 
                     <td className="px-4 py-3 text-muted-foreground">
