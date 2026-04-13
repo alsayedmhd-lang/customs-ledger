@@ -26,6 +26,11 @@ export interface CompanySettings {
   showStampOnReceipts: boolean;
   showStampOnStatements: boolean;
   footerText: string;
+  invoiceCashTitleAr: string;
+  invoiceCashTitleEn: string;
+  invoiceCreditTitleAr: string;
+  invoiceCreditTitleEn: string;
+  invoiceTitleFontSize: number;
 }
 
 export const DEFAULT_SETTINGS: CompanySettings = {
@@ -50,7 +55,12 @@ export const DEFAULT_SETTINGS: CompanySettings = {
   showStampOnReceipts: true,
   showStampOnStatements: true,
   footerText: "",
-};
+  invoiceCashTitleAr: "فاتورة نقدًا",
+  invoiceCashTitleEn: "Cash Invoice",
+  invoiceCreditTitleAr: "فاتورة على الحساب",
+  invoiceCreditTitleEn: "Credit Invoice",
+  invoiceTitleFontSize: 30,
+  };
 
 interface CompanySettingsCtx {
   settings: CompanySettings;
