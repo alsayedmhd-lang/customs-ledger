@@ -113,9 +113,12 @@ export function CompanySettingsProvider({ children }: { children: ReactNode }) {
         setSettings(merged);
         localStorage.setItem(LS_KEY, JSON.stringify(merged));
       }
-    } catch {
-      // use cached
-    }
+   } catch (error) {
+  console.error("Company settings refresh failed:", error);
+  }
+    // } catch {
+    //   // use cached
+    // }
   };
 
   useEffect(() => { refresh(); }, []);
