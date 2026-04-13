@@ -65,6 +65,7 @@ export const DEFAULT_SETTINGS: CompanySettings = {
 interface CompanySettingsCtx {
   settings: CompanySettings;
   refresh: () => Promise<void>;
+  setSettings: React.Dispatch<React.SetStateAction<CompanySettings>>;
   logoSrc: string;
   stampSrc: string;
   watermarkSrc: string;
@@ -76,6 +77,7 @@ const defaultStampSrc = `${import.meta.env.BASE_URL}stamp_nobg.png`;
 const Ctx = createContext<CompanySettingsCtx>({
   settings: DEFAULT_SETTINGS,
   refresh: async () => {},
+  setSettings: () => {},
   logoSrc: defaultLogoSrc,
   stampSrc: defaultStampSrc,
   watermarkSrc: defaultLogoSrc,
@@ -118,7 +120,7 @@ export function CompanySettingsProvider({ children }: { children: ReactNode }) {
   const watermarkSrc = settings.watermarkBase64 || logoSrc;
 
   return (
-    <Ctx.Provider value={{ settings, refresh, logoSrc, stampSrc, watermarkSrc }}>
+    <Ctx.Provider value={{ settings, refresh, setSettings, logoSrc, stampSrc, watermarkSrc }}>
       {children}
     </Ctx.Provider>
   );
