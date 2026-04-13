@@ -99,27 +99,38 @@ export default function SettingsPage() {
     reader.readAsDataURL(file);
   };
 
-  const handleSave = async () => {
-    setSaving(true);
-    try {
-      const token = sessionStorage.getItem("auth_token");
-      const res = await fetch(`${API_BASE}/company-settings`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify(form),
-      });
-      if (!res.ok) throw new Error("Failed");
-      await refresh();
-      toast({ title: isAR ? "✅ تم الحفظ بنجاح — التغييرات مفعّلة الآن" : "✅ Saved — changes are now active" });
-    } catch {
-      toast({ title: isAR ? "حدث خطأ أثناء الحفظ" : "Save failed", variant: "destructive" });
-    } finally {
-      setSaving(false);
-    }
-  };
+    const handleSave = async () => {
+      setSaving(true);
+      try {
+        const token = sessionStorage.getItem("auth_token");
+        const res = await fetch(`${API_BASE}/company-settings`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify(form),
+        });
+    
+        if (!res.ok) throw new Error("Failed");
+    
+        const saved = await res.json();
+        setForm(saved);
+    
+        toast({
+          title: isAR
+            ? "✅ تم الحفظ بنجاح — التغييرات مفعلة الآن"
+            : "✅ Saved — changes are now active",
+        });
+      } catch {
+        toast({
+          title: isAR ? "حدث خطأ أثناء الحفظ" : "Save failed",
+          variant: "destructive",
+        });
+      } finally {
+        setSaving(false);
+      }
+    };
 
   const Toggle = ({ field }: { field: keyof CompanySettings }) => (
     <button
