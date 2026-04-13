@@ -55,6 +55,7 @@ export default function ReceiptsList() {
   const hidden = <span className="tracking-widest opacity-35 font-mono">••••••</span>;
 
   const { data: receipts, isLoading } = useListReceipts();
+  console.log("RECEIPTS DATA:", receipts);   // تم اضافته زائد للتجربة//----------------------
   const deleteReceiptMutation = useDeleteReceipt();
   const queryClient = useQueryClient();
   const { toast } = useToast();
