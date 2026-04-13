@@ -64,7 +64,7 @@ export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<TabId>("identity");
 
   useEffect(() => {
-    setForm(settings);
+    setForm({ ...DEFAULT_SETTINGS, ...settings });
     setLogoPreview(settings.logoBase64 || null);
     setStampPreview(settings.stampBase64 || null);
     setWatermarkPreview(settings.watermarkBase64 || null);
@@ -115,9 +115,11 @@ export default function SettingsPage() {
         if (!res.ok) throw new Error("Failed");
     
         const saved = await res.json();
-        setForm(saved);
-        setSettings(saved);
-        localStorage.setItem("company_settings", JSON.stringify(saved));
+        const mergedSaved = { ...DEFAULT_SETTINGS, ...saved };
+        
+        setForm(mergedSaved);
+        setSettings(mergedSaved);
+        localStorage.setItem("company_settings", JSON.stringify(mergedSaved));
         toast({
           title: isAR
             ? "✅ تم الحفظ بنجاح — التغييرات مفعلة الآن"
