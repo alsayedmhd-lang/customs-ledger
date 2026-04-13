@@ -801,23 +801,8 @@ export default function SettingsPage() {
                     placeholder={isAR ? "مثال: شكراً لتعاملكم معنا · جميع الأسعار شاملة الضريبة" : "e.g. Thank you for your business"}
                   />
                 </Field>
-                <Field label={isAR ? "عنوان الفاتورة النقدية (عربي)" : "Cash Invoice Title (Arabic)"}>
-              <input
-                value={form.invoiceCashTitleAr}
-                onChange={e => setForm(p => ({ ...p, invoiceCashTitleAr: e.target.value }))}
-                className={inp}
-              />
-            </Field>
             
-            <Field label={isAR ? "عنوان الفاتورة النقدية (إنجليزي)" : "Cash Invoice Title (English)"}>
-              <input
-                value={form.invoiceCashTitleEn}
-                onChange={e => setForm(p => ({ ...p, invoiceCashTitleEn: e.target.value }))}
-                className={inp}
-              />
-            </Field>
-            
-            <Field label={isAR ? "عنوان فاتورة الحساب (عربي)" : "Credit Invoice Title (Arabic)"}>
+            <Field label={isAR ? "عنوان الفاتورة الأساسي" : "Main Invoice Title"}>
               <input
                 value={form.invoiceCreditTitleAr}
                 onChange={e => setForm(p => ({ ...p, invoiceCreditTitleAr: e.target.value }))}
@@ -825,7 +810,7 @@ export default function SettingsPage() {
               />
             </Field>
             
-            <Field label={isAR ? "عنوان فاتورة الحساب (إنجليزي)" : "Credit Invoice Title (English)"}>
+            <Field label={isAR ? "عنوان الفاتورة الفرعي" : "Sub Invoice Title"}>
               <input
                 value={form.invoiceCreditTitleEn}
                 onChange={e => setForm(p => ({ ...p, invoiceCreditTitleEn: e.target.value }))}
