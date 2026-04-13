@@ -16,7 +16,7 @@ import { useDisplaySettings, COLOR_PRESETS, SIDEBAR_COLOR_PRESETS, type PrimaryC
 
 type TabId = "preview" | "identity" | "contact" | "legal" | "branding" | "print" | "display";
 
-const API_BASE = import.meta.env.BASE_URL?.replace(/\/$/, "") + "/api";
+const API_BASE = `${import.meta.env.VITE_API_BASE_URL}/api`;
 
 function Section({ icon: Icon, title, color, children }: {
   icon: React.ElementType; title: string; color: string; children: React.ReactNode;
