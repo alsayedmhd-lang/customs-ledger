@@ -95,7 +95,7 @@ export function CompanySettingsProvider({ children }: { children: ReactNode }) {
     try {
       const token = sessionStorage.getItem("auth_token");
       
-      const res = await fetch(`${API_BASE}/company-settings`, {
+      const res = await fetch(`${API_BASE}/company-settings?ts=${Date.now()}`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
   
