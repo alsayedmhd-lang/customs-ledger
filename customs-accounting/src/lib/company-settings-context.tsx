@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 
-const API_BASE = import.meta.env.BASE_URL?.replace(/\/$/, "") + "/api";
+const API_BASE = `${import.meta.env.VITE_API_BASE_URL}/api`;
 const LS_KEY = "company_settings";
 
 export interface CompanySettings {
@@ -84,10 +84,9 @@ export function CompanySettingsProvider({ children }: { children: ReactNode }) {
   const refresh = async () => {
     try {
       const token = sessionStorage.getItem("auth_token");
-      if (!token) return;
-  
+      
       const res = await fetch(`${API_BASE}/company-settings`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
   
       if (res.ok) {
