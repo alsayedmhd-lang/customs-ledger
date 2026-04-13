@@ -116,10 +116,13 @@ export default function SettingsPage() {
     
         const saved = await res.json();
         const mergedSaved = { ...DEFAULT_SETTINGS, ...saved };
-        
+    
         setForm(mergedSaved);
         setSettings(mergedSaved);
         localStorage.setItem("company_settings", JSON.stringify(mergedSaved));
+    
+        await refresh();
+    
         toast({
           title: isAR
             ? "✅ تم الحفظ بنجاح — التغييرات مفعلة الآن"
