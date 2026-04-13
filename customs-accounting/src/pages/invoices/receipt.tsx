@@ -338,7 +338,15 @@ const impExpValue =
             : company.invoiceCreditTitleEn || "Cash / Credit Invoice"}
           </div>
             <div className="mt-1 flex items-center gap-2.5 text-sm text-gray-500 font-semibold">
-              <span>INVOICE CASH / CREDIT</span>
+              <span>
+                {isAR
+                  ? invoice.paymentType === "cash"
+                    ? company.invoiceCashTitleAr || "فاتورة نقدًا"
+                    : company.invoiceCreditTitleAr || "فاتورة على الحساب"
+                  : invoice.paymentType === "cash"
+                    ? company.invoiceCashTitleEn || "Cash Invoice"
+                    : company.invoiceCreditTitleEn || "Credit Invoice"}
+              </span>
               <span className="w-1 h-1 rounded-full bg-gray-400 inline-block" />
               <span dir="rtl">{STATUS_AR[invoice.status] ?? invoice.status}</span>
             </div>
