@@ -44,15 +44,24 @@ router.get("/receipts", requireAuth, async (req, res) => {
         .where(buildFilters())
         .orderBy(desc(receiptsTable.id));
     }
-
-    const data = rows.map((row) =>
-      formatReceipt(
-        row.receipts,
-        row.clients?.name || "",
-        row.invoices?.invoiceNumber || null,
-      ),
+    
+    //----------------------------------------------
+    const data = await Promise.all(
+      rows.map(async (row) => {
+        const [client] = await db
+          .select()
+          .from(clientsTable)
+          .where(eq(clientsTable.id, row.receipts.clientId));
+    
+        return formatReceipt(
+          row.receipts,
+          client?.name || "",
+          row.invoices?.invoiceNumber || null,
+        );
+      }),
     );
-
+    //------------------------------------------------------
+    
     res.json(data);
   } catch (err) {
     console.error(err);
