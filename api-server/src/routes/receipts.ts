@@ -53,9 +53,20 @@ router.get("/receipts", requireAuth, async (req, res) => {
           .from(clientsTable)
           .where(eq(clientsTable.id, row.receipts.clientId));
     
+        let clientName = client?.name || "";
+    
+        if (!clientName && row.invoices?.clientId) {
+          const [invoiceClient] = await db
+            .select()
+            .from(clientsTable)
+            .where(eq(clientsTable.id, row.invoices.clientId));
+    
+          clientName = invoiceClient?.name || "";
+        }
+    
         return formatReceipt(
           row.receipts,
-          client?.name || "",
+          clientName,
           row.invoices?.invoiceNumber || null,
         );
       }),
