@@ -51,7 +51,7 @@ router.get("/receipts", requireAuth, async (req, res) => {
         const [client] = await db
           .select()
           .from(clientsTable)
-          .where(eq(clientsTable.id, row.receipts.clientId));
+          .where(eq(clientsTable.id, Number(row.receipts.clientId)));
     
         let clientName = client?.name || "";
     
@@ -59,14 +59,14 @@ router.get("/receipts", requireAuth, async (req, res) => {
           const [invoiceClient] = await db
             .select()
             .from(clientsTable)
-            .where(eq(clientsTable.id, row.invoices.clientId));
+            .where(eq(clientsTable.id, Number(row.invoices.clientId)));
     
           clientName = invoiceClient?.name || "";
         }
     
         return formatReceipt(
           row.receipts,
-          clientName,
+          clientName || "لا يوجد",
           row.invoices?.invoiceNumber || null,
         );
       }),
