@@ -57,7 +57,7 @@ export const DEFAULT_SETTINGS: CompanySettings = {
   footerText: "",
   invoiceCashTitleAr: "فاتورة نقدًا",
   invoiceCashTitleEn: "Cash Invoice",
-  invoiceCreditTitleAr: "فاتورةنقدا / على الحساب",
+  invoiceCreditTitleAr: "فاتورة نقدا / على الحساب",
   invoiceCreditTitleEn: "Cash / Credit Invoice",
   invoiceTitleFontSize: 25,
   };
