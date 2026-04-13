@@ -148,7 +148,7 @@ function numberToArabicWords(amount: number): string {
 
 const STATUS_AR: Record<string, string> = {
   draft: "مسودة",
-  issued: "فاتورة نقداً على الحساب",
+  issued: "صادرة",
   paid: "مدفوعة",
   cancelled: "ملغاة",
 };
@@ -190,11 +190,11 @@ export default function InvoiceReceipt() {
   }, [invoice]);
 
   if (isLoading) {
-    return <div className="p-8 text-center">{isAR ? "جارٍ تحميل الفاتورة..." : "Loading invoice..."}</div>;
+    return <div className="p-8 text-center">{isAR ? "جارٍ تحميل ال..." : "Loading invoice..."}</div>;
   }
 
   if (!invoice) {
-    return <div className="p-8 text-center text-red-600">{isAR ? "الفاتورة غير موجودة" : "Invoice not found"}</div>;
+    return <div className="p-8 text-center text-red-600">{isAR ? "ال غير موجودة" : "Invoice not found"}</div>;
   }
 
   const invNum = invoice.invoiceNumber;
@@ -235,13 +235,13 @@ const impExpValue =
           className="flex items-center gap-2 px-5 py-2 bg-blue-700 text-white rounded-lg font-medium hover:bg-blue-800"
         >
           <Printer className="w-4 h-4" />
-          {isAR ? "طباعة الفاتورة" : "Print Invoice"}
+          {isAR ? "طباعة ال" : "Print Invoice"}
         </button>
 
         <Link href={`/accounting?invoice=${encodeURIComponent(invoice.invoiceNumber)}`}>
           <button className="flex items-center gap-2 px-4 py-2 border border-emerald-400 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-medium">
             <Calculator className="w-4 h-4" />
-            {isAR ? "حساب الفاتورة" : "Calculate Invoice"}
+            {isAR ? "حساب ال" : "Calculate Invoice"}
           </button>
         </Link>
 
@@ -328,9 +328,17 @@ const impExpValue =
           </div>
 
           <div className="flex-1 flex flex-col items-center justify-center px-6 py-2.5">
-            <div className="text-[30px] font-black text-gray-900 leading-tight" dir="rtl">
-              فاتورة نقداً على الحساب
-            </div>
+            //----------------------------------------------------
+          <div
+            className="font-black text-gray-900 leading-tight"
+            dir={isAR ? "rtl" : "ltr"}
+            style={{ fontSize: `${company.invoiceTitleFontSize || 30}px` }}
+          >
+            {isAR
+              ? company.invoiceCreditTitleAr || "فاتورة على الحساب"
+              : company.invoiceCreditTitleEn || "Credit Invoice"}
+          </div>
+            //-------------------------------------------------------------
             <div className="mt-1 flex items-center gap-2.5 text-sm text-gray-500 font-semibold">
               <span>INVOICE CASH / CREDIT</span>
               <span className="w-1 h-1 rounded-full bg-gray-400 inline-block" />
