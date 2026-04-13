@@ -61,7 +61,7 @@ router.get("/receipts", requireAuth, async (req, res) => {
       }),
     );
     //------------------------------------------------------
-    
+    console.log("DATA AFTER FORMAT:", data);
     res.json(data);
   } catch (err) {
     console.error(err);
