@@ -23,6 +23,13 @@ export const companySettingsTable = pgTable("company_settings", {
   showStampOnReceipts: boolean("show_stamp_on_receipts").notNull().default(true),
   showStampOnStatements: boolean("show_stamp_on_statements").notNull().default(true),
   footerText: text("footer_text"),
+
+  invoiceCashTitleAr: text("invoice_cash_title_ar"),
+  invoiceCashTitleEn: text("invoice_cash_title_en"),
+  invoiceCreditTitleAr: text("invoice_credit_title_ar"),
+  invoiceCreditTitleEn: text("invoice_credit_title_en"),
+  invoiceTitleFontSize: text("invoice_title_font_size"),
+  
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
