@@ -31,28 +31,55 @@ router.get("/receipts", requireAuth, async (req, res) => {
       rows = await db
         .select()
         .from(receiptsTable)
-        .leftJoin(clientsTable, eq(receiptsTable.clientId, clientsTable.id))
         .leftJoin(invoicesTable, eq(receiptsTable.invoiceId, invoicesTable.id))
-        .where(buildFilters([eq(receiptsTable.clientId, clientId)]))
+        .leftJoin(clientsTable, eq(receiptsTable.clientId, clientsTable.id))
+        .where(buildFilters([eq(invoicesTable.clientId, clientId)]))
         .orderBy(desc(receiptsTable.id));
     } else {
       rows = await db
         .select()
         .from(receiptsTable)
-        .leftJoin(clientsTable, eq(receiptsTable.clientId, clientsTable.id))
         .leftJoin(invoicesTable, eq(receiptsTable.invoiceId, invoicesTable.id))
+        .leftJoin(clientsTable, eq(receiptsTable.clientId, clientsTable.id))
         .where(buildFilters())
         .orderBy(desc(receiptsTable.id));
     }
-
-    const data = rows.map((row) =>
-      formatReceipt(
-        row.receipts,
-        row.clients?.nameEn || row.clients?.nameAr || "",
-        row.invoices?.invoiceNumber || null,
-      ),
+    
+    //----------------------------------------------
+    const data = await Promise.all(
+      rows.map(async (row) => {
+        const [client] = await db
+          .select()
+          .from(clientsTable)
+          .where(eq(clientsTable.id, Number(row.receipts.clientId)));
+    
+        let clientName = client?.name || "";
+        let invoiceClient: typeof client | undefined = undefined;
+    
+        if (!clientName && row.invoices?.clientId) {
+          [invoiceClient] = await db
+            .select()
+            .from(clientsTable)
+            .where(eq(clientsTable.id, Number(row.invoices.clientId)));
+    
+          clientName = invoiceClient?.name || "";
+        }
+    
+        console.log("ROW RECEIPT CLIENT ID:", row.receipts.clientId);
+        console.log("ROW INVOICE CLIENT ID:", row.invoices?.clientId);
+        console.log("CLIENT OBJECT:", client);
+        console.log("INVOICE CLIENT OBJECT:", invoiceClient);
+        console.log("FINAL CLIENT NAME:", clientName);
+    
+        return formatReceipt(
+          row.receipts,
+          clientName || "لا يوجد",
+          row.invoices?.invoiceNumber || null,
+        );
+      }),
     );
-
+    //------------------------------------------------------
+    console.log("DATA AFTER FORMAT:", data);
     res.json(data);
   } catch (err) {
     console.error(err);
@@ -65,11 +92,23 @@ router.post("/receipts", requireAuth, async (req, res) => {
   try {
     const receiptNumber = await generateReceiptNumber();
 
+    const clientId =
+      req.body.clientId
+        ? Number(req.body.clientId)
+        : req.body.invoiceId
+          ? (
+              await db
+                .select()
+                .from(invoicesTable)
+                .where(eq(invoicesTable.id, Number(req.body.invoiceId)))
+            )[0]?.clientId ?? null
+          : null;
+
     const [receipt] = await db
       .insert(receiptsTable)
       .values({
         receiptNumber,
-        clientId: Number(req.body.clientId),
+        clientId,
         invoiceId: req.body.invoiceId ? Number(req.body.invoiceId) : null,
         amount: String(req.body.amount),
         paymentMethod: req.body.paymentMethod,
@@ -78,10 +117,12 @@ router.post("/receipts", requireAuth, async (req, res) => {
       })
       .returning();
 
-    const [client] = await db
-      .select()
-      .from(clientsTable)
-      .where(eq(clientsTable.id, receipt.clientId));
+    const [client] = receipt.clientId
+      ? await db
+          .select()
+          .from(clientsTable)
+          .where(eq(clientsTable.id, receipt.clientId))
+      : [];
 
     const invoiceNumber = receipt.invoiceId
       ? (
@@ -95,7 +136,7 @@ router.post("/receipts", requireAuth, async (req, res) => {
     res.status(201).json(
       formatReceipt(
         receipt,
-        client?.nameEn || client?.nameAr || "",
+        client?.name || "",
         invoiceNumber,
       ),
     );
@@ -141,6 +182,7 @@ export function formatReceipt(
     deletedAt: r.deletedAt ?? null,
   };
 }
+
 router.get("/receipts/:id", requireAuth, async (req, res) => {
   try {
     const id = parseInt(req.params.id);
@@ -148,8 +190,8 @@ router.get("/receipts/:id", requireAuth, async (req, res) => {
     const rows = await db
       .select()
       .from(receiptsTable)
-      .leftJoin(clientsTable, eq(receiptsTable.clientId, clientsTable.id))
       .leftJoin(invoicesTable, eq(receiptsTable.invoiceId, invoicesTable.id))
+      .leftJoin(clientsTable, eq(receiptsTable.clientId, clientsTable.id))
       .where(eq(receiptsTable.id, id));
 
     if (!rows.length) {
@@ -161,7 +203,7 @@ router.get("/receipts/:id", requireAuth, async (req, res) => {
     res.json(
       formatReceipt(
         row.receipts,
-        row.clients?.nameEn || row.clients?.nameAr || "",
+        row.clients?.name || "",
         row.invoices?.invoiceNumber || null,
       ),
     );
