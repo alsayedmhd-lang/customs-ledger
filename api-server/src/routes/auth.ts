@@ -45,9 +45,12 @@ async function sendOTPEmail(to: string, code: string, displayName: string): Prom
   const transporter = nodemailer.createTransport({
     host,
     port: Number(port),
-    secure: Number(port) === 465,
+    secure: false,
+    requireTLS: true,
     auth: { user, pass },
-    tls: { rejectUnauthorized: false },
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 10000,
   });
 
   await transporter.sendMail({
@@ -85,9 +88,12 @@ async function sendPasswordResetEmail(to: string, code: string, displayName: str
   const transporter = nodemailer.createTransport({
     host,
     port: Number(port),
-    secure: Number(port) === 465,
+    secure: false,
+    requireTLS: true,
     auth: { user, pass },
-    tls: { rejectUnauthorized: false },
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 10000,
   });
 
   await transporter.sendMail({
