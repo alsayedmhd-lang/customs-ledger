@@ -103,13 +103,12 @@ export function CompanySettingsProvider({ children }: { children: ReactNode }) {
   
         if (res.ok) {
         const data = await res.json();
+        console.log("response data:", data);
       
         const merged = {
           ...DEFAULT_SETTINGS,
-          ...settings,
           ...data,
         };
-      
         setSettings(merged);
         localStorage.setItem(LS_KEY, JSON.stringify(merged));
       }
