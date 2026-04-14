@@ -30,7 +30,7 @@ export interface CompanySettings {
   invoiceCashTitleEn: string;
   invoiceCreditTitleAr: string;
   invoiceCreditTitleEn: string;
-  invoiceTitleFontSize: string;
+  invoiceTitleFontSize: number;
 }
 
 export const DEFAULT_SETTINGS: CompanySettings = {
@@ -57,14 +57,15 @@ export const DEFAULT_SETTINGS: CompanySettings = {
   footerText: "",
   invoiceCashTitleAr: "فاتورة نقدًا",
   invoiceCashTitleEn: "Cash Invoice",
-  invoiceCreditTitleAr: "فاتورة على الحساب",
-  invoiceCreditTitleEn: "Credit Invoice",
-  invoiceTitleFontSize: "30",
-};
+  invoiceCreditTitleAr: "فاتورة نقدا / على الحساب",
+  invoiceCreditTitleEn: "Cash / Credit Invoice",
+  invoiceTitleFontSize: 25,
+  };
 
 interface CompanySettingsCtx {
   settings: CompanySettings;
   refresh: () => Promise<void>;
+  setSettings: React.Dispatch<React.SetStateAction<CompanySettings>>;
   logoSrc: string;
   stampSrc: string;
   watermarkSrc: string;
@@ -76,6 +77,7 @@ const defaultStampSrc = `${import.meta.env.BASE_URL}stamp_nobg.png`;
 const Ctx = createContext<CompanySettingsCtx>({
   settings: DEFAULT_SETTINGS,
   refresh: async () => {},
+  setSettings: () => {},
   logoSrc: defaultLogoSrc,
   stampSrc: defaultStampSrc,
   watermarkSrc: defaultLogoSrc,
@@ -95,19 +97,27 @@ export function CompanySettingsProvider({ children }: { children: ReactNode }) {
     try {
       const token = sessionStorage.getItem("auth_token");
       
-      const res = await fetch(`${API_BASE}/company-settings`, {
+      const res = await fetch(`${API_BASE}/company-settings?ts=${Date.now()}`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
   
-      if (res.ok) {
+        if (res.ok) {
         const data = await res.json();
-        const merged = { ...DEFAULT_SETTINGS, ...data };
+        console.log("response data:", data);
+      
+        const merged = {
+          ...DEFAULT_SETTINGS,
+          ...data,
+        };
         setSettings(merged);
         localStorage.setItem(LS_KEY, JSON.stringify(merged));
       }
-    } catch {
-      // use cached
-    }
+   } catch (error) {
+  console.error("Company settings refresh failed:", error);
+  }
+    // } catch {
+    //   // use cached
+    // }
   };
 
   useEffect(() => { refresh(); }, []);
@@ -118,7 +128,7 @@ export function CompanySettingsProvider({ children }: { children: ReactNode }) {
   const watermarkSrc = settings.watermarkBase64 || logoSrc;
 
   return (
-    <Ctx.Provider value={{ settings, refresh, logoSrc, stampSrc, watermarkSrc }}>
+    <Ctx.Provider value={{ settings, refresh, setSettings, logoSrc, stampSrc, watermarkSrc }}>
       {children}
     </Ctx.Provider>
   );
