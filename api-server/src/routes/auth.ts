@@ -49,9 +49,13 @@ async function sendOTPEmail(
   try {
     const transporter = nodemailer.createTransport({
       host,
-      port,
-      secure: true,
+      port: Number(port),
+      secure: false,
+      requireTLS: true,
       auth: { user, pass },
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+      socketTimeout: 10000,
     });
 
     await transporter.sendMail({
