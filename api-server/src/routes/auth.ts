@@ -227,7 +227,10 @@ router.post("/auth/login", async (req, res) => {
     if (user.email) {
       try {
         sent = await sendOTPEmail(user.email, code, user.displayName);
-      } catch {}
+        console.log("[LOGIN OTP] send result:", sent, "email:", user.email);
+      } catch (error) {
+        console.error("[LOGIN OTP ERROR]", error);
+      }
     }
 
     const otpToken = signOtpToken(user.id);
