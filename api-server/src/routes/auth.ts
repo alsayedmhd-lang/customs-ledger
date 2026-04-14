@@ -31,68 +31,63 @@ function signOtpToken(userId: number): string {
   return jwt.sign({ userId, type: "otp_pending" }, JWT_SECRET, { expiresIn: "5m" });
 }
 
-async function sendOTPEmail(to: string, code: string, displayName: string): Promise<boolean> {
-  const host = process.env.SMTP_HOST;
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
-  const port = parseInt(process.env.SMTP_PORT || "465");
+async function sendOTPEmail(
+  to: string,
+  code: string,
+  displayName: string,
+): Promise<boolean> {
+  const apiKey = process.env.BREVO_API_KEY;
+  const fromEmail = process.env.SMTP_FROM;
 
-  if (!host || !user || !pass) {
-    console.warn(`[OTP] SMTP not configured — code: ${code}`);
+  if (!apiKey || !fromEmail) {
+    console.warn("[OTP EMAIL] BREVO_API_KEY or SMTP_FROM missing");
     return false;
   }
-  
-const transporter = nodemailer.createTransport({
-  host,
-  port: Number(port),
-  secure: true,
-  auth: { user, pass },
-  connectionTimeout: 10000,
-  greetingTimeout: 10000,
-  socketTimeout: 10000,
-});
-  
-  await transporter.sendMail({
-    from: `"حول العالم للتخليص الجمركي" <${process.env.SMTP_FROM || user}>`,
-    to,
-    subject: `رمز التحقق: ${code}`,
-    html: `
-      <div dir="rtl" style="font-family: Arial, sans-serif; max-width: 480px; margin: auto; padding: 24px; border: 1px solid #e5e7eb; border-radius: 12px;">
-        <h2 style="color: #1d4ed8; margin-bottom: 8px;">حول العالم للتخليص الجمركي</h2>
-        <p style="color: #374151;">مرحباً <strong>${displayName}</strong>،</p>
-        <p style="color: #374151;">رمز التحقق الخاص بك لتسجيل الدخول هو:</p>
-        <div style="background: #f3f4f6; border-radius: 8px; padding: 20px; text-align: center; margin: 20px 0;">
-          <span style="font-size: 36px; font-weight: bold; letter-spacing: 8px; color: #1d4ed8;">${code}</span>
-        </div>
-        <p style="color: #6b7280; font-size: 13px;">صالح لمدة 5 دقائق. لا تشاركه مع أحد.</p>
-        <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 16px 0;" />
-        <p style="color: #9ca3af; font-size: 11px; text-align: center;">Around The World Customs Clearance — Doha, Qatar</p>
-      </div>
-    `,
-  });
-  return true;
+
+  try {
+    const response = await fetch("https://api.brevo.com/v3/smtp/email", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "api-key": apiKey,
+      },
+      body: JSON.stringify({
+        sender: {
+          name: "Around The World",
+          email: fromEmail,
+        },
+        to: [
+          {
+            email: to,
+            name: displayName || to,
+          },
+        ],
+        subject: `رمز التحقق: ${code}`,
+        htmlContent: `
+          <div dir="rtl" style="font-family: Arial,sans-serif; padding:20px;">
+            <h2>رمز التحقق</h2>
+            <p>مرحبًا ${displayName}</p>
+            <p>رمز الدخول الخاص بك:</p>
+            <div style="font-size:32px;font-weight:bold;color:#2563eb">${code}</div>
+            <p>صالح لمدة 5 دقائق</p>
+          </div>
+        `,
+      }),
+    });
+
+    if (!response.ok) {
+      const err = await response.text();
+      console.error("[OTP EMAIL ERROR]", err);
+      return false;
+    }
+
+    console.log("[OTP EMAIL] sent:", to);
+    return true;
+  } catch (error) {
+    console.error("[OTP EMAIL ERROR]", error);
+    return false;
+  }
 }
-
-async function sendPasswordResetEmail(to: string, code: string, displayName: string): Promise<boolean> {
-  const host = process.env.SMTP_HOST;
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
-  const port = parseInt(process.env.SMTP_PORT || "465");
-
-  if (!host || !user || !pass) {
-    console.warn(`[RESET] SMTP not configured — code: ${code}`);
-    return false;
-  }
-  
-const transporter = nodemailer.createTransport({
-  host,
-  port: Number(port),
-  secure: true,
-  auth: { user, pass },
-  connectionTimeout: 10000,
-  greetingTimeout: 10000,
-  socketTimeout: 10000,
-});
   
   await transporter.sendMail({
     from: `"حول العالم للتخليص الجمركي" <${user}>`,
