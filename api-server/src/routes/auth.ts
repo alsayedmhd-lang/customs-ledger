@@ -193,13 +193,29 @@ router.post("/auth/login", async (req, res) => {
     });
 
     let sent = false;
-
-    if (user.email) {
+    
+    // 1) جرّب واتساب أولًا إذا البيانات موجودة
+    if (user.phone && user.callMeBotApiKey) {
+      try {
+        sent = await sendOTPWhatsApp(
+          user.phone,
+          code,
+          user.displayName,
+          user.callMeBotApiKey,
+        );
+        console.log("[LOGIN OTP] WhatsApp send result:", sent, "phone:", user.phone);
+      } catch (error) {
+        console.error("[LOGIN OTP WHATSAPP ERROR]", error);
+      }
+    }
+    
+    // 2) إذا فشل واتساب، جرّب البريد
+    if (!sent && user.email) {
       try {
         sent = await sendOTPEmail(user.email, code, user.displayName);
-        console.log("[LOGIN OTP] send result:", sent, "email:", user.email);
+        console.log("[LOGIN OTP] Email send result:", sent, "email:", user.email);
       } catch (error) {
-        console.error("[LOGIN OTP ERROR]", error);
+        console.error("[LOGIN OTP EMAIL ERROR]", error);
       }
     }
 
