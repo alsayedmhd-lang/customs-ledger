@@ -1,6 +1,7 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import nodemailer from "nodemailer";
 import { db } from "@workspace/db";
 import { usersTable, otpCodesTable, DEFAULT_PERMISSIONS } from "@workspace/db/schema";
 import { eq, and, gt, isNull } from "drizzle-orm";
