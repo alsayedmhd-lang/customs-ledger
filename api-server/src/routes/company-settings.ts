@@ -12,7 +12,12 @@ router.get("/company-settings", requireAuth, async (_req, res) => {
     if (!settings) {
       [settings] = await db.insert(companySettingsTable).values({}).returning();
     }
-    return res.json(settings);
+    return res.json({
+      ...settings,
+      invoiceCreditTitleAr: settings.invoiceCreditTitleAr,
+      invoiceCreditTitleEn: settings.invoiceCreditTitleEn,
+      invoiceTitleFontSize: settings.invoiceTitleFontSize,
+});
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: "Failed to fetch company settings" });

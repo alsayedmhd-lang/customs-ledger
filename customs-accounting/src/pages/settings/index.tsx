@@ -51,7 +51,7 @@ export default function SettingsPage() {
   const { lang, isRTL } = useLanguage();
   const isAR = lang === "ar";
   const { display, update: updateDisplay } = useDisplaySettings();
-  const { settings, refresh, logoSrc, stampSrc, watermarkSrc } = useCompanySettings();
+  const { settings, refresh, setSettings, logoSrc, stampSrc, watermarkSrc } = useCompanySettings();
   const { toast } = useToast();
   const [form, setForm] = useState<CompanySettings>({ ...DEFAULT_SETTINGS });
   const [saving, setSaving] = useState(false);
@@ -99,27 +99,44 @@ export default function SettingsPage() {
     reader.readAsDataURL(file);
   };
 
-  const handleSave = async () => {
-    setSaving(true);
-    try {
-      const token = sessionStorage.getItem("auth_token");
-      const res = await fetch(`${API_BASE}/company-settings`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify(form),
-      });
-      if (!res.ok) throw new Error("Failed");
-      await refresh();
-      toast({ title: isAR ? "✅ تم الحفظ بنجاح — التغييرات مفعّلة الآن" : "✅ Saved — changes are now active" });
-    } catch {
-      toast({ title: isAR ? "حدث خطأ أثناء الحفظ" : "Save failed", variant: "destructive" });
-    } finally {
-      setSaving(false);
-    }
-  };
+    const handleSave = async () => {
+      setSaving(true);
+      try {
+        const token = sessionStorage.getItem("auth_token");
+        const res = await fetch(`${API_BASE}/company-settings`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify(form),
+        });
+    
+        if (!res.ok) throw new Error("Failed");
+    
+        const saved = await res.json();
+        const mergedSaved = { ...DEFAULT_SETTINGS, ...saved };
+    
+        setForm(mergedSaved);
+        setSettings(mergedSaved);
+        localStorage.setItem("company_settings", JSON.stringify(mergedSaved));
+    
+        await refresh();
+    
+        toast({
+          title: isAR
+            ? "✅ تم الحفظ بنجاح — التغييرات مفعلة الآن"
+            : "✅ Saved — changes are now active",
+        });
+      } catch {
+        toast({
+          title: isAR ? "حدث خطأ أثناء الحفظ" : "Save failed",
+          variant: "destructive",
+        });
+      } finally {
+        setSaving(false);
+      }
+    };
 
   const Toggle = ({ field }: { field: keyof CompanySettings }) => (
     <button
@@ -784,6 +801,31 @@ export default function SettingsPage() {
                     placeholder={isAR ? "مثال: شكراً لتعاملكم معنا · جميع الأسعار شاملة الضريبة" : "e.g. Thank you for your business"}
                   />
                 </Field>
+            
+            <Field label={isAR ? "عنوان الفاتورة الأساسي" : "Main Invoice Title"}>
+              <input
+                value={form.invoiceCreditTitleAr}
+                onChange={e => setForm(p => ({ ...p, invoiceCreditTitleAr: e.target.value }))}
+                className={inp}
+              />
+            </Field>
+            
+            <Field label={isAR ? "عنوان الفاتورة الفرعي" : "Sub Invoice Title"}>
+              <input
+                value={form.invoiceCreditTitleEn}
+                onChange={e => setForm(p => ({ ...p, invoiceCreditTitleEn: e.target.value }))}
+                className={inp}
+              />
+            </Field>
+            
+            <Field label={isAR ? "حجم عنوان الفاتورة" : "Invoice Title Font Size"}>
+              <input
+                type="number"
+                value={form.invoiceTitleFontSize}
+                onChange={e => setForm(p => ({ ...p, invoiceTitleFontSize: Number(e.target.value) }))}
+                className={inp}
+              />
+            </Field>
               </div>
             </div>
           </Section>
