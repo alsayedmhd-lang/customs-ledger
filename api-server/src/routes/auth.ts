@@ -1,7 +1,6 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import nodemailer from "nodemailer";
 import { db } from "@workspace/db";
 import { usersTable, otpCodesTable, DEFAULT_PERMISSIONS } from "@workspace/db/schema";
 import { eq, and, gt, isNull } from "drizzle-orm";
@@ -87,27 +86,6 @@ async function sendOTPEmail(
     console.error("[OTP EMAIL ERROR]", error);
     return false;
   }
-}
-  
-  await transporter.sendMail({
-    from: `"حول العالم للتخليص الجمركي" <${user}>`,
-    to,
-    subject: `إعادة تعيين كلمة المرور — رمز التحقق: ${code}`,
-    html: `
-      <div dir="rtl" style="font-family: Arial, sans-serif; max-width: 480px; margin: auto; padding: 24px; border: 1px solid #e5e7eb; border-radius: 12px;">
-        <h2 style="color: #dc2626; margin-bottom: 8px;">إعادة تعيين كلمة المرور</h2>
-        <p style="color: #374151; margin-bottom: 4px;">مرحباً <strong>${displayName}</strong>،</p>
-        <p style="color: #374151;">تلقّينا طلباً لإعادة تعيين كلمة المرور لحسابك. رمز التحقق هو:</p>
-        <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 20px; text-align: center; margin: 20px 0;">
-          <span style="font-size: 36px; font-weight: bold; letter-spacing: 8px; color: #dc2626;">${code}</span>
-        </div>
-        <p style="color: #6b7280; font-size: 13px;">صالح لمدة 10 دقائق. إن لم تطلب ذلك، تجاهل هذه الرسالة.</p>
-        <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 16px 0;" />
-        <p style="color: #9ca3af; font-size: 11px; text-align: center;">حول العالم للتخليص الجمركي — الدوحة، قطر</p>
-      </div>
-    `,
-  });
-  return true;
 }
 
 async function sendOTPWhatsApp(phone: string, code: string, displayName: string, apiKey: string): Promise<boolean> {
