@@ -41,18 +41,17 @@ async function sendOTPEmail(to: string, code: string, displayName: string): Prom
     console.warn(`[OTP] SMTP not configured — code: ${code}`);
     return false;
   }
-
-  const transporter = nodemailer.createTransport({
-    host,
-    port: Number(port),
-    secure: false,
-    requireTLS: true,
-    auth: { user, pass },
-    connectionTimeout: 10000,
-    greetingTimeout: 10000,
-    socketTimeout: 10000,
-  });
-
+  
+const transporter = nodemailer.createTransport({
+  host,
+  port: Number(port),
+  secure: true,
+  auth: { user, pass },
+  connectionTimeout: 10000,
+  greetingTimeout: 10000,
+  socketTimeout: 10000,
+});
+  
   await transporter.sendMail({
     from: `"حول العالم للتخليص الجمركي" <${process.env.SMTP_FROM || user}>`,
     to,
@@ -84,18 +83,17 @@ async function sendPasswordResetEmail(to: string, code: string, displayName: str
     console.warn(`[RESET] SMTP not configured — code: ${code}`);
     return false;
   }
-
-  const transporter = nodemailer.createTransport({
-    host,
-    port: Number(port),
-    secure: false,
-    requireTLS: true,
-    auth: { user, pass },
-    connectionTimeout: 10000,
-    greetingTimeout: 10000,
-    socketTimeout: 10000,
-  });
-
+  
+const transporter = nodemailer.createTransport({
+  host,
+  port: Number(port),
+  secure: true,
+  auth: { user, pass },
+  connectionTimeout: 10000,
+  greetingTimeout: 10000,
+  socketTimeout: 10000,
+});
+  
   await transporter.sendMail({
     from: `"حول العالم للتخليص الجمركي" <${user}>`,
     to,
