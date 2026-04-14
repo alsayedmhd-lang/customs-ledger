@@ -44,14 +44,14 @@ async function sendOTPEmail(to: string, code: string, displayName: string): Prom
 
   const transporter = nodemailer.createTransport({
     host,
-    port,
-    secure: port === 465,
+    port: Number(port),
+    secure: Number(port) === 465,
     auth: { user, pass },
     tls: { rejectUnauthorized: false },
   });
 
   await transporter.sendMail({
-    from: `"حول العالم للتخليص الجمركي" <${user}>`,
+    from: `"حول العالم للتخليص الجمركي" <${process.env.SMTP_FROM || user}>`,
     to,
     subject: `رمز التحقق: ${code}`,
     html: `
@@ -83,7 +83,9 @@ async function sendPasswordResetEmail(to: string, code: string, displayName: str
   }
 
   const transporter = nodemailer.createTransport({
-    host, port, secure: port === 465,
+    host,
+    port: Number(port),
+    secure: Number(port) === 465,
     auth: { user, pass },
     tls: { rejectUnauthorized: false },
   });
