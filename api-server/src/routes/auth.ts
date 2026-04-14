@@ -35,50 +35,38 @@ async function sendOTPEmail(
   code: string,
   displayName: string,
 ): Promise<boolean> {
-  const apiKey = process.env.BREVO_API_KEY;
-  const fromEmail = process.env.SMTP_FROM;
+  const host = process.env.SMTP_HOST;
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
+  const port = parseInt(process.env.SMTP_PORT || "465");
 
-  if (!apiKey || !fromEmail) {
-    console.warn("[OTP EMAIL] BREVO_API_KEY or SMTP_FROM missing");
+  if (!host || !user || !pass) {
+    console.warn(`[OTP] SMTP not configured - code: ${code}`);
     return false;
   }
 
   try {
-    const response = await fetch("https://api.brevo.com/v3/smtp/email", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "api-key": apiKey,
-      },
-      body: JSON.stringify({
-        sender: {
-          name: "Around The World",
-          email: fromEmail,
-        },
-        to: [
-          {
-            email: to,
-            name: displayName || to,
-          },
-        ],
-        subject: `رمز التحقق: ${code}`,
-        htmlContent: `
-          <div dir="rtl" style="font-family: Arial,sans-serif; padding:20px;">
-            <h2>رمز التحقق</h2>
-            <p>مرحبًا ${displayName}</p>
-            <p>رمز الدخول الخاص بك:</p>
-            <div style="font-size:32px;font-weight:bold;color:#2563eb">${code}</div>
-            <p>صالح لمدة 5 دقائق</p>
-          </div>
-        `,
-      }),
+    const transporter = nodemailer.createTransport({
+      host,
+      port,
+      secure: true,
+      auth: { user, pass },
     });
 
-    if (!response.ok) {
-      const err = await response.text();
-      console.error("[OTP EMAIL ERROR]", err);
-      return false;
-    }
+    await transporter.sendMail({
+      from: `حول العالم للتخليص الجمركي <${user}>`,
+      to,
+      subject: `رمز التحقق: ${code}`,
+      html: `
+        <div dir="rtl" style="font-family: Arial,sans-serif; padding:20px;">
+          <h2>رمز التحقق</h2>
+          <p>مرحباً ${displayName}</p>
+          <p>رمز الدخول الخاص بك:</p>
+          <div style="font-size:32px;font-weight:bold;color:#2563eb">${code}</div>
+          <p>صالح لمدة 5 دقائق</p>
+        </div>
+      `,
+    });
 
     console.log("[OTP EMAIL] sent:", to);
     return true;
