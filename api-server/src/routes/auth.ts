@@ -52,9 +52,9 @@ async function sendOTPEmail(
       port: Number(port),
       secure: Number(port) === 465,
       auth: { user, pass },
-      connectionTimeout: 10000,
-      greetingTimeout: 10000,
-      socketTimeout: 10000,
+      connectionTimeout: 30000,
+      greetingTimeout: 30000,
+      socketTimeout: 30000,
     });
 
     await transporter.sendMail({
