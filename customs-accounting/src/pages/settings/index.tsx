@@ -110,7 +110,7 @@ export default function SettingsPage() {
         };
         reader.readAsDataURL(file);
       });
-
+    };
     const MAX_IMAGE_DIMENSION = 1200;
     const OUTPUT_QUALITY = 0.82;
     
