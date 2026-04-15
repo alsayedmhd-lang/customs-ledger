@@ -90,13 +90,22 @@ export default function SettingsPage() {
       toast({ title: isAR ? "الحجم كبير جداً (2 MB كحد أقصى)" : "File too large (max 2 MB)", variant: "destructive" });
       return;
     }
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const base64 = ev.target?.result as string;
-      setForm(p => ({ ...p, [field]: base64 }));
-      setPreview(base64);
-    };
-    reader.readAsDataURL(file);
+    compressImageToDataUrl(file, {
+  maxWidth: field === "watermarkBase64" ? 1600 : 1200,
+  maxHeight: field === "watermarkBase64" ? 1600 : 1200,
+  quality: field === "watermarkBase64" ? 0.75 : 0.82,
+  outputType: "image/png",
+})
+  .then((compressedBase64) => {
+    setForm((p) => ({ ...p, [field]: compressedBase64 }));
+    setPreview(compressedBase64);
+  })
+  .catch(() => {
+    toast({
+      title: isAR ? "فشل تجهيز الصورة" : "Failed to prepare image",
+      variant: "destructive",
+    });
+  });
   };
 
     const MAX_IMAGE_DIMENSION = 1200;
@@ -119,20 +128,11 @@ export default function SettingsPage() {
       } = options || {};
     
       const fileDataUrl = await new Promise<string>((resolve, reject) => {
-        compressImageToDataUrl(file, {
-          maxWidth: field === "watermarkBase64" ? 1600 : 1200,
-          maxHeight: field === "watermarkBase64" ? 1600 : 1200,
-          quality: field === "watermarkBase64" ? 0.75 : 0.82,
-          outputType: "image/png",
-        }).then((compressedBase64) => {
-          setForm((p) => ({ ...p, [field]: compressedBase64 }));
-          setPreview(compressedBase64);
-        }).catch(() => {
-          toast({
-            title: isAR ? "فشل تجهيز الصورة" : "Failed to prepare image",
-            variant: "destructive",
-          });
-        });
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ""));
+      reader.onerror = () => reject(new Error("Failed to read image"));
+      reader.readAsDataURL(file);
+    });
     
       const img = await new Promise<HTMLImageElement>((resolve, reject) => {
         const image = new Image();
