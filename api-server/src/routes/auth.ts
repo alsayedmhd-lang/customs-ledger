@@ -51,6 +51,7 @@ async function sendOTPEmail(
       host,
       port: Number(port),
       secure: Number(port) === 465,
+      requireTLS: Number(port) === 587,
       auth: { user, pass },
       connectionTimeout: 30000,
       greetingTimeout: 30000,
