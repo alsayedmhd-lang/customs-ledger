@@ -18,7 +18,7 @@ type ClientForm = {
   isActive: boolean;
 };
 
-const API_BASE = "https://customs-ledger-api.onrender.com";
+const API_BASE = "https://workspaceapi-server-production-0e1f.up.railway.app/api";
 
 const emptyForm: ClientForm = {
   name: "",
@@ -1409,16 +1409,17 @@ export default function Users({ lang }: { lang: Lang }) {
                 </select>
               </div>
 
-              <InputField
-                label={t.email}
-                value={form.email}
-                onChange={(v) => updateForm("email", v)}
-              />
-              <InputField
-                label={t.phone}
-                value={form.phone}
-                onChange={(v) => updateForm("phone", v)}
-              />
+            <InputField
+              label={t.email}
+              value={form.email}
+              onChange={(v) => updateForm("email", v)}
+            />
+                      
+            <InputField
+              label={t.phone}
+              value={form.phone}
+              onChange={(v) => updateForm("phone", v)}
+            />
 
               <div>
                 <label style={labelStyle}>{t.status}</label>
