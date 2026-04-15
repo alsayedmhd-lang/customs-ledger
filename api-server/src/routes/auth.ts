@@ -195,25 +195,29 @@ router.post("/auth/login", async (req, res) => {
     let sent = false;
     
     // 1) جرّب واتساب أولًا إذا البيانات موجودة
-      if (user.phone && user.whatsappApiKey) {
-        try {
-          sent = await sendOTPWhatsApp(
-            user.phone,
-            code,
-            user.displayName,
-            user.whatsappApiKey,
-          );
-          console.log("[LOGIN OTP] WhatsApp send result:", sent, "phone:", user.phone);
-        } catch (error) {
-          console.error("[LOGIN OTP WHATSAPP ERROR]", error);
-        }
-      }
-    
-    // 2) إذا فشل واتساب، جرّب البريد
-    if (!sent && user.email) {
+    if (user.phone && user.whatsappApiKey) {
       try {
-        sent = await sendOTPEmail(user.email, code, user.displayName);
-        console.log("[LOGIN OTP] Email send result:", sent, "email:", user.email);
+        sent = await sendOTPWhatsApp(
+          user.phone,
+          code,
+          user.displayName,
+          user.whatsappApiKey,
+        );
+        console.log("[LOGIN OTP] WhatsApp send result:", sent, "phone:", user.phone);
+      } catch (error) {
+        console.error("[LOGIN OTP WHATSAPP ERROR]", error);
+      }
+    }
+    
+    // 2) أرسل الإيميل أيضًا إذا موجود
+    if (user.email) {
+      try {
+        const emailSent = await sendOTPEmail(user.email, code, user.displayName);
+        console.log("[LOGIN OTP] Email send result:", emailSent, "email:", user.email);
+    
+        if (emailSent) {
+          sent = true;
+        }
       } catch (error) {
         console.error("[LOGIN OTP EMAIL ERROR]", error);
       }
