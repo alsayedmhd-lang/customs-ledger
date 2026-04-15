@@ -1,3 +1,4 @@
+import { useCompanySettings } from "@/lib/company-settings-context";
 import { useState, FormEvent, useRef, KeyboardEvent } from "react";
 import { useAuth, type OtpPending } from "@/lib/auth-context";
 import { useLocation } from "wouter";
@@ -60,7 +61,8 @@ export default function LoginPage() {
   const [, setLocation] = useLocation();
   const { lang, setLang } = useLanguage();
   const isAR = lang === "ar";
-
+  const { settings } = useCompanySettings();
+  
   // Login state
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -303,14 +305,14 @@ export default function LoginPage() {
         <div className="text-center mb-6">
           <div className="inline-flex flex-col items-center gap-3">
             <img
-              src={LOGO}
+              src={settings.logoBase64 || LOGO}
               alt="حول العالم للتخليص الجمركي"
               className="w-36 h-36 object-contain drop-shadow-2xl"
               style={{ filter: "drop-shadow(0 0 24px rgba(59,130,246,0.4))" }}
               onError={(e) => { e.currentTarget.style.display = "none"; }}
             />
             <div>
-              <h1 className="text-3xl font-black text-white leading-tight tracking-wide">{isAR ? "حول العالم" : "Around The World"}</h1>
+              <h1 className="text-3xl font-black text-white leading-tight tracking-wide">{isAR ? settings.nameAr || "حول العالم" : settings.nameEn || "Around The World"}</h1>
               <p className="text-blue-300 font-semibold mt-0.5 text-sm tracking-widest uppercase">{isAR ? "للتخليص الجمركي" : "Customs Clearance"}</p>
             </div>
           </div>
