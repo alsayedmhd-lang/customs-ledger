@@ -700,24 +700,29 @@ export default function SettingsPage() {
         {activeTab === "identity" && (
           <Section icon={Building2} title={isAR ? "هوية الشركة" : "Company Identity"} color="bg-blue-500/5">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Field label={isAR ? "اسم الشركة (عربي)" : "Company Name (Arabic)"}>
-                <input value={form.nameAr} onChange={e => setForm(p => ({ ...p, nameAr: e.target.value }))} className={inp} placeholder="حول العالم للتخليص الجمركي" />
-              </Field>
-              <Field label={isAR ? "اسم الشركة (إنجليزي)" : "Company Name (English)"}>
-                <input value={form.nameEn} onChange={e => setForm(p => ({ ...p, nameEn: e.target.value }))} className={inp} placeholder="Around The World Customs Clearance" />
-              </Field>
-              <Field label={isAR ? "الترجمة الثانوية (عربي)" : "Subtitle (Arabic)"}>
-                <input value={form.subtitleAr} onChange={e => setForm(p => ({ ...p, subtitleAr: e.target.value }))} className={inp} placeholder="للتخليص الجمركي" />
-              </Field>
-              <Field label={isAR ? "الترجمة الثانوية (إنجليزي)" : "Subtitle (English)"}>
-                <input value={form.subtitleEn} onChange={e => setForm(p => ({ ...p, subtitleEn: e.target.value }))} className={inp} placeholder="Customs Clearance" />
-              </Field>
-              <Field label={isAR ? "الوصف (عربي)" : "Tagline (Arabic)"}>
-                <input value={form.taglineAr} onChange={e => setForm(p => ({ ...p, taglineAr: e.target.value }))} className={inp} placeholder="خدمات التخليص الجمركي والشحن" />
-              </Field>
-              <Field label={isAR ? "الوصف (إنجليزي)" : "Tagline (English)"}>
-                <input value={form.taglineEn} onChange={e => setForm(p => ({ ...p, taglineEn: e.target.value }))} className={inp} placeholder="Customs Clearance & Shipping Services" />
-              </Field>
+            <Field label={isAR ? "اسم الشركة (عربي)" : "Company Name (Arabic)"}>
+              <input value={form.nameAr} onChange={e => setForm(p => ({ ...p, nameAr: e.target.value }))} className={inp} placeholder="اسم الشركة بالعربي" />
+            </Field>
+            
+            <Field label={isAR ? "اسم الشركة (إنجليزي)" : "Company Name (English)"}>
+              <input value={form.nameEn} onChange={e => setForm(p => ({ ...p, nameEn: e.target.value }))} className={inp} placeholder="Enter company name in English" />
+            </Field>
+            
+            <Field label={isAR ? "الترجمة الثانوية (عربي)" : "Subtitle (Arabic)"}>
+              <input value={form.subtitleAr} onChange={e => setForm(p => ({ ...p, subtitleAr: e.target.value }))} className={inp} placeholder="الترجمة الثانوية بالعربي" />
+            </Field>
+            
+            <Field label={isAR ? "الترجمة الثانوية (إنجليزي)" : "Subtitle (English)"}>
+              <input value={form.subtitleEn} onChange={e => setForm(p => ({ ...p, subtitleEn: e.target.value }))} className={inp} placeholder="Enter subtitle in English" />
+            </Field>
+            
+            <Field label={isAR ? "الوصف (عربي)" : "Tagline (Arabic)"}>
+              <input value={form.taglineAr} onChange={e => setForm(p => ({ ...p, taglineAr: e.target.value }))} className={inp} placeholder="وصف النشاط بالعربي" />
+            </Field>
+            
+            <Field label={isAR ? "الوصف (إنجليزي)" : "Tagline (English)"}>
+              <input value={form.taglineEn} onChange={e => setForm(p => ({ ...p, taglineEn: e.target.value }))} className={inp} placeholder="Enter business description in English" />
+            </Field>
             </div>
           </Section>
         )}
