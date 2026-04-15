@@ -499,7 +499,7 @@ export default function UsersPage() {
                       value={editForm.phone}
                       onChange={e => setEditForm(p => ({ ...p, phone: e.target.value }))}
                       className={inputCls + " pr-9"}
-                      placeholder={isAR ? "97455251595 (بدون +)" : "97455251595 (no +)"}
+                      placeholder={isAR ? "أدخل رقم الهاتف بدون +" : "Enter phone number without +"}
                     />
                   </div>
                 </Field>
