@@ -700,24 +700,29 @@ export default function SettingsPage() {
         {activeTab === "identity" && (
           <Section icon={Building2} title={isAR ? "هوية الشركة" : "Company Identity"} color="bg-blue-500/5">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Field label={isAR ? "اسم الشركة (عربي)" : "Company Name (Arabic)"}>
-                <input value={form.nameAr} onChange={e => setForm(p => ({ ...p, nameAr: e.target.value }))} className={inp} placeholder="حول العالم للتخليص الجمركي" />
-              </Field>
-              <Field label={isAR ? "اسم الشركة (إنجليزي)" : "Company Name (English)"}>
-                <input value={form.nameEn} onChange={e => setForm(p => ({ ...p, nameEn: e.target.value }))} className={inp} placeholder="Around The World Customs Clearance" />
-              </Field>
-              <Field label={isAR ? "الترجمة الثانوية (عربي)" : "Subtitle (Arabic)"}>
-                <input value={form.subtitleAr} onChange={e => setForm(p => ({ ...p, subtitleAr: e.target.value }))} className={inp} placeholder="للتخليص الجمركي" />
-              </Field>
-              <Field label={isAR ? "الترجمة الثانوية (إنجليزي)" : "Subtitle (English)"}>
-                <input value={form.subtitleEn} onChange={e => setForm(p => ({ ...p, subtitleEn: e.target.value }))} className={inp} placeholder="Customs Clearance" />
-              </Field>
-              <Field label={isAR ? "الوصف (عربي)" : "Tagline (Arabic)"}>
-                <input value={form.taglineAr} onChange={e => setForm(p => ({ ...p, taglineAr: e.target.value }))} className={inp} placeholder="خدمات التخليص الجمركي والشحن" />
-              </Field>
-              <Field label={isAR ? "الوصف (إنجليزي)" : "Tagline (English)"}>
-                <input value={form.taglineEn} onChange={e => setForm(p => ({ ...p, taglineEn: e.target.value }))} className={inp} placeholder="Customs Clearance & Shipping Services" />
-              </Field>
+            <Field label={isAR ? "اسم الشركة (عربي)" : "Company Name (Arabic)"}>
+              <input value={form.nameAr} onChange={e => setForm(p => ({ ...p, nameAr: e.target.value }))} className={inp} placeholder="اسم الشركة بالعربي" />
+            </Field>
+            
+            <Field label={isAR ? "اسم الشركة (إنجليزي)" : "Company Name (English)"}>
+              <input value={form.nameEn} onChange={e => setForm(p => ({ ...p, nameEn: e.target.value }))} className={inp} placeholder="Enter company name in English" />
+            </Field>
+            
+            <Field label={isAR ? "الترجمة الثانوية (عربي)" : "Subtitle (Arabic)"}>
+              <input value={form.subtitleAr} onChange={e => setForm(p => ({ ...p, subtitleAr: e.target.value }))} className={inp} placeholder="الترجمة الثانوية بالعربي" />
+            </Field>
+            
+            <Field label={isAR ? "الترجمة الثانوية (إنجليزي)" : "Subtitle (English)"}>
+              <input value={form.subtitleEn} onChange={e => setForm(p => ({ ...p, subtitleEn: e.target.value }))} className={inp} placeholder="Enter subtitle in English" />
+            </Field>
+            
+            <Field label={isAR ? "الوصف (عربي)" : "Tagline (Arabic)"}>
+              <input value={form.taglineAr} onChange={e => setForm(p => ({ ...p, taglineAr: e.target.value }))} className={inp} placeholder="وصف النشاط بالعربي" />
+            </Field>
+            
+            <Field label={isAR ? "الوصف (إنجليزي)" : "Tagline (English)"}>
+              <input value={form.taglineEn} onChange={e => setForm(p => ({ ...p, taglineEn: e.target.value }))} className={inp} placeholder="Enter business description in English" />
+            </Field>
             </div>
           </Section>
         )}
@@ -729,28 +734,28 @@ export default function SettingsPage() {
               <Field label={isAR ? "البريد الإلكتروني" : "Email"}>
                 <div className="relative">
                   <Mail className="absolute top-2.5 start-3 w-4 h-4 text-muted-foreground" />
-                  <input value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} className={`${inp} ps-9`} placeholder="example@company.com" type="email" />
+                  <input value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} className={`${inp} ps-9`} placeholder={isAR ? "أدخل البريد الإلكتروني" : "Enter email address"} type="email" />
                 </div>
               </Field>
               <Field label={isAR ? "رقم الهاتف" : "Phone"}>
                 <div className="relative">
                   <Phone className="absolute top-2.5 start-3 w-4 h-4 text-muted-foreground" />
-                  <input value={form.phone} onChange={e => setForm(p => ({ ...p, phone: e.target.value }))} className={`${inp} ps-9`} placeholder="55251595" />
+                  <input value={form.phone} onChange={e => setForm(p => ({ ...p, phone: e.target.value }))} className={`${inp} ps-9`} placeholder={isAR ? "أدخل رقم الهاتف" : "Enter phone number"} />
                 </div>
               </Field>
               <Field label={isAR ? "العنوان" : "Address"}>
                 <div className="relative">
                   <MapPin className="absolute top-2.5 start-3 w-4 h-4 text-muted-foreground" />
-                  <input value={form.address} onChange={e => setForm(p => ({ ...p, address: e.target.value }))} className={`${inp} ps-9`} placeholder="Doha, Qatar" />
+                  <input value={form.address} onChange={e => setForm(p => ({ ...p, address: e.target.value }))} className={`${inp} ps-9`} placeholder={isAR ? "أدخل عنوان الشركة" : "Enter company address"} />
                 </div>
               </Field>
               <Field label={isAR ? "صندوق البريد" : "P.O Box"}>
-                <input value={form.poBox} onChange={e => setForm(p => ({ ...p, poBox: e.target.value }))} className={inp} placeholder="P.O BOX 8180" />
+                <input value={form.poBox} onChange={e => setForm(p => ({ ...p, poBox: e.target.value }))} className={inp} placeholder={isAR ? "أدخل صندوق البريد" : "Enter P.O Box"} />
               </Field>
               <Field label={isAR ? "الموقع الإلكتروني" : "Website"}>
                 <div className="relative">
                   <Globe className="absolute top-2.5 start-3 w-4 h-4 text-muted-foreground" />
-                  <input value={form.website} onChange={e => setForm(p => ({ ...p, website: e.target.value }))} className={`${inp} ps-9`} placeholder="www.company.com" />
+                  <input value={form.website} onChange={e => setForm(p => ({ ...p, website: e.target.value }))} className={`${inp} ps-9`} placeholder={isAR ? "أدخل الموقع الإلكتروني" : "Enter website"} />
                 </div>
               </Field>
             </div>
