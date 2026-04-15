@@ -18,7 +18,7 @@ type ClientForm = {
   isActive: boolean;
 };
 
-const API_BASE = "https://customs-ledger-api.onrender.com";
+// const API_BASE = "https://customs-ledger-api.onrender.com";
 
 const emptyForm: ClientForm = {
   name: "",
@@ -1410,60 +1410,16 @@ export default function Users({ lang }: { lang: Lang }) {
               </div>
 
             <InputField
-            label={t.email}
-            value={form.email}
-            onChange={(v) => updateForm("email", v)}
-            rightElement={
-              <>
-                <span
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 700,
-                    padding: "3px 8px",
-                    borderRadius: 999,
-                    background: form.email2FA ? "#dcfce7" : "#fee2e2",
-                    color: form.email2FA ? "#166534" : "#b91c1c",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {form.email2FA ? (isArabic ? "مفعل" : "On") : (isArabic ? "معطل" : "Off")}
-                </span>
-                <input
-                  type="checkbox"
-                  checked={!!form.email2FA}
-                  onChange={(e) => updateForm("email2FA", e.target.checked)}
-                />
-              </>
-            }
-          />
-          
-          <InputField
-            label={t.phone}
-            value={form.phone}
-            onChange={(v) => updateForm("phone", v)}
-            rightElement={
-              <>
-                <span
-                  style={{
-                    fontSize: 11,
-                    fontWeight: 700,
-                    padding: "3px 8px",
-                    borderRadius: 999,
-                    background: form.phone2FA ? "#dcfce7" : "#fee2e2",
-                    color: form.phone2FA ? "#166534" : "#b91c1c",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {form.phone2FA ? (isArabic ? "مفعل" : "On") : (isArabic ? "معطل" : "Off")}
-                </span>
-                <input
-                  type="checkbox"
-                  checked={!!form.phone2FA}
-                  onChange={(e) => updateForm("phone2FA", e.target.checked)}
-                />
-              </>
-            }
-          />
+              label={t.email}
+              value={form.email}
+              onChange={(v) => updateForm("email", v)}
+            />
+                      
+            <InputField
+              label={t.phone}
+              value={form.phone}
+              onChange={(v) => updateForm("phone", v)}
+            />
 
               <div>
                 <label style={labelStyle}>{t.status}</label>
@@ -1565,46 +1521,15 @@ function InputField({
   label,
   value,
   onChange,
-  extra,
-  rightElement,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
-  extra?: React.ReactNode;
-  rightElement?: React.ReactNode;
 }) {
   return (
     <div>
       <label style={labelStyle}>{label}</label>
-
-      <div style={{ position: "relative" }}>
-        <input
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          style={{
-            ...inputStyle,
-            paddingLeft: rightElement ? 90 : inputStyle.paddingLeft,
-          }}
-        />
-        {rightElement ? (
-          <div
-            style={{
-              position: "absolute",
-              left: 12,
-              top: "50%",
-              transform: "translateY(-50%)",
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-            }}
-          >
-            {rightElement}
-          </div>
-        ) : null}
-      </div>
-
-      {extra ? <div style={{ marginTop: 8 }}>{extra}</div> : null}
+      <input value={value} onChange={(e) => onChange(e.target.value)} style={inputStyle} />
     </div>
   );
 }
