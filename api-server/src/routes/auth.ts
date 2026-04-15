@@ -53,7 +53,7 @@ async function sendOTPEmail(
       },
       body: JSON.stringify({
         sender: {
-          name: "حول العالم للتخليص الجمركي",
+          name: "Customs Accounting System",
           email: fromEmail,
         },
         to: [{ email: to }],
@@ -92,7 +92,7 @@ async function sendOTPWhatsApp(phone: string, code: string, displayName: string,
 
   // Normalize phone: remove spaces, dashes, leading +
   const normalized = phone.replace(/[\s\-]/g, "").replace(/^\+/, "");
-  const text = encodeURIComponent(`حول العالم للتخليص الجمركي\n\nمرحباً ${displayName}\nرمز التحقق الخاص بك: *${code}*\nصالح لمدة 5 دقائق فقط.`);
+  const text = encodeURIComponent(`Customs Accounting System\n\nمرحباً ${displayName}\nرمز التحقق الخاص بك: *${code}*\nصالح لمدة 5 دقائق فقط.`);
   const url = `https://api.callmebot.com/whatsapp.php?phone=${normalized}&text=${text}&apikey=${apiKey}`;
 
   const res = await fetch(url);
