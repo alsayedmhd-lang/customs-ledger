@@ -90,15 +90,89 @@ export default function SettingsPage() {
       toast({ title: isAR ? "الحجم كبير جداً (2 MB كحد أقصى)" : "File too large (max 2 MB)", variant: "destructive" });
       return;
     }
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const base64 = ev.target?.result as string;
-      setForm(p => ({ ...p, [field]: base64 }));
-      setPreview(base64);
+    compressImageToDataUrl(file, {
+      maxWidth: field === "watermarkBase64" ? 1600 : 1200,
+      maxHeight: field === "watermarkBase64" ? 1600 : 1200,
+      quality: field === "watermarkBase64" ? 0.75 : 0.82,
+      outputType: "image/jpeg",
+    })
+      .then((compressedBase64) => {
+        if (!compressedBase64) throw new Error("empty");
+        setForm((p) => ({ ...p, [field]: compressedBase64 }));
+        setPreview(compressedBase64);
+      })
+      .catch(async () => {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          const base64 = ev.target?.result as string;
+          setForm((p) => ({ ...p, [field]: base64 }));
+          setPreview(base64);
+        };
+        reader.readAsDataURL(file);
+      });
     };
-    reader.readAsDataURL(file);
-  };
-
+    const MAX_IMAGE_DIMENSION = 1200;
+    const OUTPUT_QUALITY = 0.82;
+    
+    async function compressImageToDataUrl(
+      file: File,
+      options?: {
+        maxWidth?: number;
+        maxHeight?: number;
+        quality?: number;
+        outputType?: "image/jpeg" | "image/png" | "image/webp";
+      }
+    ): Promise<string> {
+      const {
+        maxWidth = MAX_IMAGE_DIMENSION,
+        maxHeight = MAX_IMAGE_DIMENSION,
+        quality = OUTPUT_QUALITY,
+        outputType = "image/png",
+      } = options || {};
+    
+      const fileDataUrl = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ""));
+      reader.onerror = () => reject(new Error("Failed to read image"));
+      reader.readAsDataURL(file);
+    });
+    
+      const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const image = new Image();
+        image.onload = () => resolve(image);
+        image.onerror = () => reject(new Error("Failed to load image"));
+        image.src = fileDataUrl;
+      });
+    
+      let targetWidth = img.width;
+      let targetHeight = img.height;
+    
+      const ratio = Math.min(maxWidth / targetWidth, maxHeight / targetHeight, 1);
+    
+      targetWidth = Math.round(targetWidth * ratio);
+      targetHeight = Math.round(targetHeight * ratio);
+    
+      const canvas = document.createElement("canvas");
+      canvas.width = targetWidth;
+      canvas.height = targetHeight;
+    
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("Canvas not supported");
+    
+      ctx.clearRect(0, 0, targetWidth, targetHeight);
+      ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
+    
+      return canvas.toDataURL(outputType, quality);
+    }
+    
+    const handleImageRemove = (
+      field: "logoBase64" | "stampBase64" | "watermarkBase64",
+      setPreview?: (value: string) => void
+    ) => {
+      setForm((prev) => ({ ...prev, [field]: null }));
+      setPreview?.("");
+    };
+  
     const handleSave = async () => {
       setSaving(true);
       try {
@@ -718,7 +792,7 @@ export default function SettingsPage() {
                     </button>
                     {logoPreview && (
                       <button type="button" onClick={() => { setLogoPreview(null); setForm(p => ({ ...p, logoBase64: null })); }} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-muted rounded-lg hover:bg-muted-foreground/20 transition">
-                        <RotateCcw className="w-3.5 h-3.5" /> {isAR ? "ضبط" : "Reset"}
+                        <RotateCcw className="w-3.5 h-3.5" /> {isAR ? "حذف" : "Remove"}
                       </button>
                     )}
                   </div>
@@ -737,7 +811,7 @@ export default function SettingsPage() {
                     </button>
                     {stampPreview && (
                       <button type="button" onClick={() => { setStampPreview(null); setForm(p => ({ ...p, stampBase64: null })); }} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-muted rounded-lg hover:bg-muted-foreground/20 transition">
-                        <RotateCcw className="w-3.5 h-3.5" /> {isAR ? "ضبط" : "Reset"}
+                        <RotateCcw className="w-3.5 h-3.5" /> {isAR ? "حذف" : "Remove"}
                       </button>
                     )}
                   </div>
@@ -756,7 +830,7 @@ export default function SettingsPage() {
                     </button>
                     {watermarkPreview && (
                       <button type="button" onClick={() => { setWatermarkPreview(null); setForm(p => ({ ...p, watermarkBase64: null })); }} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-muted rounded-lg hover:bg-muted-foreground/20 transition">
-                        <RotateCcw className="w-3.5 h-3.5" /> {isAR ? "ضبط" : "Reset"}
+                        <RotateCcw className="w-3.5 h-3.5" /> {isAR ? "حذف" : "Remove"}
                       </button>
                     )}
                   </div>
