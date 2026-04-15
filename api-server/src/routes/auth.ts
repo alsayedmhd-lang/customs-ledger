@@ -1,7 +1,6 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import nodemailer from "nodemailer";
 import { db } from "@workspace/db";
 import { usersTable, otpCodesTable, DEFAULT_PERMISSIONS } from "@workspace/db/schema";
 import { eq, and, gt, isNull } from "drizzle-orm";
@@ -36,44 +35,48 @@ async function sendOTPEmail(
   code: string,
   displayName: string,
 ): Promise<boolean> {
-  const host = process.env.SMTP_HOST;
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
-  const port = parseInt(process.env.SMTP_PORT || "465");
+  const apiKey = process.env.BREVO_API_KEY;
+  const fromEmail = process.env.SMTP_FROM || "atwcc1246@gmail.com";
 
-  if (!host || !user || !pass) {
-    console.warn(`[OTP] SMTP not configured - code: ${code}`);
+  if (!apiKey) {
+    console.warn(`[OTP] BREVO_API_KEY not configured - code: ${code}`);
     return false;
   }
 
   try {
-    const transporter = nodemailer.createTransport({
-      host,
-      port: Number(port),
-      secure: Number(port) === 465,
-      requireTLS: Number(port) === 587,
-      auth: { user, pass },
-      connectionTimeout: 30000,
-      greetingTimeout: 30000,
-      socketTimeout: 30000,
+    const response = await fetch("https://api.brevo.com/v3/smtp/email", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "api-key": apiKey,
+        "accept": "application/json",
+      },
+      body: JSON.stringify({
+        sender: {
+          name: "حول العالم للتخليص الجمركي",
+          email: fromEmail,
+        },
+        to: [{ email: to }],
+        subject: `رمز التحقق: ${code}`,
+        htmlContent: `
+          <div dir="rtl" style="font-family: Arial, sans-serif; padding:20px;">
+            <h2>رمز التحقق</h2>
+            <p>مرحباً ${displayName}</p>
+            <p>رمز الدخول الخاص بك:</p>
+            <div style="font-size:32px;font-weight:bold;color:#2563eb">${code}</div>
+            <p>صالح لمدة 5 دقائق</p>
+          </div>
+        `,
+      }),
     });
 
-    await transporter.sendMail({
-      from: `حول العالم للتخليص الجمركي <${user}>`,
-      to,
-      subject: `رمز التحقق: ${code}`,
-      html: `
-        <div dir="rtl" style="font-family: Arial,sans-serif; padding:20px;">
-          <h2>رمز التحقق</h2>
-          <p>مرحباً ${displayName}</p>
-          <p>رمز الدخول الخاص بك:</p>
-          <div style="font-size:32px;font-weight:bold;color:#2563eb">${code}</div>
-          <p>صالح لمدة 5 دقائق</p>
-        </div>
-      `,
-    });
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("[OTP EMAIL ERROR] Brevo API:", response.status, errorText);
+      return false;
+    }
 
-    console.log("[OTP EMAIL] sent:", to);
+    console.log("[OTP EMAIL] sent via Brevo API:", to);
     return true;
   } catch (error) {
     console.error("[OTP EMAIL ERROR]", error);
