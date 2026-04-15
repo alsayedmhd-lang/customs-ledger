@@ -1414,11 +1414,31 @@ export default function Users({ lang }: { lang: Lang }) {
                 value={form.email}
                 onChange={(v) => updateForm("email", v)}
               />
+              <div style={{ marginTop: -8, marginBottom: 8 }}>
+                <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, color: "#64748b" }}>
+                  <input
+                    type="checkbox"
+                    checked={!!form.email2FA}
+                    onChange={(e) => updateForm("email2FA", e.target.checked)}
+                  />
+                  {isArabic ? "التحقق بخطوتين" : "Two-factor verification"}
+                </label>
+              </div>
               <InputField
                 label={t.phone}
                 value={form.phone}
                 onChange={(v) => updateForm("phone", v)}
               />
+              <div style={{ marginTop: -8, marginBottom: 8 }}>
+                <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, color: "#64748b" }}>
+                  <input
+                    type="checkbox"
+                    checked={!!form.phone2FA}
+                    onChange={(e) => updateForm("phone2FA", e.target.checked)}
+                  />
+                  {isArabic ? "التحقق بخطوتين" : "Two-factor verification"}
+                </label>
+              </div>
 
               <div>
                 <label style={labelStyle}>{t.status}</label>
