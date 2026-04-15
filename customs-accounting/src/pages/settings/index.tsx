@@ -789,7 +789,7 @@ export default function SettingsPage() {
                     </button>
                     {logoPreview && (
                       <button type="button" onClick={() => { setLogoPreview(null); setForm(p => ({ ...p, logoBase64: null })); }} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-muted rounded-lg hover:bg-muted-foreground/20 transition">
-                        <RotateCcw className="w-3.5 h-3.5" /> {isAR ? "ضبط" : "Reset"}
+                        <RotateCcw className="w-3.5 h-3.5" /> {isAR ? "حذف" : "Remove"}
                       </button>
                     )}
                   </div>
@@ -808,7 +808,7 @@ export default function SettingsPage() {
                     </button>
                     {stampPreview && (
                       <button type="button" onClick={() => { setStampPreview(null); setForm(p => ({ ...p, stampBase64: null })); }} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-muted rounded-lg hover:bg-muted-foreground/20 transition">
-                        <RotateCcw className="w-3.5 h-3.5" /> {isAR ? "ضبط" : "Reset"}
+                        <RotateCcw className="w-3.5 h-3.5" /> {isAR ? "حذف" : "Remove"}
                       </button>
                     )}
                   </div>
@@ -827,7 +827,7 @@ export default function SettingsPage() {
                     </button>
                     {watermarkPreview && (
                       <button type="button" onClick={() => { setWatermarkPreview(null); setForm(p => ({ ...p, watermarkBase64: null })); }} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-muted rounded-lg hover:bg-muted-foreground/20 transition">
-                        <RotateCcw className="w-3.5 h-3.5" /> {isAR ? "ضبط" : "Reset"}
+                        <RotateCcw className="w-3.5 h-3.5" /> {isAR ? "حذف" : "Remove"}
                       </button>
                     )}
                   </div>
