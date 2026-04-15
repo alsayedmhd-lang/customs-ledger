@@ -1409,56 +1409,11 @@ export default function Users({ lang }: { lang: Lang }) {
                 </select>
               </div>
 
-              <InputField
-                label={t.email}
-                value={form.email}
-                onChange={(v) => updateForm("email", v)}
-              />
-              <div style={{ marginTop: -8, marginBottom: 8 }}>            
-              <label
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  border: "1px solid #e5e7eb",
-                  borderRadius: 10,
-                  padding: "8px 12px",
-                  background: "#fff",
-                }}
-              >
-                <span
-                  style={{
-                    fontSize: 12,
-                    fontWeight: 700,
-                    padding: "4px 10px",
-                    borderRadius: 999,
-                    background: form.email2FA ? "#dcfce7" : "#fee2e2",
-                    color: form.email2FA ? "#166534" : "#b91c1c",
-                  }}
-                >
-                  {form.email2FA
-                    ? (isArabic ? "مفعل" : "Enabled")
-                    : (isArabic ? "معطل" : "Disabled")}
-                </span>
-            
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ fontSize: 13, color: "#64748b" }}>
-                    {isArabic ? "التحقق بخطوتين" : "Two-factor verification"}
-                  </span>
-                  <input
-                    type="checkbox"
-                    checked={!!form.email2FA}
-                    onChange={(e) => updateForm("email2FA", e.target.checked)}
-                  />
-                </div>
-              </label>
-            </div>
-              <InputField
-                label={t.phone}
-                value={form.phone}
-                onChange={(v) => updateForm("phone", v)}
-              />
-              <div style={{ marginTop: -8, marginBottom: 8 }}>
+            <InputField
+              label={t.email}
+              value={form.email}
+              onChange={(v) => updateForm("email", v)}
+              extra={
                 <label
                   style={{
                     display: "flex",
@@ -1476,27 +1431,69 @@ export default function Users({ lang }: { lang: Lang }) {
                       fontWeight: 700,
                       padding: "4px 10px",
                       borderRadius: 999,
-                      background: form.phone2FA ? "#dcfce7" : "#fee2e2",
-                      color: form.phone2FA ? "#166534" : "#b91c1c",
+                      background: form.email2FA ? "#dcfce7" : "#fee2e2",
+                      color: form.email2FA ? "#166534" : "#b91c1c",
                     }}
                   >
-                    {form.phone2FA
-                      ? (isArabic ? "مفعل" : "Enabled")
-                      : (isArabic ? "معطل" : "Disabled")}
+                    {form.email2FA ? (isArabic ? "مفعل" : "Enabled") : (isArabic ? "معطل" : "Disabled")}
                   </span>
-              
+            
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <span style={{ fontSize: 13, color: "#64748b" }}>
                       {isArabic ? "التحقق بخطوتين" : "Two-factor verification"}
                     </span>
                     <input
                       type="checkbox"
-                      checked={!!form.phone2FA}
-                      onChange={(e) => updateForm("phone2FA", e.target.checked)}
+                      checked={!!form.email2FA}
+                      onChange={(e) => updateForm("email2FA", e.target.checked)}
                     />
                   </div>
-                </label>
-              </div>
+             </label>
+              }
+            />
+
+              <InputField
+                label={t.phone}
+                value={form.phone}
+                onChange={(v) => updateForm("phone", v)}
+                extra={
+                  <label
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      border: "1px solid #e5e7eb",
+                      borderRadius: 10,
+                      padding: "8px 12px",
+                      background: "#fff",
+                    }}
+                  >
+                    <span
+                      style={{
+                        fontSize: 12,
+                        fontWeight: 700,
+                        padding: "4px 10px",
+                        borderRadius: 999,
+                        background: form.phone2FA ? "#dcfce7" : "#fee2e2",
+                        color: form.phone2FA ? "#166534" : "#b91c1c",
+                      }}
+                    >
+                      {form.phone2FA ? (isArabic ? "مفعل" : "Enabled") : (isArabic ? "معطل" : "Disabled")}
+                    </span>
+              
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{ fontSize: 13, color: "#64748b" }}>
+                        {isArabic ? "التحقق بخطوتين" : "Two-factor verification"}
+                      </span>
+                      <input
+                        type="checkbox"
+                        checked={!!form.phone2FA}
+                        onChange={(e) => updateForm("phone2FA", e.target.checked)}
+                      />
+                    </div>
+                  </label>
+                }
+              />
 
               <div>
                 <label style={labelStyle}>{t.status}</label>
@@ -1598,15 +1595,18 @@ function InputField({
   label,
   value,
   onChange,
+  extra,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
+  extra?: React.ReactNode
 }) {
   return (
     <div>
       <label style={labelStyle}>{label}</label>
       <input value={value} onChange={(e) => onChange(e.target.value)} style={inputStyle} />
+      {extra ? <div style={{ marginTop: 8 }}>{extra}</div> : null}
     </div>
   );
 }
