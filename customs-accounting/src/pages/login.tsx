@@ -711,7 +711,7 @@ export default function LoginPage() {
         </AnimatePresence>
 
         <p className="text-center text-white/25 text-xs mt-6 font-medium">
-          {isAR ? "حول العالم للتخليص الجمركي · نظام المحاسبة الداخلي" : "Around The World Customs Clearance · Internal Accounting System"}
+          {isAR ? "نظام المحاسبة الداخلي للتخليص الجمركي" : "Internal Accounting System For Customs Clearance"}
         </p>
       </motion.div>
     </div>
