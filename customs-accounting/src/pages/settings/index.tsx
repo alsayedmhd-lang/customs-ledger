@@ -94,7 +94,7 @@ export default function SettingsPage() {
   maxWidth: field === "watermarkBase64" ? 1600 : 1200,
   maxHeight: field === "watermarkBase64" ? 1600 : 1200,
   quality: field === "watermarkBase64" ? 0.75 : 0.82,
-  outputType: "image/png",
+  outputType: "image/jpeg",
 })
   .then((compressedBase64) => {
     setForm((p) => ({ ...p, [field]: compressedBase64 }));
