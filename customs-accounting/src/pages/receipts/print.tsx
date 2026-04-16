@@ -358,7 +358,7 @@ export default function ReceiptPrint() {
                   التاريخ
                 </td>
                 <td className="px-3 py-1.5 font-semibold text-gray-900 text-center border-l border-gray-200">
-                  {formatDate(receipt.receivedAt)}
+                  {formatDate(receipt.date || receipt.receiptDate || receipt.receivedAt)}
                 </td>
                 <td className="px-3 py-1.5 font-bold text-gray-400 text-left bg-gray-50 tracking-wide">
                   Date
@@ -416,7 +416,7 @@ export default function ReceiptPrint() {
             <div
               style={{
                 position: "absolute",
-                top: "50%",
+                top: "42%",
                 left: "50%",
                 transform: "translate(-50%, -50%)",
                 zIndex: 4,
