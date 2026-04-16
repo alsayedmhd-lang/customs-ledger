@@ -81,31 +81,31 @@ export default function ReceiptForm() {
   const selectedClientId = watch("clientId");
 
   // Filter invoices by selected client
-  const clientInvoices = (invoices ?? []).filter(
-    (inv) => inv.clientId === Number(selectedClientId) && inv.status !== "cancelled"
-  );
+    const clientInvoices = (invoices ?? []).filter(
+      (inv) => Number(inv.clientId) === Number(selectedClientId) && inv.status !== "cancelled"
+    );
 
-  useEffect(() => {
-    if (existing && isEdit) {
-      reset({
-        clientId: existing.clientId,
-        invoiceId: existing.invoiceId ?? undefined,
-        amount: existing.amount,
-        paymentMethod: existing.paymentMethod as "cash" | "transfer" | "check",
-        notes: existing.notes ?? "",
-        receiptDate: existing.receiptDate,
-      });
-    }
-  }, [existing, isEdit, reset]);
+    useEffect(() => {
+      if (existing && isEdit) {
+        reset({
+          clientId: Number(existing.clientId),
+          invoiceId: existing.invoiceId ? Number(existing.invoiceId) : undefined,
+          amount: Number(existing.amount),
+          paymentMethod: existing.paymentMethod as "cash" | "transfer" | "check",
+          notes: existing.notes ?? "",
+          receiptDate: existing.receiptDate,
+        });
+      }
+    }, [existing, isEdit, reset]);
 
   const onSubmit = async (data: ReceiptFormValues) => {
     try {
       const payload = {
-        clientId: data.clientId,
-        invoiceId: data.invoiceId || null,
-        amount: data.amount,
+        clientId: data.clientId ? Number(data.clientId) : null,
+        invoiceId: data.invoiceId ? Number(data.invoiceId) : null,
+        amount: Number(data.amount),
         paymentMethod: data.paymentMethod,
-        notes: data.notes || null,
+        notes: data.notes?.trim() || null,
         receiptDate: data.receiptDate,
       };
 
