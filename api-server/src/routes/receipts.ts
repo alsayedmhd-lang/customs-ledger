@@ -147,7 +147,7 @@ router.post("/receipts", requireAuth, async (req, res) => {
 });
 
 //------Soft update receipt----------
-router.patch("/receipts/:id", requireAuth, async (req, res) => {
+router.put("/receipts/:id", requireAuth, async (req, res) => {
   try {
     const id = parseInt(req.params.id);
 
