@@ -29,12 +29,13 @@ import {
 } from "@/components/ui/select";
 
 const formSchema = z.object({
-  clientId: z.coerce.number().min(1, "العميل مطلوب"),
+  clientId: z.number().nullable(),
+  clientName: z.string().trim().min(1, "اسم العميل مطلوب"),
   invoiceId: z.coerce.number().optional().nullable(),
-  amount: z.coerce.number().min(0.01, "المبلغ يجب أن يكون أكبر من صفر"),
+  amount: z.coerce.number().min(0.01, "المبلغ مطلوب"),
   paymentMethod: z.enum(["cash", "transfer", "check"]),
-  notes: z.string().optional().nullable(),
-  receiptDate: z.string().min(1, "التاريخ مطلوب"),
+  notes: z.string().optional(),
+  receiptDate: z.string(),
 });
 
 type ReceiptFormValues = z.infer<typeof formSchema>;
@@ -73,7 +74,12 @@ export default function ReceiptForm() {
   } = useForm<ReceiptFormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
+      clientId: null,
+      clientName: "",
+      invoiceId: undefined,
+      amount: 0,
       paymentMethod: "cash",
+      notes: "",
       receiptDate: new Date().toISOString().split("T")[0],
     },
   });
@@ -81,31 +87,32 @@ export default function ReceiptForm() {
   const selectedClientId = watch("clientId");
 
   // Filter invoices by selected client
-  const clientInvoices = (invoices ?? []).filter(
-    (inv) => inv.clientId === Number(selectedClientId) && inv.status !== "cancelled"
-  );
+    const clientInvoices = (invoices ?? []).filter(
+      (inv) => Number(inv.clientId) === Number(selectedClientId) && inv.status !== "cancelled"
+    );
 
-  useEffect(() => {
-    if (existing && isEdit) {
-      reset({
-        clientId: existing.clientId,
-        invoiceId: existing.invoiceId ?? undefined,
-        amount: existing.amount,
-        paymentMethod: existing.paymentMethod as "cash" | "transfer" | "check",
-        notes: existing.notes ?? "",
-        receiptDate: existing.receiptDate,
-      });
-    }
-  }, [existing, isEdit, reset]);
+    useEffect(() => {
+      if (existing && isEdit) {
+        reset({
+          clientId: Number(existing.clientId),
+          invoiceId: existing.invoiceId ? Number(existing.invoiceId) : undefined,
+          amount: Number(existing.amount),
+          paymentMethod: existing.paymentMethod as "cash" | "transfer" | "check",
+          notes: existing.notes ?? "",
+          receiptDate: existing.receiptDate,
+        });
+      }
+    }, [existing, isEdit, reset]);
 
   const onSubmit = async (data: ReceiptFormValues) => {
     try {
       const payload = {
-        clientId: data.clientId,
-        invoiceId: data.invoiceId || null,
-        amount: data.amount,
+        clientId: data.clientId ? Number(data.clientId) : null,
+        clientName: data.clientName?.trim() || null,
+        invoiceId: data.invoiceId ? Number(data.invoiceId) : null,
+        amount: Number(data.amount),
         paymentMethod: data.paymentMethod,
-        notes: data.notes || null,
+        notes: data.notes?.trim() || null,
         receiptDate: data.receiptDate,
       };
 
