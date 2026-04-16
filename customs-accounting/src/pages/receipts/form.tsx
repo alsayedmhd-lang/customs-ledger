@@ -29,12 +29,13 @@ import {
 } from "@/components/ui/select";
 
 const formSchema = z.object({
-  clientId: z.coerce.number().min(1, "العميل مطلوب"),
+  clientId: z.number().nullable(),
+  clientName: z.string().trim().min(1, "اسم العميل مطلوب"),
   invoiceId: z.coerce.number().optional().nullable(),
-  amount: z.coerce.number().min(0.01, "المبلغ يجب أن يكون أكبر من صفر"),
+  amount: z.coerce.number().min(0.01, "المبلغ مطلوب"),
   paymentMethod: z.enum(["cash", "transfer", "check"]),
-  notes: z.string().optional().nullable(),
-  receiptDate: z.string().min(1, "التاريخ مطلوب"),
+  notes: z.string().optional(),
+  receiptDate: z.string(),
 });
 
 type ReceiptFormValues = z.infer<typeof formSchema>;
@@ -73,7 +74,12 @@ export default function ReceiptForm() {
   } = useForm<ReceiptFormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
+      clientId: null,
+      clientName: "",
+      invoiceId: undefined,
+      amount: 0,
       paymentMethod: "cash",
+      notes: "",
       receiptDate: new Date().toISOString().split("T")[0],
     },
   });
@@ -102,6 +108,7 @@ export default function ReceiptForm() {
     try {
       const payload = {
         clientId: data.clientId ? Number(data.clientId) : null,
+        clientName: data.clientName?.trim() || null,
         invoiceId: data.invoiceId ? Number(data.invoiceId) : null,
         amount: Number(data.amount),
         paymentMethod: data.paymentMethod,
