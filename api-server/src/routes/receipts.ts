@@ -213,30 +213,12 @@ router.put("/receipts/:id", requireAuth, async (req, res) => {
       .update(receiptsTable)
       .set(patchData)
       .where(eq(receiptsTable.id, id));
-
-    const receipt = await db
-      .select({
-        id: receiptsTable.id,
-        receiptNumber: receiptsTable.receiptNumber,
-        date: receiptsTable.date,
-        amount: receiptsTable.amount,
-        paymentMethod: receiptsTable.paymentMethod,
-        // referenceNumber: receiptsTable.referenceNumber,
-        notes: receiptsTable.notes,
-        // description: receiptsTable.description,
-        invoiceId: receiptsTable.invoiceId,
-        clientId: receiptsTable.clientId,
-        createdAt: receiptsTable.createdAt,
-        // updatedAt: receiptsTable.updatedAt,
-        clientName: clientsTable.name,
-        clientNameAr: clientsTable.nameAr,
-        clientNameEn: clientsTable.nameEn,
-      })
-      .from(receiptsTable)
-      .leftJoin(clientsTable, eq(receiptsTable.clientId, clientsTable.id))
-      .where(eq(receiptsTable.id, id));
-
-    res.json(receipt[0]);
+    res.json({
+      success: true,
+      message: "Receipt updated successfully",
+      id,
+      patchData,
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Internal server error" });
