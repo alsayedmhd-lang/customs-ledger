@@ -191,23 +191,23 @@ router.put("/receipts/:id", requireAuth, async (req, res) => {
         ? null
         : req.body.amount;
 
-    const patchData: any = {
-      updatedAt: new Date(),
-    };
-
-    if (req.body.receiptNumber !== undefined) patchData.receiptNumber = req.body.receiptNumber;
-    if (req.body.date !== undefined) patchData.date = req.body.date;
-    if (req.body.paymentMethod !== undefined) patchData.paymentMethod = req.body.paymentMethod;
-    if (req.body.referenceNumber !== undefined) patchData.referenceNumber = req.body.referenceNumber;
-    if (req.body.notes !== undefined) patchData.notes = req.body.notes;
-    if (req.body.description !== undefined) patchData.description = req.body.description;
-    if (req.body.invoiceId !== undefined) patchData.invoiceId = invoiceId;
-    if (clientId !== null || req.body.clientId !== undefined || req.body.invoiceId !== undefined) {
-      patchData.clientId = clientId;
-    }
-    if (amount !== null || req.body.amount !== undefined) {
-      patchData.amount = amount;
-    }
+      const patchData: any = {};
+      
+      if (req.body.receiptNumber !== undefined) patchData.receiptNumber = req.body.receiptNumber;
+      if (req.body.date !== undefined) patchData.date = req.body.date;
+      if (req.body.paymentMethod !== undefined) patchData.paymentMethod = req.body.paymentMethod;
+      if (req.body.notes !== undefined) patchData.notes = req.body.notes;
+      if (req.body.invoiceId !== undefined) patchData.invoiceId = invoiceId;
+      
+      if (
+        req.body.clientId !== undefined ||
+        req.body.invoiceId !== undefined
+      ) {
+        patchData.clientId = clientId;
+      }
+      if (req.body.amount !== undefined) {
+        patchData.amount = amount;
+      }
 
     await db
       .update(receiptsTable)
