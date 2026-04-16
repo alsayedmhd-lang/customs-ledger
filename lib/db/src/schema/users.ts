@@ -40,6 +40,8 @@ export const usersTable = pgTable("users", {
   email: text("email"),
   phone: text("phone"),
   whatsappApiKey: text("whatsapp_api_key"),
+  twoFactorEmail: boolean("two_factor_email").default(false),
+  twoFactorWhatsapp: boolean("two_factor_whatsapp").default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
