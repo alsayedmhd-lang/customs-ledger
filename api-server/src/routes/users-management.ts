@@ -77,7 +77,6 @@ router.patch("/users/:id", requireAdmin, async (req, res) => {
     const existing = current[0]?.permissions ?? DEFAULT_PERMISSIONS;
     updates.permissions = { ...existing, ...permissions } as UserPermissions;
   }
-  }
   if (Object.keys(updates).length === 0) return res.status(400).json({ message: "لا توجد بيانات للتحديث" });
   const [user] = await db.update(usersTable).set(updates).where(eq(usersTable.id, id)).returning();
   if (!user) return res.status(404).json({ message: "المستخدم غير موجود" });
