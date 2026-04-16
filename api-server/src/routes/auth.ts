@@ -198,7 +198,7 @@ router.post("/auth/login", async (req, res) => {
     let sent = false;
     
     // 1) جرّب واتساب أولًا إذا البيانات موجودة
-    if (user.phone && user.whatsappApiKey) {
+    if (user.twoFactorWhatsapp && user.phone && user.whatsappApiKey) {
       try {
         sent = await sendOTPWhatsApp(
           user.phone,
@@ -213,7 +213,7 @@ router.post("/auth/login", async (req, res) => {
     }
     
     // 2) أرسل الإيميل أيضًا إذا موجود
-    if (user.email) {
+    if (user.twoFactorEmail && user.email) {
       try {
         const emailSent = await sendOTPEmail(user.email, code, user.displayName);
         console.log("[LOGIN OTP] Email send result:", emailSent, "email:", user.email);
@@ -231,7 +231,7 @@ router.post("/auth/login", async (req, res) => {
     return res.json({
       requiresOtp: true,
       otpToken,
-      maskedEmail: user.email ? maskEmail(user.email) : null,
+      maskedEmail: user.twoFactorEmail && user.email ? maskEmail(user.email) : null,
       visibleCode: !sent ? code : undefined,
     });
 
