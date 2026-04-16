@@ -157,11 +157,13 @@ export default function StatementsIndex() {
                             {t("viewStatement")}
                           </button>
                         </Link>
-                        <a href={`/clients/${client.id}/statement`} target="_blank" rel="noopener noreferrer"
-                           className="flex items-center gap-1.5 px-3 py-1.5 bg-muted text-muted-foreground hover:bg-foreground hover:text-background rounded-lg font-semibold text-xs transition-all">
-                        <Printer className="w-3.5 h-3.5" />
-                        {t("print")}
-                        </a>
+                      <button
+                      onClick={() => window.open(`/clients/${client.id}/statement`, "_blank")}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-muted text-muted-foreground hover:bg-foreground hover:text-background rounded-lg font-semibold text-xs transition-all"
+                    >
+                      <Printer className="w-3.5 h-3.5" />
+                      {t("print")}
+                    </button>
                       </div>
                     </td>
                   </tr>
