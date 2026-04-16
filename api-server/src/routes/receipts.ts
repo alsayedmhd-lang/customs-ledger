@@ -146,6 +146,86 @@ router.post("/receipts", requireAuth, async (req, res) => {
   }
 });
 
+//------Soft update receipt----------
+router.put("/receipts/:id", requireAuth, async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+
+    if (isNaN(id)) {
+      return res.status(400).json({ error: "Invalid receipt id" });
+    }
+
+    const invoiceId =
+      req.body.invoiceId === "" ||
+      req.body.invoiceId === null ||
+      req.body.invoiceId === undefined
+        ? null
+        : Number(req.body.invoiceId);
+
+    if (invoiceId !== null && Number.isNaN(invoiceId)) {
+      return res.status(400).json({ error: "Invalid invoiceId" });
+    }
+
+    const clientId =
+      req.body.clientId !== undefined &&
+      req.body.clientId !== null &&
+      req.body.clientId !== ""
+        ? Number(req.body.clientId)
+        : invoiceId !== null
+        ? (
+            await db
+              .select()
+              .from(invoicesTable)
+              .where(eq(invoicesTable.id, invoiceId))
+          )[0]?.clientId ?? null
+        : null;
+
+    if (clientId !== null && Number.isNaN(clientId)) {
+      return res.status(400).json({ error: "Invalid clientId" });
+    }
+
+    const amount =
+      req.body.amount === "" ||
+      req.body.amount === null ||
+      req.body.amount === undefined
+        ? null
+        : req.body.amount;
+
+      const patchData: any = {};
+      
+      if (req.body.receiptNumber !== undefined) patchData.receiptNumber = req.body.receiptNumber;
+      if (req.body.date !== undefined) patchData.receiptDate = req.body.date;
+      if (req.body.receiptDate !== undefined) patchData.receiptDate = req.body.receiptDate;
+      if (req.body.paymentMethod !== undefined) patchData.paymentMethod = req.body.paymentMethod;
+      if (req.body.notes !== undefined) patchData.notes = req.body.notes;
+      if (req.body.invoiceId !== undefined) patchData.invoiceId = invoiceId;
+      
+      if (
+        req.body.clientId !== undefined ||
+        req.body.invoiceId !== undefined
+      ) {
+        patchData.clientId = clientId;
+      }
+      if (req.body.amount !== undefined) {
+        patchData.amount = amount;
+      }
+
+    await db
+      .update(receiptsTable)
+      .set(patchData)
+      .where(eq(receiptsTable.id, id));
+    res.json({
+      success: true,
+      message: "Receipt updated successfully",
+      id,
+      patchData,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // Soft delete receipt (move to trash)
 router.delete("/receipts/:id", requireAuth, async (req, res) => {
   try {
@@ -178,7 +258,7 @@ export function formatReceipt(
     amount: parseFloat(r.amount ?? "0"),
     paymentMethod: r.paymentMethod,
     notes: r.notes ?? null,
-    receivedAt: r.receiptDate,
+    receiptDate: r.receiptDate,
     deletedAt: r.deletedAt ?? null,
   };
 }
