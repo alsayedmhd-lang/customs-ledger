@@ -194,7 +194,8 @@ router.put("/receipts/:id", requireAuth, async (req, res) => {
       const patchData: any = {};
       
       if (req.body.receiptNumber !== undefined) patchData.receiptNumber = req.body.receiptNumber;
-      if (req.body.date !== undefined) patchData.date = req.body.date;
+      if (req.body.date !== undefined) patchData.receiptDate = req.body.date;
+      if (req.body.receiptDate !== undefined) patchData.receiptDate = req.body.receiptDate;
       if (req.body.paymentMethod !== undefined) patchData.paymentMethod = req.body.paymentMethod;
       if (req.body.notes !== undefined) patchData.notes = req.body.notes;
       if (req.body.invoiceId !== undefined) patchData.invoiceId = invoiceId;
