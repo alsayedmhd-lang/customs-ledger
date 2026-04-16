@@ -209,15 +209,10 @@ router.put("/receipts/:id", requireAuth, async (req, res) => {
       patchData.amount = amount;
     }
 
-    const updated = await db
+    await db
       .update(receiptsTable)
       .set(patchData)
-      .where(eq(receiptsTable.id, id))
-      .returning();
-
-    if (!updated.length) {
-      return res.status(404).json({ error: "Receipt not found" });
-    }
+      .where(eq(receiptsTable.id, id));
 
     const receipt = await db
       .select({
