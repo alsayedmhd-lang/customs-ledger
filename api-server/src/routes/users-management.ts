@@ -9,7 +9,7 @@ const router = Router();
 
 function formatUser(u: typeof usersTable.$inferSelect) {
   const permissions = u.role === "admin" ? DEFAULT_PERMISSIONS : (u.permissions ?? DEFAULT_PERMISSIONS);
-  return { id: u.id, username: u.username, displayName: u.displayName, displayNameAr: u.displayNameAr ?? null, displayNameEn: u.displayNameEn ?? null, role: u.role, isActive: u.isActive, pendingApproval: u.pendingApproval, permissions, email: u.email ?? null, phone: u.phone ?? null, whatsappApiKey: u.whatsappApiKey ?? null, createdAt: u.createdAt };
+  return { id: u.id, username: u.username, displayName: u.displayName, displayNameAr: u.displayNameAr ?? null, displayNameEn: u.displayNameEn ?? null, role: u.role, isActive: u.isActive, pendingApproval: u.pendingApproval, permissions, email: u.email ?? null, phone: u.phone ?? null, whatsappApiKey: u.whatsappApiKey ?? null,twoFactorEmail: u.twoFactorEmail ?? false,twoFactorWhatsapp: u.twoFactorWhatsapp ?? false, createdAt: u.createdAt };
 }
 
 router.get("/users", requireAdmin, async (_req, res) => {
@@ -18,7 +18,7 @@ router.get("/users", requireAdmin, async (_req, res) => {
 });
 
 router.post("/users", requireAdmin, async (req, res) => {
-  const { username, password, displayName, displayNameAr, displayNameEn, role } = req.body as { username: string; password: string; displayName: string; displayNameAr?: string; displayNameEn?: string; role: string };
+  const { username, password, displayName, displayNameAr, displayNameEn, role,twoFactorEmail,twoFactorWhatsapp, } = req.body as { username: string; password: string; displayName: string; displayNameAr?: string; displayNameEn?: string; role: string };
   if (!username || !password || !displayName) {
     return res.status(400).json({ message: "جميع الحقول مطلوبة" });
   }
@@ -32,6 +32,8 @@ router.post("/users", requireAdmin, async (req, res) => {
       displayNameAr: displayNameAr?.trim() || null,
       displayNameEn: displayNameEn?.trim() || null,
       role: ["admin", "supervisor"].includes(role) ? role : "user",
+      twoFactorEmail: twoFactorEmail ?? false,
+      twoFactorWhatsapp: twoFactorWhatsapp ?? false,
       permissions: DEFAULT_PERMISSIONS,
     })
     .returning();
@@ -40,7 +42,7 @@ router.post("/users", requireAdmin, async (req, res) => {
 
 router.patch("/users/:id", requireAdmin, async (req, res) => {
   const id = parseInt(req.params.id);
-  const { displayName, displayNameAr, displayNameEn, role, isActive, pendingApproval, password, permissions, email, phone, whatsappApiKey } = req.body as {
+  const { displayName, displayNameAr, displayNameEn, role, isActive, pendingApproval, password, permissions, email, phone, whatsappApiKey,twoFactorEmail,twoFactorWhatsapp } = req.body as {
     displayName?: string;
     displayNameAr?: string | null;
     displayNameEn?: string | null;
@@ -52,6 +54,8 @@ router.patch("/users/:id", requireAdmin, async (req, res) => {
     email?: string | null;
     phone?: string | null;
     whatsappApiKey?: string | null;
+    twoFactorEmail?: boolean;
+    twoFactorWhatsapp?: boolean;
   };
   const updates: Partial<typeof usersTable.$inferInsert> = {};
   if (displayName) updates.displayName = displayName.trim();
@@ -64,6 +68,10 @@ router.patch("/users/:id", requireAdmin, async (req, res) => {
   if (typeof email !== "undefined") updates.email = email?.trim() || null;
   if (typeof phone !== "undefined") updates.phone = phone?.trim() || null;
   if (typeof whatsappApiKey !== "undefined") updates.whatsappApiKey = whatsappApiKey?.trim() || null;
+  
+  if (typeof twoFactorEmail !== "undefined") updates.twoFactorEmail = !!twoFactorEmail;
+  if (typeof twoFactorWhatsapp !== "undefined") updates.twoFactorWhatsapp = !!twoFactorWhatsapp;
+  
   if (permissions) {
     const current = await db.select().from(usersTable).where(eq(usersTable.id, id)).limit(1);
     const existing = current[0]?.permissions ?? DEFAULT_PERMISSIONS;

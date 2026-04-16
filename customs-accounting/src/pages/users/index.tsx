@@ -21,6 +21,8 @@ interface AppUser {
   email: string | null;
   phone: string | null;
   whatsappApiKey: string | null;
+  twoFactorEmail: boolean;
+  twoFactorWhatsapp: boolean;
   createdAt: string;
 }
 
@@ -93,8 +95,8 @@ export default function UsersPage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  const [form, setForm] = useState({ username: "", password: "", displayName: "", displayNameAr: "", displayNameEn: "", role: "user" });
-  const [editForm, setEditForm] = useState({ displayName: "", displayNameAr: "", displayNameEn: "", role: "user", isActive: true, email: "", phone: "", whatsappApiKey: "" });
+  const [form, setForm] = useState({ username: "", password: "", displayName: "", displayNameAr: "", displayNameEn: "", role: "user"  });
+  const [editForm, setEditForm] = useState({ displayName: "", displayNameAr: "", displayNameEn: "", role: "user", isActive: true, email: "", phone: "", whatsappApiKey: "", twoFactorWhatsapp: false,twoFactorEmail: false });
   const [pwdForm, setPwdForm] = useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
   const [permForm, setPermForm] = useState<UserPermissions>(DEFAULT_PERMS);
   const [resetResult, setResetResult] = useState<{ userId: number; sent: boolean; visibleCode?: string; maskedEmail: string | null; message: string } | null>(null);
@@ -314,10 +316,12 @@ export default function UsersPage() {
                   <td className="px-5 py-4 font-semibold">{(isAR ? u.displayNameAr : u.displayNameEn) || u.displayName}</td>
                   <td className="px-5 py-4">
                     <span className="font-mono text-muted-foreground">{u.username}</span>
-                    {(u.email || u.phone) && (
+                    {(u.twoFactorEmail || u.twoFactorWhatsapp) && (
                       <div className="flex items-center gap-1 mt-0.5">
                         <ShieldCheck className="w-3 h-3 text-emerald-500" />
-                        <span className="text-xs text-emerald-600 font-medium">{isAR ? "تحقق بخطوتين" : "2FA"}</span>
+                        <span className="text-xs text-emerald-600 font-medium">
+                          {isAR ? "تحقق بخطوتين" : "2FA"}
+                        </span>
                       </div>
                     )}
                   </td>
@@ -371,7 +375,7 @@ export default function UsersPage() {
                   <td className="px-5 py-4">
                     <div className="flex items-center gap-2">
                       <button
-                        onClick={() => { setEditId(u.id); setEditForm({ displayName: u.displayName, displayNameAr: u.displayNameAr ?? "", displayNameEn: u.displayNameEn ?? "", role: u.role, isActive: u.isActive, email: u.email ?? "", phone: u.phone ?? "", whatsappApiKey: u.whatsappApiKey ?? "" }); }}
+                        onClick={() => { setEditId(u.id); setEditForm({ displayName: u.displayName, displayNameAr: u.displayNameAr ?? "", displayNameEn: u.displayNameEn ?? "", role: u.role, isActive: u.isActive, email: u.email ?? "", phone: u.phone ?? "", whatsappApiKey: u.whatsappApiKey ?? "" ,twoFactorWhatsapp: u.twoFactorWhatsapp ?? false, twoFactorEmail: u.twoFactorEmail ?? false,}); }}
                         className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
                         title={isAR ? "تعديل" : "Edit"}
                       >
@@ -514,6 +518,41 @@ export default function UsersPage() {
                 </Field>
               </div>
             </div>
+
+            <div className="rounded-xl border p-3 space-y-2">
+  <div className="text-sm text-muted-foreground">
+    {isAR ? "بيانات التحقق بخطوتين (اختياري)" : "Two-factor verification settings (optional)"}
+  </div>
+
+      <label className="flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={editForm.twoFactorEmail || false}
+          onChange={(e) =>
+            setEditForm((p) => ({
+              ...p,
+              twoFactorEmail: e.target.checked,
+            }))
+          }
+        />
+        <span>{isAR ? "التحقق عبر البريد الإلكتروني" : "Verify by email"}</span>
+      </label>
+    
+      <label className="flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={editForm.twoFactorWhatsapp || false}
+          onChange={(e) =>
+            setEditForm((p) => ({
+              ...p,
+              twoFactorWhatsapp: e.target.checked,
+            }))
+          }
+        />
+        <span>{isAR ? "التحقق عبر الهاتف / واتساب" : "Verify by phone / WhatsApp"}</span>
+      </label>
+    </div>
+            
             <div className="flex gap-3 pt-2">
               <button type="submit" className="flex-1 bg-primary text-primary-foreground py-2.5 rounded-xl font-medium">{isAR ? "حفظ" : "Save"}</button>
               <button type="button" onClick={() => setEditId(null)} className="flex-1 bg-muted text-foreground py-2.5 rounded-xl font-medium">{isAR ? "إلغاء" : "Cancel"}</button>
