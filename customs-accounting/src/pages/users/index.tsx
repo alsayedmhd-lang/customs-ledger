@@ -316,10 +316,12 @@ export default function UsersPage() {
                   <td className="px-5 py-4 font-semibold">{(isAR ? u.displayNameAr : u.displayNameEn) || u.displayName}</td>
                   <td className="px-5 py-4">
                     <span className="font-mono text-muted-foreground">{u.username}</span>
-                    {(u.email || u.phone) && (
+                    {(u.twoFactorEmail || u.twoFactorWhatsapp) && (
                       <div className="flex items-center gap-1 mt-0.5">
                         <ShieldCheck className="w-3 h-3 text-emerald-500" />
-                        <span className="text-xs text-emerald-600 font-medium">{isAR ? "تحقق بخطوتين" : "2FA"}</span>
+                        <span className="text-xs text-emerald-600 font-medium">
+                          {isAR ? "تحقق بخطوتين" : "2FA"}
+                        </span>
                       </div>
                     )}
                   </td>
