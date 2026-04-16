@@ -151,7 +151,7 @@ export default function StatementsIndex() {
                     </td>
                     <td className="px-5 py-4">
                       <div className="flex items-center gap-2">
-                        <Link href={`/clients/${client.id}/statement`}>
+                        <Link href={`/clients/${client.id}`}>
                           <button className="flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground rounded-lg font-semibold text-xs transition-all">
                             <BookOpen className="w-3.5 h-3.5" />
                             {t("viewStatement")}
