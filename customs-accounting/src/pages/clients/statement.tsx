@@ -139,8 +139,8 @@ export default function ClientStatement() {
             <div className="text-left">
               <div className="text-2xl font-black text-gray-900 leading-tight">{settings.nameEn.split(" ").slice(0, 3).join(" ").toUpperCase()}</div>
               <div className="text-lg font-bold text-gray-700">{settings.subtitleEn}</div>
-              <div className="text-xs text-gray-500 mt-1">{currentUser.email || settings.email}</div>
-              <div className="text-xs text-gray-500">Tel: {currentUser.phone || settings.phone} · {settings.poBox} {settings.address}</div>
+              <div className="text-xs text-gray-500 mt-1">{settings.email}</div>
+              <div className="text-xs text-gray-500">Tel: {settings.phone} · {settings.poBox} {settings.address}</div>
             </div>
           </div>
         </div>
@@ -325,9 +325,9 @@ export default function ClientStatement() {
         {/* ══ FOOTER ══════════════════════════════════════════════════════ */}
         <div className="border-t-4 border-double border-gray-700 px-6 py-3 bg-gray-50" style={{ position: "relative", zIndex: 1 }}>
           <div className="flex items-center justify-between text-xs text-gray-600">
-            <span>✉ {currentUser.email || settings.email}</span>
+            <span>✉ {settings.email}</span>
             <span className="font-bold text-gray-800">{settings.nameAr} · {settings.nameEn.split(" ").slice(0, 3).join(" ")} C.C</span>
-            <span>{settings.poBox} {settings.address} · ☎ {currentUser.phone || settings.phone}</span>
+            <span>{settings.poBox} {settings.address} · ☎ {settings.phone}</span>
           </div>
           {settings.footerText && (
             <div className="text-center text-xs text-gray-500 mt-1">{settings.footerText}</div>
