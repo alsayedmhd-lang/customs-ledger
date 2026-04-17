@@ -26,10 +26,8 @@ export default function ClientStatement() {
   const { data: statement, isLoading } = useGetClientStatement(parseInt(id || "0"));
   const { lang } = useLanguage();
   const isAR = lang === "ar";
-  const { settings, logoSrc, stampSrc, watermarkSrc } = useCompanySettings();
+  const { settings, logoSrc, stampSrc, watermarkSrc, currentUser } = useCompanySettings();
   const currencySymbol = lang === "en" ? "QAR" : "ر.ق";
-  const currentUser = JSON.parse(localStorage.getItem("auth_user") || localStorage.getItem("user") || "{}");
-  console.log("CURRENT USER:", currentUser);
   const [showStamp, setShowStamp] = useState<boolean>(() => {
     try { return localStorage.getItem("statement_show_stamp") !== "false"; }
     catch { return true; }
