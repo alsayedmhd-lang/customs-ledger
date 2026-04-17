@@ -30,7 +30,6 @@ export default function ClientStatement() {
   const isAR = lang === "ar";
   const { settings, logoSrc, stampSrc, watermarkSrc, currentUser } = useCompanySettings();
   const currencySymbol = lang === "en" ? "QAR" : "ر.ق";
-  const user = statement?.user;
   const canCustomize = user?.permissions?.canCustomizePrintContact;
   const printPhone = canCustomize && user?.phone ? user.phone : settings.phone;
   const printEmail = canCustomize && user?.email ? user.email : settings.email;
