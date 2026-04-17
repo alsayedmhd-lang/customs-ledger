@@ -3,7 +3,7 @@ import { useState } from "react";
 type Lang = "ar" | "en";
 
 const API_BASE =
-  (import.meta.env.VITE_API_BASE_URL || "https://workspaceapi-server-production-0e1f.up.railway.app").replace(/\/$/, "");
+  (import.meta.env.VITE_API_BASE_URL || "http://localhost:10000").replace(/\/$/, "");
 
 export default function Login({
   lang,

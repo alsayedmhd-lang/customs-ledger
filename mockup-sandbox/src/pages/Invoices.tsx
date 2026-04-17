@@ -66,9 +66,7 @@ type InvoiceForm = {
   }[];
 };
 
-const API_BASE =
-  (((import.meta as any)?.env?.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, "") ||
-    "https://workspaceapi-server-production-0e1f.up.railway.app") + "/api";
+const API_BASE = "http://localhost:10000/api";
 
 function getAuthHeaders(): Record<string, string> {
   const token =

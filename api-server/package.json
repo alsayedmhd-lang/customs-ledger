@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "NODE_ENV=development tsx ./src/index.ts",
+    "dev": "cross-env NODE_ENV=development tsx ./src/index.ts",
     "start": "tsx ./src/index.ts",
     "build": "echo build-ready",
     "typecheck": "tsc -p tsconfig.json --noEmit"
@@ -16,6 +16,7 @@
     "connect-pg-simple": "^10.0.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
+    "dotenv": "^17.4.2",
     "drizzle-orm": "^0.44.5",
     "express": "^5.0.1",
     "express-session": "^1.19.0",
@@ -25,6 +26,7 @@
     "tsx": "^4.21.0"
   },
   "devDependencies": {
+    "cross-env": "^7.0.3",
     "@types/bcryptjs": "^3.0.0",
     "@types/connect-pg-simple": "^7.0.3",
     "@types/cookie-parser": "^1.4.10",

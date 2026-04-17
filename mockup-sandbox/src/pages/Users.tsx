@@ -18,7 +18,7 @@ type ClientForm = {
   isActive: boolean;
 };
 
-const API_BASE = "https://workspaceapi-server-production-0e1f.up.railway.app/api";
+const API_BASE = "http://localhost:10000/api";
 
 const emptyForm: ClientForm = {
   name: "",
