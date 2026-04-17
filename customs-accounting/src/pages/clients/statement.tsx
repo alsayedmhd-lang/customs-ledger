@@ -1,3 +1,4 @@
+import { useAuth } from "@/lib/auth-context";
 import { useState, useEffect } from "react";
 import { useParams, Link } from "wouter";
 import { useGetClientStatement } from "@workspace/api-client-react";
@@ -25,10 +26,13 @@ export default function ClientStatement() {
   const { id } = useParams<{ id: string }>();
   const { data: statement, isLoading } = useGetClientStatement(parseInt(id || "0"));
   const { lang } = useLanguage();
+  const { user } = useAuth();
   const isAR = lang === "ar";
-  const { settings, logoSrc, stampSrc, watermarkSrc } = useCompanySettings();
+  const { settings, logoSrc, stampSrc, watermarkSrc, currentUser } = useCompanySettings();
   const currencySymbol = lang === "en" ? "QAR" : "ر.ق";
-
+  const canCustomize = user?.permissions?.canCustomizePrintContact;
+  const printPhone = canCustomize && user?.phone ? user.phone : settings.phone;
+  const printEmail = canCustomize && user?.email ? user.email : settings.email;
   const [showStamp, setShowStamp] = useState<boolean>(() => {
     try { return localStorage.getItem("statement_show_stamp") !== "false"; }
     catch { return true; }
@@ -140,8 +144,8 @@ export default function ClientStatement() {
             <div className="text-left">
               <div className="text-2xl font-black text-gray-900 leading-tight">{settings.nameEn.split(" ").slice(0, 3).join(" ").toUpperCase()}</div>
               <div className="text-lg font-bold text-gray-700">{settings.subtitleEn}</div>
-              <div className="text-xs text-gray-500 mt-1">{settings.email}</div>
-              <div className="text-xs text-gray-500">Tel: {settings.phone} · {settings.poBox} {settings.address}</div>
+              <div className="text-xs text-gray-500 mt-1">{printEmail}</div>
+              <div className="text-xs text-gray-500">Tel: {printPhone} · {settings.poBox} {settings.address}</div>
             </div>
           </div>
         </div>
@@ -326,9 +330,9 @@ export default function ClientStatement() {
         {/* ══ FOOTER ══════════════════════════════════════════════════════ */}
         <div className="border-t-4 border-double border-gray-700 px-6 py-3 bg-gray-50" style={{ position: "relative", zIndex: 1 }}>
           <div className="flex items-center justify-between text-xs text-gray-600">
-            <span>✉ {settings.email}</span>
+            <span>✉ {printEmail}</span>
             <span className="font-bold text-gray-800">{settings.nameAr} · {settings.nameEn.split(" ").slice(0, 3).join(" ")} C.C</span>
-            <span>{settings.poBox} {settings.address} · ☎ {settings.phone}</span>
+            <span>{settings.poBox} {settings.address} · ☎ {printPhone}</span>
           </div>
           {settings.footerText && (
             <div className="text-center text-xs text-gray-500 mt-1">{settings.footerText}</div>
