@@ -1,3 +1,4 @@
+import { useAuth } from "@/lib/auth-context";
 import { useState, useEffect } from "react";
 import { useParams, Link } from "wouter";
 import { useGetClientStatement } from "@workspace/api-client-react";
@@ -25,6 +26,7 @@ export default function ClientStatement() {
   const { id } = useParams<{ id: string }>();
   const { data: statement, isLoading } = useGetClientStatement(parseInt(id || "0"));
   const { lang } = useLanguage();
+  const { user } = useAuth();
   const isAR = lang === "ar";
   const { settings, logoSrc, stampSrc, watermarkSrc, currentUser } = useCompanySettings();
   const currencySymbol = lang === "en" ? "QAR" : "ر.ق";
