@@ -32,6 +32,10 @@ export default function ClientStatement() {
   const canCustomize = user?.permissions?.canCustomizePrintContact;
   const printPhone = canCustomize && user?.phone ? user.phone : settings.phone;
   const printEmail = canCustomize && user?.email ? user.email : settings.email;
+  console.log("statement.user =", user);
+  console.log("canCustomize =", canCustomize);
+  console.log("user.email =", user?.email);
+  console.log("printEmail =", printEmail);
   const [showStamp, setShowStamp] = useState<boolean>(() => {
     try { return localStorage.getItem("statement_show_stamp") !== "false"; }
     catch { return true; }
