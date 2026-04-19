@@ -386,8 +386,8 @@ export default function InvoiceForm() {
       dir={isRTL ? "rtl" : "ltr"}
       className="max-w-4xl mx-auto space-y-4 pb-24"
     >
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
+      <div className={`flex items-start gap-3 w-full justify-between ${isAR ? "flex-row-reverse" : ""}`}>
+        <div className="flex items-center gap-3 order-2">
           <button
             onClick={() => setLocation("/invoices")}
             className="p-2 bg-card border border-border/50 rounded-xl hover:bg-muted transition-colors"
@@ -399,7 +399,7 @@ export default function InvoiceForm() {
             )}
           </button>
 
-          <div>
+          <div className="text-right self-start">
             <h1 className="text-xl font-bold leading-tight">
               {isEdit
                 ? `${isAR ? "تعديل" : "Edit"} ${
@@ -413,20 +413,28 @@ export default function InvoiceForm() {
               {isAR
                 ? "أدخل بيانات الفاتورة ثم احفظ"
                 : "Fill in the details and save"}
+              
             </p>
+            </div>
+            </div>
+          
+            {isEdit && invoiceId ? (
+              <div className={`flex items-center gap-2 self-start -mt-2 ${isAR ? "order-1" : "order-3"}`}>
+            <Link href={`/accounting?invoice=${encodeURIComponent(existingInvoice?.invoiceNumber || "")}`}>
+              <button className="flex items-center gap-1.5 px-3 py-2 border border-emerald-400 rounded-xl bg-emerald-50 text-emerald-700 text-sm font-medium hover:bg-emerald-100 shadow-sm">
+                <Calculator className="w-3.5 h-3.5" />
+                {isAR ? "الحسابات" : "Calculate"}
+              </button>
+            </Link>
+              <Link href={`/invoices/${invoiceId}/receipt`}>
+              <button className="flex items-center gap-1.5 px-3 py-2 bg-slate-700 text-white text-sm font-medium rounded-xl hover:bg-slate-600 transition-colors shadow-sm">
+                <Printer className="w-3.5 h-3.5" />
+                {isAR ? "طباعة" : "Print"}
+              </button>
+            </Link> 
           </div>
+        ) : null}
         </div>
-
-        {isEdit && invoiceId && (
-          <Link href={`/invoices/${invoiceId}/receipt`}>
-            <button className="flex items-center gap-1.5 px-3 py-2 bg-slate-700 text-white text-sm font-medium rounded-xl hover:bg-slate-600 transition-colors shadow-sm">
-              <Printer className="w-3.5 h-3.5" />
-              {isAR ? "طباعة" : "Print"}
-            </button>
-          </Link>
-        )}
-      </div>
-
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <div className="bg-card rounded-2xl border border-border/50 shadow-sm overflow-hidden">
           <div className="flex items-center gap-2 px-4 py-3 border-b border-border/40 bg-primary/5">
@@ -777,10 +785,10 @@ export default function InvoiceForm() {
                 : isAR
                 ? "إنشاء الفاتورة"
                 : "Create Invoice"}
-            </button>
-          </div>
-        </div>
-      </form>
+              </button>
+              </div>
+            </div>
+        </form>
     </motion.div>
   );
 }

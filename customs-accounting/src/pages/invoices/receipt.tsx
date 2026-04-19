@@ -235,13 +235,13 @@ const impExpValue =
           className="flex items-center gap-2 px-5 py-2 bg-blue-700 text-white rounded-lg font-medium hover:bg-blue-800"
         >
           <Printer className="w-4 h-4" />
-          {isAR ? "طباعة ال" : "Print Invoice"}
+          {isAR ? "الطباعة " : "Print Invoice"}
         </button>
 
         <Link href={`/accounting?invoice=${encodeURIComponent(invoice.invoiceNumber)}`}>
           <button className="flex items-center gap-2 px-4 py-2 border border-emerald-400 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-medium">
             <Calculator className="w-4 h-4" />
-            {isAR ? "حساب ال" : "Calculate Invoice"}
+            {isAR ? "الحسابات" : "Calculate Invoice"}
           </button>
         </Link>
 
