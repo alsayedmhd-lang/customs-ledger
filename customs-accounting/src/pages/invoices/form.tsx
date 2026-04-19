@@ -786,10 +786,9 @@ export default function InvoiceForm() {
                 ? "إنشاء الفاتورة"
                 : "Create Invoice"}
             </button>
-          </div>
-        </div>
-      </div>
-    </form>
-</motion.div>
-);
-}
+            </div>
+         </div>
+     </form>
+  </motion.div>
+      );
+   }
