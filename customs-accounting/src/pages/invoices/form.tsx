@@ -386,7 +386,7 @@ export default function InvoiceForm() {
       dir={isRTL ? "rtl" : "ltr"}
       className="max-w-4xl mx-auto space-y-4 pb-24"
     >
-      <div className="flex items-start justify-between gap-3 w-full">
+      <div className="flex flex-col gap-3 w-full">
         <div className="flex items-center gap-3 order-2">
           <button
             onClick={() => setLocation("/invoices")}
