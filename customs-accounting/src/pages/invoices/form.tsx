@@ -399,8 +399,7 @@ export default function InvoiceForm() {
             )}
           </button>
 
-          <div className={`flex items-start gap-3 w-full ${isAR ? "flex-row-reverse justify-start" : "justify-end"}`}>
-            <div className="text-right self-start">
+          <div className="text-right self-start">
             <h1 className="text-xl font-bold leading-tight">
               {isEdit
                 ? `${isAR ? "تعديل" : "Edit"} ${
@@ -414,8 +413,11 @@ export default function InvoiceForm() {
               {isAR
                 ? "أدخل بيانات الفاتورة ثم احفظ"
                 : "Fill in the details and save"}
+              
             </p>
             </div>
+            </div>
+          
             {isEdit && invoiceId ? (
               <div className={`flex items-center gap-2 self-start -mt-2 ${isAR ? "flex-row" : "flex-row-reverse"}`}>
             <Link href={`/accounting?invoice=${encodeURIComponent(existingInvoice?.invoiceNumber || "")}`}>
