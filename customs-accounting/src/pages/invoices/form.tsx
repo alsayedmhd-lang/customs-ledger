@@ -414,9 +414,7 @@ export default function InvoiceForm() {
                 ? "أدخل بيانات الفاتورة ثم احفظ"
                 : "Fill in the details and save"}
             </p>
-          </div>
-        </div>
-        {isEdit && invoiceId && (
+                    {isEdit && invoiceId && (
           <div className="flex items-center gap-2 self-start -mt-2">
 
             <Link href={`/accounting?invoice=${encodeURIComponent(existingInvoice?.invoiceNumber || "")}`}>
@@ -432,6 +430,7 @@ export default function InvoiceForm() {
               </button>
             </Link> 
           </div>
+        </div>
         )}
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <div className="bg-card rounded-2xl border border-border/50 shadow-sm overflow-hidden">
