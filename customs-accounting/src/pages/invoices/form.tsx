@@ -431,6 +431,7 @@ export default function InvoiceForm() {
             </Link> 
           </div>
         )}
+        </div>
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <div className="bg-card rounded-2xl border border-border/50 shadow-sm overflow-hidden">
           <div className="flex items-center gap-2 px-4 py-3 border-b border-border/40 bg-primary/5">
