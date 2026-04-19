@@ -787,7 +787,5 @@ export default function InvoiceForm() {
             </div>
         </form>
       </div>
-    </div>       
-
    );
   }
