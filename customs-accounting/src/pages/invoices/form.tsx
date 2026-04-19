@@ -386,7 +386,7 @@ export default function InvoiceForm() {
       dir={isRTL ? "rtl" : "ltr"}
       className="max-w-4xl mx-auto space-y-4 pb-24"
     >
-      <div className="flex flex-col gap-3 w-full">
+      <div className="flex items-start justify-between gap-3 w-full">
         <div className="flex items-center gap-3 order-2">
           <button
             onClick={() => setLocation("/invoices")}
@@ -417,7 +417,7 @@ export default function InvoiceForm() {
           </div>
         </div>
         {isEdit && invoiceId && (
-          <div className="flex items-center gap-2 self-start">
+          <div className="flex items-center gap-2 self-start -mt-2">
 
             <Link href={`/accounting?invoice=${encodeURIComponent(existingInvoice?.invoiceNumber || "")}`}>
               <button className="flex items-center gap-1.5 px-3 py-2 border border-emerald-400 rounded-xl bg-emerald-50 text-emerald-700 text-sm font-medium hover:bg-emerald-100 shadow-sm">
