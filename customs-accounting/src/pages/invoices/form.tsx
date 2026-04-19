@@ -386,8 +386,8 @@ export default function InvoiceForm() {
       dir={isRTL ? "rtl" : "ltr"}
       className="max-w-4xl mx-auto space-y-4 pb-24"
     >
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-start justify-between gap-3 w-full">
+        <div className="flex items-center gap-3 order-2">
           <button
             onClick={() => setLocation("/invoices")}
             className="p-2 bg-card border border-border/50 rounded-xl hover:bg-muted transition-colors"
@@ -399,7 +399,7 @@ export default function InvoiceForm() {
             )}
           </button>
 
-          <div>
+          <div className="order-1">
             <h1 className="text-xl font-bold leading-tight">
               {isEdit
                 ? `${isAR ? "تعديل" : "Edit"} ${
@@ -418,19 +418,19 @@ export default function InvoiceForm() {
         </div>
         {isEdit && invoiceId && (
           <div className="flex items-center gap-2 self-start">
-            <Link href={`/invoices/${invoiceId}/receipt`}>
-              <button className="flex items-center gap-1.5 px-3 py-2 bg-slate-700 text-white text-sm font-medium rounded-xl hover:bg-slate-600 transition-colors shadow-sm">
-                <Printer className="w-3.5 h-3.5" />
-                {isAR ? "طباعة" : "Print"}
-              </button>
-            </Link> 
-            <Link href={`/accounting?invoice=${encodeURIComponent(String(invoiceId))}`}>
-            {/* <Link href={`/accounting?invoice=${encodeURIComponent(invoice.invoiceNumber)}`}> */}
+
+            <Link href={`/accounting?invoice=${encodeURIComponent(existingInvoice?.invoiceNumber || "")}`}>
               <button className="flex items-center gap-1.5 px-3 py-2 border border-emerald-400 rounded-xl bg-emerald-50 text-emerald-700 text-sm font-medium hover:bg-emerald-100 shadow-sm">
                 <Calculator className="w-3.5 h-3.5" />
                 {isAR ? "الحسابات" : "Calculate"}
               </button>
             </Link>
+              <Link href={`/invoices/${invoiceId}/receipt`}>
+              <button className="flex items-center gap-1.5 px-3 py-2 bg-slate-700 text-white text-sm font-medium rounded-xl hover:bg-slate-600 transition-colors shadow-sm">
+                <Printer className="w-3.5 h-3.5" />
+                {isAR ? "طباعة" : "Print"}
+              </button>
+            </Link> 
           </div>
         )}
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
