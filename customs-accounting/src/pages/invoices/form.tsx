@@ -399,7 +399,7 @@ export default function InvoiceForm() {
             )}
           </button>
 
-          <div className={isAR ? "order-1 mr-auto text-right self-start" : "order-3 ml-auto text-left self-start"}>
+          <div className="text-right self-start">
             <h1 className="text-xl font-bold leading-tight">
               {isEdit
                 ? `${isAR ? "تعديل" : "Edit"} ${
