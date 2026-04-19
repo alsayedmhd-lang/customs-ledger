@@ -18,7 +18,7 @@ type ClientForm = {
   isActive: boolean;
 };
 
-const API_BASE = "http://localhost:10000/api";
+const API_BASE = "http://localhost:3000/api";
 
 const emptyForm: ClientForm = {
   name: "",

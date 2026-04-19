@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { Link } from "wouter";
-import { useListClients, useListInvoices } from "@workspace/api-client-react";
+// import { useListClients, useListInvoices } from "@/hooks/use-api";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { BookOpen, FileText, TrendingDown, TrendingUp, User, Printer, Eye, EyeOff } from "lucide-react";
 import { useLanguage } from "@/lib/language-context";
@@ -11,9 +11,12 @@ export default function StatementsIndex() {
   const isAR = lang === "ar";
   const [showAmounts, setShowAmounts] = useState(false);
   const hidden = <span className="tracking-widest opacity-35 font-mono">••••••</span>;
-  const { data: clients, isLoading: loadingClients } = useListClients();
-  const { data: allInvoices, isLoading: loadingInvoices } = useListInvoices();
-
+  // const { data: clients, isLoading: loadingClients } = useListClients();
+  // const { data: allInvoices, isLoading: loadingInvoices } = useListInvoices();
+  const clients: any[] = [];
+  const loadingClients = false;
+  const allInvoices: any[] = [];
+  const loadingInvoices = false;
   const loading = loadingClients || loadingInvoices;
 
   const clientSummaries = (clients?.map(client => {

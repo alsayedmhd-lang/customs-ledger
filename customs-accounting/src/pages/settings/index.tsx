@@ -177,13 +177,41 @@ export default function SettingsPage() {
       setSaving(true);
       try {
         const token = sessionStorage.getItem("auth_token");
+        const { id, updatedAt, createdAt, ...rawPayload } = form as any;
+
+        const payload = {
+          ...rawPayload,
+          nameAr: rawPayload.nameAr ?? "",
+          nameEn: rawPayload.nameEn ?? "",
+          subtitleAr: rawPayload.subtitleAr ?? "",
+          subtitleEn: rawPayload.subtitleEn ?? "",
+          taglineAr: rawPayload.taglineAr ?? "",
+          taglineEn: rawPayload.taglineEn ?? "",
+          email: rawPayload.email ?? "",
+          phone: rawPayload.phone ?? "",
+          address: rawPayload.address ?? "",
+          poBox: rawPayload.poBox ?? "",
+          website: rawPayload.website ?? "",
+          crNumber: rawPayload.crNumber ?? "",
+          taxNumber: rawPayload.taxNumber ?? "",
+          footerText: rawPayload.footerText ?? "",
+          invoiceCashTitleAr: rawPayload.invoiceCashTitleAr ?? "",
+          invoiceCashTitleEn: rawPayload.invoiceCashTitleEn ?? "",
+          invoiceCreditTitleAr: rawPayload.invoiceCreditTitleAr ?? "",
+          invoiceCreditTitleEn: rawPayload.invoiceCreditTitleEn ?? "",
+          showWatermark: rawPayload.showWatermark ?? true,
+          showStampOnInvoices: rawPayload.showStampOnInvoices ?? true,
+          showStampOnReceipts: rawPayload.showStampOnReceipts ?? true,
+          showStampOnStatements: rawPayload.showStampOnStatements ?? true,
+          invoiceTitleFontSize: Number(rawPayload.invoiceTitleFontSize ?? 25),
+        };
         const res = await fetch(`${API_BASE}/company-settings`, {
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
-          body: JSON.stringify(form),
+          body: JSON.stringify(payload),
         });
     
         if (!res.ok) throw new Error("Failed");

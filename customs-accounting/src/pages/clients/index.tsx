@@ -30,7 +30,7 @@ type ClientForm = z.infer<typeof clientSchema>;
 
 export default function ClientsList() {
   const { t } = useLanguage();
-  const { data: clients, isLoading } = useListClients();
+  const { data: clients = [], isLoading } = useListClients();
   const [search, setSearch] = useState("");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
@@ -139,16 +139,17 @@ function CreateClientModal({ isOpen, onClose }: { isOpen: boolean, onClose: () =
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const createClient = useCreateClient({
-    mutation: {
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getListClientsQueryKey() });
-        toast({ title: t("addClient") });
-        reset();
-        onClose();
-      },
-      onError: (err: any) => toast({ title: "خطأ في إضافة العميل", description: err.message, variant: "destructive" })
-    }
-  });
+  mutation: {
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: getListClientsQueryKey() });
+      toast({ title: t("addClient") });
+      reset();
+      onClose();
+    },
+    onError: (err: any) =>
+      toast({ title: "خطأ في إضافة العميل", description: err.message, variant: "destructive" }),
+  }
+});
 
   const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<ClientForm>({
     resolver: zodResolver(clientSchema)

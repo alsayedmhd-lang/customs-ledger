@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "wouter";
-import { useGetReceipt, useListClients } from "@workspace/api-client-react";
 import { Printer, ArrowRight, ArrowLeft, Stamp } from "lucide-react";
 import Barcode from "react-barcode";
 import { formatNumber, formatDate } from "@/lib/utils";
 import { useLanguage } from "@/lib/language-context";
 import { useCompanySettings } from "@/lib/company-settings-context";
 import { useAuth } from "@/lib/auth-context";
+import { useGetReceipt, useListClients } from "@workspace/api-client-react";
 
 // ── Number to English words ───────────────────────────────────────────────────
 const engOnes = [

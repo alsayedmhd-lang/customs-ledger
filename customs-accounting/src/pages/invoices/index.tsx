@@ -13,7 +13,7 @@ import { useLanguage } from "@/lib/language-context";
 export default function InvoicesList() {
   const { can } = useAuth();
   const { t } = useLanguage();
-  const { data: invoices, isLoading } = useListInvoices();
+  const { data: invoices = [], isLoading } = useListInvoices();
   const [search, setSearch] = useState("");
   
   const q = search.toLowerCase();
@@ -30,9 +30,9 @@ export default function InvoicesList() {
     mutation: {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getListInvoicesQueryKey() });
-        toast({ title: t("invoices") + " — " + t("delete") });
-      }
-    }
+        toast({ title: t("invoices") + " - " + t("delete") });
+      },
+    },
   });
 
   return (

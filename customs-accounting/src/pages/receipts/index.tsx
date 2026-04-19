@@ -1,8 +1,7 @@
 import { useState } from "react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
-import { useListReceipts, useListClients, useDeleteReceipt, getListReceiptsQueryKey } from "@workspace/api-client-react";
-// import { useListReceipts, useDeleteReceipt, getListReceiptsQueryKey } from "@workspace/api-client-react";
+import { useListReceipts, useDeleteReceipt, getListReceiptsQueryKey, useListClients } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -54,9 +53,8 @@ export default function ReceiptsList() {
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [showAmounts, setShowAmounts] = useState(false);
   const hidden = <span className="tracking-widest opacity-35 font-mono">••••••</span>;
-
-  const { data: receipts, isLoading } = useListReceipts();
-  const { data: clients } = useListClients();   // اضافة السطر --------------------------
+  const { data: receipts = [], isLoading } = useListReceipts();
+  const { data: clients = [] } = useListClients();
   const deleteReceiptMutation = useDeleteReceipt();
   const queryClient = useQueryClient();
   const { toast } = useToast();

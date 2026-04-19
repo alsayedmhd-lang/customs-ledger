@@ -10,7 +10,7 @@ const basePath = process.env.BASE_PATH || "/";
 export default defineConfig({
   base: basePath,
   define: {
-    "import.meta.env.VITE_API_BASE_URL": JSON.stringify("http://localhost:10000"),
+    "import.meta.env.VITE_API_BASE_URL": JSON.stringify("http://localhost:3000"),
   },
   plugins: [
     react(),

@@ -12,7 +12,7 @@ import { useLanguage } from "@/lib/language-context";
 import { useAuth } from "@/lib/auth-context";
 
 const API_BASE =
-  (import.meta.env.VITE_API_BASE_URL || "http://localhost:10000").replace(/\/$/, "");
+  (import.meta.env.VITE_API_BASE_URL || "http://localhost:3000").replace(/\/$/, "");
 interface AccountingRow {
   id: number;
   invoiceNumber: string;

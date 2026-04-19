@@ -96,7 +96,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const stored = sessionStorage.getItem("auth_token");
     if (!stored) { setIsLoading(false); return; }
 
-    fetch(`${API_BASE}/api/auth/me`, {
+    fetch(`${API_BASE}/auth/me`, {
       headers: { Authorization: `Bearer ${stored}` },
     })
       .then((r) => (r.ok ? r.json() : Promise.reject()))

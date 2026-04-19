@@ -35,3 +35,4 @@ export const companySettingsTable = pgTable("company_settings", {
 
 export type CompanySettings = typeof companySettingsTable.$inferSelect;
 export type InsertCompanySettings = typeof companySettingsTable.$inferInsert;
+[]

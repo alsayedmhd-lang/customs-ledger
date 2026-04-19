@@ -4,13 +4,13 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQueryClient } from "@tanstack/react-query";
-import { 
-  useListInvoiceItemTemplates, 
-  useCreateInvoiceItemTemplate, 
-  useUpdateInvoiceItemTemplate, 
+import {
+  useListInvoiceItemTemplates,
+  useCreateInvoiceItemTemplate,
+  useUpdateInvoiceItemTemplate,
   useDeleteInvoiceItemTemplate,
   getListInvoiceItemTemplatesQueryKey,
-  InvoiceItemTemplate
+  InvoiceItemTemplate,
 } from "@workspace/api-client-react";
 import { formatCurrency } from "@/lib/utils";
 import { Modal } from "@/components/ui/modal";
@@ -22,12 +22,12 @@ import { cn } from "@/lib/utils";
 type ViewMode = "cards" | "compact" | "list";
 
 export default function TemplatesList() {
-  const { t, lang } = useLanguage();
-  const isAR = lang === "ar";
-  const { data: templates, isLoading } = useListInvoiceItemTemplates();
-  const [editingTemplate, setEditingTemplate] = useState<InvoiceItemTemplate | null>(null);
-  const [isAddOpen, setIsAddOpen] = useState(false);
-  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    const { t, lang } = useLanguage();
+    const isAR = lang === "ar";
+    const { data: templates = [], isLoading } = useListInvoiceItemTemplates();
+    const [editingTemplate, setEditingTemplate] = useState<any>(null);
+    const [isAddOpen, setIsAddOpen] = useState(false);
+    const [viewMode, setViewMode] = useState<ViewMode>(() => {
     const saved = localStorage.getItem("templates_view_mode");
     return (saved === "cards" || saved === "compact" || saved === "list") ? saved : "cards";
   });
@@ -301,21 +301,20 @@ function TemplateModal({
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getListInvoiceItemTemplatesQueryKey() });
         toast({ title: t("templateSaved") });
+        reset({ description: "", defaultUnitPrice: 0 });
         onClose();
-        reset();
-      }
-    }
+      },
+    },
   });
 
   const updateMut = useUpdateInvoiceItemTemplate({
     mutation: {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getListInvoiceItemTemplatesQueryKey() });
-        toast({ title: t("templateUpdated") });
+        toast({ title: t("templateSaved") });
         onClose();
-        reset();
-      }
-    }
+      },
+    },
   });
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<z.infer<typeof schema>>({

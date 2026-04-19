@@ -2,8 +2,8 @@ import "dotenv/config";
 import app from "./app";
 import { seedAdminUser } from "./seed-admin";
 
-// 1. جعل المنفذ مرناً مع قيمة افتراضية لـ Render (عادة 10000)
-const port = Number(process.env["PORT"] || 10000);
+// 1. جعل المنفذ مرناً مع قيمة افتراضية لـ Render (عادة 3000)
+const port = Number(process.env["PORT"] || 3000);
 
 // التحقق من صحة المنفذ بشكل أبسط
 if (Number.isNaN(port) || port <= 0) {

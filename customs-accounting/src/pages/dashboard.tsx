@@ -1,10 +1,10 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { Link } from "wouter";
-import {
-  useListInvoices,
-  useListClients,
-} from "@workspace/api-client-react";
+// import {
+//   useListInvoices,
+//   useListClients,
+// } from "@workspace/api-client-react";
 import { formatCurrency, formatDate, arabicNums } from "@/lib/utils";
 import {
   FileText, Users, DollarSign, AlertCircle, ArrowLeft, ArrowRight, TrendingUp, Eye, EyeOff,
@@ -23,8 +23,11 @@ export default function Dashboard() {
   const isAR = lang === "ar";
   const { user } = useAuth();
   const { settings } = useCompanySettings();
-  const { data: invoices, isLoading: loadingInvoices } = useListInvoices();
-  const { data: clients } = useListClients();
+  const invoices: any[] = [];
+  const clients: any[] = [];
+  const loadingInvoices = false;
+  // const { data: invoices, isLoading: loadingInvoices } = useListInvoices();
+  // const { data: clients } = useListClients();
   const [showAmounts, setShowAmounts] = useState(false);
   const hidden = <span className="tracking-widest opacity-35 font-mono">••••••</span>;
 

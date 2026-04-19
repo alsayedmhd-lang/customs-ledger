@@ -182,19 +182,20 @@ router.post("/auth/login", async (req, res) => {
       return res.status(403).json({ message: "تم إيقاف الحساب" });
     }
 
-    const code = generateOTP();
-    const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+const code = generateOTP();
+console.log("STEP 1 OK");
 
-    await db
-      .delete(otpCodesTable)
-      .where(and(eq(otpCodesTable.userId, user.id), isNull(otpCodesTable.usedAt)));
+const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+console.log("STEP 2 OK");
 
-    await db.insert(otpCodesTable).values({
-      userId: user.id,
-      code,
-      expiresAt,
-    });
+await db.delete(otpCodesTable);
 
+await db.insert(otpCodesTable).values({
+  userId: user.id,
+  code,
+  expiresAt,
+});
+      // .where(and(eq(otpCodesTable.userId, user.id), isNull(otpCodesTable.usedAt)));
     let sent = false;
     
     // 1) جرّب واتساب أولًا إذا البيانات موجودة

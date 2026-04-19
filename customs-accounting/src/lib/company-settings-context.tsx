@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 
-const API_BASE = (import.meta.env.VITE_API_BASE_URL || "http://localhost:10000").replace(/\/$/, "") + "/api";
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || "http://localhost:3000").replace(/\/$/, "") + "/api";
 const LS_KEY = "company_settings";
 
 export interface CompanySettings {

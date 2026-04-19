@@ -54,7 +54,7 @@ export default function ReceiptForm() {
 
   const { data: clients } = useListClients();
   const { data: invoices } = useListInvoices();
-  const { data: existing } = useGetReceipt(receiptId, { query: { enabled: isEdit } });
+  const { data: existing } = useGetReceipt(receiptId);
 
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -104,12 +104,14 @@ export default function ReceiptForm() {
       }
     }, [existing, isEdit, reset]);
 
+  // const onSubmit = async (data: ReceiptFormValues) => {
   const onSubmit = async (data: ReceiptFormValues) => {
+  console.log("Receipt submit fired", data);
     try {
       const payload = {
-        clientId: data.clientId ? Number(data.clientId) : null,
+        clientId: Number(data.clientId),
         clientName: data.clientName?.trim() || null,
-        invoiceId: data.invoiceId ? Number(data.invoiceId) : null,
+        invoiceId: data.invoiceId ? Number(data.invoiceId) : 0,
         amount: Number(data.amount),
         paymentMethod: data.paymentMethod,
         notes: data.notes?.trim() || null,
@@ -126,9 +128,18 @@ export default function ReceiptForm() {
       queryClient.invalidateQueries({ queryKey: getListReceiptsQueryKey() });
       toast({ title: "تم الحفظ", description: `تم ${isEdit ? "تحديث" : "إنشاء"} سند القبض بنجاح` });
       setLocation(`/receipts/${saved.id}/print`);
-    } catch {
-      toast({ title: "خطأ", description: "فشل حفظ سند القبض", variant: "destructive" });
+
+    } catch (err) {
+      console.error("Receipt save error:", err);
+      toast({
+        title: "خطأ",
+        description: "فشل حفظ سند القبض",
+        variant: "destructive",
+      });
     }
+    // } catch {
+    //   toast({ title: "خطأ", description: "فشل حفظ سند القبض", variant: "destructive" });
+    // }
   };
 
   return (
@@ -156,7 +167,10 @@ export default function ReceiptForm() {
             <Select
               value={String(watch("clientId") || "")}
               onValueChange={(v) => {
+                const selectedClient = (clients ?? []).find((c) => String(c.id) === v);
+
                 setValue("clientId", Number(v), { shouldValidate: true });
+                setValue("clientName", selectedClient?.name || "", { shouldValidate: true });
                 setValue("invoiceId", null);
               }}
             >

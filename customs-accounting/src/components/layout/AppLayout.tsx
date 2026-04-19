@@ -102,7 +102,9 @@ export default function AppLayout({ children }: AppLayoutProps) {
         />
         <div className="min-w-0">
           <h1 className="font-black text-white text-sm leading-tight truncate">
-            {isAR ? settings.nameAr.split(" ").slice(0, 2).join(" ") : settings.nameEn.split(" ").slice(0, 3).join(" ")}
+            {isAR
+              ? (settings.nameAr || "").split(" ").slice(0, 2).join(" ")
+              : (settings.nameEn || "").split(" ").slice(0, 3).join(" ")}
           </h1>
           <p className="text-white/50 text-[11px] font-medium mt-0.5 truncate">
             {isAR ? settings.subtitleAr : settings.subtitleEn}
