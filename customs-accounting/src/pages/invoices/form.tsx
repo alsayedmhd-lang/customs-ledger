@@ -419,7 +419,7 @@ export default function InvoiceForm() {
             </div>
           
             {isEdit && invoiceId ? (
-              <div className={`flex items-center gap-2 self-start -mt-2 ${isAR ? "flex-row-reverse" : "flex-row"}`}>
+              <div className="flex items-center gap-2 self-start -mt-2">
             <Link href={`/accounting?invoice=${encodeURIComponent(existingInvoice?.invoiceNumber || "")}`}>
               <button className="flex items-center gap-1.5 px-3 py-2 border border-emerald-400 rounded-xl bg-emerald-50 text-emerald-700 text-sm font-medium hover:bg-emerald-100 shadow-sm">
                 <Calculator className="w-3.5 h-3.5" />
