@@ -430,7 +430,6 @@ export default function InvoiceForm() {
               </button>
             </Link> 
           </div>
-        </div>
         )}
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <div className="bg-card rounded-2xl border border-border/50 shadow-sm overflow-hidden">
