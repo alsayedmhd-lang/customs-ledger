@@ -786,8 +786,8 @@ export default function InvoiceForm() {
               </button>
               </div>
             </div>
-         </form>
-     </div>
-    </div>
-   );
-  }
+        </form>
+      </div>
+    </motion.div>
+  );
+}
