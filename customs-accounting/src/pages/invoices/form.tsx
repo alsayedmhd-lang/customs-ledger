@@ -424,7 +424,8 @@ export default function InvoiceForm() {
                 {isAR ? "طباعة" : "Print"}
               </button>
             </Link> 
-            <Link href={`/accounting?invoice=${encodeURIComponent(invoice.invoiceNumber)}`}>
+            <Link href={`/accounting?invoice=${encodeURIComponent(String(invoiceId))}`}>
+            {/* <Link href={`/accounting?invoice=${encodeURIComponent(invoice.invoiceNumber)}`}> */}
               <button className="flex items-center gap-1.5 px-3 py-2 border border-emerald-400 rounded-xl bg-emerald-50 text-emerald-700 text-sm font-medium hover:bg-emerald-100 shadow-sm">
                 <Calculator className="w-3.5 h-3.5" />
                 {isAR ? "الحسابات" : "Calculate"}
