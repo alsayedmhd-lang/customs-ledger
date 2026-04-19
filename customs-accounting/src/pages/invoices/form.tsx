@@ -416,7 +416,7 @@ export default function InvoiceForm() {
                 : "Fill in the details and save"}
             </p>
             </div>
-            {isEdit && invoiceId && (
+            {isEdit && invoiceId ? (
               <div className={`flex items-center gap-2 self-start -mt-2 ${isAR ? "flex-row" : "flex-row-reverse"}`}>
             <Link href={`/accounting?invoice=${encodeURIComponent(existingInvoice?.invoiceNumber || "")}`}>
               <button className="flex items-center gap-1.5 px-3 py-2 border border-emerald-400 rounded-xl bg-emerald-50 text-emerald-700 text-sm font-medium hover:bg-emerald-100 shadow-sm">
@@ -431,7 +431,7 @@ export default function InvoiceForm() {
               </button>
             </Link> 
           </div>
-        )}
+        ) : null}
         </div>
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <div className="bg-card rounded-2xl border border-border/50 shadow-sm overflow-hidden">
