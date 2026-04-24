@@ -106,7 +106,7 @@ export default function LoginPage() {
         setLocation("/");
       }
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "خطأ في تسجيل الدخول");
+      setError(err instanceof Error ? err.message : "خطأ في تسجيل الدخول ");
     } finally {
       setLoading(false);
     }
@@ -306,18 +306,17 @@ export default function LoginPage() {
           <div className="inline-flex flex-col items-center gap-3">
             <img
               src={settings.logoBase64 || LOGO}
-              alt="حول العالم للتخليص الجمركي"
+              alt="اسم الشركة "
               className="w-36 h-36 object-contain drop-shadow-2xl"
               style={{ filter: "drop-shadow(0 0 24px rgba(59,130,246,0.4))" }}
               onError={(e) => { e.currentTarget.style.display = "none"; }}
             />
             <div>
-              <h1 className="text-3xl font-black text-white leading-tight tracking-wide">{isAR ? settings.nameAr || "حول العالم" : settings.nameEn || "Around The World"}</h1>
-              <p className="text-blue-300 font-semibold mt-0.5 text-sm tracking-widest uppercase">{isAR ? "للتخليص الجمركي" : "Customs Clearance"}</p>
+              <h1 className="text-3xl font-black text-white leading-tight tracking-wide">{isAR ? settings.nameAr || "اسم الشركة " : settings.nameEn || "Around The World"}</h1>
+              <p className="text-blue-300 font-semibold mt-0.5 text-sm tracking-widest uppercase"> {isAR ? settings.subtitleAr || "نشاط الشركة" : settings.subtitleEn || "Customs Clearance"}</p>
             </div>
           </div>
         </div>
-
         <AnimatePresence mode="wait">
 
           {/* ── LOGIN ── */}
@@ -328,7 +327,7 @@ export default function LoginPage() {
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-2">
                   <div className="p-2 rounded-xl bg-blue-500/20"><LogIn className="w-5 h-5 text-blue-300" /></div>
-                  <h2 className="text-lg font-bold text-white">{isAR ? "تسجيل الدخول" : "Sign In"}</h2>
+                  <h2 className="text-lg font-bold text-white">{isAR ? "تسجيل الدخول - SQLite" : "Sign In - SQLite"}</h2>
                 </div>
                 <button type="button" onClick={() => setLang(isAR ? "en" : "ar")}
                   className="text-white/35 hover:text-white/80 text-xs font-semibold tracking-widest transition-colors uppercase"
@@ -711,8 +710,8 @@ export default function LoginPage() {
         </AnimatePresence>
 
         <p className="text-center text-white/25 text-xs mt-6 font-medium">
-          {isAR ? "نظام المحاسبة الداخلي للتخليص الجمركي" : "Internal Accounting System For Customs Clearance"}
-        </p>
+          {isAR ? "نظام المحاسبة الداخلي للتخليص الجمركي - محمد سيد عب العال - تلفون 60020446" : "Internal Accounting System For Customs Clearance - Mohamed Said Abou Elala - Phone 60020446"}
+                  </p>
       </motion.div>
     </div>
   );

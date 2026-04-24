@@ -120,8 +120,8 @@ export const translations = {
     timeJustNow: "منذ قليل",
     timeAgo: "منذ",
     // Confirmations
-    confirmDeleteTitle: "تأكيد الحذف النهائي",
-    confirmDeleteDesc: "هذا الإجراء لا يمكن التراجع عنه.",
+    confirmDeleteTitle: "تأكيد الحذف ",
+    confirmDeleteDesc: "سيتم نقل الفاتورة إلى سلة المحذوفات.",
     confirmEmptyTrash: "إفراغ السلة نهائياً",
     // Settings Panel
     settingsTitle: "الإعدادات",
@@ -153,7 +153,7 @@ export const translations = {
     noReceipts: "لا توجد سندات قبض",
     noReceiptsDesc: "ابدأ بإنشاء سند قبض جديد",
     deleteReceiptTitle: "حذف سند القبض",
-    deleteReceiptDesc: "هل أنت متأكد من حذف هذا السند؟ لا يمكن التراجع عن هذا الإجراء.",
+    deleteReceiptDesc: "سيتم نقل سند القبض إلى سلة المحذوفات.",
     invoiceRef: "الفاتورة",
     clientsDesc: "إدارة قاعدة بيانات العملاء",
     contactInfo: "بيانات التواصل",

@@ -70,6 +70,45 @@ export default function SettingsPage() {
     setWatermarkPreview(settings.watermarkBase64 || null);
   }, [settings]);
 
+  const exportInvoices = async () => {
+  try {
+    const token = sessionStorage.getItem("auth_token");
+
+    const res = await fetch("http://127.0.0.1:3000/api/invoices", {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!res.ok) {
+      alert(isAR ? "فشل الاتصال بالفواتير" : "Failed to connect invoices");
+      return;
+    }
+
+    const data = await res.json();
+
+    const blob = new Blob([JSON.stringify(data, null, 2)], {
+      type: "application/json",
+    });
+
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+
+    a.href = url;
+    a.download = "invoices-backup.json";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+
+    window.URL.revokeObjectURL(url);
+
+    alert(isAR ? "تم تصدير الفواتير" : "Invoices exported");
+  } catch (err) {
+    console.error(err);
+    alert(isAR ? "حدث خطأ أثناء التصدير" : "Export error");
+  }
+};
+
   if (user?.role !== "admin") {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 text-muted-foreground">
@@ -138,7 +177,7 @@ export default function SettingsPage() {
     });
     
       const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-        const image = new Image();
+        const image = new window.Image();
         image.onload = () => resolve(image);
         image.onerror = () => reject(new Error("Failed to load image"));
         image.src = fileDataUrl;
@@ -221,7 +260,7 @@ export default function SettingsPage() {
     
         setForm(mergedSaved);
         setSettings(mergedSaved);
-        localStorage.setItem("company_settings", JSON.stringify(mergedSaved));
+        sessionStorage.setItem("company_settings", JSON.stringify(mergedSaved));
     
         await refresh();
     
@@ -256,14 +295,14 @@ export default function SettingsPage() {
   const currentStampSrc = stampPreview || stampSrc;
   const currentWatermarkSrc = watermarkPreview || watermarkSrc;
 
-  const TABS: { id: TabId; icon: React.ElementType; labelAr: string; labelEn: string; color: string }[] = [
-    { id: "display",  icon: Palette,   labelAr: "المظهر",           labelEn: "Display",  color: "text-fuchsia-500"},
-    { id: "preview",  icon: Eye,       labelAr: "معاينة الفاتورة", labelEn: "Preview",  color: "text-indigo-500" },
-    { id: "identity", icon: Building2, labelAr: "هوية الشركة",    labelEn: "Identity", color: "text-blue-500"   },
-    { id: "contact",  icon: Phone,     labelAr: "التواصل",         labelEn: "Contact",  color: "text-green-500"  },
-    { id: "legal",    icon: Hash,      labelAr: "القانونية",        labelEn: "Legal",    color: "text-amber-500"  },
-    { id: "branding", icon: Image,     labelAr: "الشعارات",         labelEn: "Branding", color: "text-purple-500" },
-    { id: "print",    icon: Printer,   labelAr: "الطباعة",          labelEn: "Print",    color: "text-rose-500"   },
+  const TABS: { id: TabId; icon: React.ElementType; labelAr: string;   labelEn: string; color: string }[] = [
+    { id: "display",  icon: Palette,   labelAr: "المظهر",             labelEn: "Display",  color: "text-fuchsia-500"},
+    { id: "preview",  icon: Eye,       labelAr: "معاينة الفاتورة",    labelEn: "Preview",  color: "text-indigo-500" },
+    { id: "identity", icon: Building2, labelAr: "هوية الشركة",        labelEn: "Identity", color: "text-blue-500"   },
+    { id: "contact",  icon: Phone,     labelAr: "التواصل",            labelEn: "Contact",  color: "text-green-500"  },
+    { id: "legal",    icon: Hash,      labelAr: "القانونية والنسخ",  labelEn: "Legal & Backup",   color: "text-amber-500"  },
+    { id: "branding", icon: Image,     labelAr: "الشعارات",          labelEn: "Branding", color: "text-purple-500" },
+    { id: "print",    icon: Printer,   labelAr: "الطباعة",            labelEn: "Print",    color: "text-rose-500"   },
   ];
 
   const resolvedName = (isAR ? user?.displayNameAr : user?.displayNameEn) || user?.displayName || "";
@@ -339,12 +378,12 @@ export default function SettingsPage() {
 
         {/* ── Display Tab ── */}
         {activeTab === "display" && (() => {
-          const storedTheme = localStorage.getItem("theme");
+          const storedTheme = sessionStorage.getItem("theme");
           const currentTheme = storedTheme === "dark" ? "dark" : storedTheme === "light" ? "light" : "system";
           const toggleTheme = (mode: "light" | "dark" | "system") => {
-            if (mode === "dark") { document.documentElement.classList.add("dark"); localStorage.setItem("theme", "dark"); }
-            else if (mode === "light") { document.documentElement.classList.remove("dark"); localStorage.setItem("theme", "light"); }
-            else { localStorage.removeItem("theme"); document.documentElement.classList.toggle("dark", window.matchMedia("(prefers-color-scheme: dark)").matches); }
+            if (mode === "dark") { document.documentElement.classList.add("dark"); sessionStorage.setItem("theme", "dark"); }
+            else if (mode === "light") { document.documentElement.classList.remove("dark"); sessionStorage.setItem("theme", "light"); }
+            else { sessionStorage.removeItem("theme"); document.documentElement.classList.toggle("dark", window.matchMedia("(prefers-color-scheme: dark)").matches); }
           };
 
           const ToggleSwitch = ({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }) => (
@@ -792,7 +831,7 @@ export default function SettingsPage() {
 
         {/* ── Legal Tab ── */}
         {activeTab === "legal" && (
-          <Section icon={Hash} title={isAR ? "المعلومات القانونية" : "Legal Information"} color="bg-amber-500/5">
+          <Section icon={Hash} title={isAR ? "القانونية والنسخ" : "Legal & Backup"} color="bg-amber-500/5">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Field label={isAR ? "رقم السجل التجاري" : "Commercial Registration No."}>
                 <div className="relative">
@@ -806,6 +845,66 @@ export default function SettingsPage() {
                   <input value={form.taxNumber} onChange={e => setForm(p => ({ ...p, taxNumber: e.target.value }))} className={`${inp} ps-9`} placeholder="VAT-123456" />
                 </div>
               </Field>
+            </div>
+            <div className="mt-6 rounded-xl border bg-muted/20 p-4">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-bold text-foreground">
+                    {isAR ? "النسخ الاحتياطي والاستيراد" : "Backup & Import"}
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    {isAR
+                      ? "تصدير واستيراد بيانات البرنامج من مكان واحد."
+                      : "Export and import program data from one place."}
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap gap-2">
+                  <button className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white">
+                    {isAR ? "تصدير كامل البيانات" : "Export Full Data"}
+                  </button>
+                  <button className="rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white">
+                    {isAR ? "استيراد كامل البيانات" : "Import Full Data"}
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                {[
+                    { key: "invoices", title: isAR ? "الفواتير" : "Invoices" },
+                    { key: "receipts", title: isAR ? "سندات القبض" : "Receipts" },
+                    { key: "clients", title: isAR ? "العملاء" : "Clients" },
+                    { key: "items", title: isAR ? "البنود" : "Items" },
+                ].map(({ key, title }) => (
+                  <div
+                    key={key}
+                    className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm hover:shadow-md transition-all"
+                  >
+                    <span className="text-sm font-bold text-slate-800">{title}</span>
+
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (key === "invoices") {
+                            exportInvoices();
+                          }
+                        }}
+                        className="rounded-md bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100"
+                      >
+                        {isAR ? "تصدير" : "Export"}
+                      </button>
+                      <button
+                        type="button"
+                        disabled
+                        className="rounded-md bg-green-50 px-3 py-1 text-xs font-medium text-green-700 opacity-50 cursor-not-allowed"
+                      >
+                        {isAR ? "استيراد" : "Import"}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </Section>
         )}

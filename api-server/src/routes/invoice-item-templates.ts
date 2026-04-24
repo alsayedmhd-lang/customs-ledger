@@ -80,8 +80,8 @@ function formatTemplate(t: typeof invoiceItemTemplatesTable.$inferSelect) {
   return {
     id: t.id,
     description: t.description,
-    defaultUnitPrice: parseFloat(t.defaultUnitPrice ?? "0"),
-    createdAt: t.createdAt.toISOString(),
+    defaultUnitPrice: t.defaultUnitPrice,
+    createdAt: t.createdAt ? new Date(t.createdAt).toISOString() : null,
   };
 }
 

@@ -265,15 +265,19 @@ export default function ReceiptPrint() {
           </div>
         )}
 
+        {/* ══ LETTERHEAD / راس السند والشعار ════════════════════════════ */}
+
         <div className="border-b-4 border-double border-gray-800 pb-1 pt-1 px-5" style={{ position: "relative", zIndex: 1 }}>
           <div className="flex items-center justify-between">
             <div className="text-right">
               <div className="text-sm font-black text-gray-900 leading-tight">
-                {settings.nameAr.split(" ").slice(0, 2).join(" ")}
+                {settings.nameAr}
+                {/* {company.nameAr.split(" ").slice(0, 5).join(" ")} */}
               </div>
               <div className="text-xs font-bold text-gray-700">{settings.subtitleAr}</div>
-              <div className="text-[10px] text-gray-500 mt-0.5">{settings.nameEn}</div>
+              {/* <div className="text-[10px] text-gray-500 mt-0.5">{settings.nameEn}</div> */}
               <div className="text-[10px] text-gray-500">{settings.taglineAr}</div>
+              <div className="text-[10px] text-gray-500 mt-0.5">{printEmail}</div>
             </div>
 
             <div className="flex flex-col items-center gap-0.5">
@@ -286,10 +290,12 @@ export default function ReceiptPrint() {
 
             <div className="text-left">
               <div className="text-sm font-black text-gray-900 leading-tight">
-                {settings.nameEn.split(" ").slice(0, 3).join(" ").toUpperCase()}
+                {settings.nameEn.toUpperCase()}
+                {/* {settings.nameEn.split(" ").slice(0, 3).join(" ").toUpperCase()} */}
               </div>
               <div className="text-xs font-bold text-gray-700">{settings.subtitleEn}</div>
-              <div className="text-[10px] text-gray-500 mt-0.5">{printEmail}</div>
+              {/* <div className="text-[10px] text-gray-500 mt-0.5">{printEmail}</div> */}
+              <div className="text-[10px] text-gray-500">{settings.taglineEn}</div>
               <div className="text-[10px] text-gray-500">
                 Tel: {printPhone} · {settings.address}
               </div>

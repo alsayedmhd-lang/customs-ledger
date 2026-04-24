@@ -1,23 +1,26 @@
 import { Router } from "express";
-import { db } from "@workspace/db";
+import { db, companySettingsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { companySettingsTable } from "@workspace/db/schema";
 import { requireAuth, requireAdmin } from "../middleware/auth";
 
 const router = Router();
 
-router.get("/company-settings", requireAuth, async (_req, res) => {
+router.get("/company-settings", async (_req, res) => {
   try {
     let [settings] = await db.select().from(companySettingsTable).limit(1);
+
     if (!settings) {
       [settings] = await db.insert(companySettingsTable).values({ id: 1 }).returning();
     }
+
     return res.json({
       ...settings,
+      invoiceCashTitleAr: settings.invoiceCashTitleAr,
+      invoiceCashTitleEn: settings.invoiceCashTitleEn,
       invoiceCreditTitleAr: settings.invoiceCreditTitleAr,
       invoiceCreditTitleEn: settings.invoiceCreditTitleEn,
       invoiceTitleFontSize: settings.invoiceTitleFontSize,
-});
+    });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: "Failed to fetch company settings" });
@@ -50,21 +53,27 @@ router.put("/company-settings", requireAdmin, async (req, res) => {
       showStampOnReceipts: body.showStampOnReceipts,
       showStampOnStatements: body.showStampOnStatements,
       footerText: body.footerText,
+      invoiceCashTitleAr: body.invoiceCashTitleAr,
+      invoiceCashTitleEn: body.invoiceCashTitleEn,
       invoiceCreditTitleAr: body.invoiceCreditTitleAr,
       invoiceCreditTitleEn: body.invoiceCreditTitleEn,
       invoiceTitleFontSize: Number(body.invoiceTitleFontSize),
-      id: 1
+      updatedAt: new Date(),
     };
-    delete (data as any).updatedAt;
-    await db.execute("insert into company_settings (id) values (1) on conflict (id) do nothing");
+
+    let [existing] = await db.select().from(companySettingsTable).limit(1);
+
+    if (!existing) {
+      [existing] = await db.insert(companySettingsTable).values({ id: 1 }).returning();
+    }
 
     const [result] = await db
       .update(companySettingsTable)
       .set(data as any)
-      .where(eq(companySettingsTable.id, 1))
+      // .where(eq(companySettingsTable.id, Number(existing.id)))
       .returning();
 
-return res.json(result);
+    return res.json(result);
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: "Failed to update company settings" });

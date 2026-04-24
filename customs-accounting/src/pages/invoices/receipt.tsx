@@ -235,13 +235,13 @@ const impExpValue =
           className="flex items-center gap-2 px-5 py-2 bg-blue-700 text-white rounded-lg font-medium hover:bg-blue-800"
         >
           <Printer className="w-4 h-4" />
-          {isAR ? "طباعة ال" : "Print Invoice"}
+          {isAR ? "الطباعة" : "Print Invoice"}
         </button>
 
         <Link href={`/accounting?invoice=${encodeURIComponent(invoice.invoiceNumber)}`}>
           <button className="flex items-center gap-2 px-4 py-2 border border-emerald-400 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-medium">
             <Calculator className="w-4 h-4" />
-            {isAR ? "حساب ال" : "Calculate Invoice"}
+            {isAR ? "الحسابات" : "Calculate Invoice"}
           </button>
         </Link>
 
@@ -287,35 +287,41 @@ const impExpValue =
           </div>
         )}
 
-        {/* ══ LETTERHEAD / شعار ══════════════════════════════════════════ */}
+        {/* ══ LETTERHEAD / راس الفاتورة والشعار ════════════════════════════ */}
         <div className="border-b-4 border-double border-gray-800 pb-3 pt-4 px-6">
-          <div className="flex items-start justify-between">
-            <div className="text-right">
-              <div className="text-2xl font-black text-gray-900 leading-tight">
-                {company.nameAr.split(" ").slice(0, 2).join(" ")}
+          <div className="relative flex items-start justify-between gap-4">
+            <div className="text-right flex-1 min-w-0">
+              <div className="text-2xl font-black text-gray-900 leading-tight break-words">
+                {company.nameAr}
+                {/* {company.nameAr.split(" ").slice(0, 5).join(" ")} */}
               </div>
               <div className="text-lg font-bold text-gray-700">{company.subtitleAr}</div>
-              <div className="text-xs text-gray-500 mt-1">{company.nameEn}</div>
+              {/* <div className="text-xs text-gray-500 mt-1">{company.nameEn}</div> */}
               <div className="text-xs text-gray-500">{company.taglineAr}</div>
             </div>
 
-            <div className="flex flex-col items-center justify-center">
-              <img src={logoSrc} alt={company.nameAr} className="h-24 w-auto object-contain" />
+            <div className="absolute left-1/2 -top-8 -translate-x-1/2 pointer-events-none">
+              <img
+                src={logoSrc}
+                alt={company.nameAr}
+                className="h-30 w-auto object-contain opacity-95"
+              />
             </div>
 
-            <div className="text-left">
-              <div className="text-2xl font-black text-gray-900 leading-tight">
-                {company.nameEn.split(" ").slice(0, 3).join(" ").toUpperCase()}
+            <div className="text-left flex-1 min-w-0">
+              <div className="text-xl font-black text-gray-900 leading-tight break-words">
+                {company.nameEn.toUpperCase()}
+                {/* {company.nameEn.split(" ").slice(0, 5).join(" ").toUpperCase()} */}
               </div>
               <div className="text-lg font-bold text-gray-700">{company.subtitleEn}</div>
-              <div className="text-xs text-gray-500 mt-1">{printEmail}</div>
-              <div className="text-xs text-gray-500">
+              {/* <div className="text-xs text-gray-500 mt-1">{printEmail}</div> */}
+              <div className="text-xs text-gray-500">{company.taglineEn}</div>
+              {/* <div className="text-xs text-gray-500">
                 Tel: {printPhone} · {company.poBox} {company.address}
-              </div>
+              </div> */}
             </div>
           </div>
         </div>
-
         {/* ══ INVOICE META ════════════════════════════════════════════════ */}
         <div className="flex items-stretch border-b-2 border-gray-700 bg-gray-50" dir="ltr">
           <div className="flex flex-col justify-center px-6 py-2.5" style={{ width: "40%", borderRight: "1px solid #d1d5db" }}>

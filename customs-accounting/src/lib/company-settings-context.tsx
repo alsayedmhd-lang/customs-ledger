@@ -1,4 +1,5 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from "react";
+import { useAuth } from "@/lib/auth-context";
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || "http://localhost:3000").replace(/\/$/, "") + "/api";
 const LS_KEY = "company_settings";
@@ -34,16 +35,16 @@ export interface CompanySettings {
 }
 
 export const DEFAULT_SETTINGS: CompanySettings = {
-  nameAr: "حول العالم للتخليص الجمركي",
-  nameEn: "Around The World Customs Clearance",
+  nameAr: "اسم الشركة",
+  nameEn: "Company Name",
   subtitleAr: "للتخليص الجمركي",
   subtitleEn: "Customs Clearance",
   taglineAr: "خدمات التخليص الجمركي والشحن",
   taglineEn: "Customs Clearance & Shipping Services",
-  email: "atwcc1246@gmail.com",
-  phone: "55251595",
-  address: "Doha, Qatar",
-  poBox: "P.O BOX 8180",
+  email: "*********@gmail.com",
+  phone: "*********",
+  address: "****, ****",
+  poBox: "P.O BOX *****",
   website: "",
   crNumber: "",
   taxNumber: "",
@@ -93,34 +94,33 @@ export function CompanySettingsProvider({ children }: { children: ReactNode }) {
     }
   });
 
-  const refresh = async () => {
-    try {
-      const token = sessionStorage.getItem("auth_token");
-      
-      const res = await fetch(`${API_BASE}/company-settings?ts=${Date.now()}`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-  
-        if (res.ok) {
-        const data = await res.json();
-        console.log("response data:", data);
-      
-        const merged = {
-          ...DEFAULT_SETTINGS,
-          ...data,
-        };
-        setSettings(merged);
-        localStorage.setItem(LS_KEY, JSON.stringify(merged));
-      }
-   } catch (error) {
-  console.error("Company settings refresh failed:", error);
-  }
-    // } catch {
-    //   // use cached
-    // }
-  };
+  const { token } = useAuth();
 
-  useEffect(() => { refresh(); }, []);
+const refresh = useCallback(async () => {
+  try {
+    const res = await fetch(`${API_BASE}/company-settings?ts=${Date.now()}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+
+    if (!res.ok) return;
+
+    const data = await res.json();
+
+    const merged = {
+      ...DEFAULT_SETTINGS,
+      ...data,
+    };
+
+      setSettings(merged);
+      localStorage.setItem(LS_KEY, JSON.stringify(merged));
+    } catch (error) {
+      console.error("Company settings refresh failed:", error);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
 
   const logoSrc = settings.logoBase64 || defaultLogoSrc;
   const stampSrc = settings.stampBase64 || defaultStampSrc;

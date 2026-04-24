@@ -1,22 +1,52 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Link } from "wouter";
-// import { useListClients, useListInvoices } from "@/hooks/use-api";
+import { Link, useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { BookOpen, FileText, TrendingDown, TrendingUp, User, Printer, Eye, EyeOff } from "lucide-react";
 import { useLanguage } from "@/lib/language-context";
+const API_BASE = import.meta.env.VITE_API_BASE_URL;
+
+function getToken() {
+  return sessionStorage.getItem("auth_token");
+}
+
+async function fetchClients() {
+  const res = await fetch(`${API_BASE}/api/clients`, {
+    headers: { Authorization: `Bearer ${getToken()}` },
+  });
+  if (!res.ok) throw new Error("Failed to fetch clients");
+  return res.json();
+}
+
+async function fetchInvoices() {
+  const res = await fetch(`${API_BASE}/api/invoices`, {
+    headers: { Authorization: `Bearer ${getToken()}` },
+  });
+  if (!res.ok) throw new Error("Failed to fetch invoices");
+  return res.json();
+}
 
 export default function StatementsIndex() {
   const { t, lang } = useLanguage();
   const isAR = lang === "ar";
+  const [, setLocation] = useLocation();
   const [showAmounts, setShowAmounts] = useState(false);
   const hidden = <span className="tracking-widest opacity-35 font-mono">••••••</span>;
-  // const { data: clients, isLoading: loadingClients } = useListClients();
-  // const { data: allInvoices, isLoading: loadingInvoices } = useListInvoices();
-  const clients: any[] = [];
-  const loadingClients = false;
-  const allInvoices: any[] = [];
-  const loadingInvoices = false;
+  const { data: clients = [], isLoading: loadingClients } = useQuery<any[]>({
+    queryKey: ["clients"],
+    queryFn: fetchClients,
+  });
+  const { data: allInvoices = [], isLoading: loadingInvoices } = useQuery<any[]>({
+    queryKey: ["invoices"],
+    queryFn: fetchInvoices,
+  });
+
+  console.log("clients:", clients);
+  console.log("allInvoices:", allInvoices);
+  console.log("loadingClients:", loadingClients);
+  console.log("loadingInvoices:", loadingInvoices);
+ 
   const loading = loadingClients || loadingInvoices;
 
   const clientSummaries = (clients?.map(client => {
@@ -125,7 +155,7 @@ export default function StatementsIndex() {
                 clientSummaries.map(({ client, totalInvoiced, totalPaid, balance, invoiceCount, lastInvoice }) => (
                   <tr key={client.id} className="border-b border-border/50 last:border-0 hover:bg-muted/20 transition-colors">
                     <td className="px-5 py-4">
-                      <Link href={`/clients/${client.id}`}>
+                      <Link href={`/clients/${client.id}/statement`}>
                         <p className="font-semibold text-primary hover:underline cursor-pointer">{client.name}</p>
                       </Link>
                       {client.phone && <p className="text-xs text-muted-foreground mt-0.5">{client.phone}</p>}
@@ -160,13 +190,13 @@ export default function StatementsIndex() {
                             {t("viewStatement")}
                           </button>
                         </Link>
-                      <button
-                      onClick={() => window.open(`/clients/${client.id}/statement`, "_self")}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-muted text-muted-foreground hover:bg-foreground hover:text-background rounded-lg font-semibold text-xs transition-all"
-                    >
-                      <Printer className="w-3.5 h-3.5" />
-                      {t("print")}
-                    </button>
+                          <button
+                            onClick={() => setLocation(`/clients/${client.id}/statement`)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-muted/10 text-muted-foreground hover:bg-muted/20 rounded-lg font-semibold text-xs transition-all"
+                          >
+                            <Printer className="w-3.5 h-3.5" />
+                            {t("print")}
+                          </button>
                       </div>
                     </td>
                   </tr>

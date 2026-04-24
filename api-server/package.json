@@ -6,13 +6,14 @@
   "scripts": {
     "dev": "cross-env NODE_ENV=development tsx ./src/index.ts",
     "start": "tsx ./src/index.ts",
-    "build": "echo build-ready",
+    "build": "tsx build.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
     "@workspace/api-zod": "workspace:*",
     "@workspace/db": "workspace:*",
     "bcryptjs": "^3.0.3",
+    "better-sqlite3": "^11.10.0",
     "connect-pg-simple": "^10.0.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",

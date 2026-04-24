@@ -19,7 +19,7 @@ async function buildAll() {
     format: "cjs",
     target: "node22",
     outfile: path.resolve(distDir, "index.cjs"),
-    packages: "external",
+    external: ["better-sqlite3"],
     alias: {
       "@workspace/db": path.resolve(__dirname, "../lib/db/src"),
       "@workspace/api-zod": path.resolve(__dirname, "../lib/api-zod/src"),

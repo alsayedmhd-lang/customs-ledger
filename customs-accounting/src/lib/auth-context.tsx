@@ -62,7 +62,7 @@ const AuthContext = createContext<AuthContextType | null>(null);
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || "http://localhost:10000").replace(/\/$/, "") + "/api";
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
-  const [token, setToken] = useState<string | null>(() => sessionStorage.getItem("auth_token"));
+  const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const logout = useCallback(() => {
@@ -72,6 +72,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   // Auto-logout after 5 minutes of inactivity
+
   useEffect(() => {
     if (!user) return;
     const IDLE_MS = 5 * 60 * 1000;
@@ -92,18 +93,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, [user, logout]);
 
-  useEffect(() => {
-    const stored = sessionStorage.getItem("auth_token");
-    if (!stored) { setIsLoading(false); return; }
+    useEffect(() => {
+      const stored = sessionStorage.getItem("auth_token");
+      if (!stored) {
+        setIsLoading(false);
+        return;
+      }
 
-    fetch(`${API_BASE}/auth/me`, {
-      headers: { Authorization: `Bearer ${stored}` },
-    })
-      .then((r) => (r.ok ? r.json() : Promise.reject()))
-      .then((u: AuthUser) => { setUser({ ...u, permissions: u.permissions ?? ALL_PERMISSIONS }); setToken(stored); })
-      .catch(() => { sessionStorage.removeItem("auth_token"); setToken(null); })
-      .finally(() => setIsLoading(false));
-  }, []);
+      fetch(`${API_BASE}/auth/me`, {
+        headers: { Authorization: `Bearer ${stored}` },
+      })
+        .then((r) => (r.ok ? r.json() : Promise.reject()))
+        .then((u: AuthUser) => {
+          setUser({ ...u, permissions: u.permissions ?? ALL_PERMISSIONS });
+          setToken(stored);
+        })
+        .catch(() => {
+          sessionStorage.removeItem("auth_token");
+          setToken(null);
+        })
+        .finally(() => setIsLoading(false));
+    }, []);
 
   const login = useCallback(async (username: string, password: string): Promise<OtpPending | undefined> => {
     const res = await fetch(`${API_BASE}/auth/login`, {
@@ -123,6 +133,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const { token: newToken, user: newUser } = data;
     sessionStorage.setItem("auth_token", newToken);
+    console.log("verifyOtp saved token:", newToken);
+    console.log("verifyOtp readback token:", sessionStorage.getItem("auth_token"));
+
     setToken(newToken);
     setUser({ ...newUser, permissions: newUser.permissions ?? ALL_PERMISSIONS });
     return undefined;
@@ -142,7 +155,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     sessionStorage.setItem("auth_token", newToken);
     setToken(newToken);
     setUser({ ...newUser, permissions: newUser.permissions ?? ALL_PERMISSIONS });
-  }, []);
+  }, [setToken, setUser]);
 
   const resendOtp = useCallback(async (otpToken: string): Promise<OtpPending> => {
     const res = await fetch(`${API_BASE}/auth/resend-otp`, {

@@ -1,4 +1,4 @@
-ُimport { Router, type IRouter } from "express";
+import { Router, type IRouter } from "express";
 import { db, invoicesTable, invoiceItemsTable, clientsTable } from "@workspace/db";
 import { eq, desc, isNull, and, like, max } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth";
@@ -351,8 +351,8 @@ export function formatInvoice(inv: typeof invoicesTable.$inferSelect, clientName
     importerExporterName: inv.importerExporterName ?? null,
     createdBy: inv.createdBy ?? null,
     deletedAt: inv.deletedAt ? inv.deletedAt.toISOString() : null,
-    createdAt: inv.createdAt.toISOString(),
-    updatedAt: inv.updatedAt.toISOString(),
+    createdAt: inv.createdAt ? inv.createdAt.toISOString() : null,
+    updatedAt: inv.updatedAt ? inv.updatedAt.toISOString() : null,
   };
 }
 

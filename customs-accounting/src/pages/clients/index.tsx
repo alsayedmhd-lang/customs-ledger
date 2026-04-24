@@ -85,40 +85,50 @@ export default function ClientsList() {
               ) : filteredClients.length === 0 ? (
                 <tr><td colSpan={4} className="text-center py-10 text-muted-foreground">{t("noClients")}</td></tr>
               ) : (
-                filteredClients.map((client) => (
-                  <tr key={client.id} className="border-b border-border/50 last:border-0 hover:bg-muted/20 transition-colors group">
-                    <td className="px-6 py-4">
-                      <p className="font-semibold text-foreground">{client.name}</p>
-                      <p className="text-xs text-muted-foreground">{t("addedOn")} {formatDate(client.createdAt)}</p>
-                    </td>
-                    <td className="px-6 py-4">
-                      <p>{client.email || "—"}</p>
-                      <p className="text-xs text-muted-foreground">{client.phone || ""}</p>
-                    </td>
-                    <td className="px-6 py-4">{client.taxId || "—"}</td>
-                    <td className="px-6 py-4 text-end">
-                      <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Link href={`/clients/${client.id}/statement`}>
-                          <button className="p-2 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg transition-colors" title={t("statements")}>
-                            <FileText className="w-4 h-4" />
-                          </button>
-                        </Link>
-                        <Link href={`/clients/${client.id}`}>
-                          <button className="p-2 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg transition-colors" title={t("client")}>
-                            <Eye className="w-4 h-4" />
-                          </button>
-                        </Link>
-                        <button 
-                          onClick={() => setDeletingId(client.id)}
-                          className="p-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg transition-colors"
-                          title={t("delete")}
+              filteredClients.map((client) => (
+                <tr key={client.id} className="border-b border-border/50 last:border-0 hover:bg-muted/20 transition-colors group">
+                  <td className="px-6 py-4">
+                    <p className="font-semibold text-foreground">{client.name}</p>
+                    <p className="text-xs text-muted-foreground">{t("addedOn")} {formatDate(client.createdAt)}</p>
+                  </td>
+
+                  <td className="px-6 py-4">
+                    <p>{client.email || "—"}</p>
+                    <p className="text-xs text-muted-foreground">{client.phone || ""}</p>
+                  </td>
+
+                  <td className="px-6 py-4">{client.taxId || "—"}</td>
+
+                  <td className="px-6 py-4 text-end">
+                    <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+
+                      <Link href={`/clients/${client.id}/statement`}>
+                        <button
+                          className="p-2 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg transition-colors"
+                          title={t("statements")}
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <FileText className="w-4 h-4" />
                         </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                      </Link>
+
+                      <Link href={`/clients/${client.id}`}>
+                        <button className="p-2 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg transition-colors" title={t("client")}>
+                          <Eye className="w-4 h-4" />
+                        </button>
+                      </Link>
+
+                      <button
+                        onClick={() => setDeletingId(client.id)}
+                        className="p-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg transition-colors"
+                        title={t("delete")}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+
+                    </div>
+                  </td>
+                </tr>
+              ))
               )}
             </tbody>
           </table>

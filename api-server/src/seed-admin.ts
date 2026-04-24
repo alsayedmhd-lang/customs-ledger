@@ -1,14 +1,33 @@
 import bcrypt from "bcryptjs";
-import { db } from "@workspace/db";
-import { usersTable } from "@workspace/db/schema";
+import { db, usersTable } from "@workspace/db";
+import { eq } from "drizzle-orm";
 
 export async function seedAdminUser() {
-  const existing = await db.select({ id: usersTable.id }).from(usersTable).limit(1);
-  if (existing.length > 0) return;
+  const dbAny = db as any;
 
   const passwordHash = await bcrypt.hash("admin123", 10);
 
-  await db.insert(usersTable).values({
+  const existing = await dbAny
+    .select()
+    .from(usersTable)
+    .where(eq((usersTable as any).username, "admin"));
+
+  if (existing.length > 0) {
+    await dbAny
+      .update(usersTable)
+      .set({
+        passwordHash,
+        role: "admin",
+        isActive: true,
+        displayName: "المدير",
+      })
+      .where(eq((usersTable as any).username, "admin"));
+
+    console.log("✅ Admin user updated - username: admin | password: admin123");
+    return;
+  }
+
+  await dbAny.insert(usersTable).values({
     username: "admin",
     passwordHash,
     displayName: "المدير",
@@ -16,7 +35,5 @@ export async function seedAdminUser() {
     isActive: true,
   });
 
-  console.log("✅ Admin user created — username: admin | password: admin123");
+  console.log("✅ Admin user created - username: admin | password: admin123");
 }
-
-

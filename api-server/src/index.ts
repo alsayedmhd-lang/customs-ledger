@@ -1,30 +1,47 @@
-import "dotenv/config";
-import app from "./app";
-import { seedAdminUser } from "./seed-admin";
+import path from "path";
+import dotenv from "dotenv";
 
-// 1. جعل المنفذ مرناً مع قيمة افتراضية لـ Render (عادة 3000)
-const port = Number(process.env["PORT"] || 3000);
+const runtimeScriptDir = path.dirname(process.argv[1] || process.cwd());
 
-// التحقق من صحة المنفذ بشكل أبسط
-if (Number.isNaN(port) || port <= 0) {
-  console.error(`❌ Invalid PORT value: "${process.env["PORT"]}"`);
-  process.exit(1); 
+dotenv.config({
+  path: path.resolve(runtimeScriptDir, "../.env"),
+});
+
+async function start() {
+  const { default: app } = await import("./app");
+  const { seedAdminUser } = await import("./seed-admin");
+
+  const port = Number(process.env["PORT"] || 3000);
+
+  if (Number.isNaN(port) || port <= 0) {
+    console.error(`❌ Invalid PORT value: "${process.env["PORT"]}"`);
+    process.exit(1);
+  }
+
+  const server = app.listen(port, "0.0.0.0", async () => {
+    console.log("🚀 Server is officially live!");
+    console.log(`🌍 Access it at: http://0.0.0.0:${port}`);
+    console.log(`📡 Listening on port: ${port}`);
+
+    try {
+      console.log("⏳ Starting admin seeding...");
+      await seedAdminUser();
+      console.log("✅ Admin user seeding completed.");
+    } catch (error) {
+      console.error("❌ Seeding failed:", error);
+    }
+  });
+
+  server.on("close", () => {
+    console.error("❌ Server closed unexpectedly");
+  });
+
+  server.on("error", (error) => {
+    console.error("❌ Server error:", error);
+  });
 }
 
-// 2. إضافة "0.0.0.0" لضمان قبول الاتصالات الخارجية في Render
-app.listen(port, "0.0.0.0", async () => {
-  // --- رسالة التأكيد هنا ---
-  console.log(`🚀 Server is officially live!`);
-  console.log(`🌍 Access it at: http://0.0.0.0:${port}`);
-  console.log(`📡 Listening on port: ${port}`);
-  // -------------------------
-  
-  try {
-    console.log("⏳ Starting admin seeding...");
-    await seedAdminUser();
-    console.log("✅ Admin user seeding completed.");
-  } catch (error) {
-    console.error("❌ Seeding failed:", error);
-    // لا نغلق السيرفر هنا لكي يستمر في العمل حتى لو فشل الـ seed
-  }
+start().catch((error) => {
+  console.error("❌ Server failed to start:", error);
+  process.exit(1);
 });

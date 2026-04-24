@@ -226,13 +226,22 @@ export default function AccountingPage() {
 
   const filtered = useMemo(() => rows.filter((r) => {
     const e = edits[r.id] ?? rowToEdit(r);
-    if (search && !r.invoiceNumber.toLowerCase().includes(search.toLowerCase()) &&
-        !r.clientName.toLowerCase().includes(search.toLowerCase())) return false;
-    if (clientFilter && r.clientName !== clientFilter) return false;
-    if (driverFilter && e.driverName !== driverFilter) return false;
-    if (locationFilter && e.unloadLocation !== locationFilter) return false;
-    if (dateFrom && r.issueDate < dateFrom) return false;
-    if (dateTo && r.issueDate > dateTo) return false;
+
+    const invoiceNumber = String(r.invoiceNumber ?? "").toLowerCase();
+    const clientName = String(r.clientName ?? "").toLowerCase();
+    const searchValue = String(search ?? "").toLowerCase();
+
+    const driverName = String(e.driverName ?? "");
+    const unloadLocation = String(e.unloadLocation ?? "");
+    const issueDate = String(r.issueDate ?? "");
+
+    if (search && !invoiceNumber.includes(searchValue) && !clientName.includes(searchValue)) return false;
+    if (clientFilter && String(r.clientName ?? "") !== clientFilter) return false;
+    if (driverFilter && driverName !== driverFilter) return false;
+    if (locationFilter && unloadLocation !== locationFilter) return false;
+    if (dateFrom && issueDate < dateFrom) return false;
+    if (dateTo && issueDate > dateTo) return false;
+
     return true;
   }), [rows, search, clientFilter, driverFilter, locationFilter, dateFrom, dateTo, edits]);
 

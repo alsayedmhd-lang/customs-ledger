@@ -1,4 +1,4 @@
-import { Switch, Route, Router as WouterRouter, useLocation } from "wouter";
+import { Switch, Route, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -89,9 +89,7 @@ function App() {
           <AuthProvider>
             <CompanySettingsProvider>
               <DisplaySettingsProvider>
-                <WouterRouter base={import.meta.env.BASE_URL.replace(/\/$/, "")}>
-                  <ProtectedRouter />
-                </WouterRouter>
+                <ProtectedRouter />
               </DisplaySettingsProvider>
             </CompanySettingsProvider>
           </AuthProvider>

@@ -9,12 +9,23 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
 import { useLanguage } from "@/lib/language-context";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export default function InvoicesList() {
   const { can } = useAuth();
   const { t } = useLanguage();
   const { data: invoices = [], isLoading } = useListInvoices();
   const [search, setSearch] = useState("");
+  const [deleteId, setDeleteId] = useState<number | null>(null);
   
   const q = search.toLowerCase();
   const filtered = invoices?.filter(i =>
@@ -123,7 +134,7 @@ export default function InvoicesList() {
                         )}
                         {can("canDeleteInvoices") && (
                           <button
-                            onClick={() => { if(confirm(t("confirmDeleteDesc"))) deleteInvoice.mutate({ id: inv.id }); }}
+                            onClick={() => setDeleteId(inv.id)}
                             className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg transition-colors"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -146,6 +157,29 @@ export default function InvoicesList() {
             </span>
           </div>
         )}
+        <AlertDialog open={deleteId !== null} onOpenChange={() => setDeleteId(null)}>
+  <AlertDialogContent>
+    <AlertDialogHeader>
+      <AlertDialogTitle>{t("confirmDeleteTitle")}</AlertDialogTitle>
+      <AlertDialogDescription>{t("confirmDeleteDesc")}</AlertDialogDescription>
+    </AlertDialogHeader>
+
+    <AlertDialogFooter className="flex-row-reverse gap-2">
+      <AlertDialogCancel>{t("cancel")}</AlertDialogCancel>
+      <AlertDialogAction
+        onClick={() => {
+          if (deleteId !== null) {
+            deleteInvoice.mutate({ id: deleteId });
+            setDeleteId(null);
+          }
+        }}
+        className="bg-destructive hover:bg-destructive/90"
+      >
+        {t("delete")}
+      </AlertDialogAction>
+    </AlertDialogFooter>
+  </AlertDialogContent>
+</AlertDialog>
       </div>
     </motion.div>
   );

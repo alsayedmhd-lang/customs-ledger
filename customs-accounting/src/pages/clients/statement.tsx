@@ -1,7 +1,7 @@
 import { useAuth } from "@/lib/auth-context";
 import { useState, useEffect } from "react";
 import { useParams, Link } from "wouter";
-import { useGetClientStatement } from "@workspace/api-client-react";
+import { useQuery } from "@tanstack/react-query";
 import { formatCurrency, formatDate, formatNumber, arabicNums } from "@/lib/utils";
 import { Printer, ArrowRight, ArrowLeft, Stamp } from "lucide-react";
 import Barcode from "react-barcode";
@@ -22,9 +22,35 @@ const STATUS_COLOR: Record<string, string> = {
   cancelled: "text-red-600 line-through",
 };
 
+function getToken() {
+  return sessionStorage.getItem("auth_token");
+}
+
+async function fetchClientStatement(id: number) {
+  const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/clients/${id}/statement`, {
+    headers: {
+      Authorization: `Bearer ${getToken()}`,
+    },
+  });
+
+  console.log("statement status:", res.status);
+  console.log("statement id:", id);
+
+  if (!res.ok) {
+    throw new Error(`Failed to fetch client statement: ${res.status}`);
+  }
+
+  return res.json();
+}
+
 export default function ClientStatement() {
   const { id } = useParams<{ id: string }>();
-  const { data: statement, isLoading } = useGetClientStatement(parseInt(id || "0"));
+  const clientId = parseInt(id || "0", 10);
+  const { data: statement, isLoading } = useQuery({
+    queryKey: ["client-statement", clientId],
+    queryFn: () => fetchClientStatement(clientId),
+    enabled: Number.isFinite(clientId) && clientId > 0,
+  });
   const { lang } = useLanguage();
   const { user } = useAuth();
   const isAR = lang === "ar";
@@ -34,13 +60,13 @@ export default function ClientStatement() {
   const printPhone = canCustomize && user?.phone ? user.phone : settings.phone;
   const printEmail = canCustomize && user?.email ? user.email : settings.email;
   const [showStamp, setShowStamp] = useState<boolean>(() => {
-    try { return localStorage.getItem("statement_show_stamp") !== "false"; }
+    try { return sessionStorage.getItem("statement_show_stamp") !== "false"; }
     catch { return true; }
   });
 
   function toggleStamp(val: boolean) {
     setShowStamp(val);
-    try { localStorage.setItem("statement_show_stamp", val ? "true" : "false"); } catch {}
+    try { sessionStorage.setItem("statement_show_stamp", val ? "true" : "false"); } catch {}
   }
 
   useEffect(() => {

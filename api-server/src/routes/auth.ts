@@ -3,7 +3,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { db } from "@workspace/db";
 import { usersTable, otpCodesTable, DEFAULT_PERMISSIONS } from "@workspace/db/schema";
-import { eq, and, gt, isNull } from "drizzle-orm";
+import { and, eq, gt, isNull, sql } from "drizzle-orm";
 import { signToken, requireAuth, requireAdmin } from "../middleware/auth";
 
 const router = Router();
@@ -183,19 +183,14 @@ router.post("/auth/login", async (req, res) => {
     }
 
 const code = generateOTP();
-console.log("STEP 1 OK");
-
 const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
-console.log("STEP 2 OK");
 
-await db.delete(otpCodesTable);
+await db.run(sql`DELETE FROM otp_codes`);
 
-await db.insert(otpCodesTable).values({
-  userId: user.id,
-  code,
-  expiresAt,
-});
-      // .where(and(eq(otpCodesTable.userId, user.id), isNull(otpCodesTable.usedAt)));
+await db.run(sql`
+  INSERT INTO otp_codes (user_id, code, expires_at)
+  VALUES (${user.id}, ${code}, ${expiresAt.getTime()})
+`);
     let sent = false;
     
     // 1) جرّب واتساب أولًا إذا البيانات موجودة
@@ -246,6 +241,7 @@ await db.insert(otpCodesTable).values({
 
 router.post("/auth/verify-otp", async (req, res) => {
   const { otpToken, code } = req.body as { otpToken: string; code: string };
+
   if (!otpToken || !code) {
     return res.status(400).json({ message: "رمز التحقق مطلوب" });
   }
@@ -261,36 +257,65 @@ router.post("/auth/verify-otp", async (req, res) => {
     return res.status(401).json({ message: "رمز جلسة غير صالح" });
   }
 
-  const now = new Date();
-  const [otpRecord] = await db
-    .select()
-    .from(otpCodesTable)
-    .where(
-      and(
-        eq(otpCodesTable.userId, payload.userId),
-        eq(otpCodesTable.code, code.trim()),
-        gt(otpCodesTable.expiresAt, now),
-        isNull(otpCodesTable.usedAt)
-      )
-    )
-    .limit(1);
+  const nowMs = Date.now();
+  const inputCode = code.trim();
+
+  const otpRows = await db.all(sql`
+    SELECT id, user_id, code, expires_at, used_at
+    FROM otp_codes
+    WHERE user_id = ${payload.userId}
+      AND code = ${inputCode}
+      AND expires_at > ${nowMs}
+      AND used_at IS NULL
+    LIMIT 1
+  `);
+
+  const otpRecord = otpRows[0];
 
   if (!otpRecord) {
     return res.status(401).json({ message: "رمز التحقق غير صحيح أو انتهت صلاحيته" });
   }
 
-  await db.update(otpCodesTable).set({ usedAt: now }).where(eq(otpCodesTable.id, otpRecord.id));
+  await db.run(sql`
+    UPDATE otp_codes
+    SET used_at = ${nowMs}
+    WHERE id = ${otpRecord.id}
+  `);
 
-  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, payload.userId)).limit(1);
+  const [user] = await db
+    .select()
+    .from(usersTable)
+    .where(eq(usersTable.id, payload.userId))
+    .limit(1);
+
   if (!user || !user.isActive) {
     return res.status(401).json({ message: "الحساب غير نشط" });
   }
 
-  const token = signToken({ userId: user.id, username: user.username, role: user.role });
-  const permissions = user.role === "admin" ? DEFAULT_PERMISSIONS : (user.permissions ?? DEFAULT_PERMISSIONS);
+  const token = signToken({
+    userId: user.id,
+    username: user.username,
+    role: user.role,
+  });
+
+  const permissions =
+    user.role === "admin"
+      ? DEFAULT_PERMISSIONS
+      : (user.permissions ?? DEFAULT_PERMISSIONS);
+
   return res.json({
     token,
-    user: { id: user.id, username: user.username, displayName: user.displayName, displayNameAr: user.displayNameAr ?? null, displayNameEn: user.displayNameEn ?? null, role: user.role, permissions, phone: user.phone ?? null, email: user.email ?? null },
+    user: {
+      id: user.id,
+      username: user.username,
+      displayName: user.displayName,
+      displayNameAr: user.displayNameAr ?? null,
+      displayNameEn: user.displayNameEn ?? null,
+      role: user.role,
+      permissions,
+      phone: user.phone ?? null,
+      email: user.email ?? null,
+    },
   });
 });
 

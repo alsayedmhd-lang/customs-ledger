@@ -141,8 +141,8 @@ function formatClient(c: typeof clientsTable.$inferSelect) {
     address: c.address ?? null,
     taxId: c.taxId ?? null,
     notes: c.notes ?? null,
-    createdAt: c.createdAt.toISOString(),
-    updatedAt: c.updatedAt.toISOString(),
+    createdAt: c.createdAt ? new Date(c.createdAt).toISOString() : null,
+    updatedAt: c.updatedAt ? new Date(c.updatedAt).toISOString() : null,
   };
 }
 
@@ -163,8 +163,8 @@ function formatInvoice(inv: typeof invoicesTable.$inferSelect, clientName: strin
     notes: inv.notes ?? null,
     shipmentRef: inv.shipmentRef ?? null,
     portOfEntry: inv.portOfEntry ?? null,
-    createdAt: inv.createdAt.toISOString(),
-    updatedAt: inv.updatedAt.toISOString(),
+    createdAt: inv.createdAt ? inv.createdAt.toISOString() : null,
+    updatedAt: inv.updatedAt ? inv.updatedAt.toISOString() : null,
   };
 }
 
