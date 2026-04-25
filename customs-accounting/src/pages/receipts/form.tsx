@@ -105,6 +105,7 @@ export default function ReceiptForm() {
     }, [existing, isEdit, reset]);
 
   const onSubmit = async (data: ReceiptFormValues) => {
+    console.log("submit data:", data);
     try {
       const payload = {
         clientId: data.clientId ? Number(data.clientId) : null,
