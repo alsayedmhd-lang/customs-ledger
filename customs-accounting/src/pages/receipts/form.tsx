@@ -148,8 +148,20 @@ export default function ReceiptForm() {
           </p>
         </div>
       </div>
-
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+      <form
+          onSubmit={handleSubmit(
+            onSubmit,
+            (errors) => {
+              console.log("receipt validation errors:", errors);
+              toast({
+                title: "بيانات ناقصة",
+                description: "راجع الحقول المطلوبة قبل الحفظ",
+                variant: "destructive",
+              });
+            }
+          )}
+          className="space-y-6"
+        >
         <div className="bg-card rounded-2xl border border-border p-6 space-y-5">
           {/* Client */}
           <div className="space-y-2">
