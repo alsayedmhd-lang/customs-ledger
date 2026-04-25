@@ -205,7 +205,7 @@ export default function ReceiptForm() {
               <SelectTrigger>
                 <SelectValue placeholder={selectedClientId ? "اختر فاتورة (اختياري)" : "اختر العميل أولاً"} />
               </SelectTrigger>
-              <SelectContent className="bg-card border shadow-lg z-50">
+              <SelectContent className="bg-white opacity-100 border border-border shadow-xl z-[100] backdrop-blur-none">
                 <SelectItem value="none">بدون فاتورة (دفعة مستقلة)</SelectItem>
                 {clientInvoices.map((inv) => (
                   <SelectItem key={inv.id} value={String(inv.id)}>
