@@ -71,43 +71,58 @@ export default function SettingsPage() {
   }, [settings]);
 
   // Export invoices backup
-
   const exportInvoices = async () => {
-  try {
-    const token = sessionStorage.getItem("auth_token");
+    try {
+      const token = sessionStorage.getItem("auth_token");
 
-    const res = await fetch("http://127.0.0.1:3000/api/invoices", {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
+      const res = await fetch("http://127.0.0.1:3000/api/invoices", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
-    if (!res.ok) {
-      alert(isAR ? "فشل الاتصال بالفواتير" : "Failed to connect invoices");
-      return;
-    }
-
-    const data = await res.json();
-
-    const blob = new Blob([JSON.stringify(data, null, 2)], {
-      type: "application/json",
-    });
-
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement("a");
-
-    a.href = url;
-    a.download = "invoices-backup.json";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-
-    window.URL.revokeObjectURL(url);
-      } catch (err) {
-        console.error(err);
-        alert(isAR ? "حدث خطأ أثناء التصدير" : "Export error");
+      if (!res.ok) {
+        alert(isAR ? "فشل الاتصال بالفواتير" : "Failed to connect invoices");
+        return;
       }
-    };
+
+      const invoices = await res.json();
+
+      const invoicesWithItems = await Promise.all(
+        invoices.map(async (invoice: any) => {
+          const detailRes = await fetch(`http://127.0.0.1:3000/api/invoices/${invoice.id}`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          });
+
+          if (!detailRes.ok) {
+            return invoice;
+          }
+
+          return await detailRes.json();
+        })
+      );
+
+      const blob = new Blob([JSON.stringify(invoicesWithItems, null, 2)], {
+        type: "application/json",
+      });
+
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+
+      a.href = url;
+      a.download = "invoices-backup.json";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+      alert(isAR ? "حدث خطأ أثناء التصدير" : "Export error");
+    }
+  };
 
   // Export receipts backup
   const exportReceipts = async () => {

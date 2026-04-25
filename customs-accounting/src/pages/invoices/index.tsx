@@ -135,7 +135,12 @@ export default function InvoicesList() {
                 filtered.map((inv, idx) => (
                   <tr key={inv.id} className={`transition-colors group hover:bg-primary/5 ${idx % 2 !== 0 ? "bg-muted/20" : ""}`}>
                     <td className="px-4 py-3">
-                      <span className="font-mono font-bold text-primary text-sm">{inv.invoiceNumber}</span>
+                                          <Link
+                      href={`/invoices/${inv.id}/edit`}
+                      className="font-mono font-bold text-primary text-sm hover:underline"
+                    >
+                      {inv.invoiceNumber}
+                    </Link>
                     </td>
                     <td className="px-4 py-3">
                       <span className="font-medium text-sm">{inv.clientName}</span>

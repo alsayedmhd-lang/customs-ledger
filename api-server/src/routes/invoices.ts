@@ -438,20 +438,34 @@ router.post("/invoices/import", requireAuth, async (req, res) => {
     let updated = 0;
 
     for (const row of rows) {
-      const shipmentBase = getShipmentBase(row.shipmentRef);
-      if (!shipmentBase || shipmentBase.length < 14) {
-        continue;
-      }
 
-      const allInvoices = await db.select().from(invoicesTable);
+      const shipmentBase =
+        row.shipmentRef && getShipmentBase(row.shipmentRef).length >= 14
+          ? getShipmentBase(row.shipmentRef)
+          : null;
+      const [existing] = await db
+        .select()
+        .from(invoicesTable)
+        .where(
+          shipmentBase
+            ? eq(invoicesTable.shipmentRef, shipmentBase)
+            : eq(invoicesTable.invoiceNumber, "__never_match__")
+        )
+        .limit(1);
+      const requestedClientId = Number(row.clientId);
 
-      const existing = allInvoices.find(
-        (inv: any) => getShipmentBase(inv.shipmentRef) === shipmentBase
-      );
+      const [clientExists] = await db
+        .select()
+        .from(clientsTable)
+        .where(eq(clientsTable.id, requestedClientId))
+        .limit(1);
+
+      const safeClientId = clientExists ? requestedClientId : 1;
 
       const values = {
+        shipmentRef: shipmentBase ? String(row.shipmentRef) : null,
         invoiceNumber: String(row.invoiceNumber),
-        clientId: Number(row.clientId),
+        clientId: safeClientId,
         issueDate: row.issueDate ? String(row.issueDate) : new Date().toISOString().slice(0, 10),
         dueDate: row.dueDate ? String(row.dueDate) : null,
         subtotal: Number(row.subtotal ?? 0),
@@ -461,22 +475,52 @@ router.post("/invoices/import", requireAuth, async (req, res) => {
         advancePayment: Number(row.advancePayment ?? 0),
         notes: row.notes ? String(row.notes) : null,
         createdBy: row.createdBy ?? req.user?.userId ?? null,
+        deletedAt: null,
         updatedAt: new Date(),
       };
-      if (existing) {
+
+      let invoiceId: number;
+
+      if (existing && shipmentBase) {
         await db
           .update(invoicesTable)
           .set(values)
           .where(eq(invoicesTable.id, existing.id));
 
+        invoiceId = existing.id;
+
+        await db
+          .delete(invoiceItemsTable)
+          .where(eq(invoiceItemsTable.invoiceId, invoiceId));
+
         updated++;
       } else {
-        await db.insert(invoicesTable).values({
-          ...values,
-          createdAt: new Date(),
-        });
+        const [created] = await db
+          .insert(invoicesTable)
+          .values({
+            ...values,
+            createdAt: new Date(),
+          })
+          .returning();
+
+        invoiceId = created.id;
 
         inserted++;
+      }
+
+      if (Array.isArray(row.items) && row.items.length > 0) {
+        await db.insert(invoiceItemsTable).values(
+          row.items.map((item: any) => ({
+            invoiceId,
+            description: String(item.description ?? ""),
+            quantity: Number(item.quantity ?? 0),
+            unitPrice: Number(item.unitPrice ?? 0),
+            total: Number(
+              item.total ??
+              Number(item.quantity ?? 0) * Number(item.unitPrice ?? 0)
+            ),
+          }))
+        );
       }
     }
 
