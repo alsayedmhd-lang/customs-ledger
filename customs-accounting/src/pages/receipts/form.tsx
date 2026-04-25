@@ -30,7 +30,7 @@ import {
 
 const formSchema = z.object({
   clientId: z.number().nullable(),
-  clientName: z.string().trim().min(1, "اسم العميل مطلوب"),
+  clientName: z.string().optional().nullable(),
   invoiceId: z.coerce.number().optional().nullable(),
   amount: z.coerce.number().min(0.01, "المبلغ مطلوب"),
   paymentMethod: z.enum(["cash", "transfer", "check"]),
@@ -105,6 +105,7 @@ export default function ReceiptForm() {
     }, [existing, isEdit, reset]);
 
   const onSubmit = async (data: ReceiptFormValues) => {
+    console.log("submit data:", data);
     try {
       const payload = {
         clientId: data.clientId ? Number(data.clientId) : null,
@@ -147,8 +148,20 @@ export default function ReceiptForm() {
           </p>
         </div>
       </div>
-
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+      <form
+          onSubmit={handleSubmit(
+            onSubmit,
+            (errors) => {
+              console.log("receipt validation errors:", errors);
+              toast({
+                title: "بيانات ناقصة",
+                description: "راجع الحقول المطلوبة قبل الحفظ",
+                variant: "destructive",
+              });
+            }
+          )}
+          className="space-y-6"
+        >
         <div className="bg-card rounded-2xl border border-border p-6 space-y-5">
           {/* Client */}
           <div className="space-y-2">
@@ -192,7 +205,7 @@ export default function ReceiptForm() {
               <SelectTrigger>
                 <SelectValue placeholder={selectedClientId ? "اختر فاتورة (اختياري)" : "اختر العميل أولاً"} />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="bg-white opacity-100 border border-border shadow-xl z-[100] backdrop-blur-none">
                 <SelectItem value="none">بدون فاتورة (دفعة مستقلة)</SelectItem>
                 {clientInvoices.map((inv) => (
                   <SelectItem key={inv.id} value={String(inv.id)}>
