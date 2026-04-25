@@ -293,4 +293,55 @@ router.get("/receipts/:id", requireAuth, async (req, res) => {
   }
 });
 
+router.post("/receipts/import", requireAuth, async (req, res) => {
+  try {
+    const rows = req.body.data;
+
+    if (!Array.isArray(rows)) {
+      return res.status(400).json({ error: "Invalid data" });
+    }
+
+    let inserted = 0;
+    let updated = 0;
+
+    for (const row of rows) {
+      const [existing] = await db
+        .select()
+        .from(receiptsTable)
+        .where(eq(receiptsTable.receiptNumber, String(row.receiptNumber)))
+        .limit(1);
+
+      const values = {
+        receiptNumber: String(row.receiptNumber),
+        clientId: Number(row.clientId) || 1,
+        invoiceId: row.invoiceId ? Number(row.invoiceId) : null,
+        amount: String(row.amount ?? "0"),
+        paymentMethod: row.paymentMethod ?? "cash",
+        notes: row.notes ?? null,
+        receiptDate: row.receiptDate
+          ? String(row.receiptDate)
+          : new Date().toISOString().slice(0, 10),
+        deletedAt: null,
+      };
+
+      if (existing) {
+        await db
+          .update(receiptsTable)
+          .set(values)
+          .where(eq(receiptsTable.id, existing.id));
+
+        updated++;
+      } else {
+        await db.insert(receiptsTable).values(values);
+        inserted++;
+      }
+    }
+
+    return res.json({ ok: true, inserted, updated });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Import failed" });
+  }
+});
+
 export default router;

@@ -179,4 +179,56 @@ function formatItem(item: typeof invoiceItemsTable.$inferSelect) {
   };
 }
 
+router.post("/clients/import", async (req: any, res: any) => {
+  try {
+    const rows = req.body.data;
+
+    if (!Array.isArray(rows)) {
+      return res.status(400).json({ error: "Invalid data" });
+    }
+
+    let inserted = 0;
+    let updated = 0;
+
+    for (const row of rows) {
+      const [existing] = await db
+        .select()
+        .from(clientsTable)
+        .where(eq(clientsTable.name, row.name))
+        .limit(1);
+
+      const values = {
+        name: String(row.name),
+        email: row.email ?? null,
+        phone: row.phone ?? null,
+        address: row.address ?? null,
+        taxId: row.taxId ?? null,
+        notes: row.notes ?? null,
+        updatedAt: new Date(),
+      };
+
+      if (existing) {
+        await db
+          .update(clientsTable)
+          .set(values)
+          .where(eq(clientsTable.id, existing.id));
+
+        updated++;
+      } else {
+        await db.insert(clientsTable).values({
+          ...values,
+          createdAt: new Date(),
+        });
+
+        inserted++;
+      }
+    }
+
+    res.json({ ok: true, inserted, updated });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Import failed" });
+  }
+});
+
 export default router;

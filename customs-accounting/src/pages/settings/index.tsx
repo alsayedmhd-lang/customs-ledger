@@ -272,11 +272,11 @@ export default function SettingsPage() {
       });
 
       if (!res.ok) {
-        alert(isAR ? "فشل استيراد الفواتير" : "Failed to import invoices");
+        alert(isAR ? "فشل استيراد السندات" : "Failed to import receipts");
         return;
       }
 
-      alert(isAR ? "تم استيراد الفواتير بنجاح" : "Invoices imported successfully");
+      alert(isAR ? "تم استيراد السندات بنجاح" : "Receipts imported successfully");
           };
 
     // Import clients backup
@@ -1071,7 +1071,46 @@ export default function SettingsPage() {
                 </div>
 
                 <div className="flex flex-wrap gap-2">
-                  <button className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white">
+                  <button
+                    onClick={async () => {
+                      const token = sessionStorage.getItem("auth_token");
+
+                      const [invoices, receipts, clients, items] = await Promise.all([
+                        fetch("http://127.0.0.1:3000/api/invoices", {
+                          headers: { Authorization: `Bearer ${token}` },
+                        }).then(r => r.json()),
+
+                        fetch("http://127.0.0.1:3000/api/receipts", {
+                          headers: { Authorization: `Bearer ${token}` },
+                        }).then(r => r.json()),
+
+                        fetch("http://127.0.0.1:3000/api/clients", {
+                          headers: { Authorization: `Bearer ${token}` },
+                        }).then(r => r.json()),
+
+                        fetch("http://127.0.0.1:3000/api/invoice-item-templates", {
+                          headers: { Authorization: `Bearer ${token}` },
+                        }).then(r => r.json()),
+                      ]);
+
+                      const fullData = {
+                        invoices,
+                        receipts,
+                        clients,
+                        items,
+                      };
+
+                      const blob = new Blob([JSON.stringify(fullData, null, 2)], {
+                        type: "application/json",
+                      });
+
+                      const a = document.createElement("a");
+                      a.href = URL.createObjectURL(blob);
+                      a.download = "full-backup.json";
+                      a.click();
+                    }}
+                    className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white"
+                  >
                     {isAR ? "تصدير كامل البيانات" : "Export Full Data"}
                   </button>
                   <button
@@ -1089,7 +1128,30 @@ export default function SettingsPage() {
                       onChange={async (e) => {
                         const file = e.target.files?.[0];
                         if (!file) return;
-                        await importInvoices(file);
+
+                        const fullData = JSON.parse(await file.text());
+
+                        if (fullData.clients) {
+                          const blob = new Blob([JSON.stringify(fullData.clients)], { type: "application/json" });
+                          await importClients(new File([blob], "clients.json"));
+                        }
+
+                        if (fullData.items) {
+                          const blob = new Blob([JSON.stringify(fullData.items)], { type: "application/json" });
+                          await importItems(new File([blob], "items.json"));
+                        }
+
+                        if (fullData.invoices) {
+                          const blob = new Blob([JSON.stringify(fullData.invoices)], { type: "application/json" });
+                          await importInvoices(new File([blob], "invoices.json"));
+                        }
+
+                        if (fullData.receipts) {
+                          const blob = new Blob([JSON.stringify(fullData.receipts)], { type: "application/json" });
+                          await importReceipts(new File([blob], "receipts.json"));
+                        }
+
+                        alert(isAR ? "تم استيراد كامل البيانات" : "Full data imported successfully");
                       }}
                     />
                 </div>
@@ -1134,25 +1196,26 @@ export default function SettingsPage() {
                       </button>
                       <button
                         type="button"
-                        disabled={key !== "invoices"}
+                        disabled={false}
                         onClick={() => {
-                          if (key !== "invoices") return;
-
                           const input = document.createElement("input");
                           input.type = "file";
                           input.accept = ".json,application/json";
 
                           input.onchange = () => {
-                            const file = input.files?.[0];
-                            if (file) {
-                              console.log("IMPORT FILE:", file);
-                              importInvoices(file);
-                            }
-                          };
+                              const file = input.files?.[0];
+                              if (!file) return;
 
+                              console.log("IMPORT FILE:", file);
+
+                              if (key === "invoices") importInvoices(file);
+                              if (key === "receipts") importReceipts(file);
+                              if (key === "clients") importClients(file);
+                              if (key === "items") importItems(file);
+                            };
                           input.click();
                         }}
-                        className="rounded-md bg-green-50 px-3 py-1 text-xs font-medium text-green-700 hover:bg-green-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="rounded-md bg-green-50 px-3 py-1 text-xs font-medium text-green-700 hover:bg-green-100"
                       >
                         {isAR ? "استيراد" : "Import"}
                       </button>
