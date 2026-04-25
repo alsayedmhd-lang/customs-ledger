@@ -30,7 +30,7 @@ import {
 
 const formSchema = z.object({
   clientId: z.number().nullable(),
-  clientName: z.string().trim().min(1, "اسم العميل مطلوب"),
+  clientName: z.string().optional().nullable(),
   invoiceId: z.coerce.number().optional().nullable(),
   amount: z.coerce.number().min(0.01, "المبلغ مطلوب"),
   paymentMethod: z.enum(["cash", "transfer", "check"]),
