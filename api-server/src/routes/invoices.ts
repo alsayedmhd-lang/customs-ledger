@@ -1,6 +1,12 @@
 import { Router, type IRouter } from "express";
-import { db, invoicesTable, invoiceItemsTable, clientsTable } from "@workspace/db";
-import { eq, desc, isNull, and, like, max } from "drizzle-orm";
+import { db } from "@workspace/db";
+import {
+  invoicesTable,
+  invoiceItemsTable,
+  clientsTable,
+  usersTable,
+} from "@workspace/db/schema";
+import { eq, desc, isNull, and, like } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth";
 
 const router: IRouter = Router();
@@ -10,10 +16,12 @@ async function generateInvoiceNumber(): Promise<string> {
   const prefix = `INV-${year}-`;
 
   // Use MAX of existing invoice numbers for this year to avoid race conditions
-  const [row] = await db
-    .select({ maxNum: max(invoicesTable.invoiceNumber) })
-    .from(invoicesTable)
-    .where(like(invoicesTable.invoiceNumber, `${prefix}%`));
+    const [row] = await db
+      .select({ maxNum: invoicesTable.invoiceNumber })
+      .from(invoicesTable)
+      .where(like(invoicesTable.invoiceNumber, `${prefix}%`))
+      .orderBy(desc(invoicesTable.invoiceNumber))
+      .limit(1);
 
   let nextSeq = 1;
   if (row?.maxNum) {
@@ -42,6 +50,7 @@ router.get("/invoices", requireAuth, async (req, res) => {
         .select()
         .from(invoicesTable)
         .innerJoin(clientsTable, eq(invoicesTable.clientId, clientsTable.id))
+        .innerJoin(usersTable, eq(invoicesTable.createdBy, usersTable.id))
         .where(and(...filters))
         .orderBy(desc(invoicesTable.createdAt));
     } else {
@@ -62,7 +71,13 @@ router.get("/invoices", requireAuth, async (req, res) => {
           .from(invoiceItemsTable)
           .where(eq(invoiceItemsTable.invoiceId, row.invoices.id));
         return {
-          ...formatInvoice(row.invoices, row.clients.name),
+          ...formatInvoice(
+            {
+              ...row.invoices,
+              createdByName: row.users?.displayNameEn || row.users?.displayNameAr || null,
+            },
+            row.clients.name
+          ),
           items: items.map(formatItem),
         };
       })
@@ -103,6 +118,21 @@ router.post("/invoices", requireAuth, async (req, res) => {
     if (!client) {
       res.status(400).json({ error: "Client not found" });
       return;
+    }
+
+    const shipmentBase = getShipmentBase(shipmentRef);
+
+    if (shipmentBase && shipmentBase.length >= 14) {
+      const allInvoices = await db.select().from(invoicesTable);
+
+      const existing = allInvoices.find(
+        (inv: any) => getShipmentBase(inv.shipmentRef) === shipmentBase
+      );
+
+      if (existing) {
+        res.status(400).json({ error: "تم عمل فاتورة لهذا البيان" });
+        return;
+      }
     }
 
     const parsedTaxRate = parseFloat(taxRate ?? "0") || 0;
@@ -193,6 +223,7 @@ router.get("/invoices/:id", async (req, res) => {
       .select()
       .from(invoicesTable)
       .innerJoin(clientsTable, eq(invoicesTable.clientId, clientsTable.id))
+      .leftJoin(usersTable, eq(invoicesTable.createdBy, usersTable.id))
       .where(and(eq(invoicesTable.id, id), isNull(invoicesTable.deletedAt)));
 
     if (!rows.length) {
@@ -207,7 +238,13 @@ router.get("/invoices/:id", async (req, res) => {
       .where(eq(invoiceItemsTable.invoiceId, id));
 
     res.json({
-      ...formatInvoice(row.invoices, row.clients.name),
+      ...formatInvoice(
+        {
+          ...row.invoices,
+          createdByName: row.users?.displayName || row.users?.username || null,
+        },
+        row.clients.name
+      ),
       items: items.map(formatItem),
     });
   } catch (err) {
@@ -240,6 +277,23 @@ router.put("/invoices/:id", async (req, res) => {
     if (!client) {
       res.status(400).json({ error: "Client not found" });
       return;
+    }
+
+    const shipmentBase = getShipmentBase(shipmentRef);
+
+    if (shipmentBase && shipmentBase.length >= 14) {
+      const allInvoices = await db.select().from(invoicesTable);
+
+      const existing = allInvoices.find(
+        (inv: any) =>
+          getShipmentBase(inv.shipmentRef) === shipmentBase &&
+          String(inv.id) !== String(id)
+      );
+
+      if (existing) {
+        res.status(400).json({ error: "تم عمل فاتورة لهذا البيان" });
+        return;
+      }
     }
 
     const parsedTaxRate = parseFloat(taxRate ?? "0") || 0;
@@ -337,19 +391,20 @@ export function formatInvoice(inv: typeof invoicesTable.$inferSelect, clientName
     issueDate: inv.issueDate,
     dueDate: inv.dueDate ?? null,
     status: inv.status,
-    subtotal: parseFloat(inv.subtotal ?? "0"),
-    taxRate: parseFloat(inv.taxRate ?? "0"),
-    taxAmount: parseFloat(inv.taxAmount ?? "0"),
-    total: parseFloat(inv.total ?? "0"),
-    advancePayment: parseFloat(inv.advancePayment ?? "0"),
+    subtotal: Number(inv.subtotal ?? 0),
+    taxRate: Number(inv.taxRate ?? 0),
+    taxAmount: Number(inv.taxAmount ?? 0),
+    total: Number(inv.total ?? 0),
+    advancePayment: Number(inv.advancePayment ?? 0),
     notes: inv.notes ?? null,
     shipmentRef: inv.shipmentRef ?? null,
     billOfLading: inv.billOfLading ?? null,
     packageCount: inv.packageCount ?? null,
-    shipmentWeight: inv.shipmentWeight ? parseFloat(inv.shipmentWeight) : null,
+    shipmentWeight: inv.shipmentWeight ? Number(inv.shipmentWeight) : null,
     portOfEntry: inv.portOfEntry ?? null,
     importerExporterName: inv.importerExporterName ?? null,
     createdBy: inv.createdBy ?? null,
+    createdByName: (inv as any).createdByName ?? null,
     deletedAt: inv.deletedAt ? inv.deletedAt.toISOString() : null,
     createdAt: inv.createdAt ? inv.createdAt.toISOString() : null,
     updatedAt: inv.updatedAt ? inv.updatedAt.toISOString() : null,
@@ -361,10 +416,74 @@ export function formatItem(item: typeof invoiceItemsTable.$inferSelect) {
     id: item.id,
     invoiceId: item.invoiceId,
     description: item.description,
-    quantity: parseFloat(item.quantity ?? "0"),
-    unitPrice: parseFloat(item.unitPrice ?? "0"),
-    total: parseFloat(item.total ?? "0"),
+    quantity: Number(item.quantity ?? 0),
+    unitPrice: Number(item.unitPrice ?? 0),
+    total: Number(item.total ?? 0),
   };
 }
 
+function getShipmentBase(value: unknown) {
+  return String(value ?? "").trim().slice(0, 14);
+}
+
+router.post("/invoices/import", requireAuth, async (req, res) => {
+  try {
+    const rows = req.body.data;
+
+    if (!Array.isArray(rows)) {
+      return res.status(400).json({ error: "Invalid data" });
+    }
+
+    let inserted = 0;
+    let updated = 0;
+
+    for (const row of rows) {
+      const shipmentBase = getShipmentBase(row.shipmentRef);
+      if (!shipmentBase || shipmentBase.length < 14) {
+        continue;
+      }
+
+      const allInvoices = await db.select().from(invoicesTable);
+
+      const existing = allInvoices.find(
+        (inv: any) => getShipmentBase(inv.shipmentRef) === shipmentBase
+      );
+
+      const values = {
+        invoiceNumber: String(row.invoiceNumber),
+        clientId: Number(row.clientId),
+        issueDate: row.issueDate ? String(row.issueDate) : new Date().toISOString().slice(0, 10),
+        dueDate: row.dueDate ? String(row.dueDate) : null,
+        subtotal: Number(row.subtotal ?? 0),
+        taxRate: Number(row.taxRate ?? 0),
+        taxAmount: Number(row.taxAmount ?? 0),
+        total: Number(row.total ?? 0),
+        advancePayment: Number(row.advancePayment ?? 0),
+        notes: row.notes ? String(row.notes) : null,
+        createdBy: row.createdBy ?? req.user?.userId ?? null,
+        updatedAt: new Date(),
+      };
+      if (existing) {
+        await db
+          .update(invoicesTable)
+          .set(values)
+          .where(eq(invoicesTable.id, existing.id));
+
+        updated++;
+      } else {
+        await db.insert(invoicesTable).values({
+          ...values,
+          createdAt: new Date(),
+        });
+
+        inserted++;
+      }
+    }
+
+    return res.json({ ok: true, inserted, updated });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Import failed" });
+  }
+});
 export default router;

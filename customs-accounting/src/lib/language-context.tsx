@@ -37,6 +37,7 @@ export const translations = {
     confirm: "تأكيد",
     restore: "استعادة",
     actions: "الإجراءات",
+    copy: "نسخ",
     loading: "جارٍ التحميل...",
     noData: "لا توجد بيانات",
     // Users page
@@ -245,6 +246,7 @@ export const translations = {
     confirm: "Confirm",
     restore: "Restore",
     actions: "Actions",
+    copy: "Copy",
     loading: "Loading...",
     noData: "No data found",
     // Users page

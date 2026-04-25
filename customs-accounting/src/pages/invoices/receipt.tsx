@@ -203,6 +203,7 @@ export default function InvoiceReceipt() {
 
 const salesManName =
   (invoice as any).salesMan ||
+  (invoice as any).createdByName ||
   (user as any)?.displayNameEn ||
   (user as any)?.displayNameAr ||
   "-";

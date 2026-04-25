@@ -201,6 +201,7 @@ export default function InvoiceForm() {
   const [, setLocation] = useLocation();
   const { id } = useParams<{ id: string }>();
   const isEdit = Boolean(id);
+  const isCopyMode = window.location.href.includes("edit-copy");
   const invoiceId = parseInt(id || "0");
   const { lang, isRTL } = useLanguage();
   const isAR = lang === "ar";
@@ -322,7 +323,7 @@ export default function InvoiceForm() {
   };
 
   useEffect(() => {
-    if (isEdit && existingInvoice) {
+    if (isEdit && existingInvoice && !isCopyMode) {
       reset({
         clientId: existingInvoice.clientId,
         issueDate: existingInvoice.issueDate.split("T")[0],
@@ -347,7 +348,56 @@ export default function InvoiceForm() {
         })),
       });
     }
-  }, [isEdit, existingInvoice, reset]);
+
+    else if (isEdit && existingInvoice && isCopyMode) {
+      sessionStorage.setItem(
+        "copy_invoice",
+        JSON.stringify({
+          ...existingInvoice,
+          id: undefined,
+          invoiceNumber: undefined,
+          shipmentRef: "",
+          billOfLading: "",
+          packageCount: null,
+          shipmentWeight: null,
+          notes: "",
+          issueDate: new Date().toISOString().split("T")[0],
+          dueDate: "",
+        })
+      );
+
+      setLocation("/invoices/new");
+    }
+
+    else {
+  const copied = sessionStorage.getItem("copy_invoice");
+  if (copied) {
+    const data = JSON.parse(copied);
+    reset({
+      clientId: data.clientId,
+      issueDate: data.issueDate?.split("T")[0] ?? "",
+      dueDate: data.dueDate ? data.dueDate.split("T")[0] : "",
+      status: data.status,
+      importerExporterName: data.importerExporterName ?? "",
+      taxRate: data.taxRate,
+      advancePayment: data.advancePayment ?? 0,
+      shipmentRef:  "",
+      billOfLading: "",
+      packageCount: null,
+      shipmentWeight: null,
+      portOfEntry: data.portOfEntry ?? "",
+      notes: data.notes ?? "",
+      items: data.items?.map((i: any) => ({
+        description: i.description,
+        quantity: i.quantity,
+        unitPrice: i.unitPrice,
+      })) ?? [],
+    });
+    sessionStorage.removeItem("copy_invoice");
+  }
+}
+
+  }, [isEdit, existingInvoice, isCopyMode, reset, setLocation]);
 
   const itemsWatch = watch("items") || [];
   const taxRateWatch = watch("taxRate") || 0;
@@ -386,8 +436,8 @@ export default function InvoiceForm() {
       dir={isRTL ? "rtl" : "ltr"}
       className="max-w-4xl mx-auto space-y-4 pb-24"
     >
-      <div className={`flex items-start gap-3 w-full justify-between ${isAR ? "flex-row-reverse" : ""}`}>
-        <div className="flex items-center gap-3 order-2">
+      <div className="flex items-start gap-4 w-full">
+        <div className="flex items-center gap-3 self-start">
           <button
             onClick={() => setLocation("/invoices")}
             className="p-2 bg-card border border-border/50 rounded-xl hover:bg-muted transition-colors"
@@ -418,20 +468,51 @@ export default function InvoiceForm() {
             </div>
             </div>
           
-            {isEdit && invoiceId ? (
-              <div className={`flex items-center gap-2 self-start -mt-2 ${isAR ? "order-1" : "order-3"}`}>
+        {isEdit && invoiceId ? (
+          <div className={`flex items-center gap-5 -mt-2 min-w-[420px] ${isAR ? "order-1"  :  "order-3"}`}>
+
+            <button
+              type="button"
+              onClick={() => {
+                if (!existingInvoice) return;
+
+                sessionStorage.setItem(
+                  "copy_invoice",
+                  JSON.stringify({
+                    ...existingInvoice,
+                    id: undefined,
+                    invoiceNumber: undefined,
+                    shipmentRef: "",
+                    billOfLading: "",
+                    shipmentWeight: null,
+                    packageCount: null,
+                    notes: "",
+                    issueDate: new Date().toISOString().split("T")[0],
+                    dueDate: "",
+                  })
+                );
+
+                setLocation("/invoices/new");
+              }}
+              className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white text-sm font-medium rounded-xl hover:bg-blue-500 shadow-sm"
+            >
+              {isAR ? "نسخ الفاتورة" : "Copy Invoice"}
+            </button>
+
             <Link href={`/accounting?invoice=${encodeURIComponent(existingInvoice?.invoiceNumber || "")}`}>
-              <button className="flex items-center gap-1.5 px-3 py-2 border border-emerald-400 rounded-xl bg-emerald-50 text-emerald-700 text-sm font-medium hover:bg-emerald-100 shadow-sm">
+              <button className="flex items-center gap-1.5 px-3 py-2 border border-emerald-400 rounded-xl bg-emerald-50 text-emerald-700 text-sm font-medium">
                 <Calculator className="w-3.5 h-3.5" />
                 {isAR ? "الحسابات" : "Calculate"}
               </button>
             </Link>
-              <Link href={`/invoices/${invoiceId}/receipt`}>
-              <button className="flex items-center gap-1.5 px-3 py-2 bg-slate-700 text-white text-sm font-medium rounded-xl hover:bg-slate-600 transition-colors shadow-sm">
+
+            <Link href={`/invoices/${invoiceId}/receipt`}>
+              <button className="flex items-center gap-1.5 px-3 py-2 bg-slate-700 text-white text-sm font-medium rounded-xl hover:bg-slate-600">
                 <Printer className="w-3.5 h-3.5" />
                 {isAR ? "طباعة" : "Print"}
               </button>
-            </Link> 
+            </Link>
+
           </div>
         ) : null}
         </div>

@@ -70,6 +70,8 @@ export default function SettingsPage() {
     setWatermarkPreview(settings.watermarkBase64 || null);
   }, [settings]);
 
+  // Export invoices backup
+
   const exportInvoices = async () => {
   try {
     const token = sessionStorage.getItem("auth_token");
@@ -101,13 +103,207 @@ export default function SettingsPage() {
     a.remove();
 
     window.URL.revokeObjectURL(url);
+      } catch (err) {
+        console.error(err);
+        alert(isAR ? "حدث خطأ أثناء التصدير" : "Export error");
+      }
+    };
 
-    alert(isAR ? "تم تصدير الفواتير" : "Invoices exported");
-  } catch (err) {
-    console.error(err);
-    alert(isAR ? "حدث خطأ أثناء التصدير" : "Export error");
-  }
-};
+  // Export receipts backup
+  const exportReceipts = async () => {
+    try {
+      const token = sessionStorage.getItem("auth_token");
+
+      const res = await fetch("http://127.0.0.1:3000/api/receipts", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!res.ok) {
+        alert(isAR ? "فشل الاتصال بسندات القبض" : "Failed to connect receipts");
+        return;
+      }
+
+      const data = await res.json();
+
+      const blob = new Blob([JSON.stringify(data, null, 2)], {
+        type: "application/json",
+      });
+
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+
+      a.href = url;
+      a.download = "receipts-backup.json";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+      alert(isAR ? "حدث خطأ أثناء التصدير" : "Export error");
+    }
+  };
+    // Export clients backup
+    const exportClients = async () => {
+      try {
+        const token = sessionStorage.getItem("auth_token");
+
+        const res = await fetch("http://127.0.0.1:3000/api/clients", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (!res.ok) {
+          alert(isAR ? "فشل الاتصال بالعملاء" : "Failed to connect clients");
+          return;
+        }
+
+        const data = await res.json();
+
+        const blob = new Blob([JSON.stringify(data, null, 2)], {
+          type: "application/json",
+        });
+
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+
+        a.href = url;
+        a.download = "clients-backup.json";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+
+        window.URL.revokeObjectURL(url);
+      } catch (err) {
+        console.error(err);
+        alert(isAR ? "حدث خطأ أثناء التصدير" : "Export error");
+      }
+    };
+      // Export items backup
+    const exportItems = async () => {
+      try {
+        const token = sessionStorage.getItem("auth_token");
+
+        const res = await fetch("http://127.0.0.1:3000/api/invoice-item-templates", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (!res.ok) {
+          alert(isAR ? "فشل الاتصال بالبـنود" : "Failed to connect items");
+          return;
+        }
+
+        const data = await res.json();
+
+        const blob = new Blob([JSON.stringify(data, null, 2)], {
+          type: "application/json",
+        });
+
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement("a");
+
+        a.href = url;
+        a.download = "items-backup.json";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+
+        window.URL.revokeObjectURL(url);
+      } catch (err) {
+        console.error(err);
+        alert(isAR ? "حدث خطأ أثناء التصدير" : "Export error");
+      }
+    };
+
+    // Import invoices backup
+    const importInvoices = async (file: File) => {
+      const token = sessionStorage.getItem("auth_token");
+      const data = JSON.parse(await file.text());
+
+      const res = await fetch("http://127.0.0.1:3000/api/invoices/import", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ data }),
+      });
+
+      alert("تم استيراد الفواتير بنجاح");
+      if (!res.ok) {
+        alert(isAR ? "فشل استيراد الفواتير" : "Failed to import invoices");
+        return;
+      }
+    };
+
+    // Import receipts backup
+    const importReceipts = async (file: File) => {
+      const token = sessionStorage.getItem("auth_token");
+      const data = JSON.parse(await file.text());
+
+      const res = await fetch("http://127.0.0.1:3000/api/receipts/import", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ data }),
+      });
+
+      if (!res.ok) {
+        alert(isAR ? "فشل استيراد الفواتير" : "Failed to import invoices");
+        return;
+      }
+
+      alert(isAR ? "تم استيراد الفواتير بنجاح" : "Invoices imported successfully");
+          };
+
+    // Import clients backup
+    const importClients = async (file: File) => {
+      const token = sessionStorage.getItem("auth_token");
+      const data = JSON.parse(await file.text());
+
+      const res = await fetch("http://127.0.0.1:3000/api/clients/import", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ data }),
+      });
+
+      if (!res.ok) {
+        alert(isAR ? "فشل استيراد العملاء" : "Failed to import clients");
+        return;
+      }
+    };
+
+    // Import items backup
+    const importItems = async (file: File) => {
+      const token = sessionStorage.getItem("auth_token");
+      const data = JSON.parse(await file.text());
+
+      const res = await fetch("http://127.0.0.1:3000/api/invoice-item-templates/import", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ data }),
+      });
+
+      if (!res.ok) {
+        alert(isAR ? "فشل استيراد البنود" : "Failed to import items");
+        return;
+      }
+    };
+
 
   if (user?.role !== "admin") {
     return (
@@ -863,9 +1059,24 @@ export default function SettingsPage() {
                   <button className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white">
                     {isAR ? "تصدير كامل البيانات" : "Export Full Data"}
                   </button>
-                  <button className="rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white">
-                    {isAR ? "استيراد كامل البيانات" : "Import Full Data"}
-                  </button>
+                  <button
+                      onClick={() => document.getElementById("full-import")?.click()}
+                      className="rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white"
+                    >
+                      {isAR ? "استيراد كامل البيانات" : "Import Full Data"}
+                    </button>
+
+                    <input
+                      id="full-import"
+                      type="file"
+                      accept=".json"
+                      className="hidden"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        await importInvoices(file);
+                      }}
+                    />
                 </div>
               </div>
 
@@ -889,6 +1100,18 @@ export default function SettingsPage() {
                           if (key === "invoices") {
                             exportInvoices();
                           }
+
+                          if (key === "receipts") {
+                            exportReceipts();
+                          }
+
+                          if (key === "clients") {
+                            exportClients();
+                          }
+
+                          if (key === "items") {
+                            exportItems();
+                          }
                         }}
                         className="rounded-md bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100"
                       >
@@ -896,8 +1119,25 @@ export default function SettingsPage() {
                       </button>
                       <button
                         type="button"
-                        disabled
-                        className="rounded-md bg-green-50 px-3 py-1 text-xs font-medium text-green-700 opacity-50 cursor-not-allowed"
+                        disabled={key !== "invoices"}
+                        onClick={() => {
+                          if (key !== "invoices") return;
+
+                          const input = document.createElement("input");
+                          input.type = "file";
+                          input.accept = ".json,application/json";
+
+                          input.onchange = () => {
+                            const file = input.files?.[0];
+                            if (file) {
+                              console.log("IMPORT FILE:", file);
+                              importInvoices(file);
+                            }
+                          };
+
+                          input.click();
+                        }}
+                        className="rounded-md bg-green-50 px-3 py-1 text-xs font-medium text-green-700 hover:bg-green-100 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {isAR ? "استيراد" : "Import"}
                       </button>

@@ -99,7 +99,9 @@ export function CompanySettingsProvider({ children }: { children: ReactNode }) {
 const refresh = useCallback(async () => {
   try {
     const res = await fetch(`${API_BASE}/company-settings?ts=${Date.now()}`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      headers: {
+        Authorization: `Bearer ${token || sessionStorage.getItem("auth_token") || ""}`,
+      },
     });
 
     if (!res.ok) return;

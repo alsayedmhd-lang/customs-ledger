@@ -1,7 +1,7 @@
-import { useState } from "react";
-import { Link } from "wouter";
+import { useEffect, useState } from "react";
+import { Link, useLocation } from "wouter";
 import { motion } from "framer-motion";
-import { useListInvoices, useDeleteInvoice, getListInvoicesQueryKey } from "@workspace/api-client-react";
+import { useListInvoices, useDeleteInvoice, getListInvoicesQueryKey, useGetInvoice } from "@workspace/api-client-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { StatusBadge } from "../dashboard";
 import { Plus, Search, Edit2, Trash2, Printer } from "lucide-react";
@@ -26,6 +26,37 @@ export default function InvoicesList() {
   const { data: invoices = [], isLoading } = useListInvoices();
   const [search, setSearch] = useState("");
   const [deleteId, setDeleteId] = useState<number | null>(null);
+  const [, setLocation] = useLocation();
+  const [copyId, setCopyId] = useState<number | null>(null);
+  const { data: invoiceToCopy } = useGetInvoice(copyId || 0, {
+  query: { enabled: copyId !== null },
+});
+  useEffect(() => {
+    if (!invoiceToCopy) return;
+      console.log("invoiceToCopy:", invoiceToCopy);
+    sessionStorage.setItem(
+      "copy_invoice",
+      JSON.stringify({
+        clientId: invoiceToCopy.clientId,
+        taxRate: invoiceToCopy.taxRate,
+        advancePayment: invoiceToCopy.advancePayment ?? 0,
+        importerExporterName: invoiceToCopy.importerExporterName ?? "",
+        portOfEntry: invoiceToCopy.portOfEntry ?? "",
+        notes: "",
+        status: invoiceToCopy.status,
+        issueDate: new Date().toISOString().split("T")[0],
+        dueDate: "",
+        items: invoiceToCopy.items?.map((i: any) => ({
+          description: i.description,
+          quantity: i.quantity,
+          unitPrice: i.unitPrice,
+        })),
+      })
+    );
+
+    setCopyId(null);
+    setLocation("/invoices/new");
+  }, [invoiceToCopy, setLocation]);
   
   const q = search.toLowerCase();
   const filtered = invoices?.filter(i =>
@@ -125,6 +156,15 @@ export default function InvoicesList() {
                             {t("print")}
                           </button>
                         </Link>
+                        <button
+                          onClick={() => {
+                            setCopyId(inv.id);
+                          }}
+                          className="p-1.5 text-muted-foreground hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                          title={t("copy")}
+                        >
+                          📄
+                        </button>
                         {can("canEditInvoices") && (
                           <Link href={`/invoices/${inv.id}/edit`}>
                             <button className="p-1.5 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg transition-colors" title={t("edit")}>

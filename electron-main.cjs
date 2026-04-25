@@ -16,15 +16,14 @@ function createWindow() {
 
   backendProcess = spawn(
     "node",
-    ["dist/index.cjs"],
+    [backendEntry],
     {
-      cwd: path.join(process.resourcesPath, "api-server"),
+      cwd: backendCwd,
       windowsHide: true,
-      stdio: "ignore",
+      stdio: "inherit",
       detached: false,
     }
   );
-
   backendProcess.on("error", (err) => {
     console.error("Backend process error:", err);
   });
