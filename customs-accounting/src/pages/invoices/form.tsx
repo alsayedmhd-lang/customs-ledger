@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useLocation, useParams, Link } from "wouter";
 import { motion } from "framer-motion";
 import { useForm, useFieldArray } from "react-hook-form";
@@ -22,6 +22,7 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import {
   useListClients,
+  useListInvoices,
   useListInvoiceItemTemplates,
   useCreateInvoice,
   useGetInvoice,
@@ -45,6 +46,7 @@ import {
   Printer,
   GripVertical,
 } from "lucide-react";
+import { useAuth } from "@/lib/auth-context";
 
 const itemSchema = z.object({
   description: z.string().min(1, "الوصف مطلوب"),
@@ -53,6 +55,7 @@ const itemSchema = z.object({
 });
 
 const formSchema = z.object({
+  createdBy: z.string().optional(),
   clientId: z.coerce.number().min(1, "العميل مطلوب"),
   issueDate: z.string().min(1, "التاريخ مطلوب"),
   dueDate: z.string().optional().nullable(),
@@ -79,7 +82,7 @@ const STATUS_LABELS: Record<string, { ar: string; en: string }> = {
 type InvoiceFormValues = z.infer<typeof formSchema>;
 
 const inputCls =
-  "w-full px-3 py-1.5 text-sm bg-background border border-border rounded-lg outline-none focus:ring-2 focus:ring-primary/20 transition-colors";
+  "w-full px-3 h-10 text-sm bg-background border border-border rounded-lg outline-none focus:ring-2 focus:ring-primary/20 transition-colors";
 const labelCls =
   "block text-xs font-semibold text-muted-foreground mb-1 uppercase tracking-wide";
 
@@ -198,6 +201,7 @@ function SortableRow({
 }
 
 export default function InvoiceForm() {
+  const { user } = useAuth();
   const [, setLocation] = useLocation();
   const { id } = useParams<{ id: string }>();
   const isEdit = Boolean(id);
@@ -205,16 +209,28 @@ export default function InvoiceForm() {
   const invoiceId = parseInt(id || "0");
   const { lang, isRTL } = useLanguage();
   const isAR = lang === "ar";
-
+  const [users, setUsers] = useState<any[]>([]);
   const { data: clients } = useListClients();
+  const { data: invoices } = useListInvoices();
   const { data: templates } = useListInvoiceItemTemplates();
   const { data: existingInvoice } = useGetInvoice(invoiceId, {
     query: { enabled: isEdit },
   });
 
+  useEffect(() => {
+  const token = sessionStorage.getItem("auth_token");
+
+  fetch(`${import.meta.env.VITE_API_BASE_URL}/api/users`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  })
+    .then((r) => r.json())
+    .then((data) => setUsers(Array.isArray(data) ? data : data.data || []));
+}, []);
+
   const queryClient = useQueryClient();
   const { toast } = useToast();
-
   const createMut = useCreateInvoice({
     mutation: {
       onSuccess: () => {
@@ -266,6 +282,8 @@ export default function InvoiceForm() {
     reset,
     getValues,
     formState: { errors },
+    setError,
+    clearErrors,
   } = useForm<InvoiceFormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -411,7 +429,43 @@ export default function InvoiceForm() {
   const taxAmount = subtotal * (Number(taxRateWatch) / 100);
   const total = subtotal + taxAmount - Number(advancePaymentWatch);
 
-  const onSubmit = (data: InvoiceFormValues) => {
+  const onSubmit = async (data: InvoiceFormValues) => {
+    const cleanShipmentRef = String(data.shipmentRef ?? "")
+      .replace(/[\/-]/g, "")
+      .trim();
+
+    if (cleanShipmentRef) {
+      const token = sessionStorage.getItem("auth_token");
+
+      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/invoices`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const cachedInvoices = await res.json();
+
+      const matchedInvoice = cachedInvoices.find((inv: any) => {
+        if (isEdit && String(inv.id) === String(invoiceId)) return false;
+
+        const oldRef = String(inv.shipmentRef ?? "")
+          .replace(/[\/-]/g, "")
+          .trim();
+
+        return oldRef && oldRef === cleanShipmentRef;
+      });
+
+      if (matchedInvoice) {
+        setError("shipmentRef", {
+          type: "manual",
+          message: isAR
+            ? `رقم البيان موجود سابقًا في الفاتورة ${matchedInvoice.invoiceNumber || ""}`
+            : `Shipment ref already exists in invoice ${matchedInvoice.invoiceNumber || ""}`,
+        });
+        return;
+      }
+    }
+
     if (isEdit) {
       updateMut.mutate({ id: invoiceId, data: data as any });
     } else {
@@ -524,7 +578,7 @@ export default function InvoiceForm() {
               {isAR ? "البيانات الأساسية" : "Basic Details"}
             </h2>
           </div>
-
+        
           <div className="p-4 grid grid-cols-2 md:grid-cols-4 gap-3">
             <div className="col-span-2 md:col-span-2">
               <label className={labelCls}>{isAR ? "العميل" : "Client"}</label>
@@ -572,18 +626,7 @@ export default function InvoiceForm() {
               />
             </div>
 
-            <div>
-              <label className={labelCls}>{isAR ? "الحالة" : "Status"}</label>
-              <select {...register("status")} className={inputCls}>
-                {Object.values(CreateInvoiceRequestStatus).map((s) => (
-                  <option key={s} value={s}>
-                    {STATUS_LABELS[s]?.[lang] || s}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="col-span-2 md:col-span-2">
+           <div className="col-span-2 md:col-span-2">
             <label className={labelCls}>
               {isAR ? "اسم المستورد / المصدر" : "Importer / Exporter Name"}
             </label>
@@ -593,6 +636,34 @@ export default function InvoiceForm() {
               className={inputCls}
             />
           </div>
+
+            <div>
+              <label className={labelCls}>{isAR ? "الحالة" : "Status"}</label>
+              <select {...register("status")} className={inputCls}>
+                {Object.values(CreateInvoiceRequestStatus).map((s) => {
+                  const status = String(s) as keyof typeof STATUS_LABELS;
+
+                  return (
+                    <option key={status} value={status}>
+                      {STATUS_LABELS[status]?.[lang] || status}
+                    </option>
+                  );
+                })}
+            </select>
+            </div>
+
+            <div>
+              <label className={labelCls}>
+                {isAR ? "المندوب" : "Salesman"}
+              </label>
+              <select {...register("createdBy")} className={inputCls}>
+                {users.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.displayName || u.username}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
 
@@ -610,16 +681,41 @@ export default function InvoiceForm() {
                 {isAR ? "رقم البيان" : "Shipment Ref"}
               </label>
               <input
-                {...register("shipmentRef")}
+                {...register("shipmentRef", {
+                  onBlur: (e) => {
+                    const value = e.target.value.trim().slice(0, 14);
+
+                    const found = invoices?.find(
+                      (inv: any) =>
+                        String(inv.shipmentRef ?? "").trim().slice(0, 14) === value
+                    );
+
+                    if (found) {
+                      const sameUser = String(found.createdBy) === String(user?.id || "");
+
+                      if (sameUser) {
+                        setLocation(`/invoices/${found.id}/edit`);
+                        return;
+                      } else {
+                        toast({
+                          title: isAR ? "البيان موجود" : "Shipment exists",
+                          description: isAR
+                            ? `رقم الفاتورة: ${found.invoiceNumber || ""} | بواسطة مستخدم آخر`
+                            : `Invoice: ${found.invoiceNumber || ""} | Registered by another user`,
+                        });
+                      }
+                    }
+                  },
+                })}
                 placeholder={isAR ? "مثال: 123456" : "e.g. 123456"}
                 className={inputCls}
               />
-            </div>
-
-            <div>
+          </div>
+             <div>
               <label className={labelCls}>
                 {isAR ? "رقم البوليصة B/L" : "Bill of Lading"}
               </label>
+           
               <input
                 {...register("billOfLading")}
                 placeholder="MSKU1234567"
