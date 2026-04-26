@@ -538,7 +538,9 @@ export default function SettingsPage() {
               {resolvedName?.[0]?.toUpperCase() || <User className="w-4 h-4" />}
             </div>
             <div className="min-w-0">
-              <p className="text-xs font-bold truncate leading-tight">{resolvedName || user?.displayName}</p>
+              <p className="text-xs font-bold truncate leading-tight">
+                {isAR ? (resolvedName || user?.displayName) : (user?.displayNameEn || resolvedName || user?.displayName)}
+              </p>
               <span className="text-xs text-muted-foreground">{roleLabel}</span>
             </div>
           </div>

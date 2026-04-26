@@ -30,7 +30,7 @@ import {
 
 const formSchema = z.object({
   clientId: z.number().nullable(),
-  clientName: z.string().trim().min(1, "اسم العميل مطلوب"),
+  clientName: z.string().optional().nullable(),
   invoiceId: z.coerce.number().optional().nullable(),
   amount: z.coerce.number().min(0.01, "المبلغ مطلوب"),
   paymentMethod: z.enum(["cash", "transfer", "check"]),
@@ -159,7 +159,20 @@ export default function ReceiptForm() {
         </div>
       </div>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+      <form
+          onSubmit={handleSubmit(
+            onSubmit,
+            (errors) => {
+              console.log("receipt validation errors:", errors);
+              toast({
+                title: "بيانات ناقصة",
+                description: "راجع الحقول المطلوبة قبل الحفظ",
+                variant: "destructive",
+              });
+            }
+          )}
+          className="space-y-6"
+        >
         <div className="bg-card rounded-2xl border border-border p-6 space-y-5">
           {/* Client */}
           <div className="space-y-2">
@@ -177,7 +190,10 @@ export default function ReceiptForm() {
               <SelectTrigger>
                 <SelectValue placeholder="اختر العميل" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent
+                  position="popper"
+                  className="z-[9999] bg-white dark:bg-slate-900 opacity-100 backdrop-blur-none border border-slate-300 shadow-2xl"
+                >
                 {(clients ?? []).map((c) => (
                   <SelectItem key={c.id} value={String(c.id)}>
                     {c.name}
@@ -206,7 +222,10 @@ export default function ReceiptForm() {
               <SelectTrigger>
                 <SelectValue placeholder={selectedClientId ? "اختر فاتورة (اختياري)" : "اختر العميل أولاً"} />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent
+                  position="popper"
+                  className="z-[9999] bg-white dark:bg-slate-900 opacity-100 backdrop-blur-none border border-slate-300 shadow-2xl"
+                >
                 <SelectItem value="none">بدون فاتورة (دفعة مستقلة)</SelectItem>
                 {clientInvoices.map((inv) => (
                   <SelectItem key={inv.id} value={String(inv.id)}>
@@ -248,7 +267,10 @@ export default function ReceiptForm() {
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent
+                  position="popper"
+                  className="z-[9999] bg-white dark:bg-slate-900 opacity-100 backdrop-blur-none border border-slate-300 shadow-2xl"
+                >
                 {Object.entries(PAYMENT_METHOD_LABELS).map(([value, label]) => (
                   <SelectItem key={value} value={value}>{label}</SelectItem>
                 ))}

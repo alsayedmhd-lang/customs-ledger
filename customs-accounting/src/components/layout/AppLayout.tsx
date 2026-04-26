@@ -80,6 +80,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
     { name: t("trash"), href: "/trash", icon: Trash2, color: "text-red-400" },
   ];
 
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
   const resolvedName = (isAR ? user?.displayNameAr : user?.displayNameEn) || user?.displayName || "";
   const initial = resolvedName?.charAt(0) ?? "م";
   const todayStr = new Date().toLocaleDateString(lang === "ar" ? "ar-EG" : "en-US", {
@@ -157,7 +158,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
             {initial}
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-bold text-white truncate">{resolvedName || user?.displayName}</p>
+            <p className="text-sm font-bold text-white truncate">{isAR ? resolvedName : user?.displayNameEn || resolvedName}</p>
             <p className="text-xs text-white/40 font-medium">{user?.role === "admin" ? t("admin") : t("user")}</p>
           </div>
         </div>
@@ -260,7 +261,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
               <span className={cn("transition-all", lang === "ar" && "text-primary font-extrabold")}>عربي</span>
             </button>
 
-            {/* Settings */}
+           {/* Settings */}
             <div className="relative">
               <button
                 onClick={() => setSettingsOpen((o) => !o)}
@@ -274,14 +275,45 @@ export default function AppLayout({ children }: AppLayoutProps) {
               >
                 <Settings className={cn("w-5 h-5 transition-transform duration-300", settingsOpen && "rotate-90")} />
               </button>
+
               {settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} />}
             </div>
+
             {/* Avatar */}
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-black text-sm shadow-md">
-              {initial}
+            <div className="relative">
+              <button
+                onClick={() => setUserMenuOpen(!userMenuOpen)}
+                className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-semibold"
+              >
+                {initial}
+              </button>
+
+              {userMenuOpen && (
+                <div
+                    className={cn(
+                      "absolute top-10 bg-white rounded-xl shadow-xl border p-4 min-w-[220px] z-[9999]",
+                      isRTL ? "left-2" : "right-0"
+                    )}
+                  >
+                  <p className="text-sm font-semibold text-slate-900">
+                    {isAR ? resolvedName : user?.displayNameEn || resolvedName}
+                  </p>
+                  <p className="text-xs text-slate-500 mb-2">
+                    {user?.role === "admin" ? t("admin") : t("user")}
+                  </p>
+
+                  <button
+                    onClick={logout}
+                    className="w-full flex items-center gap-2 mt-2 text-sm text-red-600 hover:text-red-700"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    {t("logout")}
+                  </button>
+                </div>
+              )}
             </div>
           </div>
-        </header>
+          </header>
 
         {/* Page content */}
         <div className="flex-1 overflow-y-auto main-bg-pattern">
