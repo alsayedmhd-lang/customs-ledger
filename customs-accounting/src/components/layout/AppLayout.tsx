@@ -35,6 +35,26 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const { display } = useDisplaySettings();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [pageZoom, setPageZoom] = useState(1);
+
+    useEffect(() => {
+      const handleWheel = (e: WheelEvent) => {
+        if (!e.ctrlKey) return;
+
+        e.preventDefault();
+
+        setPageZoom((z) => {
+          const next = e.deltaY < 0 ? z + 0.1 : z - 0.1;
+          return Math.min(1.3, Math.max(0.8, Number(next.toFixed(1))));
+        });
+      };
+
+      window.addEventListener("wheel", handleWheel, { passive: false });
+
+      return () => {
+        window.removeEventListener("wheel", handleWheel);
+      };
+    }, []);
 
   const bgLayerStyle: React.CSSProperties = (() => {
     const op = (display.bgOpacity ?? 15) / 100;
@@ -253,13 +273,36 @@ export default function AppLayout({ children }: AppLayoutProps) {
             {/* Language toggle */}
             <button
               onClick={() => setLang(lang === "ar" ? "en" : "ar")}
-              className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold border border-border bg-background hover:bg-muted hover:border-primary/40 transition-all select-none"
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-border bg-background/80 shadow-sm"
               title={lang === "ar" ? "Switch to English" : "التبديل إلى العربية"}
             >
               <span className={cn("transition-all", lang === "en" && "text-primary font-extrabold")}>EN</span>
               <span className="text-muted-foreground/50 mx-0.5">|</span>
               <span className={cn("transition-all", lang === "ar" && "text-primary font-extrabold")}>عربي</span>
             </button>
+
+              {/* Page Zoom Control */}
+                <div className="flex items-center gap-1 rounded-xl border border-border bg-background/80 px-1 py-1 text-xs font-bold shadow-sm">
+                <button
+                  type="button"
+                  onClick={() => setPageZoom((z) => Math.max(0.8, Number((z - 0.1).toFixed(1))))}
+                  className="w-6 h-6 rounded-lg hover:bg-muted"
+                >
+                  -
+                </button>
+
+                <span className="min-w-[42px] text-center text-muted-foreground">
+                  {Math.round(pageZoom * 100)}%
+                </span>
+
+                <button
+                  type="button"
+                  onClick={() => setPageZoom((z) => Math.min(1.3, Number((z + 0.1).toFixed(1))))}
+                  className="w-6 h-6 rounded-lg hover:bg-muted"
+                >
+                  +
+                </button>
+              </div>
 
            {/* Settings */}
             <div className="relative">
@@ -316,7 +359,10 @@ export default function AppLayout({ children }: AppLayoutProps) {
           </header>
 
         {/* Page content */}
-        <div className="flex-1 overflow-y-auto main-bg-pattern">
+        <div
+            className="flex-1 overflow-y-auto main-bg-pattern"
+            style={{ zoom: pageZoom }}
+          >
           <div className="min-h-full">
             <div className="mx-auto max-w-7xl p-4 sm:p-6 lg:p-8">
               {children}
