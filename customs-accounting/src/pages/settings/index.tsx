@@ -589,6 +589,41 @@ export default function SettingsPage() {
           </div>
         </div>
 
+           {/* ── Always Visible Invoice Preview ── */}
+          <div className="mb-5">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl border border-border/50 shadow-sm overflow-hidden">
+            <div className="flex items-center gap-2 px-5 py-3 border-b border-border/40 bg-indigo-500/5">
+              <Eye className="w-4 h-4 text-indigo-500" />
+              <h2 className="text-sm font-bold">{isAR ? "معاينة رأس الفاتورة" : "Invoice Header Preview"}</h2>
+            </div>
+            <div className="p-4">
+              <div className="border-b-4 border-double border-gray-700 pb-3 pt-2 px-4 bg-white rounded-xl shadow-inner" style={{ fontFamily: "'Cairo', sans-serif" }}>
+                <div className="flex items-start justify-between">
+                  <div className="text-right">
+                    <div className="text-lg font-black text-gray-900 leading-tight">{form.nameAr.split(" ").slice(0, 2).join(" ")}</div>
+                    <div className="text-sm font-bold text-gray-700">{form.subtitleAr}</div>
+                    <div className="text-xs text-gray-500 mt-0.5">{form.nameEn}</div>
+                    <div className="text-xs text-gray-500">{form.taglineAr}</div>
+                  </div>
+                  <div className="flex flex-col items-center">
+                    <img src={currentLogoSrc} alt="logo" className="h-16 w-auto object-contain" onError={(e) => { e.currentTarget.style.display = "none"; }} />
+                  </div>
+                  <div className="text-left">
+                    <div className="text-lg font-black text-gray-900 leading-tight">{form.nameEn.split(" ").slice(0, 3).join(" ")}</div>
+                    <div className="text-sm font-bold text-gray-700">{form.subtitleEn}</div>
+                    <div className="text-xs text-gray-500 mt-0.5">{form.email}</div>
+                    <div className="text-xs text-gray-500">Tel: {form.phone} · {form.poBox}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="flex items-start gap-3 mx-4 mb-4 p-3 bg-blue-500/5 border border-blue-500/20 rounded-xl text-xs text-blue-700 dark:text-blue-300">
+              <Info className="w-4 h-4 mt-0.5 flex-shrink-0" />
+              <p>{isAR ? "هذه معاينة حية تعكس بيانات النماذج في الأقسام الأخرى." : "This is a live preview reflecting the data in the other sections."}</p>
+            </div>
+          </div>
+        </div>
+
         {/* ── Display Tab ── */}
         {activeTab === "display" && (() => {
           const storedTheme = sessionStorage.getItem("theme");
@@ -615,7 +650,8 @@ export default function SettingsPage() {
           );
 
           return (
-            <div className="space-y-5">
+            <>
+            <div className="space-y-4 max-h-[520px] overflow-y-auto pr-2">
 
               {/* ─ Theme ─ */}
               <SectionCard icon={Sun} title={isAR ? "ثيم الواجهة" : "Interface Theme"} color="bg-yellow-500/5">
@@ -625,7 +661,7 @@ export default function SettingsPage() {
                       className={cn("flex flex-col items-center gap-2 py-4 px-2 rounded-xl text-xs font-semibold border-2 transition-all",
                         currentTheme === mode ? "border-primary bg-primary/10 text-primary" : "border-border bg-background text-muted-foreground hover:border-primary/40 hover:text-foreground"
                       )}>
-                      <Icon className="w-5 h-5" />{label}
+                      <Icon className="w-4 h-4" />{label}
                     </button>
                   ))}
                 </div>
@@ -734,7 +770,7 @@ export default function SettingsPage() {
                           type="color"
                           value={display.bgColor}
                           onChange={e => updateDisplay({ bgColor: e.target.value })}
-                          className="w-10 h-10 rounded-xl border border-border cursor-pointer p-0.5 bg-background"
+                          className="w-8 h-8 rounded-xl border border-border cursor-pointer p-0.5 bg-background"
                         />
                         <div className="flex flex-wrap gap-1.5">
                           {["#e8f0fe","#fce4ec","#e8f5e9","#fff3e0","#f3e5f5","#e0f7fa","#fafafa","#1e1e2e"].map(c => (
@@ -938,43 +974,9 @@ export default function SettingsPage() {
                   : "All display options are applied instantly and saved locally in the browser. They do not affect invoices or other settings."}</p>
               </div>
             </div>
+            </>
           );
         })()}
-
-        {/* ── Preview Tab ── */}
-        {activeTab === "preview" && (
-          <div className="bg-white dark:bg-gray-900 rounded-2xl border border-border/50 shadow-sm overflow-hidden">
-            <div className="flex items-center gap-2 px-5 py-3 border-b border-border/40 bg-indigo-500/5">
-              <Eye className="w-4 h-4 text-indigo-500" />
-              <h2 className="text-sm font-bold">{isAR ? "معاينة رأس الفاتورة" : "Invoice Header Preview"}</h2>
-            </div>
-            <div className="p-4">
-              <div className="border-b-4 border-double border-gray-700 pb-3 pt-2 px-4 bg-white rounded-xl shadow-inner" style={{ fontFamily: "'Cairo', sans-serif" }}>
-                <div className="flex items-start justify-between">
-                  <div className="text-right">
-                    <div className="text-lg font-black text-gray-900 leading-tight">{form.nameAr.split(" ").slice(0, 2).join(" ")}</div>
-                    <div className="text-sm font-bold text-gray-700">{form.subtitleAr}</div>
-                    <div className="text-xs text-gray-500 mt-0.5">{form.nameEn}</div>
-                    <div className="text-xs text-gray-500">{form.taglineAr}</div>
-                  </div>
-                  <div className="flex flex-col items-center">
-                    <img src={currentLogoSrc} alt="logo" className="h-16 w-auto object-contain" onError={(e) => { e.currentTarget.style.display = "none"; }} />
-                  </div>
-                  <div className="text-left">
-                    <div className="text-lg font-black text-gray-900 leading-tight">{form.nameEn.split(" ").slice(0, 3).join(" ")}</div>
-                    <div className="text-sm font-bold text-gray-700">{form.subtitleEn}</div>
-                    <div className="text-xs text-gray-500 mt-0.5">{form.email}</div>
-                    <div className="text-xs text-gray-500">Tel: {form.phone} · {form.poBox}</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div className="flex items-start gap-3 mx-4 mb-4 p-3 bg-blue-500/5 border border-blue-500/20 rounded-xl text-xs text-blue-700 dark:text-blue-300">
-              <Info className="w-4 h-4 mt-0.5 flex-shrink-0" />
-              <p>{isAR ? "هذه معاينة حية تعكس بيانات النماذج في الأقسام الأخرى." : "This is a live preview reflecting the data in the other sections."}</p>
-            </div>
-          </div>
-        )}
 
         {/* ── Identity Tab ── */}
         {activeTab === "identity" && (
