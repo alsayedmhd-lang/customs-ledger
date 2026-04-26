@@ -462,8 +462,8 @@ const impExpValue =
                 </tr>
               ))}
 
-              {invoice.items.length < 5 &&
-                Array.from({ length: 5 - invoice.items.length }).map((_, i) => (
+              {invoice.items.length < 1 &&
+                Array.from({ length: 1 - invoice.items.length }).map((_, i) => (
                   <tr key={`empty-${i}`} className="border-b border-dashed border-gray-200">
                     <td className="py-3 px-2" />
                     <td className="py-3 px-3" />

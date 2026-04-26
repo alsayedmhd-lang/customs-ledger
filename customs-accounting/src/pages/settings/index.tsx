@@ -588,39 +588,48 @@ export default function SettingsPage() {
         </div>
 
            {/* ── Always Visible Invoice Preview ── */}
-          <div className="mb-5">
-          <div className="bg-white dark:bg-gray-900 rounded-2xl border border-border/50 shadow-sm overflow-hidden">
-            <div className="flex items-center gap-2 px-5 py-3 border-b border-border/40 bg-indigo-500/5">
-              <Eye className="w-3.5 h-3.5 text-indigo-500" />
-              <h2 className="text-sm font-bold">{isAR ? "معاينة رأس الفاتورة" : "Invoice Header Preview"}</h2>
-            </div>
-            <div className="p-4">
-              <div className="border-b-4 border-double border-gray-700 pb-3 pt-2 px-4 bg-white rounded-xl shadow-inner" style={{ fontFamily: "'Cairo', sans-serif" }}>
-                <div className="flex items-start justify-between">
-                  <div className="text-right">
-                    <div className="text-lg font-black text-gray-900 leading-tight">{form.nameAr.split(" ").slice(0, 2).join(" ")}</div>
-                    <div className="text-sm font-bold text-gray-700">{form.subtitleAr}</div>
-                    <div className="text-xs text-gray-500 mt-0.5">{form.nameEn}</div>
-                    <div className="text-xs text-gray-500">{form.taglineAr}</div>
+          <div className="p-4">
+            <div
+              className="bg-white rounded-xl shadow-inner border border-gray-200 overflow-hidden"
+              style={{ fontFamily: "'Cairo', sans-serif" }}
+            >
+              {/* Invoice real header preview */}
+              <div className="px-4 pt-3 pb-2 border-b-4 border-double border-gray-700">
+                <div className="grid grid-cols-[1fr_auto_1fr] items-start gap-4">
+                  {/* Arabic side */}
+                  <div className="text-right text-gray-900">
+                    <div className="text-lg font-black leading-tight">{form.nameAr}</div>
+                    <div className="text-sm font-bold leading-tight">{form.subtitleAr}</div>
+                    <div className="text-xs text-gray-600 mt-1">{form.taglineAr}</div>
+                    <div className="text-xs text-gray-600">{form.address}</div>
                   </div>
-                  <div className="flex flex-col items-center">
-                    <img src={currentLogoSrc} alt="logo" className="h-16 w-auto object-contain" onError={(e) => { e.currentTarget.style.display = "none"; }} />
+
+                  {/* Logo */}
+                  <div className="flex flex-col items-center justify-start">
+                    <img
+                      src={currentLogoSrc}
+                      alt="logo"
+                      className="h-16 w-auto object-contain"
+                      onError={(e) => {
+                        e.currentTarget.style.display = "none";
+                      }}
+                    />
                   </div>
-                  <div className="text-left">
-                    <div className="text-lg font-black text-gray-900 leading-tight">{form.nameEn.split(" ").slice(0, 3).join(" ")}</div>
-                    <div className="text-sm font-bold text-gray-700">{form.subtitleEn}</div>
-                    <div className="text-xs text-gray-500 mt-0.5">{form.email}</div>
-                    <div className="text-xs text-gray-500">Tel: {form.phone} · {form.poBox}</div>
+
+                  {/* English side */}
+                  <div className="text-left text-gray-900">
+                    <div className="text-lg font-black leading-tight">{form.nameEn}</div>
+                    <div className="text-sm font-bold leading-tight">{form.subtitleEn}</div>
+                    <div className="text-xs text-gray-600 mt-1">{form.taglineEn}</div>
+                    <div className="text-xs text-gray-600">
+                      Tel: {form.phone} · {form.poBox}
+                    </div>
+                    <div className="text-xs text-gray-600">{form.email}</div>
                   </div>
                 </div>
               </div>
             </div>
-            <div className="flex items-start gap-3 mx-4 mb-4 p-3 bg-blue-500/5 border border-blue-500/20 rounded-xl text-xs text-blue-700 dark:text-blue-300">
-              <Info className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
-              <p>{isAR ? "هذه معاينة حية تعكس بيانات النماذج في الأقسام الأخرى." : "This is a live preview reflecting the data in the other sections."}</p>
-            </div>
           </div>
-        </div>
 
           {/* ── Preview Tab Content ── */}
             {activeTab === "preview" && (
