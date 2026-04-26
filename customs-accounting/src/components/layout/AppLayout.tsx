@@ -273,7 +273,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
             {/* Language toggle */}
             <button
               onClick={() => setLang(lang === "ar" ? "en" : "ar")}
-              className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-border bg-background/80 shadow-sm"
+              className="flex items-center gap-1 px-2 py-1 rounded-xl border border-border bg-background/80 shadow-sm text-xs"
               title={lang === "ar" ? "Switch to English" : "التبديل إلى العربية"}
             >
               <span className={cn("transition-all", lang === "en" && "text-primary font-extrabold")}>EN</span>
@@ -282,11 +282,11 @@ export default function AppLayout({ children }: AppLayoutProps) {
             </button>
 
               {/* Page Zoom Control */}
-                <div className="flex items-center gap-1 rounded-xl border border-border bg-background/80 px-1 py-1 text-xs font-bold shadow-sm">
+                <div className="flex items-center gap-1 rounded-xl border border-border bg-background/80 px-1 py-0.5 text-xs font-bold shadow-sm">
                 <button
                   type="button"
                   onClick={() => setPageZoom((z) => Math.max(0.8, Number((z - 0.1).toFixed(1))))}
-                  className="w-6 h-6 rounded-lg hover:bg-muted"
+                  className="w-5 h-5 rounded-lg hover:bg-muted"
                 >
                   -
                 </button>
@@ -298,7 +298,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                 <button
                   type="button"
                   onClick={() => setPageZoom((z) => Math.min(1.3, Number((z + 0.1).toFixed(1))))}
-                  className="w-6 h-6 rounded-lg hover:bg-muted"
+                  className="w-5 h-5 rounded-lg hover:bg-muted"
                 >
                   +
                 </button>
