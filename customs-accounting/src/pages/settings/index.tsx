@@ -1,3 +1,4 @@
+import InvoicePrintHeader from "@/components/invoice-print-header";
 import { useState, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useAuth } from "@/lib/auth-context";
@@ -594,62 +595,16 @@ export default function SettingsPage() {
               style={{ fontFamily: "'Cairo', sans-serif" }}
             >
               {/* Invoice real header preview */}
-              <div className="px-4 pt-3 pb-2 border-b-4 border-double border-gray-700">
-                <div className="grid grid-cols-[1fr_auto_1fr] items-start gap-4">
-                  {/* Arabic side */}
-                  <div className="text-right text-gray-900">
-                    <div className="text-lg font-black leading-tight">{form.nameAr}</div>
-                    <div className="text-sm font-bold leading-tight">{form.subtitleAr}</div>
-                    <div className="text-xs text-gray-600 mt-1">{form.taglineAr}</div>
-                    <div className="text-xs text-gray-600">{form.address}</div>
-                  </div>
-
-                  {/* Logo */}
-                  <div className="flex flex-col items-center justify-start">
-                    <img
-                      src={currentLogoSrc}
-                      alt="logo"
-                      className="h-16 w-auto object-contain"
-                      onError={(e) => {
-                        e.currentTarget.style.display = "none";
-                      }}
-                    />
-                  </div>
-
-                  {/* English side */}
-                  <div className="text-left text-gray-900">
-                    <div className="text-lg font-black leading-tight">{form.nameEn}</div>
-                    <div className="text-sm font-bold leading-tight">{form.subtitleEn}</div>
-                    <div className="text-xs text-gray-600 mt-1">{form.taglineEn}</div>
-                    <div className="text-xs text-gray-600">
-                      Tel: {form.phone} · {form.poBox}
-                    </div>
-                    <div className="text-xs text-gray-600">{form.email}</div>
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-stretch border-b-2 border-gray-700 bg-gray-50" dir="ltr">
-              <div className="flex flex-col justify-center px-4 py-2" style={{ width: "40%", borderRight: "1px solid #d1d5db" }}>
-                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Invoice No</div>
-                <div className="font-mono font-black text-blue-800 text-lg">INV-PREVIEW</div>
-              </div>
-
-              <div className="flex-1 flex flex-col items-center justify-center px-4 py-2">
-                <div
-                  className="font-black text-gray-900 leading-tight"
-                  style={{ fontSize: `${form.invoiceTitleFontSize || 25}px` }}
-                >
-                  {form.invoiceCreditTitleAr || "فاتورة نقدًا / على الحساب"}
-                </div>
-
-                <div className="mt-1 text-sm text-gray-500 font-semibold">
-                  {form.invoiceCreditTitleEn || "Cash / Credit Invoice"}
-                </div>
-              </div>
+              <InvoicePrintHeader
+                company={form}
+                logoSrc={currentLogoSrc}
+                isAR={isAR}
+                invoiceNumber="INV-PREVIEW"
+                statusText="صادرة"
+              />
             </div>
             </div>
-          </div>
-        
+            
           {/* ── Preview Tab Content ── */}
             {activeTab === "preview" && (
               <Section
