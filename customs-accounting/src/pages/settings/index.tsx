@@ -628,9 +628,28 @@ export default function SettingsPage() {
                   </div>
                 </div>
               </div>
+              <div className="flex items-stretch border-b-2 border-gray-700 bg-gray-50" dir="ltr">
+              <div className="flex flex-col justify-center px-4 py-2" style={{ width: "40%", borderRight: "1px solid #d1d5db" }}>
+                <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Invoice No</div>
+                <div className="font-mono font-black text-blue-800 text-lg">INV-PREVIEW</div>
+              </div>
+
+              <div className="flex-1 flex flex-col items-center justify-center px-4 py-2">
+                <div
+                  className="font-black text-gray-900 leading-tight"
+                  style={{ fontSize: `${form.invoiceTitleFontSize || 25}px` }}
+                >
+                  {form.invoiceCreditTitleAr || "فاتورة نقدًا / على الحساب"}
+                </div>
+
+                <div className="mt-1 text-sm text-gray-500 font-semibold">
+                  {form.invoiceCreditTitleEn || "Cash / Credit Invoice"}
+                </div>
+              </div>
+            </div>
             </div>
           </div>
-
+        
           {/* ── Preview Tab Content ── */}
             {activeTab === "preview" && (
               <Section
