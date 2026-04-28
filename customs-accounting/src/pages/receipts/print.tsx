@@ -477,11 +477,18 @@ export default function ReceiptPrint() {
                 />
               </div>
             )}
+            </div>
+          <div className="text-center text-xs text-gray-400 mt-1">
+            طُبع في{" "}
+            {new Date().toLocaleDateString("ar-EG-u-nu-latn", {
+              year: "numeric",
+              month: "long",
+              day: "numeric",
+            })}
+            {" — "} رقم السند: {receipt.receiptNumber}
           </div>
-          <p className="text-[10px] text-gray-500 py-1">هذه الوصل إلكتروني له قيمة قانونية إذا كان مختوم وموقع</p>
-        </div>
       </div>
-
+    </div>
   );
 };
 

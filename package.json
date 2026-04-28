@@ -89,12 +89,17 @@
     },
     "files": [
       "electron-main.cjs",
+      "preload.js",
       "customs-accounting/dist/**",
       "package.json",
       "pnpm-workspace.yaml",
       "pnpm-lock.yaml"
     ],
     "extraResources": [
+        {
+          "from": "preload.js",
+          "to": "preload.js"
+        },
         {
           "from": "api-server/dist",
           "to": "api-server/dist"
