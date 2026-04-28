@@ -24,6 +24,7 @@ interface AppUser {
   twoFactorEmail: boolean;
   twoFactorWhatsapp: boolean;
   createdAt: string;
+  receiverSignatureBase64?: string | null;
 }
 
 function authFetch(url: string, opts: RequestInit = {}) {
@@ -95,8 +96,11 @@ export default function UsersPage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  const [form, setForm] = useState({ username: "", password: "", displayName: "", displayNameAr: "", displayNameEn: "", role: "user"  });
-  const [editForm, setEditForm] = useState({ displayName: "", displayNameAr: "", displayNameEn: "", role: "user", isActive: true, email: "", phone: "", whatsappApiKey: "", twoFactorWhatsapp: false,twoFactorEmail: false });
+  const [form, setForm] = useState({ username: "", password: "", displayName: "", displayNameAr: "", 
+    displayNameEn: "", role: "user"  });
+  const [editForm, setEditForm] = useState({ displayName: "", displayNameAr: "", 
+    displayNameEn: "", role: "user", isActive: true, email: "", phone: "", receiverSignatureBase64: "", 
+    whatsappApiKey: "", twoFactorWhatsapp: false,twoFactorEmail: false });
   const [pwdForm, setPwdForm] = useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
   const [permForm, setPermForm] = useState<UserPermissions>(DEFAULT_PERMS);
   const [resetResult, setResetResult] = useState<{ userId: number; sent: boolean; visibleCode?: string; maskedEmail: string | null; message: string } | null>(null);
@@ -375,7 +379,11 @@ export default function UsersPage() {
                   <td className="px-5 py-4">
                     <div className="flex items-center gap-2">
                       <button
-                        onClick={() => { setEditId(u.id); setEditForm({ displayName: u.displayName, displayNameAr: u.displayNameAr ?? "", displayNameEn: u.displayNameEn ?? "", role: u.role, isActive: u.isActive, email: u.email ?? "", phone: u.phone ?? "", whatsappApiKey: u.whatsappApiKey ?? "" ,twoFactorWhatsapp: u.twoFactorWhatsapp ?? false, twoFactorEmail: u.twoFactorEmail ?? false,}); }}
+                        onClick={() => { setEditId(u.id); setEditForm({ displayName: u.displayName, displayNameAr: u.displayNameAr ?? "", 
+                          displayNameEn: u.displayNameEn ?? "", role: u.role, isActive: u.isActive, email: u.email ?? "", 
+                          phone: u.phone ?? "", receiverSignatureBase64: u.receiverSignatureBase64 ?? "", 
+                          whatsappApiKey: u.whatsappApiKey ?? "" ,twoFactorWhatsapp: u.twoFactorWhatsapp ?? false, 
+                          twoFactorEmail: u.twoFactorEmail ?? false,}); }}
                         className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
                         title={isAR ? "تعديل" : "Edit"}
                       >
@@ -507,6 +515,36 @@ export default function UsersPage() {
                     />
                   </div>
                 </Field>
+
+                  <Field label={isAR ? "توقيع المستلم" : "Receiver Signature"}>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+
+                        const reader = new FileReader();
+                        reader.onload = () => {
+                          setEditForm((p) => ({
+                            ...p,
+                            receiverSignatureBase64: reader.result as string,
+                          }));
+                        };
+                        reader.readAsDataURL(file);
+                      }}
+                      className={inputCls}
+                    />
+
+                    {editForm.receiverSignatureBase64 && (
+                      <img
+                        src={editForm.receiverSignatureBase64}
+                        alt="Receiver Signature"
+                        className="h-10 w-auto object-contain mx-auto mt-2"
+                      />
+                    )}
+                  </Field>
+
                 <Field label={isAR ? "مفتاح واتساب CallMeBot" : "WhatsApp API Key"}>
                   <input
                     type="text"

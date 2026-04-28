@@ -315,6 +315,7 @@ router.post("/auth/verify-otp", async (req, res) => {
       permissions,
       phone: user.phone ?? null,
       email: user.email ?? null,
+      receiverSignatureBase64: user.receiverSignatureBase64 ?? null,
     },
   });
 });
@@ -504,7 +505,19 @@ router.get("/auth/me", requireAuth, async (req, res) => {
     .limit(1);
   if (!user) return res.status(404).json({ message: "المستخدم غير موجود" });
   const permissions = user.role === "admin" ? DEFAULT_PERMISSIONS : (user.permissions ?? DEFAULT_PERMISSIONS);
-  return res.json({ id: user.id, username: user.username, displayName: user.displayName, displayNameAr: user.displayNameAr ?? null, displayNameEn: user.displayNameEn ?? null, role: user.role, permissions, phone: user.phone ?? null, email: user.email ?? null });
+  return res.json({
+    id: user.id,
+    username: user.username,
+    displayName: user.displayName,
+    displayNameAr: user.displayNameAr ?? null,
+    displayNameEn: user.displayNameEn ?? null,
+    role: user.role,
+    permissions,
+    phone: user.phone ?? null,
+    email: user.email ?? null,
+    receiverSignatureBase64: user.receiverSignatureBase64 ?? null,
+  });
+
 });
 
 export default router;

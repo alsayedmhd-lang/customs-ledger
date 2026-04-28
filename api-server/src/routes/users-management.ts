@@ -9,7 +9,20 @@ const router = Router();
 
 function formatUser(u: typeof usersTable.$inferSelect) {
   const permissions = u.role === "admin" ? DEFAULT_PERMISSIONS : (u.permissions ?? DEFAULT_PERMISSIONS);
-  return { id: u.id, username: u.username, displayName: u.displayName, displayNameAr: u.displayNameAr ?? null, displayNameEn: u.displayNameEn ?? null, role: u.role, isActive: u.isActive, pendingApproval: u.pendingApproval, permissions, email: u.email ?? null, phone: u.phone ?? null, whatsappApiKey: u.whatsappApiKey ?? null,twoFactorEmail: u.twoFactorEmail ?? false,twoFactorWhatsapp: u.twoFactorWhatsapp ?? false, createdAt: u.createdAt };
+  return { id: u.id, username: u.username,
+   displayName: u.displayName, displayNameAr: u.displayNameAr ?? null,
+   displayNameEn: u.displayNameEn ?? null, 
+   role: u.role, isActive: u.isActive, 
+   pendingApproval: u.pendingApproval, 
+   permissions, 
+   email: u.email ?? null,
+   phone: u.phone ?? null, 
+   receiverSignatureBase64: u.receiverSignatureBase64 ?? null, 
+   whatsappApiKey: u.whatsappApiKey ?? null,
+   twoFactorEmail: u.twoFactorEmail ?? false,
+   twoFactorWhatsapp: u.twoFactorWhatsapp ?? false, 
+   createdAt: u.createdAt
+  };
 }
 
 router.get("/users", requireAdmin, async (_req, res) => {
@@ -42,7 +55,20 @@ router.post("/users", requireAdmin, async (req, res) => {
 
 router.patch("/users/:id", requireAdmin, async (req, res) => {
   const id = parseInt(req.params.id);
-  const { displayName, displayNameAr, displayNameEn, role, isActive, pendingApproval, password, permissions, email, phone, whatsappApiKey,twoFactorEmail,twoFactorWhatsapp } = req.body as {
+  const { displayName, 
+    displayNameAr, 
+    displayNameEn, 
+    role, 
+    isActive, 
+    pendingApproval, 
+    password, 
+    permissions, 
+    email,
+    phone,
+    receiverSignatureBase64,
+    whatsappApiKey,
+    twoFactorEmail,
+    twoFactorWhatsapp } = req.body as {
     displayName?: string;
     displayNameAr?: string | null;
     displayNameEn?: string | null;
@@ -53,6 +79,7 @@ router.patch("/users/:id", requireAdmin, async (req, res) => {
     permissions?: Partial<UserPermissions>;
     email?: string | null;
     phone?: string | null;
+    receiverSignatureBase64?: string | null;
     whatsappApiKey?: string | null;
     twoFactorEmail?: boolean;
     twoFactorWhatsapp?: boolean;
@@ -67,6 +94,9 @@ router.patch("/users/:id", requireAdmin, async (req, res) => {
   if (password) updates.passwordHash = await bcrypt.hash(password, 10);
   if (typeof email !== "undefined") updates.email = email?.trim() || null;
   if (typeof phone !== "undefined") updates.phone = phone?.trim() || null;
+  if (typeof receiverSignatureBase64 !== "undefined") {
+    updates.receiverSignatureBase64 = receiverSignatureBase64 || null;
+  }
   if (typeof whatsappApiKey !== "undefined") updates.whatsappApiKey = whatsappApiKey?.trim() || null;
   
   if (typeof twoFactorEmail !== "undefined") updates.twoFactorEmail = !!twoFactorEmail;

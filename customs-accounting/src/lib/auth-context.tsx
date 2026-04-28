@@ -36,6 +36,7 @@ export interface AuthUser {
   permissions: UserPermissions;
   phone?: string | null;
   email?: string | null;
+  receiverSignatureBase64?: string | null;
 }
 
 export interface OtpPending {

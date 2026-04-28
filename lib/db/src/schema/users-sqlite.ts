@@ -40,6 +40,7 @@ export const usersTableSqlite = sqliteTable("users", {
   email: text("email"),
   phone: text("phone"),
   whatsappApiKey: text("whatsapp_api_key"),
+  receiverSignatureBase64: text("receiver_signature_base64"),
   twoFactorEmail: integer("two_factor_email", { mode: "boolean" }).default(false),
   twoFactorWhatsapp: integer("two_factor_whatsapp", { mode: "boolean" }).default(false),
   createdAt: integer("created_at", { mode: "timestamp_ms" }),

@@ -430,20 +430,20 @@ export default function ReceiptPrint() {
                 src={stampSrc}
                 alt="الختم الرسمي"
                 className="w-auto object-contain"
-                style={{ height: "130px", maxWidth: "200px", opacity: 0.92 }}
+                style={{ height: "110px", maxWidth: "170px", opacity: 0.92 }}
               />
             </div>
           )}
 
           <div className="text-center">
-            {settings.showReceiverSignature && settings.receiverSignatureBase64 ? (
+            {settings.showReceiverSignature && (user as any)?.receiverSignatureBase64 ? (
               <img
-                src={settings.receiverSignatureBase64}
+                src={(user as any)?.receiverSignatureBase64}
                 alt="Receiver Signature"
-                className="h-10 w-auto object-contain mx-auto"
+                className="h-15 w-auto object-contain mx-auto"
               />
             ) : (
-              <div className="h-10 border-b-2 border-gray-400" />
+              <div className="h-15 border-b-2 border-gray-400" />
             )}
             <p className="text-xs text-gray-500 mt-1 font-bold">توقيع المستلم</p>
             <p className="text-xs text-gray-400">Receiver Signature</p>
