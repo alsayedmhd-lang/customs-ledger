@@ -517,33 +517,48 @@ export default function UsersPage() {
                 </Field>
 
                   <Field label={isAR ? "توقيع المستلم" : "Receiver Signature"}>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (!file) return;
+                    <div className="flex items-center gap-2">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
 
-                        const reader = new FileReader();
-                        reader.onload = () => {
-                          setEditForm((p) => ({
-                            ...p,
-                            receiverSignatureBase64: reader.result as string,
-                          }));
-                        };
-                        reader.readAsDataURL(file);
-                      }}
-                      className={inputCls}
-                    />
+                            const reader = new FileReader();
+                            reader.onload = () => {
+                              setEditForm((p) => ({
+                                ...p,
+                                receiverSignatureBase64: reader.result as string,
+                              }));
+                            };
+                            reader.readAsDataURL(file);
+                          }}
+                          className={inputCls}
+                        />
 
-                    {editForm.receiverSignatureBase64 && (
-                      <img
-                        src={editForm.receiverSignatureBase64}
-                        alt="Receiver Signature"
-                        className="h-10 w-auto object-contain mx-auto mt-2"
-                      />
-                    )}
-                  </Field>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setEditForm((p) => ({
+                              ...p,
+                              receiverSignatureBase64: "",
+                            }))
+                          }
+                          className="p-2 rounded-lg bg-muted hover:bg-muted/80"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+
+                {editForm.receiverSignatureBase64 && (
+                  <img
+                    src={editForm.receiverSignatureBase64}
+                    alt="Receiver Signature"
+                    className="h-10 w-auto object-contain mx-auto mt-2"
+                  />
+                )}
+              </Field>
 
                 <Field label={isAR ? "مفتاح واتساب CallMeBot" : "WhatsApp API Key"}>
                   <input
@@ -558,38 +573,38 @@ export default function UsersPage() {
             </div>
 
             <div className="rounded-xl border p-3 space-y-2">
-  <div className="text-sm text-muted-foreground">
-    {isAR ? "بيانات التحقق بخطوتين (اختياري)" : "Two-factor verification settings (optional)"}
-  </div>
+              <div className="text-sm text-muted-foreground">
+                {isAR ? "بيانات التحقق بخطوتين (اختياري)" : "Two-factor verification settings (optional)"}
+              </div>
 
-      <label className="flex items-center gap-2 text-sm">
-        <input
-          type="checkbox"
-          checked={editForm.twoFactorEmail || false}
-          onChange={(e) =>
-            setEditForm((p) => ({
-              ...p,
-              twoFactorEmail: e.target.checked,
-            }))
-          }
-        />
-        <span>{isAR ? "التحقق عبر البريد الإلكتروني" : "Verify by email"}</span>
-      </label>
-    
-      <label className="flex items-center gap-2 text-sm">
-        <input
-          type="checkbox"
-          checked={editForm.twoFactorWhatsapp || false}
-          onChange={(e) =>
-            setEditForm((p) => ({
-              ...p,
-              twoFactorWhatsapp: e.target.checked,
-            }))
-          }
-        />
-        <span>{isAR ? "التحقق عبر الهاتف / واتساب" : "Verify by phone / WhatsApp"}</span>
-      </label>
-    </div>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={editForm.twoFactorEmail || false}
+                      onChange={(e) =>
+                        setEditForm((p) => ({
+                          ...p,
+                          twoFactorEmail: e.target.checked,
+                        }))
+                      }
+                    />
+                    <span>{isAR ? "التحقق عبر البريد الإلكتروني" : "Verify by email"}</span>
+                  </label>
+                
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={editForm.twoFactorWhatsapp || false}
+                      onChange={(e) =>
+                        setEditForm((p) => ({
+                          ...p,
+                          twoFactorWhatsapp: e.target.checked,
+                        }))
+                      }
+                    />
+                    <span>{isAR ? "التحقق عبر الهاتف / واتساب" : "Verify by phone / WhatsApp"}</span>
+                  </label>
+                </div>
             
             <div className="flex gap-3 pt-2">
               <button type="submit" className="flex-1 bg-primary text-primary-foreground py-2.5 rounded-xl font-medium">{isAR ? "حفظ" : "Save"}</button>
