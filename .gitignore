@@ -51,3 +51,11 @@ Thumbs.db
 lib/db/local.db
 release/win-unpacked/resources/api-server/.env
 
+release/
+release/win-unpacked/
+*.exe
+*.blockmap
+*.yml
+app.asar
+
+
