@@ -171,7 +171,7 @@ export default function ReceiptPrint() {
       return true;
     }
   });
-
+  const [showSignatures, setShowSignatures] = useState(false);
   function toggleStamp(val: boolean) {
     setShowStamp(val);
     try {
@@ -244,6 +244,17 @@ export default function ReceiptPrint() {
             <span className="text-sm font-medium text-gray-700">{isAR ? "إظهار الختم" : "Show Stamp"}</span>
           </label>
         )}
+        <label className="flex items-center gap-2 px-4 py-2 h-[42px] border border-gray-300 rounded-lg bg-white cursor-pointer select-none hover:bg-gray-50">
+          <input
+            type="checkbox"
+            checked={showSignatures}
+            onChange={(e) => setShowSignatures(e.target.checked)}
+            className="w-4 h-4 accent-blue-700"
+          />
+          <span className="text-sm font-medium text-gray-700">
+            {isAR ? "إظهار التوقيع" : "Show Signatures"}
+          </span>
+        </label>
       </div>
 
       <div
@@ -410,65 +421,67 @@ export default function ReceiptPrint() {
 
           <div className="border border-gray-300 bg-gray-50 rounded px-3 py-1.5 mt-2">
             <div className="text-xs text-right font-bold leading-snug" dir="rtl">
-              <span className="text-gray-500">المبلغ كتابةً: </span>
+              <span className="text-gray-500">المبلغ الأجمالي: </span>
               <span className="text-gray-800">{amountWords}</span>
             </div>
             <div className="text-xs text-left font-bold leading-snug border-t border-gray-200 mt-1 pt-1" dir="ltr">
-              <span className="text-gray-500">In Words: </span>
+              <span className="text-gray-500">Amount Total: </span>
               <span className="text-gray-800">{amountWordsEn}</span>
             </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-8 px-10 pb-3 pt-4 border-t border-gray-300" style={{ position: "relative", zIndex: 3 }}>
-          {settings.showStampOnReceipts && showStamp && (
-            <div
-              className="absolute inset-0 flex items-center justify-center pointer-events-none"
-              style={{ zIndex: 2 }}
-            >
-              <img
-                src={stampSrc}
-                alt="الختم الرسمي"
-                className="w-auto object-contain"
-                style={{ height: "110px", maxWidth: "170px", opacity: 0.92 }}
-              />
+          <div className="relative grid grid-cols-2 gap-8 px-10 pb-3 pt-4 border-t border-gray-300" style={{ zIndex: 3 }}>
+            <div className="text-center">
+              <div className="h-12 border-b-2 border-gray-400" />
+              <p className="text-xs text-gray-500 mt-1 font-bold">توقيع المستلم</p>
+              <p className="text-xs text-gray-400">Receiver Signature</p>
             </div>
-          )}
 
-          <div className="text-center">
-            {settings.showReceiverSignature && (user as any)?.receiverSignatureBase64 ? (
-              <img
-                src={(user as any)?.receiverSignatureBase64}
-                alt="Receiver Signature"
-                className="h-15 w-auto object-contain mx-auto"
-              />
-            ) : (
-              <div className="h-15 border-b-2 border-gray-400" />
-            )}
-            <p className="text-xs text-gray-500 mt-1 font-bold">توقيع المستلم</p>
-            <p className="text-xs text-gray-400">Receiver Signature</p>
-          </div>
+            <div className="text-center">
+              <div className="h-12 border-b-2 border-gray-400" />
+              <p className="text-xs text-gray-500 mt-1 font-bold">توقيع المحاسب</p>
+              <p className="text-xs text-gray-400">Accountant Signature</p>
+            </div>
 
-          <div className="text-center">
-            {settings.showAccountantSignature && settings.accountantSignatureBase64 ? (
+              {showSignatures &&
+                settings.showReceiverSignature &&
+                ((user as any)?.signatureBase64 || (user as any)?.receiverSignatureBase64) && (
+                  <img
+                    src={(user as any)?.signatureBase64 || (user as any)?.receiverSignatureBase64}
+                    alt="Receiver Signature"
+                    className="absolute bottom-10 right-[12%] h-14 w-auto object-contain pointer-events-none"
+                    style={{ zIndex: 3, opacity: 0.9, mixBlendMode: "multiply" }}
+                  />
+                )}
+
+            {showSignatures && settings.showAccountantSignature && settings.accountantSignatureBase64 && (
               <img
                 src={settings.accountantSignatureBase64}
                 alt="Accountant Signature"
-                className="h-10 w-auto object-contain mx-auto"
+                className="absolute bottom-10 left-[12%] h-14 w-auto object-contain pointer-events-none"
+                style={{ zIndex: 3, opacity: 0.9, mixBlendMode: "multiply" }}
               />
-            ) : (
-              <div className="h-10 border-b-2 border-gray-400" />
             )}
-            <p className="text-xs text-gray-500 mt-1 font-bold">توقيع المحاسب</p>
-            <p className="text-xs text-gray-400">Accountant Signature</p>
-          </div>
-        </div>
 
-        <div className="text-center text-gray-500 text-xs py-2" style={{ position: "relative", zIndex: 1 }}>
-          <p>هذه الوصل إلكتروني له قيمة قانونية</p>
+            {settings.showStampOnReceipts && showStamp && (
+              <div
+                className="absolute inset-0 flex items-center justify-center pointer-events-none"
+                style={{ zIndex: 2 }}
+              >
+                <img
+                  src={stampSrc}
+                  alt="الختم الرسمي"
+                  className="w-auto object-contain"
+                  style={{ height: "110px", maxWidth: "170px", opacity: 0.92 }}
+                />
+              </div>
+            )}
+          </div>
+          <p className="text-[10px] text-gray-500 py-1">هذه الوصل إلكتروني له قيمة قانونية إذا كان مختوم وموقع</p>
         </div>
       </div>
-    </div>
+
   );
 };
 

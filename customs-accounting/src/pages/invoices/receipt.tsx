@@ -173,6 +173,8 @@ export default function InvoiceReceipt() {
     }
   });
 
+  const [showSignatures, setShowSignatures] = useState(false);
+
   function toggleStamp(val: boolean) {
     setShowStamp(val);
     try {
@@ -255,9 +257,23 @@ const impExpValue =
               className="w-4 h-4 accent-blue-700"
             />
             <Stamp className="w-4 h-4 text-gray-500" />
-            <span className="text-sm font-medium text-gray-700">{isAR ? "إظهار الختم" : "Show Stamp"}</span>
+            <span className="text-sm font-medium text-gray-700">
+              {isAR ? "إظهار الختم" : "Show Stamp"}
+            </span>
           </label>
         )}
+
+        <label className="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg bg-white cursor-pointer select-none hover:bg-gray-50">
+          <input
+            type="checkbox"
+            checked={showSignatures}
+            onChange={(e) => setShowSignatures(e.target.checked)}
+            className="w-4 h-4 accent-blue-700"
+          />
+          <span className="text-sm font-medium text-gray-700">
+            {isAR ? "إظهار التوقيع" : "Show Signatures"}
+          </span>
+        </label>
       </div>
 
       {/* ── A4 Invoice ────────────────────────────────────────────────────── */}
@@ -497,11 +513,11 @@ const impExpValue =
 
           <div className="border border-gray-300 bg-gray-50 rounded px-3 py-2 mt-3">
             <div className="text-sm text-right" dir="rtl">
-              <span className="font-bold text-gray-600">المبلغ كتابةً : </span>
+              <span className="font-bold text-gray-600">المبلغ الأجمالي : </span>
               <span className="font-bold text-gray-800">{amountWords}</span>
             </div>
             <div className="text-sm text-left border-t border-gray-200 mt-1.5 pt-1.5" dir="ltr">
-              <span className="font-bold text-gray-600">Amount in Words: </span>
+              <span className="font-bold text-gray-600">Amount Total: </span>
               <span className="font-bold text-gray-800">{amountWordsEn}</span>
             </div>
           </div>
@@ -515,34 +531,45 @@ const impExpValue =
         </div>
 
         {/* ══ SIGNATURES / STAMP ══════════════════════════════════════════ */}
-        <div className="relative grid grid-cols-2 gap-4 px-6 pb-4 pt-6 border-t border-gray-300 mt-4">
+        <div className="relative grid grid-cols-2 gap-4 px-6 pb-2 pt-3 border-t border-gray-300 mt-2">
           <div className="text-center">
-            {company.showReceiverSignature && (user as any)?.receiverSignatureBase64 ? (
-              <img
-                src={(user as any)?.receiverSignatureBase64}
-                alt="Receiver Signature"
-                className="h-20 w-auto object-contain mx-auto"
-              />
-            ) : (
-              <div className="h-20 border-b-2 border-gray-400" />
-            )}
+            <div className="h-12 flex items-end justify-center">
+              <div className="w-full border-b-2 border-gray-400" />
+            </div>
             <p className="text-xs text-gray-500 mt-1 font-bold">توقيع المستلم</p>
             <p className="text-xs text-gray-400">Received By</p>
           </div>
 
           <div className="text-center">
-            {company.showAccountantSignature && company.accountantSignatureBase64 ? (
-              <img
-                src={company.accountantSignatureBase64}
-                alt="Accountant Signature"
-                className="h-20 w-auto object-contain mx-auto"
-              />
-            ) : (
-              <div className="h-20 border-b-2 border-gray-400" />
-            )}
+            <div className="h-12 flex items-end justify-center">
+              <div className="w-full border-b-2 border-gray-400" />
+            </div>
             <p className="text-xs text-gray-500 mt-1 font-bold">توقيع المحاسب</p>
             <p className="text-xs text-gray-400">Accountant</p>
           </div>
+
+          {showSignatures && ((user as any)?.signatureBase64 || (user as any)?.receiverSignatureBase64) && (
+            <img
+              src={(user as any)?.signatureBase64 || (user as any)?.receiverSignatureBase64}
+              alt="Receiver Signature"
+              className="absolute bottom-10 right-[12%] h-20 w-auto object-contain pointer-events-none"
+              style={{ zIndex: 3, opacity: 0.9, mixBlendMode: "multiply" }}
+            />
+          )}
+
+          {showSignatures && company.showAccountantSignature && company.accountantSignatureBase64 && (
+            <img
+              src={company.accountantSignatureBase64}
+              alt="Accountant Signature"
+              className="absolute bottom-10 left-[10%] h-20 w-auto object-contain pointer-events-none"
+              style={{
+                zIndex: 3,
+                opacity: 0.9,
+                mixBlendMode: "multiply",
+                filter: "brightness(1.4) contrast(1.2)"
+              }}
+            />
+          )}
 
           {company.showStampOnInvoices && showStamp && (
             <div
@@ -558,7 +585,6 @@ const impExpValue =
             </div>
           )}
         </div>
-
         {/* ══ FOOTER ══════════════════════════════════════════════════════ */}
         <div className="border-t-4 border-double border-gray-700 px-6 py-3 bg-gray-50">
           <div className="flex items-center justify-between text-xs text-gray-600">
