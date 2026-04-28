@@ -1,4 +1,5 @@
 import { useAuth } from "@/lib/auth-context";
+import { savePdf } from "@/lib/pdf";
 import { useState, useEffect } from "react";
 import { useParams, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
@@ -109,7 +110,9 @@ export default function ClientStatement() {
           </button>
         </Link>
         <button
-          onClick={() => window.print()}
+          onClick={async () => {
+                await savePdf(`ST-${client?.id || "0"} - ${client?.name || "client"}`);
+              }}
           className="flex items-center gap-2 px-5 py-2 bg-blue-700 text-white rounded-lg font-medium hover:bg-blue-800"
         >
           <Printer className="w-4 h-4" />

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { savePdf } from "@/lib/pdf";
 import { useParams, Link } from "wouter";
 import { useGetInvoice } from "@workspace/api-client-react";
 import { Printer, ArrowRight, ArrowLeft, Stamp, Calculator } from "lucide-react";
@@ -233,18 +234,12 @@ const impExpValue =
           </button>
         </Link>
 
-        <button
-          onClick={async () => {
-             console.log("PDF button clicked", (window as any).electronAPI);
-
-              if (!(window as any).electronAPI) {
-                alert("electronAPI غير موجود — preload لم يعمل");
-                return;
-              }
-            await (window as any).electronAPI.saveCurrentPagePDF(`${invNum} - ${invoice.clientName}`);
-          }}
-          className="flex items-center gap-2 px-5 py-2 bg-blue-700 text-white rounded-lg font-medium hover:bg-blue-800"
-        >
+          <button
+            onClick={async () => {
+              await savePdf(`${invNum} - ${invoice.clientName}`);
+            }}
+            className="flex items-center gap-2 px-5 py-2 bg-blue-700 text-white rounded-lg font-medium hover:bg-blue-800"
+          >
           <Printer className="w-4 h-4" />
           {isAR ? "الطباعة" : "Print Invoice"}
         </button>

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { savePdf } from "@/lib/pdf";
 import { useParams, Link } from "wouter";
 import { Printer, ArrowRight, ArrowLeft, Stamp } from "lucide-react";
 import Barcode from "react-barcode";
@@ -7,9 +8,6 @@ import { useLanguage } from "@/lib/language-context";
 import { useCompanySettings } from "@/lib/company-settings-context";
 import { useAuth } from "@/lib/auth-context";
 import { useGetReceipt, useListClients } from "@workspace/api-client-react";
-import settings from "../settings";
-import settings from "../settings";
-import settings from "../settings";
 
 // ── Number to English words ───────────────────────────────────────────────────
 const engOnes = [
@@ -225,7 +223,9 @@ export default function ReceiptPrint() {
         </Link>
 
         <button
-          onClick={() => window.print()}
+          onClick={async () => {
+            await savePdf(`${receipt.receiptNumber} - ${receipt.clientName}`);
+          }}
           className="flex items-center gap-2 px-4 py-2 bg-blue-700 text-white rounded-lg text-sm font-medium hover:bg-blue-800"
         >
           <Printer className="w-4 h-4" />
