@@ -57,6 +57,10 @@ CREATE TABLE IF NOT EXISTS company_settings (
   invoice_credit_title_ar TEXT,
   invoice_credit_title_en TEXT,
   invoice_title_font_size INTEGER DEFAULT 25,
+  accountant_signature_base64 TEXT,
+  receiver_signature_base64 TEXT,
+  show_accountant_signature INTEGER DEFAULT 1,
+  show_receiver_signature INTEGER DEFAULT 1,
   updated_at INTEGER
 );
 

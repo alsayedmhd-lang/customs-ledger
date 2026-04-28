@@ -7,6 +7,9 @@ import { useLanguage } from "@/lib/language-context";
 import { useCompanySettings } from "@/lib/company-settings-context";
 import { useAuth } from "@/lib/auth-context";
 import { useGetReceipt, useListClients } from "@workspace/api-client-react";
+import settings from "../settings";
+import settings from "../settings";
+import settings from "../settings";
 
 // ── Number to English words ───────────────────────────────────────────────────
 const engOnes = [
@@ -420,14 +423,8 @@ export default function ReceiptPrint() {
         <div className="grid grid-cols-2 gap-8 px-10 pb-3 pt-4 border-t border-gray-300" style={{ position: "relative", zIndex: 3 }}>
           {settings.showStampOnReceipts && showStamp && (
             <div
-              style={{
-                position: "absolute",
-                top: "40%",
-                left: "50%",
-                transform: "translate(-50%, -50%)",
-                zIndex: 4,
-                pointerEvents: "none",
-              }}
+              className="absolute inset-0 flex items-center justify-center pointer-events-none"
+              style={{ zIndex: 2 }}
             >
               <img
                 src={stampSrc}
@@ -439,18 +436,39 @@ export default function ReceiptPrint() {
           )}
 
           <div className="text-center">
-            <div className="h-10 border-b-2 border-gray-400" />
+            {settings.showReceiverSignature && settings.receiverSignatureBase64 ? (
+              <img
+                src={settings.receiverSignatureBase64}
+                alt="Receiver Signature"
+                className="h-10 w-auto object-contain mx-auto"
+              />
+            ) : (
+              <div className="h-10 border-b-2 border-gray-400" />
+            )}
             <p className="text-xs text-gray-500 mt-1 font-bold">توقيع المستلم</p>
             <p className="text-xs text-gray-400">Receiver Signature</p>
           </div>
 
           <div className="text-center">
-            <div className="h-10 border-b-2 border-gray-400" />
+            {settings.showAccountantSignature && settings.accountantSignatureBase64 ? (
+              <img
+                src={settings.accountantSignatureBase64}
+                alt="Accountant Signature"
+                className="h-10 w-auto object-contain mx-auto"
+              />
+            ) : (
+              <div className="h-10 border-b-2 border-gray-400" />
+            )}
             <p className="text-xs text-gray-500 mt-1 font-bold">توقيع المحاسب</p>
             <p className="text-xs text-gray-400">Accountant Signature</p>
           </div>
         </div>
+
+        <div className="text-center text-gray-500 text-xs py-2" style={{ position: "relative", zIndex: 1 }}>
+          <p>هذه الوصل إلكتروني له قيمة قانونية</p>
+        </div>
       </div>
     </div>
   );
-}
+};
+

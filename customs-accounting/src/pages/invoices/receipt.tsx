@@ -517,13 +517,29 @@ const impExpValue =
         {/* ══ SIGNATURES / STAMP ══════════════════════════════════════════ */}
         <div className="relative grid grid-cols-2 gap-4 px-6 pb-4 pt-6 border-t border-gray-300 mt-4">
           <div className="text-center">
-            <div className="h-16 border-b-2 border-gray-400" />
+            {company.showReceiverSignature && company.receiverSignatureBase64 ? (
+              <img
+                src={company.receiverSignatureBase64}
+                alt="Receiver Signature"
+                className="h-16 w-auto object-contain mx-auto"
+              />
+            ) : (
+              <div className="h-16 border-b-2 border-gray-400" />
+            )}
             <p className="text-xs text-gray-500 mt-1 font-bold">توقيع المستلم</p>
             <p className="text-xs text-gray-400">Received By</p>
           </div>
 
           <div className="text-center">
-            <div className="h-16 border-b-2 border-gray-400" />
+            {company.showAccountantSignature && company.accountantSignatureBase64 ? (
+              <img
+                src={company.accountantSignatureBase64}
+                alt="Accountant Signature"
+                className="h-16 w-auto object-contain mx-auto"
+              />
+            ) : (
+              <div className="h-16 border-b-2 border-gray-400" />
+            )}
             <p className="text-xs text-gray-500 mt-1 font-bold">توقيع المحاسب</p>
             <p className="text-xs text-gray-400">Accountant</p>
           </div>

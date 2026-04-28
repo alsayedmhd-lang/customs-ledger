@@ -59,7 +59,11 @@ export default function SettingsPage() {
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [stampPreview, setStampPreview] = useState<string | null>(null);
   const [watermarkPreview, setWatermarkPreview] = useState<string | null>(null);
+  const [accountantSignaturePreview, setAccountantSignaturePreview] = useState<string | null>(null);
+  const [receiverSignaturePreview, setReceiverSignaturePreview] = useState<string | null>(null);
   const logoRef = useRef<HTMLInputElement>(null);
+  const accountantSignatureRef = useRef<HTMLInputElement>(null);
+  const receiverSignatureRef = useRef<HTMLInputElement>(null);
   const stampRef = useRef<HTMLInputElement>(null);
   const watermarkRef = useRef<HTMLInputElement>(null);
   const [activeTab, setActiveTab] = useState<TabId>("identity");
@@ -69,6 +73,8 @@ export default function SettingsPage() {
     setLogoPreview(settings.logoBase64 || null);
     setStampPreview(settings.stampBase64 || null);
     setWatermarkPreview(settings.watermarkBase64 || null);
+    setAccountantSignaturePreview(settings.accountantSignatureBase64 || null);
+    setReceiverSignaturePreview(settings.receiverSignatureBase64 || null);
   }, [settings]);
 
   // Export invoices backup
@@ -332,7 +338,12 @@ export default function SettingsPage() {
 
   const handleImageUpload = (
     e: React.ChangeEvent<HTMLInputElement>,
-    field: "logoBase64" | "stampBase64" | "watermarkBase64",
+    field:
+      | "logoBase64"
+      | "stampBase64"
+      | "watermarkBase64"
+      | "accountantSignatureBase64"
+      | "receiverSignatureBase64",
     setPreview: (v: string | null) => void
   ) => {
     const file = e.target.files?.[0];
@@ -417,7 +428,7 @@ export default function SettingsPage() {
     }
     
     const handleImageRemove = (
-      field: "logoBase64" | "stampBase64" | "watermarkBase64",
+      field: "logoBase64" | "stampBase64" | "watermarkBase64" | "accountantSignatureBase64" | "receiverSignatureBase64",
       setPreview?: (value: string) => void
     ) => {
       setForm((prev) => ({ ...prev, [field]: null }));
@@ -446,6 +457,7 @@ export default function SettingsPage() {
           crNumber: rawPayload.crNumber ?? "",
           taxNumber: rawPayload.taxNumber ?? "",
           footerText: rawPayload.footerText ?? "",
+          logoSize: Number(rawPayload.logoSize ?? 80),
           invoiceCashTitleAr: rawPayload.invoiceCashTitleAr ?? "",
           invoiceCashTitleEn: rawPayload.invoiceCashTitleEn ?? "",
           invoiceCreditTitleAr: rawPayload.invoiceCreditTitleAr ?? "",
@@ -454,8 +466,13 @@ export default function SettingsPage() {
           showStampOnInvoices: rawPayload.showStampOnInvoices ?? true,
           showStampOnReceipts: rawPayload.showStampOnReceipts ?? true,
           showStampOnStatements: rawPayload.showStampOnStatements ?? true,
+          accountantSignatureBase64: rawPayload.accountantSignatureBase64 ?? null,
+          receiverSignatureBase64: rawPayload.receiverSignatureBase64 ?? null,
+          showAccountantSignature: rawPayload.showAccountantSignature ?? true,
+          showReceiverSignature: rawPayload.showReceiverSignature ?? true,
           invoiceTitleFontSize: Number(rawPayload.invoiceTitleFontSize ?? 25),
         };
+        console.log("payload accountant:", payload.accountantSignatureBase64?.slice?.(0, 50));
         const res = await fetch(`${API_BASE}/company-settings`, {
           method: "PUT",
           headers: {
@@ -604,7 +621,7 @@ export default function SettingsPage() {
               />
             </div>
             </div>
-            
+
           {/* ── Preview Tab Content ── */}
             {activeTab === "preview" && (
               <Section
@@ -1237,6 +1254,23 @@ export default function SettingsPage() {
                   <p className="text-xs text-muted-foreground text-center">{isAR ? "PNG/JPG · أقصى 2 MB" : "PNG/JPG · Max 2 MB"}</p>
                 </div>
                 <input ref={logoRef} type="file" accept="image/*" className="hidden" onChange={e => handleImageUpload(e, "logoBase64", setLogoPreview)} />
+              
+                 <div className="space-y-2">
+                  <label className="text-xs font-medium text-muted-foreground">
+                    {isAR ? "حجم الشعار" : "Logo Size"}
+                  </label>
+                  <input
+                    type="number"
+                    min="40"
+                    max="200"
+                    value={form.logoSize || 80}
+                    onChange={(e) =>
+                      setForm((p) => ({ ...p, logoSize: Number(e.target.value) }))
+                    }
+                    className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm"
+                  />
+                </div>   
+              
               </div>
               {/* Stamp */}
               <div className="space-y-3">
@@ -1257,6 +1291,69 @@ export default function SettingsPage() {
                 </div>
                 <input ref={stampRef} type="file" accept="image/*" className="hidden" onChange={e => handleImageUpload(e, "stampBase64", setStampPreview)} />
               </div>
+              
+                {/* Accountant Signature */}
+                <div className="space-y-3">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                  {isAR ? "توقيع المحاسب" : "Accountant Signature"}
+                </p>
+
+                <div className="flex flex-col items-center justify-center gap-3 p-4 border-2 border-dashed border-border rounded-xl bg-muted/20 hover:bg-muted/30 transition-colors min-h-[160px]">
+                  <img
+                    src={accountantSignaturePreview || ""}
+                    alt="accountant-signature"
+                    className="h-16 w-auto object-contain"
+                    onError={(e) => {
+                      e.currentTarget.style.display = "none";
+                    }}
+                  />
+
+                  <div className="flex gap-2 flex-wrap justify-center">
+                    <button
+                      type="button"
+                      onClick={() => accountantSignatureRef.current?.click()}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition"
+                    >
+                      <Upload className="w-3.5 h-3.5" />
+                      {isAR ? "رفع توقيع" : "Upload"}
+                    </button>
+
+                    {accountantSignaturePreview && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAccountantSignaturePreview(null);
+                          setForm((p) => ({ ...p, accountantSignatureBase64: null }));
+                        }}
+                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-muted rounded-lg hover:bg-muted-foreground/20 transition"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                        {isAR ? "حذف" : "Remove"}
+                      </button>
+                    )}
+                  </div>
+
+                  <p className="text-xs text-muted-foreground text-center">
+                    {isAR ? "PNG شفاف · أقصى 2 MB" : "Transparent PNG · Max 2 MB"}
+                  </p>
+                </div>
+
+                <input
+                  ref={accountantSignatureRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => handleImageUpload(e, "accountantSignatureBase64", setAccountantSignaturePreview)}
+                />
+              </div>
+
+              <div className="flex items-center justify-between gap-4 p-3 rounded-xl hover:bg-muted/30 transition-colors">
+                <span className="text-sm font-medium">
+                  {isAR ? "إظهار توقيع المحاسب" : "Show Accountant Signature"}
+                </span>
+                <Toggle field="showAccountantSignature" />
+              </div>
+
               {/* Watermark */}
               <div className="space-y-3">
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{isAR ? "العلامة المائية" : "Watermark"}</p>

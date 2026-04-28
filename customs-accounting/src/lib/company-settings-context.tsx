@@ -20,6 +20,7 @@ export interface CompanySettings {
   crNumber: string;
   taxNumber: string;
   logoBase64: string | null;
+  logoSize?: number;
   stampBase64: string | null;
   watermarkBase64: string | null;
   showWatermark: boolean;
@@ -32,6 +33,10 @@ export interface CompanySettings {
   invoiceCreditTitleAr: string;
   invoiceCreditTitleEn: string;
   invoiceTitleFontSize: number;
+  accountantSignatureBase64: string | null;
+  receiverSignatureBase64: string | null;
+  showAccountantSignature: boolean;
+  showReceiverSignature: boolean;
 }
 
 export const DEFAULT_SETTINGS: CompanySettings = {
@@ -49,6 +54,7 @@ export const DEFAULT_SETTINGS: CompanySettings = {
   crNumber: "",
   taxNumber: "",
   logoBase64: null,
+  logoSize: 80,
   stampBase64: null,
   watermarkBase64: null,
   showWatermark: true,
@@ -61,6 +67,10 @@ export const DEFAULT_SETTINGS: CompanySettings = {
   invoiceCreditTitleAr: "فاتورة نقدا / على الحساب",
   invoiceCreditTitleEn: "Cash / Credit Invoice",
   invoiceTitleFontSize: 25,
+  accountantSignatureBase64: null,
+  receiverSignatureBase64: null,
+  showAccountantSignature: true,
+  showReceiverSignature: true,
   };
 
 interface CompanySettingsCtx {

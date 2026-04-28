@@ -16,6 +16,7 @@ export const companySettingsTableSqlite = sqliteTable("company_settings", {
   crNumber: text("cr_number"),
   taxNumber: text("tax_number"),
   logoBase64: text("logo_base64"),
+  logoSize: integer("logo_size").default(80),
   stampBase64: text("stamp_base64"),
   watermarkBase64: text("watermark_base64"),
   showWatermark: integer("show_watermark", { mode: "boolean" }).default(true),
@@ -28,6 +29,10 @@ export const companySettingsTableSqlite = sqliteTable("company_settings", {
   invoiceCreditTitleAr: text("invoice_credit_title_ar"),
   invoiceCreditTitleEn: text("invoice_credit_title_en"),
   invoiceTitleFontSize: integer("invoice_title_font_size").default(25),
+  accountantSignatureBase64: text("accountant_signature_base64"),
+  receiverSignatureBase64: text("receiver_signature_base64"),
+  showAccountantSignature: integer("show_accountant_signature", { mode: "boolean" }).default(true),
+  showReceiverSignature: integer("show_receiver_signature", { mode: "boolean" }).default(true),
   updatedAt: integer("updated_at", { mode: "timestamp_ms" }),
 });
 

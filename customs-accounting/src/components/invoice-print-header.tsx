@@ -18,7 +18,7 @@ export default function InvoicePrintHeader({
   return (
     <>
       {/* LETTERHEAD */}
-      <div className="border-b-4 border-double border-gray-800 pb-3 pt-4 px-6">
+      <div className="border-b-4 border-double border-gray-800 pb-4 pt-5 px-6">
         <div className="relative flex items-start justify-between gap-4">
           <div className="text-right flex-1 min-w-0">
             <div className="text-2xl font-black text-gray-900 leading-tight break-words">
@@ -32,7 +32,8 @@ export default function InvoicePrintHeader({
             <img
               src={logoSrc}
               alt={company.nameAr}
-              className="h-30 w-auto object-contain opacity-95"
+              style={{ height: `${company.logoSize || 60}px` }}
+              className="w-auto object-contain opacity-95"
             />
           </div>
 

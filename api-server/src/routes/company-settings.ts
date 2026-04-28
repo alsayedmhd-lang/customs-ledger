@@ -20,6 +20,11 @@ router.get("/company-settings", async (_req, res) => {
       invoiceCreditTitleAr: settings.invoiceCreditTitleAr,
       invoiceCreditTitleEn: settings.invoiceCreditTitleEn,
       invoiceTitleFontSize: settings.invoiceTitleFontSize,
+
+      accountantSignatureBase64: settings.accountantSignatureBase64,
+      receiverSignatureBase64: settings.receiverSignatureBase64,
+      showAccountantSignature: settings.showAccountantSignature,
+      showReceiverSignature: settings.showReceiverSignature,
     });
   } catch (err) {
     console.error(err);
@@ -30,6 +35,8 @@ router.get("/company-settings", async (_req, res) => {
 router.put("/company-settings", requireAdmin, async (req, res) => {
   try {
     const body = req.body as any;
+    console.log("LOGO SIZE RECEIVED:", body.logoSize);
+    console.log("body accountant:", body.accountantSignatureBase64?.slice?.(0, 50));
 
     const data = {
       nameAr: body.nameAr,
@@ -45,19 +52,24 @@ router.put("/company-settings", requireAdmin, async (req, res) => {
       website: body.website,
       crNumber: body.crNumber,
       taxNumber: body.taxNumber,
-      logoBase64: body.logoBase64,
-      stampBase64: body.stampBase64,
-      watermarkBase64: body.watermarkBase64,
-      showWatermark: body.showWatermark,
-      showStampOnInvoices: body.showStampOnInvoices,
-      showStampOnReceipts: body.showStampOnReceipts,
-      showStampOnStatements: body.showStampOnStatements,
+      logoBase64: body.logoBase64 ?? null,
+      logoSize: Number(body.logoSize ?? 80),
+      stampBase64: body.stampBase64 ?? null,
+      watermarkBase64: body.watermarkBase64 ?? null,
+      showWatermark: body.showWatermark ?? false,
+      showStampOnInvoices: body.showStampOnInvoices ?? false,
+      showStampOnReceipts: body.showStampOnReceipts ?? false,
+      showStampOnStatements: body.showStampOnStatements ?? false,
       footerText: body.footerText,
       invoiceCashTitleAr: body.invoiceCashTitleAr,
       invoiceCashTitleEn: body.invoiceCashTitleEn,
       invoiceCreditTitleAr: body.invoiceCreditTitleAr,
       invoiceCreditTitleEn: body.invoiceCreditTitleEn,
       invoiceTitleFontSize: Number(body.invoiceTitleFontSize),
+      accountantSignatureBase64: body.accountantSignatureBase64 ?? null,
+      receiverSignatureBase64: body.receiverSignatureBase64 ?? null,
+      showAccountantSignature: body.showAccountantSignature ?? false,
+      showReceiverSignature: body.showReceiverSignature ?? false,
       updatedAt: new Date(),
     };
 
@@ -70,7 +82,7 @@ router.put("/company-settings", requireAdmin, async (req, res) => {
     const [result] = await db
       .update(companySettingsTable)
       .set(data as any)
-      // .where(eq(companySettingsTable.id, Number(existing.id)))
+      .where(eq(companySettingsTable.id, Number(existing.id)))
       .returning();
 
     return res.json(result);
