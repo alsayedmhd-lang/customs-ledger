@@ -5,8 +5,8 @@ import {
   invoiceItemsTable,
   clientsTable,
   usersTable,
-  invoiceAuditLogsTableSqlite,
 } from "@workspace/db/schema";
+import { invoiceAuditLogsTableSqlite } from "@workspace/db/schema/invoices-sqlite";
 import { eq, desc, isNull, and, like } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth";
 
@@ -53,7 +53,7 @@ router.get("/invoices", requireAuth, async (req, res) => {
         .innerJoin(clientsTable, eq(invoicesTable.clientId, clientsTable.id))
         .innerJoin(usersTable, eq(invoicesTable.createdBy, usersTable.id))
         .where(and(...filters))
-        .orderBy(desc(invoicesTable.createdAt));
+        .orderBy(desc(invoicesTable.id));
     } else {
       const filters = [isNull(invoicesTable.deletedAt)];
       if (ownerFilter) filters.push(ownerFilter);
@@ -62,7 +62,7 @@ router.get("/invoices", requireAuth, async (req, res) => {
         .from(invoicesTable)
         .innerJoin(clientsTable, eq(invoicesTable.clientId, clientsTable.id))
         .where(and(...filters))
-        .orderBy(desc(invoicesTable.createdAt));
+        .orderBy(desc(invoicesTable.id));
     }
 
     const invoicesWithItems = await Promise.all(
@@ -473,10 +473,29 @@ router.put("/invoices/:id", async (req, res) => {
 router.delete("/invoices/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
+     const [oldInvoice] = await db
+      .select()
+      .from(invoicesTable)
+      .where(eq(invoicesTable.id, id)); 
     await db
       .update(invoicesTable)
       .set({ deletedAt: new Date() })
       .where(and(eq(invoicesTable.id, id), isNull(invoicesTable.deletedAt)));
+
+    await db.insert(invoiceAuditLogsTableSqlite).values({
+        invoiceId: id,
+        action: "deleted",
+        userId: req.user?.userId ?? null,
+        username: req.user?.username ?? null,
+        userEmail: req.user?.email ?? null,
+        userPhone: req.user?.phone ?? null,
+        changesJson: JSON.stringify({
+          before: oldInvoice,
+          after: { deletedAt: new Date() },
+        }),
+        createdAt: new Date(),
+      });
+
     res.status(204).send();
   } catch (err) {
     console.error(err);

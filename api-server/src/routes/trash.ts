@@ -1,6 +1,12 @@
 import { Router, type IRouter } from "express";
-import { db, invoicesTable, invoiceItemsTable, clientsTable, receiptsTable } from "@workspace/db";
+import {
+  invoicesTable,
+  invoiceItemsTable,
+  clientsTable,
+} from "@workspace/db/schema";
+import { invoiceAuditLogsTableSqlite } from "@workspace/db/schema/invoices-sqlite";
 import { eq, desc, isNotNull, and } from "drizzle-orm";
+import { db } from "@workspace/db";
 import { formatInvoice, formatItem } from "./invoices";
 import { formatReceipt } from "./receipts";
 
@@ -52,6 +58,20 @@ router.post("/trash/invoices/:id/restore", async (req, res) => {
       res.status(404).json({ error: "Invoice not found in trash" });
       return;
     }
+
+  await db.insert(invoiceAuditLogsTableSqlite).values({
+    invoiceId: invoice.id,
+    action: "restored",
+    userId: null,
+    username: "admin",
+    userEmail: null,
+    userPhone: null,
+    changesJson: JSON.stringify({
+      before: { deletedAt: "not_null" },
+      after: { deletedAt: null },
+    }),
+    createdAt: new Date(),
+  });
 
     const [client] = await db.select().from(clientsTable).where(eq(clientsTable.id, invoice.clientId));
     const items = await db

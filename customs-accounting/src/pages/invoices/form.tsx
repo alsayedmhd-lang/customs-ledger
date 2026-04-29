@@ -542,6 +542,104 @@ export default function InvoiceForm() {
     }
   };
 
+    const getAuditSummary = (log: any) => {
+    try {
+      const changes = log.changesJson ? JSON.parse(log.changesJson) : null;
+
+      if (!changes) return [];
+
+      if (log.action === "created") {
+        return [isAR ? "تم إنشاء الفاتورة" : "Invoice was created"];
+      }
+
+      if (log.action === "deleted") {
+        return [
+          isAR
+            ? "تم نقل الفاتورة إلى سلة المحذوفات"
+            : "Invoice moved to trash"
+        ];
+      }
+
+      if (log.action === "updated") {
+        const before = changes.before?.invoice || {};
+        const after = changes.after?.invoice || {};
+        const result: string[] = [];
+
+        const changeText = (labelAr: string, labelEn: string, from: any, to: any) =>
+          isAR
+            ? `تم تغيير ${labelAr} من ${from ?? "-"} إلى ${to ?? "-"}`
+            : `${labelEn} changed from ${from ?? "-"} to ${to ?? "-"}`;
+
+        if (before.notes !== after.notes) {
+            result.push(changeText("الملاحظات", "Notes", before.notes, after.notes));
+          }
+
+          if (before.taxRate !== after.taxRate) {
+            result.push(
+              isAR
+                ? `تم تغيير الضريبة من ${before.taxRate ?? "-"} إلى ${after.taxRate ?? "-"}`
+                : `Tax changed from ${before.taxRate ?? "-"} to ${after.taxRate ?? "-"}`
+            );
+          }
+
+          if (before.advancePayment !== after.advancePayment) {
+            result.push(
+              isAR
+                ? `تم تغيير الدفعة المقدمة من ${before.advancePayment ?? "-"} إلى ${after.advancePayment ?? "-"}`
+                : `Advance payment changed from ${before.advancePayment ?? "-"} to ${after.advancePayment ?? "-"}`
+            );
+          }
+
+          if (before.importerExporterName !== after.importerExporterName) {
+            result.push(changeText("المستورد / المصدر", "Importer / exporter", before.importerExporterName, after.importerExporterName));
+          }
+
+          if (before.billOfLading !== after.billOfLading) {
+            result.push(changeText("بوليصة الشحن", "Bill of lading", before.billOfLading, after.billOfLading));
+          }
+
+      if (before.packageCount !== after.packageCount) {
+        result.push(changeText("عدد الطرود", "Package count", before.packageCount, after.packageCount));
+      }
+
+      if (before.clientId !== after.clientId) {
+        result.push(changeText("العميل", "Client", before.clientId, after.clientId));
+      }
+
+      if (before.shipmentRef !== after.shipmentRef) {
+        result.push(changeText("رقم البيان", "Shipment reference", before.shipmentRef, after.shipmentRef));
+      }
+
+      if (before.total !== after.total) {
+        result.push(changeText("الإجمالي", "Total", before.total, after.total));
+      }
+
+      if (before.createdBy !== after.createdBy) {
+        result.push(changeText("المندوب", "Agent", before.createdBy, after.createdBy));
+      }
+
+      const beforeItems = changes.before?.items || [];
+      const afterItems = changes.after?.items || [];
+
+      if (JSON.stringify(beforeItems) !== JSON.stringify(afterItems)) {
+        result.push(
+          isAR
+            ? "تم تعديل أصناف الفاتورة (إضافة / حذف / تعديل)"
+            : "Invoice items modified (add / remove / edit)"
+        );
+      }
+
+      return result.length > 0
+        ? result
+        : [isAR ? "تم تعديل بيانات الفاتورة" : "Invoice details updated"];
+      }
+
+      return [log.action];
+      } catch {
+        return [isAR ? "تعذر قراءة تفاصيل التغيير" : "Could not read change details"];
+      }
+  };
+
  return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
@@ -1054,9 +1152,14 @@ export default function InvoiceForm() {
 
           <div className="divide-y divide-border/40 max-h-80 overflow-y-auto">
             {auditLogs.map((log, i) => {
-              const dateValue = Number(log.createdAt);
-              const dateText = Number.isFinite(dateValue)
-                ? new Date(dateValue).toLocaleString(isAR ? "ar-QA" : "en-US")
+              const rawDate =
+                log.createdAt ??
+                log.created_at ??
+                JSON.parse(log.changesJson || "{}")?.after?.invoice?.updatedAt ??
+                JSON.parse(log.changesJson || "{}")?.before?.invoice?.updatedAt;
+
+              const dateText = rawDate
+                ? new Date(rawDate).toLocaleString("en-US")
                 : "-";
 
               const actionLabel =
@@ -1064,18 +1167,43 @@ export default function InvoiceForm() {
                   ? isAR ? "إنشاء الفاتورة" : "Invoice Created"
                   : log.action === "updated"
                     ? isAR ? "تعديل الفاتورة" : "Invoice Updated"
-                    : log.action;
+                    : log.action === "deleted"
+                      ? isAR ? "حذف الفاتورة" : "Invoice Deleted"
+                      : log.action === "restored"
+                        ? isAR ? "استعادة الفاتورة" : "Invoice Restored"
+                        : log.action;
+              const actionStyle =
+                log.action === "created"
+                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                  : log.action === "updated"
+                    ? "bg-blue-50 text-blue-700 border-blue-200"
+                    : log.action === "deleted"
+                      ? "bg-red-50 text-red-700 border-red-200"
+                      : "bg-purple-50 text-purple-700 border-purple-200";
+
+              const summary = getAuditSummary(log);
 
               return (
-                <div key={i} className="px-5 py-3 flex items-start justify-between gap-4">
-                  <div>
-                    <div className="font-semibold text-sm">{actionLabel}</div>
-                    <div className="text-xs text-muted-foreground mt-1">
+                <div
+                    key={i}
+                    className="px-5 py-3 grid grid-cols-1 md:grid-cols-[0.6fr_3fr_0.7fr] gap-4 items-start"
+                  >
+                  <div className="min-w-0">
+                    <div className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-bold ${actionStyle}`}>
+                      {actionLabel}
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-2 leading-5">
                       {isAR ? "بواسطة" : "By"}: {log.username || "-"}
                     </div>
                   </div>
 
-                  <div className="text-xs text-muted-foreground whitespace-nowrap">
+                  <div className="min-w-0 text-xs text-muted-foreground space-y-2 leading-6 break-words whitespace-normal px-2">
+                    {summary.map((s: string, idx: number) => (
+                      <div key={idx}>• {s}</div>
+                    ))}
+                  </div>
+
+                  <div className="min-w-0 text-xs text-muted-foreground break-words whitespace-normal md:text-start pl-2">
                     {dateText}
                   </div>
                 </div>
