@@ -268,6 +268,23 @@ router.get("/invoices/:id", async (req, res) => {
   }
 });
 
+router.get("/invoices/:id/audit-logs", requireAuth, async (req, res) => {
+  try {
+    const id = parseInt(req.params.id);
+
+    const logs = await db
+      .select()
+      .from(invoiceAuditLogsTableSqlite)
+      .where(eq(invoiceAuditLogsTableSqlite.invoiceId, id))
+      .orderBy(desc(invoiceAuditLogsTableSqlite.createdAt));
+
+    res.json(logs);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 router.put("/invoices/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);

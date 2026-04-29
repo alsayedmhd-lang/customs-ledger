@@ -237,6 +237,8 @@ export default function InvoiceForm() {
     query: { enabled: isEdit },
   });
 
+  const [auditLogs, setAuditLogs] = useState<any[]>([]);
+
   useEffect(() => {
   const token = sessionStorage.getItem("auth_token");
 
@@ -448,6 +450,21 @@ export default function InvoiceForm() {
     setValue("createdBy", String(user.id));
   }
 }, [isEdit, user?.id, users.length, setValue]);
+
+  useEffect(() => {
+    if (!isEdit) return;
+
+    const token = sessionStorage.getItem("auth_token");
+
+    fetch(`${import.meta.env.VITE_API_BASE_URL}/api/invoices/${invoiceId}/audit-logs`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    })
+      .then((r) => r.json())
+      .then((data) => setAuditLogs(Array.isArray(data) ? data : []));
+  }, [invoiceId, isEdit]);
+  
 
   const itemsWatch = watch("items") || [];
   const taxRateWatch = watch("taxRate") || 0;
@@ -1023,6 +1040,50 @@ export default function InvoiceForm() {
           </div>
         </div>
       </form>
+
+     {isEdit && user?.role === "admin" && auditLogs.length > 0 && (
+        <div className="rounded-2xl border border-border/50 bg-card shadow-sm overflow-hidden">
+          <div className="px-5 py-3 border-b border-border/40 flex items-center justify-between">
+            <h3 className="text-sm font-bold">
+              {isAR ? "سجل تغييرات الفاتورة" : "Invoice Audit Log"}
+            </h3>
+            <span className="text-xs text-muted-foreground">
+              {auditLogs.length} {isAR ? "عملية" : "events"}
+            </span>
+          </div>
+
+          <div className="divide-y divide-border/40 max-h-80 overflow-y-auto">
+            {auditLogs.map((log, i) => {
+              const dateValue = Number(log.createdAt);
+              const dateText = Number.isFinite(dateValue)
+                ? new Date(dateValue).toLocaleString(isAR ? "ar-QA" : "en-US")
+                : "-";
+
+              const actionLabel =
+                log.action === "created"
+                  ? isAR ? "إنشاء الفاتورة" : "Invoice Created"
+                  : log.action === "updated"
+                    ? isAR ? "تعديل الفاتورة" : "Invoice Updated"
+                    : log.action;
+
+              return (
+                <div key={i} className="px-5 py-3 flex items-start justify-between gap-4">
+                  <div>
+                    <div className="font-semibold text-sm">{actionLabel}</div>
+                    <div className="text-xs text-muted-foreground mt-1">
+                      {isAR ? "بواسطة" : "By"}: {log.username || "-"}
+                    </div>
+                  </div>
+
+                  <div className="text-xs text-muted-foreground whitespace-nowrap">
+                    {dateText}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </motion.div>
   );
 }
