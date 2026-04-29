@@ -728,7 +728,7 @@ export default function InvoiceForm() {
             </button>
 
             {isEdit && invoiceId && (
-                <Link href={`/invoices/${invoiceId}/receipt`}>
+                <Link href={`/receipts/new?invoice=${invoiceId}`}>
                   <button
                     type="button"
                     className="flex items-center gap-1.5 px-3 py-2 border border-emerald-400 rounded-xl bg-emerald-50 text-emerald-700 text-sm font-medium hover:bg-emerald-100 shadow-sm"

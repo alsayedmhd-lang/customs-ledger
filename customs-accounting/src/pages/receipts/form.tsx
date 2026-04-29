@@ -51,10 +51,13 @@ export default function ReceiptForm() {
   const { id } = useParams<{ id: string }>();
   const isEdit = Boolean(id);
   const receiptId = parseInt(id || "0");
-
+  const search = new URLSearchParams(window.location.search);
+  const invoiceIdFromUrl = search.get("invoice");
   const { data: clients } = useListClients();
   const { data: invoices } = useListInvoices();
+
   const { data: existing } = useGetReceipt(receiptId);
+
 
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -83,6 +86,18 @@ export default function ReceiptForm() {
       receiptDate: new Date().toISOString().split("T")[0],
     },
   });
+
+      useEffect(() => {
+    if (!invoiceIdFromUrl || !invoices || isEdit) return;
+
+    const invoice = invoices.find((i: any) => String(i.id) === invoiceIdFromUrl);
+    if (!invoice) return;
+
+    setValue("invoiceId", invoice.id);
+    setValue("clientId", invoice.clientId);
+    setValue("clientName", invoice.clientName ?? "");
+    setValue("amount", Number(invoice.total ?? 0));
+  }, [invoiceIdFromUrl, invoices, isEdit, setValue]);
 
   const selectedClientId = watch("clientId");
 
