@@ -45,6 +45,7 @@ import {
   StickyNote,
   Printer,
   GripVertical,
+  ReceiptText,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 
@@ -726,6 +727,18 @@ export default function InvoiceForm() {
               {isAR ? "نسخ الفاتورة" : "Copy Invoice"}
             </button>
 
+            {isEdit && invoiceId && (
+                <Link href={`/invoices/${invoiceId}/receipt`}>
+                  <button
+                    type="button"
+                    className="flex items-center gap-1.5 px-3 py-2 border border-emerald-400 rounded-xl bg-emerald-50 text-emerald-700 text-sm font-medium hover:bg-emerald-100 shadow-sm"
+                  >
+                    <ReceiptText className="w-3.5 h-3.5" />
+                    {isAR ? "سند قبض" : "Receipt"}
+                  </button>
+                </Link>
+              )}
+
             <Link href={`/accounting?invoice=${encodeURIComponent(existingInvoice?.invoiceNumber || "")}`}>
               <button className="flex items-center gap-1.5 px-3 py-2 border border-emerald-400 rounded-xl bg-emerald-50 text-emerald-700 text-sm font-medium">
                 <Calculator className="w-3.5 h-3.5" />
@@ -733,7 +746,7 @@ export default function InvoiceForm() {
               </button>
             </Link>
 
-            <Link href={`/invoices/${invoiceId}/receipt`}>
+            <Link href={`/invoices/${invoiceId}/print`}>
               <button className="flex items-center gap-1.5 px-3 py-2 bg-slate-700 text-white text-sm font-medium rounded-xl hover:bg-slate-600">
                 <Printer className="w-3.5 h-3.5" />
                 {isAR ? "طباعة" : "Print"}

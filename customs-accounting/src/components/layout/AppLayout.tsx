@@ -197,7 +197,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
   return (
     <div
-      className={cn("min-h-screen bg-background flex flex-col md:flex-row")}
+      className={cn("h-screen overflow-hidden bg-background flex flex-col md:flex-row")}
       dir={isRTL ? "rtl" : "ltr"}
     >
       {/* Desktop Sidebar */}
