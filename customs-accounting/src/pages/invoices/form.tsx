@@ -307,6 +307,7 @@ export default function InvoiceForm() {
   } = useForm<InvoiceFormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
+      createdBy: user?.id ? String(user.id) : "",
       clientId: "",
       issueDate: new Date().toISOString().split("T")[0],
       dueDate: "",
@@ -363,6 +364,7 @@ export default function InvoiceForm() {
   useEffect(() => {
     if (isEdit && existingInvoice && !isCopyMode) {
       reset({
+        createdBy: String((existingInvoice as any).createdBy ?? ""),
         clientId: String(existingInvoice.clientId ?? ""),
         issueDate: existingInvoice.issueDate.split("T")[0],
         dueDate: existingInvoice.dueDate
@@ -412,6 +414,7 @@ export default function InvoiceForm() {
   if (copied) {
     const data = JSON.parse(copied);
     reset({
+      createdBy: user?.id ? String(user.id) : "",
       clientId: String(data.clientId ?? ""),
       issueDate: data.issueDate?.split("T")[0] ?? "",
       dueDate: data.dueDate ? data.dueDate.split("T")[0] : "",
@@ -433,9 +436,12 @@ export default function InvoiceForm() {
     });
     sessionStorage.removeItem("copy_invoice");
   }
+  if (!isEdit && !sessionStorage.getItem("copy_invoice") && user?.id) {
+    setValue("createdBy", String(user.id));
+  }
 }
 
-  }, [isEdit, existingInvoice, isCopyMode, reset, setLocation]);
+  }, [isEdit, existingInvoice, isCopyMode, reset, setLocation, setValue, user?.id]);
 
   const itemsWatch = watch("items") || [];
   const taxRateWatch = watch("taxRate") || 0;
@@ -676,7 +682,17 @@ export default function InvoiceForm() {
               <label className={labelCls}>
                 {isAR ? "المندوب" : "Salesman"}
               </label>
-              <select {...register("createdBy")} className={inputCls}>
+              <select
+                {...register("createdBy")}
+                className={inputCls}
+                disabled={!isEdit}
+              >
+                {user && !users.some((u) => String(u.id) === String(user.id)) && (
+                  <option value={String(user.id)}>
+                    {user.displayName || user.username}
+                  </option>
+                )}
+
                 {users.map((u) => (
                   <option key={u.id} value={u.id}>
                     {u.displayName || u.username}
