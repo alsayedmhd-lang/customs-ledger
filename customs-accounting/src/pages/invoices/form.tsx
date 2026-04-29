@@ -499,10 +499,21 @@ export default function InvoiceForm() {
     }
 
     if (isEdit) {
-      updateMut.mutate({ id: invoiceId, data: data as any });
-    } else {
-      createMut.mutate({ data: data as any });
-    }
+        updateMut.mutate({
+          id: invoiceId,
+          data: {
+            ...data,
+            createdBy: Number(data.createdBy),
+          } as any,
+        });
+      } else {
+        createMut.mutate({
+          data: {
+            ...data,
+            createdBy: Number(data.createdBy),
+          } as any,
+        });
+      }
   };
 
   const applyTemplate = (index: number, templateIdStr: string) => {

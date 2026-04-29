@@ -94,6 +94,7 @@ router.post("/invoices", requireAuth, async (req, res) => {
   try {
     const {
       clientId,
+      createdBy,
       issueDate,
       dueDate,
       status,
@@ -168,7 +169,7 @@ router.post("/invoices", requireAuth, async (req, res) => {
             shipmentWeight: shipmentWeight ? parseFloat(shipmentWeight).toFixed(3) : null,
             portOfEntry: portOfEntry ?? null,
             importerExporterName: importerExporterName ?? null,
-            createdBy: req.user!.userId,
+            createdBy: createdBy ? Number(createdBy) : req.user!.userId,
           })
           .returning();
         invoice = inserted;
@@ -256,8 +257,10 @@ router.get("/invoices/:id", async (req, res) => {
 router.put("/invoices/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
+
     const {
       clientId,
+      createdBy,
       issueDate,
       dueDate,
       status,
@@ -273,7 +276,13 @@ router.put("/invoices/:id", async (req, res) => {
       items,
     } = req.body;
 
-    const [client] = await db.select().from(clientsTable).where(eq(clientsTable.id, clientId));
+    console.log("INVOICE UPDATE BODY createdBy:", createdBy);
+
+    const [client] = await db
+      .select()
+      .from(clientsTable)
+      .where(eq(clientsTable.id, clientId));
+
     if (!client) {
       res.status(400).json({ error: "Client not found" });
       return;
@@ -297,37 +306,57 @@ router.put("/invoices/:id", async (req, res) => {
     }
 
     const parsedTaxRate = parseFloat(taxRate ?? "0") || 0;
-    const effectiveAdvancePayment = status === "paid" ? 0 : parseFloat(advancePayment ?? "0") || 0;
+    const effectiveAdvancePayment =
+      status === "paid" ? 0 : parseFloat(advancePayment ?? "0") || 0;
+
     const subtotal = (items ?? []).reduce(
       (sum: number, item: { quantity: number; unitPrice: number }) => {
-        return sum + parseFloat(String(item.quantity)) * parseFloat(String(item.unitPrice));
+        return (
+          sum +
+          parseFloat(String(item.quantity)) *
+            parseFloat(String(item.unitPrice))
+        );
       },
       0
     );
+
     const taxAmount = subtotal * (parsedTaxRate / 100);
     const total = subtotal + taxAmount - effectiveAdvancePayment;
 
+    const updateData: any = {
+      clientId,
+      issueDate,
+      dueDate: dueDate ?? null,
+      status: status ?? "draft",
+      subtotal: subtotal.toFixed(2),
+      taxRate: parsedTaxRate.toFixed(2),
+      taxAmount: taxAmount.toFixed(2),
+      advancePayment: effectiveAdvancePayment.toFixed(2),
+      total: total.toFixed(2),
+      notes: notes ?? null,
+      shipmentRef: shipmentRef ?? null,
+      billOfLading: billOfLading ?? null,
+      packageCount: packageCount ? parseInt(packageCount) : null,
+      shipmentWeight: shipmentWeight
+        ? parseFloat(shipmentWeight).toFixed(3)
+        : null,
+      portOfEntry: portOfEntry ?? null,
+      importerExporterName: importerExporterName ?? null,
+      updatedAt: new Date(),
+    };
+
+    if (
+      typeof createdBy !== "undefined" &&
+      createdBy !== null &&
+      createdBy !== "" &&
+      !Number.isNaN(Number(createdBy))
+    ) {
+      updateData.createdBy = Number(createdBy);
+    }
+
     const [invoice] = await db
       .update(invoicesTable)
-      .set({
-        clientId,
-        issueDate,
-        dueDate: dueDate ?? null,
-        status: status ?? "draft",
-        subtotal: subtotal.toFixed(2),
-        taxRate: parsedTaxRate.toFixed(2),
-        taxAmount: taxAmount.toFixed(2),
-        advancePayment: effectiveAdvancePayment.toFixed(2),
-        total: total.toFixed(2),
-        notes: notes ?? null,
-        shipmentRef: shipmentRef ?? null,
-        billOfLading: billOfLading ?? null,
-        packageCount: packageCount ? parseInt(packageCount) : null,
-        shipmentWeight: shipmentWeight ? parseFloat(shipmentWeight).toFixed(3) : null,
-        portOfEntry: portOfEntry ?? null,
-        importerExporterName: importerExporterName ?? null,
-        updatedAt: new Date(),
-      })
+      .set(updateData)
       .where(and(eq(invoicesTable.id, id), isNull(invoicesTable.deletedAt)))
       .returning();
 
@@ -336,25 +365,35 @@ router.put("/invoices/:id", async (req, res) => {
       return;
     }
 
-    await db.delete(invoiceItemsTable).where(eq(invoiceItemsTable.invoiceId, id));
+    await db
+      .delete(invoiceItemsTable)
+      .where(eq(invoiceItemsTable.invoiceId, id));
 
     const insertedItems = await Promise.all(
-      (items ?? []).map(async (item: { description: string; quantity: number; unitPrice: number }) => {
-        const qty = parseFloat(String(item.quantity));
-        const price = parseFloat(String(item.unitPrice));
-        const itemTotal = qty * price;
-        const [inserted] = await db
-          .insert(invoiceItemsTable)
-          .values({
-            invoiceId: invoice.id,
-            description: item.description,
-            quantity: qty.toFixed(3),
-            unitPrice: price.toFixed(2),
-            total: itemTotal.toFixed(2),
-          })
-          .returning();
-        return formatItem(inserted);
-      })
+      (items ?? []).map(
+        async (item: {
+          description: string;
+          quantity: number;
+          unitPrice: number;
+        }) => {
+          const qty = parseFloat(String(item.quantity));
+          const price = parseFloat(String(item.unitPrice));
+          const itemTotal = qty * price;
+
+          const [inserted] = await db
+            .insert(invoiceItemsTable)
+            .values({
+              invoiceId: invoice.id,
+              description: item.description,
+              quantity: qty.toFixed(3),
+              unitPrice: price.toFixed(2),
+              total: itemTotal.toFixed(2),
+            })
+            .returning();
+
+          return formatItem(inserted);
+        }
+      )
     );
 
     res.json({
