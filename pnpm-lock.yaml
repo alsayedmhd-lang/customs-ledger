@@ -156,6 +156,10 @@ overrides:
 importers:
 
   .:
+    dependencies:
+      better-sqlite3:
+        specifier: ^12.9.0
+        version: 12.9.0
     devDependencies:
       '@hookform/resolvers':
         specifier: ^3.10.0

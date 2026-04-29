@@ -79,7 +79,27 @@ const STATUS_LABELS: Record<string, { ar: string; en: string }> = {
   cancelled: { ar: "ملغاة", en: "Cancelled" },
 };
 
-type InvoiceFormValues = z.infer<typeof formSchema>;
+type InvoiceFormValues = {
+  clientId?: string;
+  issueDate?: string;
+  dueDate?: string;
+  status?: string;
+  importerExporterName?: string;
+  taxRate?: number;
+  advancePayment?: number;
+  shipmentRef?: string;
+  billOfLading?: string;
+  packageCount?: number;
+  shipmentWeight?: number;
+  portOfEntry?: string;
+  notes?: string;
+  createdBy?: string;
+  items: {
+    description: string;
+    quantity: number;
+    unitPrice: number;
+  }[];
+};
 
 const inputCls =
   "w-full px-3 h-10 text-sm bg-background border border-border rounded-lg outline-none focus:ring-2 focus:ring-primary/20 transition-colors";
@@ -287,7 +307,7 @@ export default function InvoiceForm() {
   } = useForm<InvoiceFormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      clientId: 0,
+      clientId: "",
       issueDate: new Date().toISOString().split("T")[0],
       dueDate: "",
       status: "draft",
@@ -343,7 +363,7 @@ export default function InvoiceForm() {
   useEffect(() => {
     if (isEdit && existingInvoice && !isCopyMode) {
       reset({
-        clientId: existingInvoice.clientId,
+        clientId: String(existingInvoice.clientId ?? ""),
         issueDate: existingInvoice.issueDate.split("T")[0],
         dueDate: existingInvoice.dueDate
           ? existingInvoice.dueDate.split("T")[0]
@@ -353,12 +373,12 @@ export default function InvoiceForm() {
           (existingInvoice as any).importerExporterName ?? "",
         taxRate: existingInvoice.taxRate,
         advancePayment: (existingInvoice as any).advancePayment ?? 0,
-        shipmentRef: existingInvoice.shipmentRef ?? "",
-        billOfLading: existingInvoice.billOfLading ?? "",
-        packageCount: existingInvoice.packageCount,
-        shipmentWeight: existingInvoice.shipmentWeight,
-        portOfEntry: existingInvoice.portOfEntry ?? "",
-        notes: existingInvoice.notes ?? "",
+        shipmentRef: String(existingInvoice.shipmentRef ?? ""),
+        billOfLading: String(existingInvoice.billOfLading ?? ""),
+        packageCount: existingInvoice.packageCount?? undefined,
+        shipmentWeight: existingInvoice.shipmentWeight ?? undefined,
+        portOfEntry: String(existingInvoice.portOfEntry ?? ""),
+        notes: String(existingInvoice.notes ?? ""),
         items: existingInvoice.items.map((i) => ({
           description: i.description,
           quantity: i.quantity,
@@ -392,19 +412,19 @@ export default function InvoiceForm() {
   if (copied) {
     const data = JSON.parse(copied);
     reset({
-      clientId: data.clientId,
+      clientId: String(data.clientId ?? ""),
       issueDate: data.issueDate?.split("T")[0] ?? "",
       dueDate: data.dueDate ? data.dueDate.split("T")[0] : "",
       status: data.status,
       importerExporterName: data.importerExporterName ?? "",
       taxRate: data.taxRate,
       advancePayment: data.advancePayment ?? 0,
-      shipmentRef:  "",
-      billOfLading: "",
-      packageCount: null,
-      shipmentWeight: null,
-      portOfEntry: data.portOfEntry ?? "",
-      notes: data.notes ?? "",
+      shipmentRef: String(data.shipmentRef ?? ""),
+      billOfLading: String(data.billOfLading ?? ""),
+      packageCount: undefined,
+      shipmentWeight: undefined,
+      portOfEntry: String(data.portOfEntry ?? ""),
+      notes: String(data.notes ?? ""),
       items: data.items?.map((i: any) => ({
         description: i.description,
         quantity: i.quantity,

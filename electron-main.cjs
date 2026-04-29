@@ -24,15 +24,27 @@ function createWindow() {
   const backendCwd = path.join(process.resourcesPath, "api-server");
 
   backendProcess = spawn(
-    "node",
+    process.execPath,
     [backendEntry],
     {
       cwd: backendCwd,
       windowsHide: true,
-      stdio: "inherit",
+      stdio: ["ignore", "pipe", "pipe"],
+      env: {
+        ...process.env,
+        NODE_ENV: "production",
+        ELECTRON_RUN_AS_NODE: "1",
+      },
       detached: false,
     }
   );
+  backendProcess.stdout.on("data", (data) => {
+    console.log("[backend stdout]", data.toString());
+  });
+
+  backendProcess.stderr.on("data", (data) => {
+    console.error("[backend stderr]", data.toString());
+  });
 
   backendProcess.on("error", (err) => {
     console.error("Backend process error:", err);

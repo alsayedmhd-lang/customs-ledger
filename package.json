@@ -12,7 +12,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "electron:start": "electron .",
     "dist": "electron-builder --win"
-   },
+  },
   "devDependencies": {
     "@hookform/resolvers": "^3.10.0",
     "@radix-ui/react-accordion": "^1.2.12",
@@ -93,32 +93,44 @@
       "customs-accounting/dist/**",
       "package.json",
       "pnpm-workspace.yaml",
-      "pnpm-lock.yaml"
+      "pnpm-lock.yaml",
+      "node_modules/better-sqlite3/**/*"
     ],
     "extraResources": [
-        {
-          "from": "preload.js",
-          "to": "preload.js"
-        },
-        {
-          "from": "api-server/dist",
-          "to": "api-server/dist"
-        },
-        {
-          "from": "api-server/.env",
-          "to": "api-server/.env"
-        },
-        {
-          "from": "lib/db/local.db",
-          "to": "api-server/lib/db/local.db"
-        },
-          {
-          "from": "node_modules/better-sqlite3/build/Release/better_sqlite3.node",
-          "to": "api-server/build/Release/better_sqlite3.node"
-        }
-      ],
+      {
+        "from": "preload.js",
+        "to": "preload.js"
+      },
+      {
+        "from": "api-server/dist",
+        "to": "api-server/dist"
+      },
+      {
+        "from": "api-server/.env",
+        "to": "api-server/.env"
+      },
+      {
+        "from": "lib/db/local.db",
+        "to": "api-server/lib/db/local.db"
+      },
+      {
+        "from": "node_modules/better-sqlite3",
+        "to": "api-server/node_modules/better-sqlite3"
+      },
+      {
+        "from": "node_modules/bindings",
+        "to": "api-server/node_modules/bindings"
+      },
+      {
+        "from": "node_modules/file-uri-to-path",
+        "to": "api-server/node_modules/file-uri-to-path"
+      }
+    ],
     "win": {
       "target": "nsis"
     }
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.9.0"
   }
 }
