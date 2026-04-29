@@ -23,7 +23,7 @@ export async function seedAdminUser() {
       })
       .where(eq((usersTable as any).username, "admin"));
 
-    console.log("✅ Admin user updated - username: admin | password: admin123");
+    console.log("✅ Admin user ready");
     return;
   }
 
@@ -35,5 +35,5 @@ export async function seedAdminUser() {
     isActive: true,
   });
 
-  console.log("✅ Admin user created - username: admin | password: admin123");
+  console.log("✅ Admin user ready");
 }

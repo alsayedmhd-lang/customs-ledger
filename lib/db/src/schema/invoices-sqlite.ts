@@ -55,3 +55,15 @@ export const invoiceAccountingTableSqlite = sqliteTable("invoice_accounting", {
   otherExpensesPaid: integer("other_expenses_paid", { mode: "boolean" }).default(false),
   updatedAt: integer("updated_at", { mode: "timestamp_ms" }),
 });
+
+export const invoiceAuditLogsTableSqlite = sqliteTable("invoice_audit_logs", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  invoiceId: integer("invoice_id").notNull(),
+  action: text("action").notNull(),
+  userId: integer("user_id"),
+  username: text("username"),
+  userEmail: text("user_email"),
+  userPhone: text("user_phone"),
+  changesJson: text("changes_json"),
+  createdAt: integer("created_at", { mode: "timestamp_ms" }),
+});

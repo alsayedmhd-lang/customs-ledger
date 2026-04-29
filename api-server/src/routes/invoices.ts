@@ -5,6 +5,7 @@ import {
   invoiceItemsTable,
   clientsTable,
   usersTable,
+  invoiceAuditLogsTableSqlite,
 } from "@workspace/db/schema";
 import { eq, desc, isNull, and, like } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth";
@@ -114,8 +115,9 @@ router.post("/invoices", requireAuth, async (req, res) => {
       res.status(400).json({ error: "clientId, issueDate, and items are required" });
       return;
     }
-
+    
     const [client] = await db.select().from(clientsTable).where(eq(clientsTable.id, clientId));
+
     if (!client) {
       res.status(400).json({ error: "Client not found" });
       return;
@@ -173,7 +175,19 @@ router.post("/invoices", requireAuth, async (req, res) => {
           })
           .returning();
         invoice = inserted;
-        break;
+          
+      await db.insert(invoiceAuditLogsTableSqlite).values({
+        invoiceId: inserted.id,
+        action: "created",
+        userId: req.user?.userId ?? null,
+        username: req.user?.username ?? null,
+        userEmail: req.user?.email ?? null,
+        userPhone: req.user?.phone ?? null,
+        changesJson: JSON.stringify({ created: true }),
+        createdAt: new Date(),
+      });
+
+      break;    
       } catch (insertErr: any) {
         // 23505 = unique_violation in PostgreSQL
         if (insertErr?.cause?.code === "23505" || insertErr?.code === "23505") {
@@ -276,7 +290,7 @@ router.put("/invoices/:id", async (req, res) => {
       items,
     } = req.body;
 
-    console.log("INVOICE UPDATE BODY createdBy:", createdBy);
+
 
     const [client] = await db
       .select()
@@ -354,6 +368,16 @@ router.put("/invoices/:id", async (req, res) => {
       updateData.createdBy = Number(createdBy);
     }
 
+    const [oldInvoice] = await db
+      .select()
+      .from(invoicesTable)
+      .where(eq(invoicesTable.id, id));
+
+    const oldItems = await db
+      .select()
+      .from(invoiceItemsTable)
+      .where(eq(invoiceItemsTable.invoiceId, id));
+
     const [invoice] = await db
       .update(invoicesTable)
       .set(updateData)
@@ -395,6 +419,28 @@ router.put("/invoices/:id", async (req, res) => {
         }
       )
     );
+
+    const changes: any = {
+      before: {
+        invoice: oldInvoice,
+        items: oldItems,
+      },
+      after: {
+        invoice,
+        items: insertedItems,
+      },
+    };
+
+    await db.insert(invoiceAuditLogsTableSqlite).values({
+      invoiceId: invoice.id,
+      action: "updated",
+      userId: req.user?.userId ?? null,
+      username: req.user?.username ?? null,
+      userEmail: req.user?.email ?? null,
+      userPhone: req.user?.phone ?? null,
+      changesJson: JSON.stringify(changes),
+      createdAt: new Date(),
+    });
 
     res.json({
       ...formatInvoice(invoice, client.name),
@@ -518,9 +564,12 @@ router.post("/invoices/import", requireAuth, async (req, res) => {
         updatedAt: new Date(),
       };
 
+      console.log("BEFORE BRANCH DECISION");
+
       let invoiceId: number;
 
       if (existing && shipmentBase) {
+        console.log("IMPORT/UPDATE BRANCH", existing?.id);
         await db
           .update(invoicesTable)
           .set(values)
@@ -543,7 +592,6 @@ router.post("/invoices/import", requireAuth, async (req, res) => {
           .returning();
 
         invoiceId = created.id;
-
         inserted++;
       }
 

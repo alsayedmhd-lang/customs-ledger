@@ -22,3 +22,5 @@ export {
 export {
   companySettingsTableSqlite as companySettingsTable,
 } from "./company-settings-sqlite";
+
+export * from "./invoices-sqlite";
