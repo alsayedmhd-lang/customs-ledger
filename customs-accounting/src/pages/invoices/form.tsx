@@ -443,6 +443,12 @@ export default function InvoiceForm() {
 
   }, [isEdit, existingInvoice, isCopyMode, reset, setLocation, setValue, user?.id]);
 
+  useEffect(() => {
+  if (!isEdit && user?.id) {
+    setValue("createdBy", String(user.id));
+  }
+}, [isEdit, user?.id, users.length, setValue]);
+
   const itemsWatch = watch("items") || [];
   const taxRateWatch = watch("taxRate") || 0;
   const advancePaymentWatch = watch("advancePayment") || 0;
@@ -684,8 +690,12 @@ export default function InvoiceForm() {
               </label>
               <select
                 {...register("createdBy")}
+                value={watch("createdBy") || (user?.id ? String(user.id) : "")}
                 className={inputCls}
-                disabled={!isEdit}
+                disabled={
+                  !isEdit ||
+                  (user?.role !== "admin" && user?.role !== "supervisor")
+                }
               >
                 {user && !users.some((u) => String(u.id) === String(user.id)) && (
                   <option value={String(user.id)}>

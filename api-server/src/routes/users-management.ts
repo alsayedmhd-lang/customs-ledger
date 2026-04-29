@@ -25,7 +25,7 @@ function formatUser(u: typeof usersTable.$inferSelect) {
   };
 }
 
-router.get("/users", requireAdmin, async (_req, res) => {
+router.get("/users", requireAuth, async (_req, res) => {
   const users = await db.select().from(usersTable).orderBy(usersTable.id);
   return res.json(users.map(formatUser));
 });
