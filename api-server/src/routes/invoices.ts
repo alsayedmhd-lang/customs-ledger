@@ -7,7 +7,7 @@ import {
   usersTable,
 } from "@workspace/db/schema";
 import { invoiceAuditLogsTableSqlite } from "@workspace/db/schema/invoices-sqlite";
-import { eq, desc, isNull, and, like } from "drizzle-orm";
+import { eq, desc, isNull, and, like, isNotNull } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth";
 
 const router: IRouter = Router();
@@ -146,6 +146,19 @@ router.post("/invoices", requireAuth, async (req, res) => {
     const taxAmount = subtotal * (parsedTaxRate / 100);
     const total = subtotal + taxAmount - parsedAdvancePayment;
 
+    const deletedInvoiceWithSameShipment = shipmentRef
+      ? await db
+          .select()
+          .from(invoicesTable)
+          .where(
+            and(
+              eq(invoicesTable.shipmentRef, shipmentRef),
+              isNotNull(invoicesTable.deletedAt)
+            )
+          )
+          .limit(1)
+      : [];
+
     // Retry up to 5 times if invoice number collides (race condition)
     let invoice: typeof invoicesTable.$inferSelect | null = null;
     for (let attempt = 0; attempt < 5; attempt++) {
@@ -178,7 +191,11 @@ router.post("/invoices", requireAuth, async (req, res) => {
           
       await db.insert(invoiceAuditLogsTableSqlite).values({
         invoiceId: inserted.id,
-        action: "created",
+        action:
+          Array.isArray(deletedInvoiceWithSameShipment) &&
+          deletedInvoiceWithSameShipment.length > 0
+            ? "recreated"
+            : "created",
         userId: req.user?.userId ?? null,
         username: req.user?.username ?? null,
         userEmail: req.user?.email ?? null,

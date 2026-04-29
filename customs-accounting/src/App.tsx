@@ -33,9 +33,6 @@ import SettingsPage from "./pages/settings/index";
 const queryClient = new QueryClient();
 
 function RouteWrapper({ children }: { children: React.ReactNode }) {
-  const [location] = useLocation();
-  const isPrintRoute = location.endsWith('/statement') || location.endsWith('/receipt') || location.endsWith('/print');
-  if (isPrintRoute) return <>{children}</>;
   return <AppLayout>{children}</AppLayout>;
 }
 

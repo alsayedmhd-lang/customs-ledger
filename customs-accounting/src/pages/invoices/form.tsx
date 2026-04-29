@@ -255,7 +255,7 @@ export default function InvoiceForm() {
   const { toast } = useToast();
   const createMut = useCreateInvoice({
     mutation: {
-      onSuccess: () => {
+      onSuccess: (data) => {
         queryClient.invalidateQueries({ queryKey: getListInvoicesQueryKey() });
         toast({ title: isAR ? "تم إنشاء الفاتورة بنجاح" : "Invoice created" });
         setLocation("/invoices");
@@ -276,10 +276,11 @@ export default function InvoiceForm() {
 
   const updateMut = useUpdateInvoice({
     mutation: {
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getListInvoicesQueryKey() });
+      onSuccess: async () => {
+        await queryClient.invalidateQueries({ queryKey: getListInvoicesQueryKey() });
+        await queryClient.invalidateQueries({ queryKey: ["/api/invoices", invoiceId] });
+
         toast({ title: isAR ? "تم تحديث الفاتورة" : "Invoice updated" });
-        setLocation("/invoices");
       },
       onError: (err: any) => {
         const msg =
@@ -383,11 +384,19 @@ export default function InvoiceForm() {
         shipmentWeight: existingInvoice.shipmentWeight ?? undefined,
         portOfEntry: String(existingInvoice.portOfEntry ?? ""),
         notes: String(existingInvoice.notes ?? ""),
-        items: existingInvoice.items.map((i) => ({
-          description: i.description,
-          quantity: i.quantity,
-          unitPrice: i.unitPrice,
-        })),
+        items: Array.isArray(existingInvoice.items)
+        ? existingInvoice.items.map((i) => ({
+            description: i.description ?? "",
+            quantity: i.quantity ?? 1,
+            unitPrice: i.unitPrice ?? 0,
+          }))
+        : [
+            {
+              description: "",
+              quantity: 1,
+              unitPrice: 0,
+            },
+          ],
       });
     }
 
@@ -550,6 +559,12 @@ export default function InvoiceForm() {
 
       if (log.action === "created") {
         return [isAR ? "تم إنشاء الفاتورة" : "Invoice was created"];
+      }
+
+      if (log.action === "recreated") {
+        return isAR
+          ? "تم إعادة إنشاء الفاتورة بعد حذف سابق"
+          : "Invoice recreated after previous deletion";
       }
 
       if (log.action === "deleted") {
@@ -1151,7 +1166,8 @@ export default function InvoiceForm() {
           </div>
 
           <div className="divide-y divide-border/40 max-h-80 overflow-y-auto">
-            {auditLogs.map((log, i) => {
+            {Array.isArray(auditLogs) &&
+              auditLogs.map((log, i) => {
               const rawDate =
                 log.createdAt ??
                 log.created_at ??
@@ -1198,7 +1214,7 @@ export default function InvoiceForm() {
                   </div>
 
                   <div className="min-w-0 text-xs text-muted-foreground space-y-2 leading-6 break-words whitespace-normal px-2">
-                    {summary.map((s: string, idx: number) => (
+                    {(Array.isArray(summary) ? summary : [String(summary ?? "")]).map((s: string, idx: number) => (
                       <div key={idx}>• {s}</div>
                     ))}
                   </div>
