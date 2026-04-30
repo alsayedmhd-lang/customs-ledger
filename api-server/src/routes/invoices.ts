@@ -604,9 +604,41 @@ router.post("/invoices/import", requireAuth, async (req, res) => {
 
       const safeClientId = clientExists ? requestedClientId : 1;
 
+      let finalInvoiceNumber = String(row.invoiceNumber);
+
+      const [sameInvoiceNumber] = await db
+        .select()
+        .from(invoicesTable)
+        .where(eq(invoicesTable.invoiceNumber, finalInvoiceNumber))
+        .limit(1);
+
+      if (
+        sameInvoiceNumber &&
+        (!shipmentBase || sameInvoiceNumber.shipmentRef !== shipmentBase)
+      ) {
+        let counter = 1;
+
+        while (true) {
+          const candidate = `${row.invoiceNumber}-${counter}`;
+
+          const [existsCandidate] = await db
+            .select()
+            .from(invoicesTable)
+            .where(eq(invoicesTable.invoiceNumber, candidate))
+            .limit(1);
+
+          if (!existsCandidate) {
+            finalInvoiceNumber = candidate;
+            break;
+          }
+
+          counter++;
+        }
+      }
+
       const values = {
-        shipmentRef: shipmentBase ? String(row.shipmentRef) : null,
-        invoiceNumber: String(row.invoiceNumber),
+        shipmentRef: shipmentBase,
+        invoiceNumber: finalInvoiceNumber,
         clientId: safeClientId,
         issueDate: row.issueDate ? String(row.issueDate) : new Date().toISOString().slice(0, 10),
         dueDate: row.dueDate ? String(row.dueDate) : null,
@@ -621,12 +653,10 @@ router.post("/invoices/import", requireAuth, async (req, res) => {
         updatedAt: new Date(),
       };
 
-      console.log("BEFORE BRANCH DECISION");
-
       let invoiceId: number;
 
       if (existing && shipmentBase) {
-        console.log("IMPORT/UPDATE BRANCH", existing?.id);
+      
         await db
           .update(invoicesTable)
           .set(values)

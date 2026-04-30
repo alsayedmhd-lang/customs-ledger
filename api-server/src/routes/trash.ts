@@ -1,16 +1,17 @@
-import { Router, type IRouter } from "express";
 import {
   invoicesTable,
   invoiceItemsTable,
   clientsTable,
+  receiptsTable,
 } from "@workspace/db/schema";
 import { invoiceAuditLogsTableSqlite } from "@workspace/db/schema/invoices-sqlite";
 import { eq, desc, isNotNull, and } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { formatInvoice, formatItem } from "./invoices";
 import { formatReceipt } from "./receipts";
+import { Router } from "express";
 
-const router: IRouter = Router();
+const router = Router();
 
 // ─── Invoices Trash ───────────────────────────────────────────────────────────
 

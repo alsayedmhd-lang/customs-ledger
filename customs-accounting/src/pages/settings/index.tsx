@@ -644,28 +644,44 @@ export default function SettingsPage() {
 
                 <div className="flex flex-wrap gap-2">
                   <button
-                    onClick={async () => {
+                    type="button"
+                    onClick={async (e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+
+                      const password = window.confirm(
+                          isAR ? "هل تريد تصدير النسخة الاحتياطية؟" : "Export backup?"
+                        )
+                          ? "1234"
+                          : "";
+                      if (!password) return;
+
+                      console.log("PASSWORD:", password);
+
                       const token = sessionStorage.getItem("auth_token");
 
                       const [invoices, receipts, clients, items] = await Promise.all([
                         fetch("http://127.0.0.1:3000/api/invoices", {
                           headers: { Authorization: `Bearer ${token}` },
-                        }).then(r => r.json()),
+                        }).then((r) => r.json()),
 
                         fetch("http://127.0.0.1:3000/api/receipts", {
                           headers: { Authorization: `Bearer ${token}` },
-                        }).then(r => r.json()),
+                        }).then((r) => r.json()),
 
                         fetch("http://127.0.0.1:3000/api/clients", {
                           headers: { Authorization: `Bearer ${token}` },
-                        }).then(r => r.json()),
+                        }).then((r) => r.json()),
 
                         fetch("http://127.0.0.1:3000/api/invoice-item-templates", {
                           headers: { Authorization: `Bearer ${token}` },
-                        }).then(r => r.json()),
+                        }).then((r) => r.json()),
                       ]);
 
+                      console.log("DATA READY", invoices, receipts, clients, items);
+
                       const fullData = {
+                        password,
                         invoices,
                         receipts,
                         clients,
@@ -679,13 +695,16 @@ export default function SettingsPage() {
                       const a = document.createElement("a");
                       a.href = URL.createObjectURL(blob);
                       a.download = "full-backup.json";
+                      document.body.appendChild(a);
                       a.click();
+                      a.remove();
                     }}
                     className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white"
                   >
                     {isAR ? "تصدير كامل البيانات" : "Export Full Data"}
                   </button>
                   <button
+                      type="button"
                       onClick={() => document.getElementById("full-import")?.click()}
                       className="rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white"
                     >
@@ -702,6 +721,17 @@ export default function SettingsPage() {
                         if (!file) return;
 
                         const fullData = JSON.parse(await file.text());
+
+                        const enteredPassword = window.confirm(
+                          isAR ? "هل كلمة المرور هي 1234 ؟" : "Is password 1234?"
+                        )
+                          ? "1234"
+                          : "";
+
+                        if (fullData.password !== enteredPassword) {
+                          alert(isAR ? "كلمة المرور غير صحيحة" : "Wrong password");
+                          return;
+                        }
 
                         if (fullData.clients) {
                           const blob = new Blob([JSON.stringify(fullData.clients)], { type: "application/json" });
