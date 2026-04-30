@@ -132,6 +132,9 @@ CREATE TABLE IF NOT EXISTS receipts (
   deleted_at INTEGER,
   created_at INTEGER
 );
+CREATE UNIQUE INDEX IF NOT EXISTS receipts_invoice_id_unique_active
+ON receipts(invoice_id)
+WHERE invoice_id IS NOT NULL AND deleted_at IS NULL;
 CREATE TABLE IF NOT EXISTS otp_codes (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   user_id INTEGER NOT NULL,

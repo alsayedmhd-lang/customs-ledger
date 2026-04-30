@@ -269,16 +269,20 @@ router.get("/invoices/:id", async (req, res) => {
       .from(invoiceItemsTable)
       .where(eq(invoiceItemsTable.invoiceId, id));
 
-    res.json({
-      ...formatInvoice(
+    const formatted = formatInvoice(
         {
           ...row.invoices,
           createdByName: row.users?.displayName || row.users?.username || null,
         },
         row.clients.name
-      ),
-      items: items.map(formatItem),
-    });
+      );
+
+      res.json({
+        ...formatted,
+        clientName: row.clients.name,
+        invoiceNumber: row.invoices.invoiceNumber,
+        items: items.map(formatItem),
+      });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Internal server error" });

@@ -1,9 +1,42 @@
 import { Router, type IRouter } from "express";
-import { db, receiptsTable, clientsTable, invoicesTable } from "@workspace/db";
+import { db, sqlite, receiptsTable, clientsTable, invoicesTable } from "@workspace/db";
 import { eq, desc, isNull, and } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth";
 
 const router: IRouter = Router();
+
+function ensureUniqueActiveReceiptPerInvoice() {
+  if (!sqlite) return;
+
+  try {
+    sqlite.exec(`
+      CREATE UNIQUE INDEX IF NOT EXISTS receipts_invoice_id_unique_active
+      ON receipts(invoice_id)
+      WHERE invoice_id IS NOT NULL AND deleted_at IS NULL;
+    `);
+  } catch (error) {
+    console.error("Failed to ensure receipts invoice unique index:", error);
+  }
+}
+
+ensureUniqueActiveReceiptPerInvoice();
+
+async function findActiveReceiptByInvoiceId(invoiceId: number) {
+  const rows = await db
+    .select()
+    .from(receiptsTable)
+    .leftJoin(invoicesTable, eq(receiptsTable.invoiceId, invoicesTable.id))
+    .leftJoin(clientsTable, eq(receiptsTable.clientId, clientsTable.id))
+    .where(
+      and(
+        eq(receiptsTable.invoiceId, invoiceId),
+        isNull(receiptsTable.deletedAt),
+      ),
+    )
+    .limit(1);
+
+  return rows[0] ?? null;
+}
 
 async function generateReceiptNumber(): Promise<string> {
   const year = new Date().getFullYear();
@@ -87,20 +120,86 @@ router.get("/receipts", requireAuth, async (req, res) => {
   }
 });
 
+router.get("/receipts/by-invoice/:invoiceId", requireAuth, async (req, res) => {
+  try {
+    const invoiceId = Number(req.params.invoiceId);
+
+    if (Number.isNaN(invoiceId) || invoiceId <= 0) {
+      return res.status(400).json({ error: "Invalid invoice id" });
+    }
+
+    const isAdmin = req.user!.role === "admin" || req.user!.role === "supervisor";
+    const userId = req.user!.userId;
+
+    const invoiceRows = await db
+      .select()
+      .from(invoicesTable)
+      .where(
+        isAdmin
+          ? eq(invoicesTable.id, invoiceId)
+          : and(eq(invoicesTable.id, invoiceId), eq(invoicesTable.createdBy, userId)),
+      )
+      .limit(1);
+
+    if (!invoiceRows.length) {
+      return res.json(null);
+    }
+
+    const row = await findActiveReceiptByInvoiceId(invoiceId);
+
+    if (!row) {
+      return res.json(null);
+    }
+
+    return res.json(
+      formatReceipt(
+        row.receipts,
+        row.clients?.name || "",
+        row.invoices?.invoiceNumber || null,
+      ),
+    );
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // Create receipt
 router.post("/receipts", requireAuth, async (req, res) => {
   try {
+    const invoiceId =
+      req.body.invoiceId === "" ||
+      req.body.invoiceId === null ||
+      req.body.invoiceId === undefined
+        ? null
+        : Number(req.body.invoiceId);
+
+    if (invoiceId !== null && Number.isNaN(invoiceId)) {
+      return res.status(400).json({ error: "Invalid invoiceId" });
+    }
+
+    if (invoiceId !== null) {
+      const existingReceipt = await findActiveReceiptByInvoiceId(invoiceId);
+
+      if (existingReceipt) {
+        return res.status(409).json({
+          error: "Receipt already exists for this invoice",
+          receiptId: existingReceipt.receipts.id,
+        });
+      }
+    }
+
     const receiptNumber = await generateReceiptNumber();
 
     const clientId =
       req.body.clientId
         ? Number(req.body.clientId)
-        : req.body.invoiceId
+        : invoiceId
           ? (
               await db
                 .select()
                 .from(invoicesTable)
-                .where(eq(invoicesTable.id, Number(req.body.invoiceId)))
+                .where(eq(invoicesTable.id, invoiceId))
             )[0]?.clientId ?? null
           : null;
 
@@ -109,7 +208,7 @@ router.post("/receipts", requireAuth, async (req, res) => {
       .values({
         receiptNumber,
         clientId,
-        invoiceId: req.body.invoiceId ? Number(req.body.invoiceId) : null,
+        invoiceId,
         amount: String(req.body.amount),
         paymentMethod: req.body.paymentMethod,
         notes: req.body.notes || null,
@@ -164,6 +263,17 @@ router.put("/receipts/:id", requireAuth, async (req, res) => {
 
     if (invoiceId !== null && Number.isNaN(invoiceId)) {
       return res.status(400).json({ error: "Invalid invoiceId" });
+    }
+
+    if (invoiceId !== null) {
+      const existingReceipt = await findActiveReceiptByInvoiceId(invoiceId);
+
+      if (existingReceipt && existingReceipt.receipts.id !== id) {
+        return res.status(409).json({
+          error: "Receipt already exists for this invoice",
+          receiptId: existingReceipt.receipts.id,
+        });
+      }
     }
 
     const clientId =

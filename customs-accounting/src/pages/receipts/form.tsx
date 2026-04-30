@@ -8,6 +8,7 @@ import {
   useListClients,
   useListInvoices,
   useCreateReceipt,
+  useGetInvoice,
   useGetReceipt,
   useUpdateReceipt,
   getListReceiptsQueryKey,
@@ -32,6 +33,7 @@ const formSchema = z.object({
   clientId: z.number().nullable(),
   clientName: z.string().optional().nullable(),
   invoiceId: z.coerce.number().optional().nullable(),
+  invoiceNumber: z.string().optional().nullable(),
   amount: z.coerce.number().min(0.01, "المبلغ مطلوب"),
   paymentMethod: z.enum(["cash", "transfer", "check"]),
   notes: z.string().optional(),
@@ -41,9 +43,9 @@ const formSchema = z.object({
 type ReceiptFormValues = z.infer<typeof formSchema>;
 
 const PAYMENT_METHOD_LABELS: Record<string, string> = {
-  cash: "نقداً",
-  transfer: "تحويل بنكي",
-  check: "شيك",
+  cash: "cash - نقداً",
+  transfer: "transfer - تحويل بنكي",
+  check: "check - شيك",
 };
 
 export default function ReceiptForm() {
@@ -53,12 +55,13 @@ export default function ReceiptForm() {
   const receiptId = parseInt(id || "0");
   const search = new URLSearchParams(window.location.search);
   const invoiceIdFromUrl = search.get("invoice");
+  const invoiceIdFromUrlNumber = invoiceIdFromUrl ? Number(invoiceIdFromUrl) : 0;
   const { data: clients } = useListClients();
   const { data: invoices } = useListInvoices();
-
+  const { data: linkedInvoice } = useGetInvoice(invoiceIdFromUrlNumber, {
+    query: { enabled: !isEdit && invoiceIdFromUrlNumber > 0 },
+  });
   const { data: existing } = useGetReceipt(receiptId);
-
-
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { lang } = useLanguage();
@@ -80,6 +83,7 @@ export default function ReceiptForm() {
       clientId: null,
       clientName: "",
       invoiceId: undefined,
+      invoiceNumber: "",
       amount: 0,
       paymentMethod: "cash",
       notes: "",
@@ -87,37 +91,83 @@ export default function ReceiptForm() {
     },
   });
 
-      useEffect(() => {
-    if (!invoiceIdFromUrl || !invoices || isEdit) return;
+  useEffect(() => {
+    if (isEdit || !invoiceIdFromUrlNumber || !linkedInvoice) return;
 
-    const invoice = invoices.find((i: any) => String(i.id) === invoiceIdFromUrl);
-    if (!invoice) return;
+    const linkedClient = (clients ?? []).find(
+      (c) => Number(c.id) === Number(linkedInvoice.clientId)
+    );
 
-    setValue("invoiceId", invoice.id);
-    setValue("clientId", invoice.clientId);
-    setValue("clientName", invoice.clientName ?? "");
-    setValue("amount", Number(invoice.total ?? 0));
-  }, [invoiceIdFromUrl, invoices, isEdit, setValue]);
+    setValue("invoiceId", Number(linkedInvoice.id), { shouldValidate: true });
+    setValue(
+      "invoiceNumber",
+      linkedInvoice.invoiceNumber || ""
+    );
+    setValue("clientId", Number(linkedInvoice.clientId), { shouldValidate: true });
+    setValue(
+      "clientName",
+      linkedInvoice.clientName ||
+      linkedClient?.name ||
+      "",
+      { shouldValidate: true }
+    );
+    setValue("amount", Number(linkedInvoice.total ?? 0), { shouldValidate: true });
+  }, [invoiceIdFromUrlNumber, isEdit, linkedInvoice, clients?.length, setValue]);
 
   const selectedClientId = watch("clientId");
 
   // Filter invoices by selected client
+    const effectiveClientId =
+      selectedClientId || watch("clientId") || existing?.clientId;
+
     const clientInvoices = (invoices ?? []).filter(
-      (inv) => Number(inv.clientId) === Number(selectedClientId) && inv.status !== "cancelled"
+      (inv) =>
+        Number(inv.clientId) === Number(effectiveClientId) &&
+        inv.status !== "cancelled"
     );
+    useEffect(() => {
+      if (!existing || !isEdit) return;
+      if (!invoices || invoices.length === 0) return;
+
+      const matchedInvoice = invoices.find(
+        (inv) => Number(inv.id) === Number(existing.invoiceId)
+      );
+
+      reset({
+        clientId: Number(existing.clientId),
+        clientName:
+          existing.clientName ||
+          matchedInvoice?.clientName ||
+          "",
+        invoiceId: existing.invoiceId ? Number(existing.invoiceId) : undefined,
+        invoiceNumber:
+          existing.invoiceNumber ||
+          matchedInvoice?.invoiceNumber ||
+          "",
+        amount: Number(existing.amount),
+        paymentMethod: existing.paymentMethod as "cash" | "transfer" | "check",
+        notes: existing.notes ?? "",
+        receiptDate: existing.receiptDate,
+      });
+    }, [existing?.id, isEdit, invoices?.length, reset]);
 
     useEffect(() => {
-      if (existing && isEdit) {
-        reset({
-          clientId: Number(existing.clientId),
-          invoiceId: existing.invoiceId ? Number(existing.invoiceId) : undefined,
-          amount: Number(existing.amount),
-          paymentMethod: existing.paymentMethod as "cash" | "transfer" | "check",
-          notes: existing.notes ?? "",
-          receiptDate: existing.receiptDate,
+      const currentInvoiceId = watch("invoiceId");
+
+      if (!currentInvoiceId || !invoices || invoices.length === 0) return;
+
+      const invoice = invoices.find(
+        (i) => Number(i.id) === Number(currentInvoiceId)
+      );
+
+      if (!invoice) return;
+
+      if (!watch("invoiceNumber") && invoice.invoiceNumber) {
+        setValue("invoiceNumber", invoice.invoiceNumber ?? "", {
+          shouldValidate: true,
         });
       }
-    }, [existing, isEdit, reset]);
+    }, [watch("invoiceId"), invoices?.length, setValue]);
 
   // const onSubmit = async (data: ReceiptFormValues) => {
   const onSubmit = async (data: ReceiptFormValues) => {
@@ -126,7 +176,7 @@ export default function ReceiptForm() {
       const payload = {
         clientId: Number(data.clientId),
         clientName: data.clientName?.trim() || null,
-        invoiceId: data.invoiceId ? Number(data.invoiceId) : 0,
+        invoiceId: data.invoiceId ? Number(data.invoiceId) : null,
         amount: Number(data.amount),
         paymentMethod: data.paymentMethod,
         notes: data.notes?.trim() || null,
@@ -146,16 +196,40 @@ export default function ReceiptForm() {
 
     } catch (err) {
       console.error("Receipt save error:", err);
+      const conflictReceiptId = Number((err as any)?.data?.receiptId);
+
+      if ((err as any)?.status === 409 && conflictReceiptId > 0) {
+        toast({
+          title: "سند موجود",
+          description: "يوجد سند قبض مرتبط مسبقاً بهذه الفاتورة",
+        });
+        setLocation(`/receipts/${conflictReceiptId}/edit`);
+        return;
+      }
       toast({
         title: "خطأ",
         description: "فشل حفظ سند القبض",
         variant: "destructive",
       });
     }
-    // } catch {
-    //   toast({ title: "خطأ", description: "فشل حفظ سند القبض", variant: "destructive" });
-    // }
+
   };
+
+  const selectedInvoiceNumber =
+    watch("invoiceNumber") ||
+    linkedInvoice?.invoiceNumber ||
+    clientInvoices.find(
+      (inv) => Number(inv.id) === Number(watch("invoiceId"))
+    )?.invoiceNumber ||
+    "";
+
+  const selectedClientName =
+    watch("clientName") ||
+    linkedInvoice?.clientName ||
+    (clients ?? []).find(
+      (c) => Number(c.id) === Number(watch("clientId") || linkedInvoice?.clientId || 0)
+    )?.name ||
+    "";
 
   return (
     <div className="space-y-6">
@@ -193,17 +267,25 @@ export default function ReceiptForm() {
           <div className="space-y-2">
             <Label>العميل <span className="text-destructive">*</span></Label>
             <Select
-              value={String(watch("clientId") || "")}
+              key={watch("clientId") || linkedInvoice?.clientId || "empty-client"}
+              value={String(watch("clientId") || linkedInvoice?.clientId || "")}
               onValueChange={(v) => {
                 const selectedClient = (clients ?? []).find((c) => String(c.id) === v);
 
                 setValue("clientId", Number(v), { shouldValidate: true });
-                setValue("clientName", selectedClient?.name || "", { shouldValidate: true });
-                setValue("invoiceId", null);
+
+                if (!isEdit) {
+                  setValue("clientName", selectedClient?.name || "", { shouldValidate: true });
+                }
+
+                if (!isEdit) {
+                  setValue("invoiceId", null);
+                  setValue("invoiceNumber", "");
+                }
               }}
             >
               <SelectTrigger>
-                <SelectValue placeholder="اختر العميل" />
+                <SelectValue placeholder={selectedClientName || "اختر العميل"} />
               </SelectTrigger>
               <SelectContent
                   position="popper"
@@ -223,19 +305,38 @@ export default function ReceiptForm() {
           <div className="space-y-2">
             <Label>الفاتورة <span className="text-muted-foreground text-xs">(اختياري — اتركه فارغاً للدفعة المستقلة)</span></Label>
             <Select
-              value={String(watch("invoiceId") || "none")}
+              key={watch("invoiceId") || linkedInvoice?.id || "none"}
+              value={String(watch("invoiceId") || linkedInvoice?.id || "none")}
               onValueChange={(v) => {
                 const inv = v === "none" ? null : Number(v);
+
                 setValue("invoiceId", inv, { shouldValidate: true });
-                if (inv) {
-                  const invoice = (invoices ?? []).find((i) => i.id === inv);
-                  if (invoice) setValue("amount", invoice.total, { shouldValidate: true });
+
+                if (!inv) {
+                  setValue("invoiceNumber", "");
+                  return;
+                }
+
+                const invoice = (invoices ?? []).find((i) => Number(i.id) === Number(inv));
+
+                if (invoice) {
+                  setValue("invoiceNumber", invoice.invoiceNumber ?? "");
+                  setValue("clientId", Number(invoice.clientId), { shouldValidate: true });
+                  setValue("clientName", invoice.clientName || watch("clientName") || "", {
+                    shouldValidate: true,
+                  });
+                  setValue("amount", Number(invoice.total), { shouldValidate: true });
                 }
               }}
-              disabled={!selectedClientId}
+              disabled={!effectiveClientId && !watch("invoiceId")}
             >
               <SelectTrigger>
-                <SelectValue placeholder={selectedClientId ? "اختر فاتورة (اختياري)" : "اختر العميل أولاً"} />
+                <SelectValue
+                  placeholder={
+                    selectedInvoiceNumber ||
+                    (effectiveClientId ? "اختر فاتورة (اختياري)" : "اختر العميل أولاً")
+                  }
+                />
               </SelectTrigger>
               <SelectContent
                   position="popper"

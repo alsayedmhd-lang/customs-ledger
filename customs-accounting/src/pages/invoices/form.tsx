@@ -231,6 +231,7 @@ export default function InvoiceForm() {
   const { lang, isRTL } = useLanguage();
   const isAR = lang === "ar";
   const [users, setUsers] = useState<any[]>([]);
+  const [receiptLookupPending, setReceiptLookupPending] = useState(false);
   const { data: clients } = useListClients();
   const { data: invoices } = useListInvoices();
   const { data: templates } = useListInvoiceItemTemplates();
@@ -552,6 +553,46 @@ export default function InvoiceForm() {
     }
   };
 
+  const handleReceiptClick = async () => {
+    if (!invoiceId) return;
+
+    try {
+      setReceiptLookupPending(true);
+
+      const token = sessionStorage.getItem("auth_token");
+      const response = await fetch(
+        `${import.meta.env.VITE_API_BASE_URL}/api/receipts/by-invoice/${invoiceId}`,
+        {
+          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error(`Receipt lookup failed with status ${response.status}`);
+      }
+
+      const receipt = await response.json();
+
+      if (receipt?.id) {
+        setLocation(`/receipts/${receipt.id}/edit`);
+        return;
+      }
+
+      setLocation(`/receipts/new?invoice=${invoiceId}`);
+    } catch (error) {
+      console.error("Receipt lookup failed:", error);
+      toast({
+        title: isAR ? "خطأ" : "Error",
+        description: isAR
+          ? "تعذر التحقق من سند القبض المرتبط بهذه الفاتورة"
+          : "Failed to check the receipt linked to this invoice",
+        variant: "destructive",
+      });
+    } finally {
+      setReceiptLookupPending(false);
+    }
+  };
+
     const getAuditSummary = (log: any) => {
     try {
       const changes = log.changesJson ? JSON.parse(log.changesJson) : null;
@@ -727,11 +768,19 @@ export default function InvoiceForm() {
               {isAR ? "نسخ الفاتورة" : "Copy Invoice"}
             </button>
 
-            {isEdit && invoiceId && (
-                <Link href={`/receipts/new?invoice=${invoiceId}`}>
+              {isEdit && invoiceId && (
+                <Link
+                  href={`/receipts/new?invoice=${invoiceId}`}
+                >
                   <button
                     type="button"
-                    className="flex items-center gap-1.5 px-3 py-2 border border-emerald-400 rounded-xl bg-emerald-50 text-emerald-700 text-sm font-medium hover:bg-emerald-100 shadow-sm"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      void handleReceiptClick();
+                    }}
+                    disabled={receiptLookupPending}
+                    className="flex items-center gap-1.5 px-3 py-2 border border-emerald-400 rounded-xl bg-emerald-50 text-emerald-700 text-sm font-medium hover:bg-emerald-100 shadow-sm disabled:opacity-60"
                   >
                     <ReceiptText className="w-3.5 h-3.5" />
                     {isAR ? "سند قبض" : "Receipt"}
