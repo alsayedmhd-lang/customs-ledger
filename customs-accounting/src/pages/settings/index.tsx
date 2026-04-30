@@ -67,6 +67,10 @@ export default function SettingsPage() {
   const stampRef = useRef<HTMLInputElement>(null);
   const watermarkRef = useRef<HTMLInputElement>(null);
   const [activeTab, setActiveTab] = useState<TabId>("identity");
+  const [backupPassword, setBackupPassword] = useState("");
+  const [importPassword, setImportPassword] = useState("");
+  const [showBackupPassword, setShowBackupPassword] = useState(false);
+  const [showImportPassword, setShowImportPassword] = useState(false);
 
   useEffect(() => {
     setForm({ ...DEFAULT_SETTINGS, ...settings });
@@ -605,22 +609,7 @@ export default function SettingsPage() {
           </div>
         </div>
 
-           {/* ── Always Visible Invoice Preview ── */}
-          <div className="p-4">
-            <div
-              className="bg-white rounded-xl shadow-inner border border-gray-200 overflow-hidden"
-              style={{ fontFamily: "'Cairo', sans-serif" }}
-            >
-              {/* Invoice real header preview */}
-              <InvoicePrintHeader
-                company={form}
-                logoSrc={currentLogoSrc}
-                isAR={isAR}
-                invoiceNumber="INV-PREVIEW"
-                statusText="صادرة"
-              />
-            </div>
-            </div>
+
 
           {/* ── Preview Tab Content ── */}
             {activeTab === "preview" && (
@@ -630,141 +619,184 @@ export default function SettingsPage() {
                 color="bg-indigo-500/5"
               >
             <div className="mt-6 rounded-xl border bg-muted/20 p-4">
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <h3 className="text-sm font-bold text-foreground">
-                    {isAR ? "بيانات البرنامج" : "Program Data"}
-                  </h3>
-                  <p className="text-xs text-muted-foreground">
-                    {isAR
-                      ? "تصدير واستيراد بيانات البرنامج من مكان واحد."
-                      : "Export and import program data from one place."}
-                  </p>
-                </div>
+              <div className="rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-sm">
+                <div className="grid grid-cols-1 lg:grid-cols-[1fr_260px_360px] gap-4 items-center" dir={isAR ? "rtl" : "ltr"}>
 
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={async (e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
+                  {/* Program data / بيانات البرنامج */}
+                  <div className={`${isAR ? "text-right" : "text-left"} order-1 lg:order-3`}>
+                    <h3 className="text-sm font-bold text-foreground">
+                      {isAR ? "بيانات البرنامج" : "Program Data"}
+                    </h3>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {isAR
+                        ? "تصدير واستيراد بيانات البرنامج من مكان واحد."
+                        : "Export and import program data from one place."}
+                    </p>
+                  </div>
 
-                      const password = window.confirm(
-                          isAR ? "هل تريد تصدير النسخة الاحتياطية؟" : "Export backup?"
-                        )
-                          ? "1234"
-                          : "";
-                      if (!password) return;
-
-                      console.log("PASSWORD:", password);
-
-                      const token = sessionStorage.getItem("auth_token");
-
-                      const [invoices, receipts, clients, items] = await Promise.all([
-                        fetch("http://127.0.0.1:3000/api/invoices", {
-                          headers: { Authorization: `Bearer ${token}` },
-                        }).then((r) => r.json()),
-
-                        fetch("http://127.0.0.1:3000/api/receipts", {
-                          headers: { Authorization: `Bearer ${token}` },
-                        }).then((r) => r.json()),
-
-                        fetch("http://127.0.0.1:3000/api/clients", {
-                          headers: { Authorization: `Bearer ${token}` },
-                        }).then((r) => r.json()),
-
-                        fetch("http://127.0.0.1:3000/api/invoice-item-templates", {
-                          headers: { Authorization: `Bearer ${token}` },
-                        }).then((r) => r.json()),
-                      ]);
-
-                      console.log("DATA READY", invoices, receipts, clients, items);
-
-                      const fullData = {
-                        password,
-                        invoices,
-                        receipts,
-                        clients,
-                        items,
-                      };
-
-                      const blob = new Blob([JSON.stringify(fullData, null, 2)], {
-                        type: "application/json",
-                      });
-
-                      const a = document.createElement("a");
-                      a.href = URL.createObjectURL(blob);
-                      a.download = "full-backup.json";
-                      document.body.appendChild(a);
-                      a.click();
-                      a.remove();
-                    }}
-                    className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white"
-                  >
-                    {isAR ? "تصدير كامل البيانات" : "Export Full Data"}
-                  </button>
-                  <button
+                  {/* Export & import buttons / أزرار التصدير والاستيراد */}
+                  <div className="flex flex-col gap-2 order-2 lg:order-2">
+                    <button
                       type="button"
-                      onClick={() => document.getElementById("full-import")?.click()}
-                      className="rounded-lg bg-green-600 px-4 py-2 text-sm font-semibold text-white"
-                    >
-                      {isAR ? "استيراد كامل البيانات" : "Import Full Data"}
-                    </button>
+                      onClick={async () => {
+                        const password = backupPassword.trim();
 
-                    <input
-                      id="full-import"
-                      type="file"
-                      accept=".json"
-                      className="hidden"
-                      onChange={async (e) => {
-                        const file = e.target.files?.[0];
-                        if (!file) return;
-
-                        const fullData = JSON.parse(await file.text());
-
-                        const enteredPassword = window.confirm(
-                          isAR ? "هل كلمة المرور هي 1234 ؟" : "Is password 1234?"
-                        )
-                          ? "1234"
-                          : "";
-
-                        if (fullData.password !== enteredPassword) {
-                          alert(isAR ? "كلمة المرور غير صحيحة" : "Wrong password");
+                        if (!password) {
+                          alert(isAR ? "أدخل كلمة مرور للتصدير" : "Enter export password");
                           return;
                         }
 
-                        if (fullData.clients) {
-                          const blob = new Blob([JSON.stringify(fullData.clients)], { type: "application/json" });
-                          await importClients(new File([blob], "clients.json"));
-                        }
+                        const token = sessionStorage.getItem("auth_token");
 
-                        if (fullData.items) {
-                          const blob = new Blob([JSON.stringify(fullData.items)], { type: "application/json" });
-                          await importItems(new File([blob], "items.json"));
-                        }
+                        const [invoices, receipts, clients, items] = await Promise.all([
+                          fetch("http://127.0.0.1:3000/api/invoices", {
+                            headers: { Authorization: `Bearer ${token}` },
+                          }).then((r) => r.json()),
 
-                        if (fullData.invoices) {
-                          const blob = new Blob([JSON.stringify(fullData.invoices)], { type: "application/json" });
-                          await importInvoices(new File([blob], "invoices.json"));
-                        }
+                          fetch("http://127.0.0.1:3000/api/receipts", {
+                            headers: { Authorization: `Bearer ${token}` },
+                          }).then((r) => r.json()),
 
-                        if (fullData.receipts) {
-                          const blob = new Blob([JSON.stringify(fullData.receipts)], { type: "application/json" });
-                          await importReceipts(new File([blob], "receipts.json"));
-                        }
+                          fetch("http://127.0.0.1:3000/api/clients", {
+                            headers: { Authorization: `Bearer ${token}` },
+                          }).then((r) => r.json()),
 
-                        alert(isAR ? "تم استيراد كامل البيانات" : "Full data imported successfully");
+                          fetch("http://127.0.0.1:3000/api/invoice-item-templates", {
+                            headers: { Authorization: `Bearer ${token}` },
+                          }).then((r) => r.json()),
+                        ]);
+
+                        const fullData = {
+                          password,
+                          invoices,
+                          receipts,
+                          clients,
+                          items,
+                        };
+
+                        const blob = new Blob([JSON.stringify(fullData, null, 2)], {
+                          type: "application/json",
+                        });
+
+                        const a = document.createElement("a");
+                        a.href = URL.createObjectURL(blob);
+                        a.download = "full-backup.json";
+                        document.body.appendChild(a);
+                        a.click();
+                        a.remove();
                       }}
-                    />
+                      className="h-10 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700"
+                    >
+                      {isAR ? "تصدير كامل البيانات" : "Export Full Data"}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => document.getElementById("full-import")?.click()}
+                      className="h-10 rounded-lg bg-green-600 px-4 text-sm font-semibold text-white hover:bg-green-700"
+                    >
+                      {isAR ? "استيراد كامل البيانات" : "Import Full Data"}
+                    </button>
+                  </div>
+
+                  {/* Password fields / حقول كلمات المرور */}
+                  <div className="flex flex-col gap-2 order-3 lg:order-1">
+
+                    <div className="relative">
+                      <input
+                        type={showBackupPassword ? "text" : "password"}
+                        value={backupPassword}
+                        onChange={(e) => setBackupPassword(e.target.value)}
+                        placeholder={isAR ? "كلمة مرور التصدير" : "Export password"}
+                        className="h-10 w-full rounded-lg border px-3 pl-10 text-sm text-right"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowBackupPassword(!showBackupPassword)}
+                        className="absolute left-3 top-1/2 -translate-y-1/2 text-xs"
+                      >
+                        👁️
+                      </button>
+                    </div>
+
+                    <div className="relative">
+                      <input
+                        type={showImportPassword ? "text" : "password"}
+                        value={importPassword}
+                        onChange={(e) => setImportPassword(e.target.value)}
+                        placeholder={isAR ? "كلمة مرور الاستيراد" : "Import password"}
+                        className="h-10 w-full rounded-lg border px-3 pl-10 text-sm text-right"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowImportPassword(!showImportPassword)}
+                        className="absolute left-3 top-1/2 -translate-y-1/2 text-xs"
+                      >
+                        👁️
+                      </button>
+                    </div>
+                  </div>
                 </div>
+
+                <input
+                  id="full-import"
+                  type="file"
+                  accept=".json"
+                  className="hidden"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+
+                    const fullData = JSON.parse(await file.text());
+                    const enteredPassword = importPassword.trim();
+
+                    if (!enteredPassword) {
+                      alert(isAR ? "أدخل كلمة مرور الاستيراد" : "Enter import password");
+                      return;
+                    }
+
+                    if (fullData.password !== enteredPassword) {
+                      alert(isAR ? "كلمة المرور غير صحيحة" : "Wrong password");
+                      return;
+                    }
+
+                    if (fullData.clients) {
+                      const blob = new Blob([JSON.stringify(fullData.clients)], { type: "application/json" });
+                      await importClients(new File([blob], "clients.json"));
+                    }
+
+                    if (fullData.items) {
+                      const blob = new Blob([JSON.stringify(fullData.items)], { type: "application/json" });
+                      await importItems(new File([blob], "items.json"));
+                    }
+
+                    if (fullData.invoices) {
+                      const blob = new Blob([JSON.stringify(fullData.invoices)], { type: "application/json" });
+                      await importInvoices(new File([blob], "invoices.json"));
+                    }
+
+                    if (fullData.receipts) {
+                      const blob = new Blob([JSON.stringify(fullData.receipts)], { type: "application/json" });
+                      await importReceipts(new File([blob], "receipts.json"));
+                    }
+
+                    alert(isAR ? "تم استيراد كامل البيانات" : "Full data imported successfully");
+                  }}
+                />
               </div>
 
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
+                {isAR
+                  ? "يمكنك تصدير واستيراد بيانات البرنامج أو كل قسم بشكل مستقل من هنا."
+                  : "You can export and import all program data or each section separately from here."}
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2 mt-4">
                 {[
-                    { key: "invoices", title: isAR ? "الفواتير" : "Invoices" },
-                    { key: "receipts", title: isAR ? "سندات القبض" : "Receipts" },
-                    { key: "clients", title: isAR ? "العملاء" : "Clients" },
-                    { key: "items", title: isAR ? "البنود" : "Items" },
+                  { key: "invoices", title: isAR ? "الفواتير" : "Invoices" },
+                  { key: "receipts", title: isAR ? "سندات القبض" : "Receipts" },
+                  { key: "clients", title: isAR ? "العملاء" : "Clients" },
+                  { key: "items", title: isAR ? "البنود" : "Items" },
                 ].map(({ key, title }) => (
                   <div
                     key={key}
@@ -776,60 +808,49 @@ export default function SettingsPage() {
                       <button
                         type="button"
                         onClick={() => {
-                          if (key === "invoices") {
-                            exportInvoices();
-                          }
-
-                          if (key === "receipts") {
-                            exportReceipts();
-                          }
-
-                          if (key === "clients") {
-                            exportClients();
-                          }
-
-                          if (key === "items") {
-                            exportItems();
-                          }
+                          if (key === "invoices") exportInvoices();
+                          if (key === "receipts") exportReceipts();
+                          if (key === "clients") exportClients();
+                          if (key === "items") exportItems();
                         }}
                         className="rounded-md bg-blue-50 px-3 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100"
                       >
                         {isAR ? "تصدير" : "Export"}
                       </button>
+
                       <button
                         type="button"
-                        disabled={false}
                         onClick={() => {
                           const input = document.createElement("input");
                           input.type = "file";
                           input.accept = ".json,application/json";
 
                           input.onchange = () => {
-                              const file = input.files?.[0];
-                              if (!file) return;
+                            const file = input.files?.[0];
+                            if (!file) return;
 
-                              console.log("IMPORT FILE:", file);
+                            if (key === "invoices") importInvoices(file);
+                            if (key === "receipts") importReceipts(file);
+                            if (key === "clients") importClients(file);
+                            if (key === "items") importItems(file);
+                          };
 
-                              if (key === "invoices") importInvoices(file);
-                              if (key === "receipts") importReceipts(file);
-                              if (key === "clients") importClients(file);
-                              if (key === "items") importItems(file);
-                            };
                           input.click();
                         }}
                         className="rounded-md bg-green-50 px-3 py-1 text-xs font-medium text-green-700 hover:bg-green-100"
                       >
-                        {isAR ? "استيراد" : "Import"}
-                      </button>
+                          {isAR ? "استيراد" : "Import"}
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
-              </Section>
+            </Section>
             )}
 
-        {/* ── Display Tab ── */}
+          {/* ── Display Tab ── */}
+
         {activeTab === "display" && (() => {
           const storedTheme = sessionStorage.getItem("theme");
           const currentTheme = storedTheme === "dark" ? "dark" : storedTheme === "light" ? "light" : "system";
@@ -1407,51 +1428,85 @@ export default function SettingsPage() {
           </Section>
         )}
 
-        {/* ── Print Tab ── */}
-        {activeTab === "print" && (
-          <Section icon={Printer} title={isAR ? "خيارات الطباعة" : "Print Options"} color="bg-rose-500/5">
-            <div className="space-y-4">
-              {[
-                { field: "showWatermark" as const, labelAr: "إظهار العلامة المائية في صفحات الطباعة", labelEn: "Show watermark on print pages", icon: Eye },
-                { field: "showStampOnInvoices" as const, labelAr: "إظهار الختم على الفواتير", labelEn: "Show stamp on invoices", icon: Stamp },
-                { field: "showStampOnReceipts" as const, labelAr: "إظهار الختم على سندات القبض", labelEn: "Show stamp on receipts", icon: Stamp },
-                { field: "showStampOnStatements" as const, labelAr: "إظهار الختم على كشوف الحساب", labelEn: "Show stamp on statements", icon: Stamp },
-              ].map(({ field, labelAr, labelEn, icon: Icon }) => (
-                <div key={field} className="flex items-center justify-between gap-4 p-3 rounded-xl hover:bg-muted/30 transition-colors">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center">
-                      <Icon className="w-3.5 h-3.5 text-muted-foreground" />
+          {/* ── Print Tab ── */}
+          {activeTab === "print" && (
+            <Section icon={Printer} title={isAR ? "خيارات الطباعة" : "Print Options"} color="bg-rose-500/5">
+              <div className="space-y-4">
+
+                {/* Invoice Preview */}
+                <div
+                  className="bg-white rounded-xl shadow-inner border border-gray-200 overflow-hidden mb-4 p-4 space-y-4"
+                  style={{ fontFamily: "'Cairo', sans-serif" }}
+                >
+                  <InvoicePrintHeader
+                    company={form}
+                    logoSrc={currentLogoSrc}
+                    isAR={isAR}
+                    invoiceNumber="INV-PREVIEW"
+                    statusText="مسودة"
+                  />
+
+                  {/* Footer preview */}
+                  {form.footerText && (
+                    <div className="text-center text-xs text-gray-500 border-t pt-2">
+                      {form.footerText}
                     </div>
-                    <span className="text-sm font-medium">{isAR ? labelAr : labelEn}</span>
-                  </div>
-                  <Toggle field={field} />
+                  )}
+
+                  {/* Stamp preview */}
+                  {form.showStampOnInvoices && form.stampBase64 && (
+                    <div className="flex justify-center pt-3">
+                      <img
+                        src={form.stampBase64}
+                        alt="stamp"
+                        className="h-16 opacity-90 object-contain drop-shadow-sm"
+                      />
+                    </div>
+                  )}
                 </div>
-              ))}
-            
-            <Field label={isAR ? "عنوان الفاتورة الأساسي" : "Main Invoice Title"}>
-              <input
-                value={form.invoiceCreditTitleAr}
-                onChange={e => setForm(p => ({ ...p, invoiceCreditTitleAr: e.target.value }))}
-                className={inp}
-              />
-            </Field>
-            
-            <Field label={isAR ? "عنوان الفاتورة الفرعي" : "Sub Invoice Title"}>
-              <input
-                value={form.invoiceCreditTitleEn}
-                onChange={e => setForm(p => ({ ...p, invoiceCreditTitleEn: e.target.value }))}
-                className={inp}
-              />
-            </Field>
-            
-            <Field label={isAR ? "حجم عنوان الفاتورة" : "Invoice Title Font Size"}>
-              <input
-                type="number"
-                value={form.invoiceTitleFontSize}
-                onChange={e => setForm(p => ({ ...p, invoiceTitleFontSize: Number(e.target.value) }))}
-                className={inp}
-              />
-            </Field>
+
+                {[
+                  { field: "showWatermark" as const, labelAr: "إظهار العلامة المائية في صفحات الطباعة", labelEn: "Show watermark on print pages", icon: Eye },
+                  { field: "showStampOnInvoices" as const, labelAr: "إظهار الختم على الفواتير", labelEn: "Show stamp on invoices", icon: Stamp },
+                  { field: "showStampOnReceipts" as const, labelAr: "إظهار الختم على سندات القبض", labelEn: "Show stamp on receipts", icon: Stamp },
+                  { field: "showStampOnStatements" as const, labelAr: "إظهار الختم على كشوف الحساب", labelEn: "Show stamp on statements", icon: Stamp },
+                ].map(({ field, labelAr, labelEn, icon: Icon }) => (
+                  <div key={field} className="flex items-center justify-between gap-4 p-3 rounded-xl hover:bg-muted/30 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center">
+                        <Icon className="w-3.5 h-3.5 text-muted-foreground" />
+                      </div>
+                      <span className="text-sm font-medium">{isAR ? labelAr : labelEn}</span>
+                    </div>
+                    <Toggle field={field} />
+                  </div>
+                ))}
+
+                <Field label={isAR ? "عنوان الفاتورة الأساسي" : "Main Invoice Title"}>
+                  <input
+                    value={form.invoiceCreditTitleAr}
+                    onChange={e => setForm(p => ({ ...p, invoiceCreditTitleAr: e.target.value }))}
+                    className={inp}
+                  />
+                </Field>
+
+                <Field label={isAR ? "عنوان الفاتورة الفرعي" : "Sub Invoice Title"}>
+                  <input
+                    value={form.invoiceCreditTitleEn}
+                    onChange={e => setForm(p => ({ ...p, invoiceCreditTitleEn: e.target.value }))}
+                    className={inp}
+                  />
+                </Field>
+
+                <Field label={isAR ? "حجم عنوان الفاتورة" : "Invoice Title Font Size"}>
+                  <input
+                    type="number"
+                    value={form.invoiceTitleFontSize}
+                    onChange={e => setForm(p => ({ ...p, invoiceTitleFontSize: Number(e.target.value) }))}
+                    className={inp}
+                  />
+                </Field>
+
                 <Field
                   label={isAR ? "نص التذييل في صفحات الطباعة" : "Footer text on print pages"}
                   hint={isAR ? "يظهر في أسفل كل فاتورة وسند" : "Appears at the bottom of each invoice and receipt"}
@@ -1465,17 +1520,21 @@ export default function SettingsPage() {
                   />
                 </Field>
               </div>
-          </Section>
-        )}
+            </Section>
+          )}
+          {/* Info banner */}
+          {activeTab !== "preview" && (
+            <div className="flex items-start gap-3 p-4 bg-blue-500/5 border border-blue-500/20 rounded-2xl text-sm text-blue-700 dark:text-blue-300">
+              <Info className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+              <p>
+                {isAR
+                  ? "جميع التغييرات تُطبَّق فوراً في كامل البرنامج وصفحات الطباعة عند الحفظ دون الحاجة لإعادة تشغيل."
+                  : "All changes are applied instantly across the entire app and print pages upon saving — no restart needed."}
+              </p>
+            </div>
+          )}
 
-        {/* Info banner */}
-        <div className="flex items-start gap-3 p-4 bg-blue-500/5 border border-blue-500/20 rounded-2xl text-sm text-blue-700 dark:text-blue-300">
-          <Info className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
-          <p>{isAR
-            ? "جميع التغييرات تُطبَّق فوراً في كامل البرنامج وصفحات الطباعة عند الحفظ دون الحاجة لإعادة تشغيل."
-            : "All changes are applied instantly across the entire app and print pages upon saving — no restart needed."}</p>
-        </div>
-      </div>
-    </motion.div>
-  );
-}
+          </div>
+        </motion.div>
+      );
+    }

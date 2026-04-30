@@ -616,10 +616,11 @@ router.post("/invoices/import", requireAuth, async (req, res) => {
         sameInvoiceNumber &&
         (!shipmentBase || sameInvoiceNumber.shipmentRef !== shipmentBase)
       ) {
+        const baseInvoice = String(row.invoiceNumber).replace(/-\d+$/, "");
         let counter = 1;
 
         while (true) {
-          const candidate = `${row.invoiceNumber}-${counter}`;
+          const candidate = `${baseInvoice}-${counter}`;
 
           const [existsCandidate] = await db
             .select()
