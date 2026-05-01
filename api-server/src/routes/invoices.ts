@@ -237,6 +237,7 @@ router.post("/invoices", requireAuth, async (req, res) => {
         return formatItem(inserted);
       })
     );
+    
 
     res.status(201).json({
       ...formatInvoice(invoice, client.name),
@@ -309,6 +310,21 @@ router.get("/invoices/:id/audit-logs", requireAuth, async (req, res) => {
 router.put("/invoices/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
+
+    const [beforeInvoice] = await db
+      .select()
+      .from(invoicesTable)
+      .where(eq(invoicesTable.id, id));
+
+    if (!beforeInvoice) {
+      res.status(404).json({ error: "Invoice not found" });
+      return;
+    }
+
+    const beforeItems = await db
+      .select()
+      .from(invoiceItemsTable)
+      .where(eq(invoiceItemsTable.invoiceId, id));
 
     const {
       clientId,
@@ -458,6 +474,53 @@ router.put("/invoices/:id", async (req, res) => {
       )
     );
 
+    const normalizeAuditItem = (item: any) => ({
+  description: String(item.description ?? "").trim(),
+  quantity: Number(item.quantity ?? 0),
+  unitPrice: Number(item.unitPrice ?? 0),
+  total: Number(item.total ?? 0),
+});
+
+const oldAuditItems = beforeItems.map(normalizeAuditItem);
+const newAuditItems = insertedItems.map(normalizeAuditItem);
+
+const itemAuditChanges: string[] = [];
+
+const maxItemsLength = Math.max(oldAuditItems.length, newAuditItems.length);
+
+for (let i = 0; i < maxItemsLength; i++) {
+  const before = oldAuditItems[i];
+  const after = newAuditItems[i];
+
+  if (!before && after) {
+    itemAuditChanges.push(`تمت إضافة صنف: ${after.description}`);
+    continue;
+  }
+
+  if (before && !after) {
+    itemAuditChanges.push(`تم حذف صنف: ${before.description}`);
+    continue;
+  }
+
+  if (!before || !after) continue;
+
+  if (before.description !== after.description) {
+    itemAuditChanges.push(`تم تغيير وصف الصنف من "${before.description}" إلى "${after.description}"`);
+  }
+
+  if (before.quantity !== after.quantity) {
+    itemAuditChanges.push(`تم تغيير كمية الصنف "${after.description}" من ${before.quantity} إلى ${after.quantity}`);
+  }
+
+  if (before.unitPrice !== after.unitPrice) {
+    itemAuditChanges.push(`تم تغيير سعر الصنف "${after.description}" من ${before.unitPrice} إلى ${after.unitPrice}`);
+  }
+
+  if (before.total !== after.total) {
+    itemAuditChanges.push(`تم تغيير إجمالي الصنف "${after.description}" من ${before.total} إلى ${after.total}`);
+  }
+}
+
     const changes: any = {
       before: {
         invoice: oldInvoice,
@@ -467,6 +530,7 @@ router.put("/invoices/:id", async (req, res) => {
         invoice,
         items: insertedItems,
       },
+      itemChanges: itemAuditChanges,
     };
 
     await db.insert(invoiceAuditLogsTableSqlite).values({

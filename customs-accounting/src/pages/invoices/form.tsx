@@ -617,6 +617,10 @@ export default function InvoiceForm() {
         ];
       }
 
+      if (Array.isArray(changes.itemChanges) && changes.itemChanges.length > 0) {
+        return changes.itemChanges;
+      }
+
       if (log.action === "updated") {
         const before = changes.before?.invoice || {};
         const after = changes.after?.invoice || {};
