@@ -18,31 +18,34 @@ export default function InvoicePrintHeader({
   return (
     <>
       {/* LETTERHEAD */}
-      <div className="border-b-4 border-double border-gray-800 pb-4 pt-5 px-6">
-        <div className="relative flex items-start justify-between gap-4">
-          <div className="text-right flex-1 min-w-0">
-            <div className="text-2xl font-black text-gray-900 leading-tight break-words">
-              {company.nameAr}
+      <div className="border-b border-gray-800 pb-1 pt-1.5 px-4" dir="ltr">
+        <div className="grid grid-cols-3 items-start gap-2">
+          {/* English - fixed left */}
+          <div className="text-left min-w-0 space-y-0">
+            <div className="text-xl font-black text-gray-900 leading-tight break-words uppercase">
+              {company.nameEn}
             </div>
-            <div className="text-lg font-bold text-gray-700">{company.subtitleAr}</div>
-            <div className="text-xs text-gray-500">{company.taglineAr}</div>
+            <div className="text-sm font-bold text-gray-700">{company.subtitleEn}</div>
+            <div className="text-[10px] text-gray-500">{company.taglineEn}</div>
           </div>
 
-          <div className="absolute left-1/2 -top-8 -translate-x-1/2 pointer-events-none">
+          {/* Logo - fixed center */}
+          <div className="flex justify-center items-start -mt-8">
             <img
               src={logoSrc}
               alt={company.nameAr}
-              style={{ height: `${company.logoSize || 60}px` }}
+              style={{ height: `${company.logoSize || 45}px` }}
               className="w-auto object-contain opacity-95"
             />
           </div>
 
-          <div className="text-left flex-1 min-w-0">
+          {/* Arabic - fixed right */}
+          <div className="text-right min-w-0 space-y-0" dir="rtl">
             <div className="text-xl font-black text-gray-900 leading-tight break-words">
-              {company.nameEn}
+              {company.nameAr}
             </div>
-            <div className="text-lg font-bold text-gray-700">{company.subtitleEn}</div>
-            <div className="text-xs text-gray-500">{company.taglineEn}</div>
+            <div className="text-sm font-bold text-gray-700">{company.subtitleAr}</div>
+            <div className="text-[10px] text-gray-500">{company.taglineAr}</div>
           </div>
         </div>
       </div>
