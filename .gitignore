@@ -48,14 +48,16 @@ Thumbs.db
 .cache/
 .local/
 
+# Local DB & env
 lib/db/local.db
 release/win-unpacked/resources/api-server/.env
 
-release/win-unpacked
-release/win-unpacked/app.asar
-*.exe
-*.blockmap
-*.yml
-app.asar
+# Build output (Electron)
+release/
 
+# Specific build files (احتياط)
+*.exe
+*.asar
+*.blockmap
+*.db
 
