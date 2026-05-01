@@ -8,7 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import {
   Building2, Globe, Phone, Mail, MapPin, Hash, Upload, Save, RefreshCw,
-  Stamp, Eye, Shield, Printer, Info, Image, RotateCcw, User,
+  Stamp, Eye, EyeOff, Shield, Printer, Info, Image, RotateCcw, User,
   Palette, Sun, Moon, Monitor, Zap, ZapOff, Layers, RectangleHorizontal, Square, Minus,
   AlignVerticalJustifyStart, AlignVerticalJustifyCenter, AlignVerticalSpaceAround,
   Wallpaper, SlidersHorizontal, Ban, Blend,
@@ -71,6 +71,76 @@ export default function SettingsPage() {
   const [importPassword, setImportPassword] = useState("");
   const [showBackupPassword, setShowBackupPassword] = useState(false);
   const [showImportPassword, setShowImportPassword] = useState(false);
+  const textEncoder = new TextEncoder();
+const textDecoder = new TextDecoder();
+
+const bufferToBase64 = (buffer: ArrayBuffer) =>
+  btoa(String.fromCharCode(...new Uint8Array(buffer)));
+
+const base64ToBuffer = (base64: string) =>
+  Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+
+const deriveBackupKey = async (password: string, salt: Uint8Array) => {
+  const keyMaterial = await crypto.subtle.importKey(
+    "raw",
+    textEncoder.encode(password),
+    "PBKDF2",
+    false,
+    ["deriveKey"]
+  );
+
+  return crypto.subtle.deriveKey(
+    {
+      name: "PBKDF2",
+      salt,
+      iterations: 100000,
+      hash: "SHA-256",
+    },
+    keyMaterial,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["encrypt", "decrypt"]
+  );
+};
+
+const encryptBackupData = async (data: unknown, password: string) => {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const key = await deriveBackupKey(password, salt);
+
+  const encrypted = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv },
+    key,
+    textEncoder.encode(JSON.stringify(data))
+  );
+
+  return {
+    version: 1,
+    encrypted: true,
+    algorithm: "AES-GCM",
+    kdf: "PBKDF2-SHA256",
+    iterations: 100000,
+    salt: bufferToBase64(salt.buffer),
+    iv: bufferToBase64(iv.buffer),
+    data: bufferToBase64(encrypted),
+  };
+};
+
+const decryptBackupData = async (backupFile: any, password: string) => {
+  const salt = base64ToBuffer(backupFile.salt);
+  const iv = base64ToBuffer(backupFile.iv);
+  const encryptedData = base64ToBuffer(backupFile.data);
+
+  const key = await deriveBackupKey(password, salt);
+
+  const decrypted = await crypto.subtle.decrypt(
+    { name: "AES-GCM", iv },
+    key,
+    encryptedData
+  );
+
+  return JSON.parse(textDecoder.decode(decrypted));
+};
 
   useEffect(() => {
     setForm({ ...DEFAULT_SETTINGS, ...settings });
@@ -745,209 +815,248 @@ export default function SettingsPage() {
               </Section>
               )}
 
-            {/* ── Backup & Import Tab | النسخ الاحتياطي والاستيراد ── */}
-            {activeTab === "backup" && (
-              <Section
-                icon={Shield}
-                title={isAR ? "النسخ الاحتياطي والاستيراد" : "Backup & Import"}
-                color="bg-emerald-500/5"
-              >
-                <div className="space-y-4">
+          {/* ── Backup & Import Tab | النسخ الاحتياطي والاستيراد ── */}
+          {activeTab === "backup" && (
+            <Section
+              icon={Shield}
+              title={isAR ? "النسخ الاحتياطي والاستيراد" : "Backup & Import"}
+              color="bg-emerald-500/5"
+            >
+              <div className="space-y-4">
+                {/* Program Data - خارج الإطار */}
+                <div className={`${isAR ? "text-right" : "text-left"}`}>
+                  <h3 className="text-sm font-bold text-foreground">
+                    {isAR ? "بيانات البرنامج" : "Program Data"}
+                  </h3>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {isAR
+                      ? "تصدير واستيراد بيانات البرنامج من مكان واحد."
+                      : "Export and import program data from one place."}
+                  </p>
+                </div>
 
-                  {/* Program Data - خارج الإطار */}
-                  <div className={`${isAR ? "text-right" : "text-left"}`}>
-                    <h3 className="text-sm font-bold text-foreground">
-                      {isAR ? "بيانات البرنامج" : "Program Data"}
-                    </h3>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {isAR
-                        ? "تصدير واستيراد بيانات البرنامج من مكان واحد."
-                        : "Export and import program data from one place."}
-                    </p>
-                  </div>
 
-                  {/* الإطار الكبير */}
-                  <div
-                    className="rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-sm"
-                    dir={isAR ? "rtl" : "ltr"}
-                  >
-                    {/* All Data Row */}
-                    <div
-                      className="flex items-center justify-between gap-3 px-1 py-1.5 w-full"
-                      dir={isAR ? "rtl" : "ltr"}
-                    >
-                      <div className="flex items-center">
-                        <span className="text-sm whitespace-nowrap">
-                          {isAR ? "كل البيانات" : "All Data"}
-                        </span>
-                      </div>
+                {/* الإطار الكبير Big frame */}
+                <div
+                  className="rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-sm"
+                  dir={isAR ? "rtl" : "ltr"}
+                >
+                  {/* All Data Row "كل البيانات" */}
+                  <div className="border rounded-lg p-3 mb-3">
+                    <div className="flex items-center justify-between gap-3 w-full">
+                      <span className="text-sm font-medium whitespace-nowrap">
+                        {isAR ? "كل البيانات" : "All Data"}
+                      </span>
 
                       <div className="flex items-center gap-2">
-                        <input
-                          type={showBackupPassword ? "text" : "password"}
-                          value={backupPassword}
-                          onChange={(e) => setBackupPassword(e.target.value)}
-                          placeholder={isAR ? "كلمة مرور التصدير" : "Export password"}
-                          className="h-7 w-28 rounded border px-2 text-xs"
-                        />
+                        {/* Export password */}
+                        <div className="relative">
+                          <input
+                            type={showBackupPassword ? "text" : "password"}
+                            value={backupPassword}
+                            onChange={(e) => setBackupPassword(e.target.value)}
+                            placeholder={isAR ? "كلمة مرور التصدير" : "Export password"}
+                            className={`h-8 w-32 rounded-md border px-2 text-xs ${
+                              isAR ? "pl-9" : "pr-9"
+                            }`}
+                          />
 
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            const password = backupPassword.trim();
-                            if (!password) {
-                              alert(isAR ? "أدخل كلمة مرور للتصدير" : "Enter export password");
-                              return;
-                            }
+                          <button
+                            type="button"
+                            onClick={() => setShowBackupPassword(!showBackupPassword)}
+                            className={`absolute top-1/2 -translate-y-1/2 ${
+                              isAR ? "left-1" : "right-1"
+                            } p-1 text-gray-600 hover:text-black`}
+                          >
+                            {showBackupPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                          </button>
+                        </div>
 
-                            const token = sessionStorage.getItem("auth_token");
+                        {/* Export button */}
 
-                            const [invoices, receipts, clients, items] = await Promise.all([
-                              fetch("http://127.0.0.1:3000/api/invoices", {
-                                headers: { Authorization: `Bearer ${token}` },
-                              }).then((r) => r.json()),
-                              fetch("http://127.0.0.1:3000/api/receipts", {
-                                headers: { Authorization: `Bearer ${token}` },
-                              }).then((r) => r.json()),
-                              fetch("http://127.0.0.1:3000/api/clients", {
-                                headers: { Authorization: `Bearer ${token}` },
-                              }).then((r) => r.json()),
-                              fetch("http://127.0.0.1:3000/api/invoice-item-templates", {
-                                headers: { Authorization: `Bearer ${token}` },
-                              }).then((r) => r.json()),
-                            ]);
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const password = backupPassword.trim();
+                          if (!password) {
+                            alert(isAR ? "أدخل كلمة مرور للتصدير" : "Enter export password");
+                            return;
+                          }
 
-                            const fullData = { password, invoices, receipts, clients, items };
-                            const blob = new Blob([JSON.stringify(fullData, null, 2)], {
-                              type: "application/json",
-                            });
+                          const token = sessionStorage.getItem("auth_token");
 
-                            const a = document.createElement("a");
-                            a.href = URL.createObjectURL(blob);
-                            a.download = "full-backup.json";
-                            document.body.appendChild(a);
-                            a.click();
-                            a.remove();
-                          }}
-                          className="text-xs px-2 py-1 bg-blue-50 rounded"
-                        >
-                          {isAR ? "تصدير" : "Export"}
-                        </button>
+                          const [invoices, receipts, clients, items] = await Promise.all([
+                            fetch("http://127.0.0.1:3000/api/invoices", {
+                              headers: { Authorization: `Bearer ${token}` },
+                            }).then((r) => r.json()),
+                            fetch("http://127.0.0.1:3000/api/receipts", {
+                              headers: { Authorization: `Bearer ${token}` },
+                            }).then((r) => r.json()),
+                            fetch("http://127.0.0.1:3000/api/clients", {
+                              headers: { Authorization: `Bearer ${token}` },
+                            }).then((r) => r.json()),
+                            fetch("http://127.0.0.1:3000/api/invoice-item-templates", {
+                              headers: { Authorization: `Bearer ${token}` },
+                            }).then((r) => r.json()),
+                          ]);
 
+                          const rawData = { invoices, receipts, clients, items };
+
+                          const fullData = await encryptBackupData(rawData, password);
+
+                          const blob = new Blob([JSON.stringify(fullData, null, 2)], {
+                            type: "application/json",
+                          });
+
+                          const a = document.createElement("a");
+                          a.href = URL.createObjectURL(blob);
+                          a.download = "full-backup.json";
+                          document.body.appendChild(a);
+                          a.click();
+                          a.remove();
+                        }}
+                        className="h-8 px-3 text-xs bg-blue-50 rounded-md hover:bg-blue-100 transition"
+                      >
+                        {isAR ? "تصدير" : "Export"}
+                      </button>
+
+                      <div className="relative">
                         <input
                           type={showImportPassword ? "text" : "password"}
                           value={importPassword}
                           onChange={(e) => setImportPassword(e.target.value)}
                           placeholder={isAR ? "كلمة مرور الاستيراد" : "Import password"}
-                          className="h-7 w-28 rounded border px-2 text-xs"
+                          className={`h-8 w-32 rounded-md border px-2 text-xs ${
+                            isAR ? "pl-9" : "pr-9"
+                          }`}
                         />
 
                         <button
                           type="button"
-                          onClick={() => document.getElementById("full-import")?.click()}
-                          className="text-xs px-2 py-1 bg-green-50 rounded"
+                          onClick={() => setShowImportPassword(!showImportPassword)}
+                          className={`absolute top-1/2 -translate-y-1/2 ${
+                            isAR ? "left-1" : "right-1"
+                          } p-1 text-gray-600 hover:text-black`}
                         >
+                          {showImportPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                        </button>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => document.getElementById("full-import")?.click()}
+                        className="h-8 px-3 text-xs bg-green-50 rounded-md hover:bg-green-100 transition"
+                      >
+                        {isAR ? "استيراد" : "Import"}
+                      </button>
+                    </div>
+                  </div>
+                 </div>
+
+                  <input
+                    id="full-import"
+                    type="file"
+                    accept=".json"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+
+                      const backupFile = JSON.parse(await file.text());
+                      const enteredPassword = importPassword.trim();
+
+                      let fullData;
+
+                      if (backupFile.encrypted) {
+                        try {
+                          fullData = await decryptBackupData(backupFile, enteredPassword);
+                        } catch {
+                          alert(isAR ? "كلمة المرور غير صحيحة أو الملف تالف" : "Wrong password or corrupted file");
+                          return;
+                        }
+                      } else {
+                        // دعم النسخ القديمة
+                        if (backupFile.password !== enteredPassword) {
+                          alert(isAR ? "كلمة المرور غير صحيحة" : "Wrong password");
+                          return;
+                        }
+                        fullData = backupFile;
+                      }
+
+                      if (fullData.clients) {
+                        await importClients(new File([new Blob([JSON.stringify(fullData.clients)])], "clients.json"));
+                      }
+                      if (fullData.items) {
+                        await importItems(new File([new Blob([JSON.stringify(fullData.items)])], "items.json"));
+                      }
+                      if (fullData.invoices) {
+                        await importInvoices(new File([new Blob([JSON.stringify(fullData.invoices)])], "invoices.json"));
+                      }
+                      if (fullData.receipts) {
+                        await importReceipts(new File([new Blob([JSON.stringify(fullData.receipts)])], "receipts.json"));
+                      }
+
+                      alert(isAR ? "تم استيراد كامل البيانات" : "Full data imported successfully");
+                    }}
+                  />
+
+                  <div className="grid grid-cols-2 gap-3 mt-4">
+                    {/* الفواتير */}
+                    <div className="flex justify-between items-center border rounded-lg p-2">
+                      <span className="text-sm">{isAR ? "الفواتير" : "Invoices"}</span>
+                      <div className="flex gap-2">
+                        <button type="button" onClick={exportInvoices} className="h-8 px-3 text-xs bg-blue-50 rounded-md hover:bg-blue-100 transition">
+                          {isAR ? "تصدير" : "Export"}
+                        </button>
+                        <button type="button" className="h-8 px-3 text-xs bg-green-50 rounded-md hover:bg-green-100 transition">
                           {isAR ? "استيراد" : "Import"}
                         </button>
                       </div>
                     </div>
 
-                    <input
-                      id="full-import"
-                      type="file"
-                      accept=".json"
-                      className="hidden"
-                      onChange={async (e) => {
-                        const file = e.target.files?.[0];
-                        if (!file) return;
-
-                        const fullData = JSON.parse(await file.text());
-                        const enteredPassword = importPassword.trim();
-
-                        if (!enteredPassword) {
-                          alert(isAR ? "أدخل كلمة مرور الاستيراد" : "Enter import password");
-                          return;
-                        }
-
-                        if (fullData.password !== enteredPassword) {
-                          alert(isAR ? "كلمة المرور غير صحيحة" : "Wrong password");
-                          return;
-                        }
-
-                        if (fullData.clients) {
-                          await importClients(new File([new Blob([JSON.stringify(fullData.clients)])], "clients.json"));
-                        }
-                        if (fullData.items) {
-                          await importItems(new File([new Blob([JSON.stringify(fullData.items)])], "items.json"));
-                        }
-                        if (fullData.invoices) {
-                          await importInvoices(new File([new Blob([JSON.stringify(fullData.invoices)])], "invoices.json"));
-                        }
-                        if (fullData.receipts) {
-                          await importReceipts(new File([new Blob([JSON.stringify(fullData.receipts)])], "receipts.json"));
-                        }
-
-                        alert(isAR ? "تم استيراد كامل البيانات" : "Full data imported successfully");
-                      }}
-                    />
-
-                    <div className="grid grid-cols-2 gap-3 mt-4">
-                      {/* الفواتير */}
-                      <div className="flex justify-between items-center border rounded-lg p-2">
-                        <span className="text-sm">{isAR ? "الفواتير" : "Invoices"}</span>
-                        <div className="flex gap-2">
-                          <button type="button" onClick={exportInvoices} className="text-xs px-2 py-1 bg-blue-50 rounded">
-                            {isAR ? "تصدير" : "Export"}
-                          </button>
-                          <button type="button" className="text-xs px-2 py-1 bg-green-50 rounded">
-                            {isAR ? "استيراد" : "Import"}
-                          </button>
-                        </div>
+                    {/* العملاء */}
+                    <div className="flex justify-between items-center border rounded-lg p-2">
+                      <span className="text-sm">{isAR ? "العملاء" : "Clients"}</span>
+                      <div className="flex gap-2">
+                        <button type="button" onClick={exportClients} className="h-8 px-3 text-xs bg-blue-50 rounded-md hover:bg-blue-100 transition">
+                          {isAR ? "تصدير" : "Export"}
+                        </button>
+                        <button type="button" className="h-8 px-3 text-xs bg-green-50 rounded-md hover:bg-green-100 transition">
+                          {isAR ? "استيراد" : "Import"}
+                        </button>
                       </div>
+                    </div>
 
-                      {/* العملاء */}
-                      <div className="flex justify-between items-center border rounded-lg p-2">
-                        <span className="text-sm">{isAR ? "العملاء" : "Clients"}</span>
-                        <div className="flex gap-2">
-                          <button type="button" onClick={exportClients} className="text-xs px-2 py-1 bg-blue-50 rounded">
-                            {isAR ? "تصدير" : "Export"}
-                          </button>
-                          <button type="button" className="text-xs px-2 py-1 bg-green-50 rounded">
-                            {isAR ? "استيراد" : "Import"}
-                          </button>
-                        </div>
+                    {/* سندات القبض */}
+                    <div className="flex justify-between items-center border rounded-lg p-2">
+                      <span className="text-sm">{isAR ? "سندات القبض" : "Receipts"}</span>
+                      <div className="flex gap-2">
+                        <button type="button" onClick={exportReceipts} className="h-8 px-3 text-xs bg-blue-50 rounded-md hover:bg-blue-100 transition">
+                          {isAR ? "تصدير" : "Export"}
+                        </button>
+                        <button type="button" className="h-8 px-3 text-xs bg-green-50 rounded-md hover:bg-green-100 transition">
+                          {isAR ? "استيراد" : "Import"}
+                        </button>
                       </div>
+                    </div>
 
-                      {/* سندات القبض */}
-                      <div className="flex justify-between items-center border rounded-lg p-2">
-                        <span className="text-sm">{isAR ? "سندات القبض" : "Receipts"}</span>
-                        <div className="flex gap-2">
-                          <button type="button" onClick={exportReceipts} className="text-xs px-2 py-1 bg-blue-50 rounded">
-                            {isAR ? "تصدير" : "Export"}
-                          </button>
-                          <button type="button" className="text-xs px-2 py-1 bg-green-50 rounded">
-                            {isAR ? "استيراد" : "Import"}
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* البنود */}
-                      <div className="flex justify-between items-center border rounded-lg p-2">
-                        <span className="text-sm">{isAR ? "البنود" : "Items"}</span>
-                        <div className="flex gap-2">
-                          <button type="button" onClick={exportItems} className="text-xs px-2 py-1 bg-blue-50 rounded">
-                            {isAR ? "تصدير" : "Export"}
-                          </button>
-                          <button type="button" className="text-xs px-2 py-1 bg-green-50 rounded">
-                            {isAR ? "استيراد" : "Import"}
-                          </button>
-                        </div>
+                    {/* البنود */}
+                    <div className="flex justify-between items-center border rounded-lg p-2">
+                      <span className="text-sm">{isAR ? "البنود" : "Items"}</span>
+                      <div className="flex gap-2">
+                        <button type="button" onClick={exportItems} className="h-8 px-3 text-xs bg-blue-50 rounded-md hover:bg-blue-100 transition">
+                          {isAR ? "تصدير" : "Export"}
+                        </button>
+                        <button type="button" className="h-8 px-3 text-xs bg-green-50 rounded-md hover:bg-green-100 transition">
+                          {isAR ? "استيراد" : "Import"}
+                        </button>
                       </div>
                     </div>
                   </div>
                 </div>
-              </Section>
-            )}
+              </div>
+            </Section>
+          )}
 
           {/* ── Display Tab ── */}
 
