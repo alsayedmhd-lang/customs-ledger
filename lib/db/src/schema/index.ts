@@ -24,3 +24,5 @@ export {
 } from "./company-settings-sqlite";
 
 export * from "./invoices-sqlite";
+
+export * from "./customer-ledger-sqlite";

@@ -39,3 +39,5 @@ if (provider === "sqlite") {
 export const db = dbInstance;
 
 export * from "./sqlite-schema";
+
+export * from "./schema/customer-ledger-sqlite";

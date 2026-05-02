@@ -4,7 +4,7 @@ import {
   clientsTable,
   receiptsTable,
 } from "@workspace/db/schema";
-import { invoiceAuditLogsTableSqlite } from "@workspace/db/schema/invoices-sqlite";
+import { invoiceAuditLogsTableSqlite } from "../../../lib/db/src/schema/invoices-sqlite";
 import { eq, desc, isNotNull, and } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { formatInvoice, formatItem } from "./invoices";

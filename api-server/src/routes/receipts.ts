@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, sqlite, receiptsTable, clientsTable, invoicesTable, usersTable } from "@workspace/db";
+import { db, sqlite, receiptsTable, clientsTable, invoicesTable, customerLedgerTableSqlite, usersTable } from "@workspace/db";
 import { eq, desc, isNull, and } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth";
 
@@ -224,6 +224,28 @@ router.post("/receipts", requireAuth, async (req, res) => {
         createdBy: (req as any).user?.id ?? 1,
       })
       .returning();
+
+      await db.insert(customerLedgerTableSqlite).values({
+        clientId: receipt.clientId,
+        invoiceId: receipt.invoiceId ?? null,
+        receiptId: receipt.id,
+
+        entryDate: new Date().toISOString().split("T")[0],
+        entryType: "receipt",
+
+        descriptionAr: `سند قبض رقم ${receipt.receiptNumber}`,
+        descriptionEn: `Receipt ${receipt.receiptNumber}`,
+
+        referenceType: "receipt",
+        referenceNumber: receipt.receiptNumber,
+
+        debit: 0,
+        credit: Number(receipt.amount ?? 0),
+
+        balanceImpact: -Number(receipt.amount ?? 0),
+
+        createdBy: (req as any).user?.id ?? 1,
+      });
 
     const [client] = receipt.clientId
       ? await db

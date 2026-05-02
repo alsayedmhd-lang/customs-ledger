@@ -155,7 +155,7 @@ export default function ReceiptPrint() {
 
   console.log("PRINT RECEIPT ID:", id);
   console.log("PRINT RECEIPT DATA:", receipt);
-  
+
   const { data: clients } = useListClients();
   const { currencySymbol, lang } = useLanguage();
   const isAR = lang === "ar";
@@ -452,6 +452,7 @@ export default function ReceiptPrint() {
                 settings.showReceiverSignature &&
                 ((user as any)?.signatureBase64 || (user as any)?.receiverSignatureBase64) && (
                   <>
+                    {/* التوقيع */}
                     <img
                       src={(user as any)?.signatureBase64 || (user as any)?.receiverSignatureBase64}
                       alt="Receiver Signature"
@@ -459,16 +460,20 @@ export default function ReceiptPrint() {
                       style={{ zIndex: 3, opacity: 0.9, mixBlendMode: "multiply" }}
                     />
 
-                    <div
-                      className="absolute bottom-4 right-[12%] text-xs text-center"
-                      style={{ width: "120px" }}
+                    {/* اسم المستلم بجانب التوقيع */}
+                    <span
+                      className="absolute text-xs font-semibold text-gray-700"
+                      style={{
+                        bottom: "38px",
+                        right: "calc(12% - 70px)", // بجانب التوقيع
+                        width: "120px",
+                        textAlign: "center"
+                      }}
                     >
-                      {isAR ? "استلم بواسطة:" : "Received by:"}
-                      <br />
                       {(receipt as any).receivedByName || ""}
-                    </div>
+                    </span>
                   </>
-              )}
+                )}
 
             {showSignatures && settings.showAccountantSignature && settings.accountantSignatureBase64 && (
               <img

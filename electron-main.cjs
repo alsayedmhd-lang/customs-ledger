@@ -34,6 +34,13 @@ function createWindow() {
         ...process.env,
         NODE_ENV: "production",
         ELECTRON_RUN_AS_NODE: "1",
+        SQLITE_DB_PATH: path.join(
+          process.resourcesPath,
+          "api-server",
+          "lib",
+          "db",
+          "local.db"
+        ),
       },
       detached: false,
     }

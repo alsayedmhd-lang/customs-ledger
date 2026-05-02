@@ -1,12 +1,14 @@
 import { Router, type IRouter } from "express";
-import { db } from "@workspace/db";
+
 import {
+  db,
   invoicesTable,
   invoiceItemsTable,
   clientsTable,
   usersTable,
-} from "@workspace/db/schema";
-import { invoiceAuditLogsTableSqlite } from "@workspace/db/schema/invoices-sqlite";
+  customerLedgerTableSqlite,
+} from "@workspace/db";
+import { invoiceAuditLogsTableSqlite } from "../../../lib/db/src/schema/invoices-sqlite";
 import { eq, desc, isNull, and, like, isNotNull } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth";
 
@@ -188,7 +190,29 @@ router.post("/invoices", requireAuth, async (req, res) => {
           })
           .returning();
         invoice = inserted;
-          
+
+        await db.insert(customerLedgerTableSqlite).values({
+          clientId: inserted.clientId,
+          invoiceId: inserted.id,
+          receiptId: null,
+
+          entryDate: new Date().toISOString().split("T")[0],
+          entryType: "invoice",
+
+          descriptionAr: `فاتورة رقم ${inserted.invoiceNumber}`,
+          descriptionEn: `Invoice ${inserted.invoiceNumber}`,
+
+          referenceType: "invoice",
+          referenceNumber: inserted.invoiceNumber,
+
+          debit: Number(inserted.total ?? 0),
+          credit: 0,
+
+          balanceImpact: Number(inserted.total ?? 0),
+
+          createdBy: req.user?.userId ?? null,
+        });
+                  
       await db.insert(invoiceAuditLogsTableSqlite).values({
         invoiceId: inserted.id,
         action:
@@ -744,6 +768,33 @@ router.post("/invoices/import", requireAuth, async (req, res) => {
           .returning();
 
         invoiceId = created.id;
+
+          const invoiceAmount =
+            Number(values.subtotal ?? 0) + Number(values.taxAmount ?? 0);
+
+          await db.insert(customerLedgerTableSqlite).values({
+            clientId: values.clientId,
+
+            invoiceId: created.id,
+
+            entryDate: new Date().toISOString(),
+
+            entryType: "invoice",
+
+            descriptionAr: "فاتورة",
+            descriptionEn: "Invoice",
+
+            referenceType: "invoice",
+            referenceNumber: created.invoiceNumber,
+
+            debit: invoiceAmount,
+            credit: 0,
+
+            balanceImpact: invoiceAmount,
+
+            createdBy: null,
+          });
+
         inserted++;
       }
 
