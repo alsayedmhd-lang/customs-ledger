@@ -183,25 +183,28 @@ const getClientName = (receipt: { clientName?: string | null; clientId?: number 
               <thead className="sticky top-0 z-10">
                 <tr className="border-b border-border bg-muted/40">
                   <th className="text-start px-4 py-3 font-semibold text-muted-foreground">
-                    {t("receiptNumber")}
+                    {isAR ? "رقم السند" : "Receipt No"}
                   </th>
                   <th className="text-start px-4 py-3 font-semibold text-muted-foreground">
-                    {t("client")}
+                    {isAR ? "العميل" : "Client"}
                   </th>
                   <th className="text-start px-4 py-3 font-semibold text-muted-foreground">
-                    {t("invoiceRef")}
+                    {isAR ? "الفاتورة" : "Invoice"}
                   </th>
                   <th className="text-start px-4 py-3 font-semibold text-muted-foreground">
-                    {t("amount")}
+                    {isAR ? "المبلغ" : "Amount"}
                   </th>
                   <th className="text-start px-4 py-3 font-semibold text-muted-foreground">
-                    {t("paymentMethod")}
+                    {isAR ? "طريقة الدفع" : "Payment Method"}
                   </th>
                   <th className="text-start px-4 py-3 font-semibold text-muted-foreground">
-                    {t("date")}
+                    {isAR ? "المستلم" : "Received By"}
+                  </th>
+                  <th className="text-start px-4 py-3 font-semibold text-muted-foreground">
+                    {isAR ? "التاريخ" : "Date"}
                   </th>
                   <th className="text-end px-4 py-3 font-semibold text-muted-foreground">
-                    {t("actions")}
+                    {isAR ? "الإجراءات" : "Actions"}
                   </th>
                 </tr>
               </thead>
@@ -247,9 +250,13 @@ const getClientName = (receipt: { clientName?: string | null; clientId?: number 
                         {paymentMethodLabel[receipt.paymentMethod] ?? receipt.paymentMethod}
                       </span>
                     </td>
-
+                    <td className="px-4 py-3 text-center">
+                      <span className="px-2 py-1 rounded bg-blue-50 text-blue-700 text-xs font-semibold">
+                        {(receipt as any).receivedByName || "—"}
+                      </span>
+                    </td>
                     <td className="px-4 py-3 text-muted-foreground">
-                      {formatDate(receipt.receivedAt)}
+                      {formatDate((receipt as any).receiptDate || (receipt as any).receivedAt)}
                     </td>
 
                     <td className="px-4 py-3">

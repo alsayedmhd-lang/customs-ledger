@@ -71,6 +71,7 @@ router.get("/receipts", requireAuth, async (req, res) => {
         .from(receiptsTable)
         .leftJoin(invoicesTable, eq(receiptsTable.invoiceId, invoicesTable.id))
         .leftJoin(clientsTable, eq(receiptsTable.clientId, clientsTable.id))
+        .leftJoin(usersTable, eq(usersTable.id, receiptsTable.createdBy))
         .where(buildFilters([eq(invoicesTable.clientId, clientId)]))
         .orderBy(desc(receiptsTable.id));
     } else {
@@ -79,6 +80,7 @@ router.get("/receipts", requireAuth, async (req, res) => {
         .from(receiptsTable)
         .leftJoin(invoicesTable, eq(receiptsTable.invoiceId, invoicesTable.id))
         .leftJoin(clientsTable, eq(receiptsTable.clientId, clientsTable.id))
+        .leftJoin(usersTable, eq(usersTable.id, receiptsTable.createdBy))
         .where(buildFilters())
         .orderBy(desc(receiptsTable.id));
     }
@@ -113,6 +115,7 @@ router.get("/receipts", requireAuth, async (req, res) => {
           row.receipts,
           clientName || "لا يوجد",
           row.invoices?.invoiceNumber || null,
+          row.users?.displayNameEn || row.users?.displayName || "—",
         );
       }),
     );
