@@ -152,6 +152,10 @@ const PAYMENT_METHOD_LABELS: Record<string, string> = {
 export default function ReceiptPrint() {
   const { id } = useParams<{ id: string }>();
   const { data: receipt, isLoading } = useGetReceipt(parseInt(id || "0"));
+
+  console.log("PRINT RECEIPT ID:", id);
+  console.log("PRINT RECEIPT DATA:", receipt);
+  
   const { data: clients } = useListClients();
   const { currencySymbol, lang } = useLanguage();
   const isAR = lang === "ar";
@@ -447,13 +451,24 @@ export default function ReceiptPrint() {
               {showSignatures &&
                 settings.showReceiverSignature &&
                 ((user as any)?.signatureBase64 || (user as any)?.receiverSignatureBase64) && (
-                  <img
-                    src={(user as any)?.signatureBase64 || (user as any)?.receiverSignatureBase64}
-                    alt="Receiver Signature"
-                    className="absolute bottom-10 right-[12%] h-14 w-auto object-contain pointer-events-none"
-                    style={{ zIndex: 3, opacity: 0.9, mixBlendMode: "multiply" }}
-                  />
-                )}
+                  <>
+                    <img
+                      src={(user as any)?.signatureBase64 || (user as any)?.receiverSignatureBase64}
+                      alt="Receiver Signature"
+                      className="absolute bottom-10 right-[12%] h-14 w-auto object-contain pointer-events-none"
+                      style={{ zIndex: 3, opacity: 0.9, mixBlendMode: "multiply" }}
+                    />
+
+                    <div
+                      className="absolute bottom-4 right-[12%] text-xs text-center"
+                      style={{ width: "120px" }}
+                    >
+                      {isAR ? "استلم بواسطة:" : "Received by:"}
+                      <br />
+                      {(receipt as any).receivedByName || ""}
+                    </div>
+                  </>
+              )}
 
             {showSignatures && settings.showAccountantSignature && settings.accountantSignatureBase64 && (
               <img

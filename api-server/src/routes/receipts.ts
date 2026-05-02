@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, sqlite, receiptsTable, clientsTable, invoicesTable } from "@workspace/db";
+import { db, sqlite, receiptsTable, clientsTable, invoicesTable, usersTable } from "@workspace/db";
 import { eq, desc, isNull, and } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth";
 
@@ -21,12 +21,17 @@ function ensureUniqueActiveReceiptPerInvoice() {
 
 ensureUniqueActiveReceiptPerInvoice();
 
+try {
+  sqlite.exec(`ALTER TABLE receipts ADD COLUMN created_by INTEGER;`);
+} catch {}
+
 async function findActiveReceiptByInvoiceId(invoiceId: number) {
   const rows = await db
     .select()
     .from(receiptsTable)
     .leftJoin(invoicesTable, eq(receiptsTable.invoiceId, invoicesTable.id))
     .leftJoin(clientsTable, eq(receiptsTable.clientId, clientsTable.id))
+    .leftJoin(usersTable, eq(usersTable.id, receiptsTable.createdBy))
     .where(
       and(
         eq(receiptsTable.invoiceId, invoiceId),
@@ -213,6 +218,7 @@ router.post("/receipts", requireAuth, async (req, res) => {
         paymentMethod: req.body.paymentMethod,
         notes: req.body.notes || null,
         receiptDate: req.body.receiptDate || req.body.receivedAt,
+        createdBy: (req as any).user?.id ?? 1,
       })
       .returning();
 
@@ -357,6 +363,7 @@ export function formatReceipt(
   r: typeof receiptsTable.$inferSelect,
   clientName: string,
   invoiceNumber: string | null,
+  receivedByName: string = "", 
 ) {
   return {
     id: r.id,
@@ -370,6 +377,7 @@ export function formatReceipt(
     notes: r.notes ?? null,
     receiptDate: r.receiptDate,
     deletedAt: r.deletedAt ?? null,
+    receivedByName,
   };
 }
 
@@ -382,6 +390,7 @@ router.get("/receipts/:id", requireAuth, async (req, res) => {
       .from(receiptsTable)
       .leftJoin(invoicesTable, eq(receiptsTable.invoiceId, invoicesTable.id))
       .leftJoin(clientsTable, eq(receiptsTable.clientId, clientsTable.id))
+      .leftJoin(usersTable, eq(usersTable.id, receiptsTable.createdBy))
       .where(eq(receiptsTable.id, id));
 
     if (!rows.length) {
@@ -395,6 +404,7 @@ router.get("/receipts/:id", requireAuth, async (req, res) => {
         row.receipts,
         row.clients?.name || "",
         row.invoices?.invoiceNumber || null,
+        row.users?.displayNameEn || row.users?.displayName || "غير محدد"
       ),
     );
   } catch (err) {

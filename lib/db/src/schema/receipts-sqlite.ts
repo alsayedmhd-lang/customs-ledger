@@ -9,6 +9,7 @@ export const receiptsTableSqlite = sqliteTable("receipts", {
   paymentMethod: text("payment_method").default("cash"),
   notes: text("notes"),
   receiptDate: text("receipt_date").notNull(),
+  createdBy: integer("created_by"),
   deletedAt: integer("deleted_at", { mode: "timestamp_ms" }),
   createdAt: integer("created_at", { mode: "timestamp_ms" }),
 });
