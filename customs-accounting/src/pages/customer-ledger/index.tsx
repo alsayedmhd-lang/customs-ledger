@@ -118,7 +118,7 @@ export default function CustomerLedgerPage() {
           type="button"
           onClick={openPrintPage}
           disabled={!clientId}
-          className="px-5 py-2 rounded-xl bg-purple-600 text-white shadow hover:bg-purple-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+          className="px-5 py-2 rounded-xl bg-primary text-white shadow hover:bg-primary/90 transition disabled:opacity-50 disabled:cursor-not-allowed"
         >
           الطباعة
         </button>
@@ -188,7 +188,7 @@ export default function CustomerLedgerPage() {
             type="button"
             onClick={loadLedger}
             disabled={!clientId || isLoading}
-            className="h-[42px] rounded-xl bg-purple-600 text-white shadow hover:bg-purple-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+            className="h-[42px] rounded-xl bg-primary text-white shadow hover:bg-primary/90 transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isLoading ? "جاري البحث..." : "بحث"}
           </button>

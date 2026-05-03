@@ -599,13 +599,15 @@ const decryptBackupData = async (backupFile: any, password: string) => {
   const currentWatermarkSrc = watermarkPreview || watermarkSrc;
 
   const TABS = [
-    { id: "display", icon: Palette, labelAr: "المظهر", labelEn: "Display", color: "text-fuchsia-500" },
-    { id: "preview", icon: Eye, labelAr: "المعاينة", labelEn: "Preview", color: "text-indigo-500" },
-    { id: "backup", icon: Shield, labelAr: "النسخ الاحتياطي", labelEn: "Backup", color: "text-emerald-500" },
-    { id: "company", icon: Building2, labelAr: "بيانات الشركة", labelEn: "Company", color: "text-blue-500" },
-    { id: "branding", icon: Image, labelAr: "الشعارات", labelEn: "Branding", color: "text-purple-500" },
-    { id: "print", icon: Printer, labelAr: "أدوات الطباعة", labelEn: "Print Tools", color: "text-rose-500" },
-  ];
+  { id: "preview", icon: Eye, labelAr: "المعاينة", labelEn: "Preview", color: "text-indigo-500" },
+
+  { id: "company", icon: Building2, labelAr: "بيانات الشركة", labelEn: "Company", color: "text-blue-500" },
+  { id: "branding", icon: Image, labelAr: "الشعارات", labelEn: "Branding", color: "text-purple-500" },
+  { id: "print", icon: Printer, labelAr: "أدوات الطباعة", labelEn: "Print Tools", color: "text-rose-500" },
+  { id: "backup", icon: Shield, labelAr: "النسخ الاحتياطي", labelEn: "Backup", color: "text-emerald-500" },
+
+  { id: "display", icon: Palette, labelAr: "المظهر", labelEn: "Display", color: "text-fuchsia-500" }, // آخر واحد
+];
 
   const resolvedName = (isAR ? user?.displayNameAr : user?.displayNameEn) || user?.displayName || "";
   const roleLabel = isAR
@@ -646,12 +648,18 @@ const decryptBackupData = async (backupFile: any, password: string) => {
               className={cn(
                 "w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium transition-all text-start",
                 activeTab === tab.id
-                  ? "bg-primary/10 text-primary shadow-sm"
+                  ? "bg-primary/10 text-primary font-semibold shadow-sm ring-1 ring-primary/20"
                   : "text-muted-foreground hover:bg-muted hover:text-foreground"
               )}
             >
               <tab.icon className={cn("w-3.5 h-3.5 shrink-0", activeTab === tab.id ? "text-primary" : tab.color)} />
-              {isAR ? tab.labelAr : tab.labelEn}
+              <div className="flex items-center justify-between w-full">
+              <span>{isAR ? tab.labelAr : tab.labelEn}</span>
+
+              {activeTab === tab.id && (
+                <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+              )}
+            </div>
             </button>
           ))}
         </nav>
@@ -673,9 +681,21 @@ const decryptBackupData = async (backupFile: any, password: string) => {
         {/* Section title */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold">{isAR ? "إعدادات البرنامج" : "App Settings"}</h1>
+            <h1 className="text-2xl font-bold">
+              {activeTab === "preview" && (isAR ? "المعاينة" : "Preview")}
+              {activeTab === "company" && (isAR ? "بيانات الشركة" : "Company")}
+              {activeTab === "branding" && (isAR ? "الشعارات" : "Branding")}
+              {activeTab === "print" && (isAR ? "أدوات الطباعة" : "Print Tools")}
+              {activeTab === "backup" && (isAR ? "النسخ الاحتياطي" : "Backup")}
+              {activeTab === "display" && (isAR ? "المظهر" : "Display")}
+            </h1>
             <p className="text-sm text-muted-foreground mt-0.5">
-              {isAR ? "تحكم كامل في هوية الشركة وإعدادات الطباعة" : "Full control over company identity and print settings"}
+              {activeTab === "preview" && (isAR ? "معاينة مباشرة لشكل المستندات قبل الطباعة" : "Live preview of documents before printing")}
+              {activeTab === "company" && (isAR ? "إدارة بيانات الشركة الأساسية ومعلومات التواصل" : "Manage company identity and contact details")}
+              {activeTab === "branding" && (isAR ? "إدارة الشعار والختم والعلامة المائية والتوقيعات" : "Manage logo, stamp, watermark, and signatures")}
+              {activeTab === "print" && (isAR ? "ضبط عناوين الفواتير وأدوات الطباعة" : "Configure invoice titles and print tools")}
+              {activeTab === "backup" && (isAR ? "تصدير واستيراد النسخ الاحتياطية بأمان" : "Securely export and import backups")}
+              {activeTab === "display" && (isAR ? "ضبط ألوان ومظهر واجهة البرنامج" : "Customize application colors and appearance")}
             </p>
           </div>
         </div>
@@ -683,16 +703,19 @@ const decryptBackupData = async (backupFile: any, password: string) => {
 
           {/* ── Preview Tab Content ── */}
 
-            {activeTab === "preview" && (
-              <Section
-                icon={Eye}
-                title={isAR ? "المعاينة" : "Preview"}
-                color="bg-indigo-500/5"
-              >
-                <div className="mb-6 rounded-xl border bg-background p-4">
-                  <h3 className="text-sm font-bold mb-3">
+          {activeTab === "preview" && (
+              <div className="bg-gradient-to-br from-primary/5 to-transparent p-4 rounded-2xl border border-primary/10">
+                <Section
+                  icon={Eye}
+                  title={isAR ? "المعاينة" : "Preview"}
+                  color="bg-primary/5"
+                >
+                <div className="mb-6 rounded-xl border bg-background/80 backdrop-blur-sm p-4 transition-all hover:shadow-lg hover:border-primary/30">
+                  <h3 className="text-sm font-bold mb-3 text-primary">
                     {isAR ? "🔍 معاينة مباشرة للمستندات" : "🔍 Live Document Preview"}
                   </h3>
+
+                  <div className="h-0.5 w-12 bg-primary rounded-full mb-4" />
 
                   <div className="space-y-4">
 
@@ -813,7 +836,8 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                   </div>
                 </div>
               </Section>
-              )}
+            </div>
+           )}
 
           {/* ── Backup & Import Tab | النسخ الاحتياطي والاستيراد ── */}
           {activeTab === "backup" && (
@@ -1172,7 +1196,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
               </SectionCard>
 
               {/* ─ App Background ─ */}
-              <SectionCard icon={Wallpaper} title={isAR ? "خلفية التطبيق" : "App Background"} color="bg-indigo-500/5">
+              <SectionCard icon={Wallpaper} title={isAR ? "خلفية التطبيق" : "App Background"}color="bg-primary/5">
                 {/* Type selector */}
                 <div className="grid grid-cols-3 gap-2 mb-5">
                   {([

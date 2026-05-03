@@ -377,14 +377,32 @@ export default function LoginPage() {
                 <div className="space-y-1.5">
                   <label className="block text-xs font-semibold uppercase tracking-wider"
                     style={{ color: loginTheme.textMuted }}>{isAR ? "اسم المستخدم" : "Username"}</label>
-                  <input type="text" value={username} onChange={e => setUsername(e.target.value)} className={inputCls} placeholder={isAR ? "أدخل اسم المستخدم" : "Enter username"} autoComplete="username" required dir="ltr" />
+                  <input
+                    type="text"
+                    value={username}
+                    onChange={e => setUsername(e.target.value)}
+                    className={inputCls}
+                    placeholder={isAR ? "أدخل اسم المستخدم" : "Enter username"}
+                    autoComplete="username"
+                    required
+                    dir={isAR ? "rtl" : "ltr"}
+                  />
                 </div>
                 <div className="space-y-1.5">
                   <label className="block text-xs font-semibold uppercase tracking-wider"
                     style={{ color: loginTheme.textMuted }}>{isAR ? "كلمة السر" : "Password"}</label>
                   <div className="relative">
-                    <input type={showPass ? "text" : "password"} value={password} onChange={e => setPassword(e.target.value)} className={`${inputCls} pl-12`} placeholder="••••••••" autoComplete="current-password" required />
-                    <button type="button" onClick={() => setShowPass(v => !v)} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors">
+                    <input
+                      type={showPass ? "text" : "password"}
+                      value={password}
+                      onChange={e => setPassword(e.target.value)}
+                      className={`${inputCls} ${isAR ? "pl-12" : "pr-12"}`}
+                      placeholder="••••••••"
+                      autoComplete="current-password"
+                      required
+                      dir={isAR ? "rtl" : "ltr"}
+                    />
+                    <button type="button" onClick={() => setShowPass(v => !v)} className={`absolute ${isAR ? "left-3" : "right-3"} top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors`}>
                       {showPass ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                     </button>
                   </div>
@@ -455,12 +473,12 @@ export default function LoginPage() {
                 <div className="space-y-1">
                   <label className="block text-xs font-semibold uppercase tracking-wider"
                     style={{ color: loginTheme.textMuted }}>{isAR ? "الاسم الكامل" : "Full Name"} <span className="text-red-400">*</span></label>
-                  <input type="text" value={reg.displayName} onChange={e => setReg(p => ({ ...p, displayName: e.target.value }))} className={inputCls} placeholder={isAR ? "محمد أحمد" : "John Smith"} required autoComplete="off" />
+                  <input type="text" value={reg.displayName} onChange={e => setReg(p => ({ ...p, displayName: e.target.value }))} className={inputCls} placeholder={isAR ? "الاسم العربي" : "John Smith"} required dir={isAR ? "rtl" : "ltr"} autoComplete="off" />
                 </div>
                 <div className="space-y-1">
                   <label className="block text-xs font-semibold uppercase tracking-wider"
                     style={{ color: loginTheme.textMuted }}>{isAR ? "اسم المستخدم (للدخول)" : "Username (for login)"} <span className="text-red-400">*</span></label>
-                  <input type="text" value={reg.username} onChange={e => setReg(p => ({ ...p, username: e.target.value }))} className={inputCls} placeholder="mohammed123" required dir="ltr" autoComplete="off" />
+                  <input type="text" value={reg.username} onChange={e => setReg(p => ({ ...p, username: e.target.value }))} className={inputCls} placeholder="User123" required dir="ltr" autoComplete="off" />
                 </div>
                 <div className="space-y-1">
                   <label className="block text-xs font-semibold uppercase tracking-wider"
@@ -476,8 +494,8 @@ export default function LoginPage() {
                   <label className="block text-xs font-semibold uppercase tracking-wider"
                     style={{ color: loginTheme.textMuted }}>{isAR ? "كلمة السر" : "Password"} <span className="text-red-400">*</span></label>
                   <div className="relative">
-                    <input type={showRegPass ? "text" : "password"} value={reg.password} onChange={e => setReg(p => ({ ...p, password: e.target.value }))} className={`${inputCls} pl-10`} placeholder={isAR ? "6 أحرف على الأقل" : "At least 6 characters"} required autoComplete="new-password" />
-                    <button type="button" onClick={() => setShowRegPass(v => !v)} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors">
+                    <input type={showRegPass ? "text" : "password"} value={reg.password} onChange={e => setReg(p => ({ ...p, password: e.target.value }))} className={`${inputCls} ${isAR ? "pl-12" : "pr-12"}`} placeholder={isAR ? "6 أحرف على الأقل" : "At least 6 characters"} required autoComplete="new-password" dir={isAR ? "rtl" : "ltr"} />
+                    <button type="button" onClick={() => setShowRegPass(v => !v)} className={`absolute ${isAR ? "left-3" : "right-3"} top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors`}>
                       {showRegPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
                   </div>
@@ -486,8 +504,8 @@ export default function LoginPage() {
                   <label className="block text-xs font-semibold uppercase tracking-wider"
                     style={{ color: loginTheme.textMuted }}>{isAR ? "تأكيد كلمة السر" : "Confirm Password"} <span className="text-red-400">*</span></label>
                   <div className="relative">
-                    <input type={showRegConfirm ? "text" : "password"} value={reg.confirm} onChange={e => setReg(p => ({ ...p, confirm: e.target.value }))} className={`${inputCls} pl-10`} placeholder="••••••••" required autoComplete="new-password" />
-                    <button type="button" onClick={() => setShowRegConfirm(v => !v)} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors">
+                    <input type={showRegConfirm ? "text" : "password"} value={reg.confirm} onChange={e => setReg(p => ({ ...p, confirm: e.target.value }))} className={`${inputCls} ${isAR ? "pl-12" : "pr-12"}`} placeholder="••••••••" required autoComplete="new-password" dir={isAR ? "rtl" : "ltr"} />
+                    <button type="button" onClick={() => setShowRegConfirm(v => !v)} className={`absolute ${isAR ? "left-3" : "right-3"} top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors`}>
                       {showRegConfirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
                   </div>
@@ -641,7 +659,7 @@ export default function LoginPage() {
                   <label className="block text-xs font-semibold uppercase tracking-wider"
                     style={{ color: loginTheme.textMuted }}>{isAR ? "اسم المستخدم" : "Username"}</label>
                   <input type="text" value={forgotUsername} onChange={e => setForgotUsername(e.target.value)}
-                    className={inputCls} placeholder={isAR ? "أدخل اسم المستخدم" : "Enter username"} dir="ltr" required autoComplete="username" />
+                    className={inputCls} placeholder={isAR ? "أدخل اسم المستخدم" : "Enter username"} dir={isAR ? "rtl" : "ltr"} required autoComplete="username" />
                 </div>
 
                 {error && (
@@ -752,8 +770,8 @@ export default function LoginPage() {
                     style={{ color: loginTheme.textMuted }}>{isAR ? "كلمة السر الجديدة" : "New Password"}</label>
                   <div className="relative">
                     <input type={showNewPass ? "text" : "password"} value={newPassword} onChange={e => setNewPassword(e.target.value)}
-                      className={`${inputCls} ${isAR ? "pr-4 pl-12" : "pl-4 pr-12"}`}
-                      placeholder={isAR ? "6 أحرف على الأقل" : "At least 6 characters"} required autoComplete="new-password" />
+                      className={`${inputCls} ${isAR ? "pl-12" : "pr-12"}`}
+                      placeholder={isAR ? "6 أحرف على الأقل" : "At least 6 characters"} required autoComplete="new-password" dir={isAR ? "rtl" : "ltr"} />
                     <button type="button" onClick={() => setShowNewPass(v => !v)}
                       className={`absolute ${isAR ? "left-3" : "right-3"} top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors`}>
                       {showNewPass ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
@@ -766,8 +784,8 @@ export default function LoginPage() {
                     style={{ color: loginTheme.textMuted }}>{isAR ? "تأكيد كلمة السر" : "Confirm Password"}</label>
                   <div className="relative">
                     <input type={showConfirmPass ? "text" : "password"} value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)}
-                      className={`${inputCls} ${isAR ? "pr-4 pl-12" : "pl-4 pr-12"}`}
-                      placeholder="••••••••" required autoComplete="new-password" />
+                      className={`${inputCls} ${isAR ? "pl-12" : "pr-12"}`}
+                      placeholder="••••••••" required autoComplete="new-password" dir={isAR ? "rtl" : "ltr"} />
                     <button type="button" onClick={() => setShowConfirmPass(v => !v)}
                       className={`absolute ${isAR ? "left-3" : "right-3"} top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors`}>
                       {showConfirmPass ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
@@ -793,7 +811,7 @@ export default function LoginPage() {
         </AnimatePresence>
 
         <p className="text-center text-white/25 text-xs mt-6 font-medium">
-          {isAR ? "نظام المحاسبة الداخلي للتخليص الجمركي - محمد سيد عب العال - تلفون 60020446" : "Internal Accounting System For Customs Clearance - Mohamed Said Abou Elala - Phone 60020446"}
+          {isAR ? "نظام المحاسبة الداخلي للتخليص الجمركي - محمد سيد عبد العال - تلفون 60020446" : "Internal Accounting System For Customs Clearance - Mohamed Said Abou Elala - Phone 60020446"}
                   </p>
       </motion.div>
     </div>
