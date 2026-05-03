@@ -85,6 +85,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
     { name: t("dashboard"), href: "/", icon: LayoutDashboard, color: "text-blue-400" },
     { name: t("invoices"), href: "/invoices", icon: FileText, color: "text-sky-400" },
     { name: t("receipts"), href: "/receipts", icon: ReceiptText, color: "text-emerald-400" },
+    { name: "customerLedger", href: "/customer-ledger", icon: FileText, color: "text-indigo-400" },
     { name: t("statements"), href: "/statements", icon: BookOpen, color: "text-teal-400" },
     { name: t("templates"), href: "/templates", icon: PackageSearch, color: "text-amber-400" },
     { name: t("clients"), href: "/clients", icon: Users, color: "text-violet-400" },
@@ -158,7 +159,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                     isActive ? "text-primary" : item.color
                   )} />
                 </div>
-                <span className="text-sm font-semibold">{item.name}</span>
+                <span className="text-sm font-semibold">{t(item.name as any) || item.name}</span>
                 {isActive && (
                   <motion.div
                     layoutId="activeIndicator"

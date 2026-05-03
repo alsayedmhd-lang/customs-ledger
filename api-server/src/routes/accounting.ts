@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { db, invoicesTable, clientsTable, invoiceAccountingTable } from "@workspace/db";
+import { db, invoicesTable, clientsTable, invoiceAccountingTable, customerLedgerTableSqlite } from "@workspace/db";
 import { eq, isNull, desc, and } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth";
 
@@ -9,6 +9,27 @@ function toNumber(value: unknown): number {
   const n = parseFloat(String(value ?? "0"));
   return Number.isFinite(n) ? n : 0;
 }
+
+router.get("/customer-ledger/:clientId", requireAuth, async (req, res) => {
+  try {
+    const clientId = Number(req.params.clientId);
+
+    if (Number.isNaN(clientId)) {
+      return res.status(400).json({ error: "Invalid client id" });
+    }
+
+    const rows = await db
+      .select()
+      .from(customerLedgerTableSqlite)
+      .where(eq(customerLedgerTableSqlite.clientId, clientId))
+      .orderBy(customerLedgerTableSqlite.entryDate, customerLedgerTableSqlite.id);
+
+    res.json(rows);
+  } catch (err) {
+    console.error("[GET /customer-ledger/:clientId ERROR]", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
 
 router.get("/accounting", requireAuth, async (req, res) => {
   try {

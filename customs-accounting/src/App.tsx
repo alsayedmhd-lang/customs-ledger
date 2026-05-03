@@ -29,6 +29,7 @@ import UsersPage from "./pages/users/index";
 import TrashPage from "./pages/trash/index";
 import AccountingPage from "./pages/accounting/index";
 import SettingsPage from "./pages/settings/index";
+import CustomerLedgerPage from "./pages/customer-ledger";
 
 const queryClient = new QueryClient();
 
@@ -72,6 +73,7 @@ function ProtectedRouter() {
         <Route path="/accounting" component={AccountingPage} />
         <Route path="/trash" component={TrashPage} />
         <Route path="/settings" component={SettingsPage} />
+        <Route path="/customer-ledger" component={CustomerLedgerPage} />
         <Route component={NotFound} />
       </Switch>
     </RouteWrapper>
