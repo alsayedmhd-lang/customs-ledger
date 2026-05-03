@@ -212,6 +212,30 @@ router.post("/invoices", requireAuth, async (req, res) => {
 
           createdBy: req.user?.userId ?? null,
         });
+
+        if (Number(inserted.advancePayment ?? 0) > 0) {
+          await db.insert(customerLedgerTableSqlite).values({
+            clientId: inserted.clientId,
+            invoiceId: inserted.id,
+            receiptId: null,
+
+            entryDate: new Date().toISOString().split("T")[0],
+            entryType: "advance",
+
+            descriptionAr: `دفعة مقدمة للفاتورة ${inserted.invoiceNumber}`,
+            descriptionEn: `Advance payment for invoice ${inserted.invoiceNumber}`,
+
+            referenceType: "invoice",
+            referenceNumber: inserted.invoiceNumber,
+
+            debit: 0,
+            credit: Number(inserted.advancePayment ?? 0),
+
+            balanceImpact: -Number(inserted.advancePayment ?? 0),
+
+            createdBy: req.user?.userId ?? null,
+          });
+        }
                   
       await db.insert(invoiceAuditLogsTableSqlite).values({
         invoiceId: inserted.id,

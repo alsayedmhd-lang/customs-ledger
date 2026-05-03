@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db, invoicesTable, clientsTable, invoiceAccountingTable, customerLedgerTableSqlite } from "@workspace/db";
-import { eq, isNull, desc, and } from "drizzle-orm";
+import { eq, isNull, desc, and, gte, lte, lt } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth";
 
 const router: IRouter = Router();
@@ -14,17 +14,52 @@ router.get("/customer-ledger/:clientId", requireAuth, async (req, res) => {
   try {
     const clientId = Number(req.params.clientId);
 
-    if (Number.isNaN(clientId)) {
-      return res.status(400).json({ error: "Invalid client id" });
-    }
+      if (Number.isNaN(clientId)) {
+        return res.status(400).json({ error: "Invalid client id" });
+      }
 
-    const rows = await db
-      .select()
-      .from(customerLedgerTableSqlite)
-      .where(eq(customerLedgerTableSqlite.clientId, clientId))
-      .orderBy(customerLedgerTableSqlite.entryDate, customerLedgerTableSqlite.id);
+      const { from, to } = req.query;
 
-    res.json(rows);
+  let whereClause = eq(customerLedgerTableSqlite.clientId, clientId);
+
+  if (from && to) {
+    whereClause = and(
+      eq(customerLedgerTableSqlite.clientId, clientId),
+      gte(customerLedgerTableSqlite.entryDate, String(from)),
+      lte(customerLedgerTableSqlite.entryDate, String(to))
+    );
+  }
+
+  let openingBalance = 0;
+
+if (from) {
+  const previous = await db
+    .select()
+    .from(customerLedgerTableSqlite)
+    .where(
+      and(
+        eq(customerLedgerTableSqlite.clientId, clientId),
+        lt(customerLedgerTableSqlite.entryDate, String(from))
+      )
+    );
+
+  openingBalance = previous.reduce(
+    (sum, r) => sum + Number(r.balanceImpact ?? 0),
+    0
+  );
+}
+
+  const rows = await db
+    .select()
+    .from(customerLedgerTableSqlite)
+    .where(whereClause)
+    .orderBy(customerLedgerTableSqlite.entryDate, customerLedgerTableSqlite.id);
+
+    res.json({
+  rows,
+  openingBalance,
+});
+
   } catch (err) {
     console.error("[GET /customer-ledger/:clientId ERROR]", err);
     res.status(500).json({ error: "Internal server error" });

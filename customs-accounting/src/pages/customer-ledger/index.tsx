@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 export default function CustomerLedgerPage() {
   const [data, setData] = useState<any[]>([]);
+  const [openingBalance, setOpeningBalance] = useState(0);
   const [clients, setClients] = useState<any[]>([]);
   const [clientId, setClientId] = useState<number | "">("");
 
@@ -32,7 +33,10 @@ export default function CustomerLedgerPage() {
       }
     )
       .then((res) => res.json())
-      .then((res) => setData(Array.isArray(res) ? res : []))
+      .then((res) => {
+        setData(Array.isArray(res) ? res : res.rows ?? []);
+        setOpeningBalance(res.openingBalance ?? 0);
+      })
       .catch(console.error);
   };
 
@@ -40,7 +44,7 @@ export default function CustomerLedgerPage() {
     <div className="p-6 space-y-4">
       <h1 className="text-2xl font-bold">ملخص العميل المالي</h1>
 
-      <div className="grid grid-cols-4 gap-3 bg-white border rounded-xl p-4">
+      <div className="grid grid-cols-4 gap-3 bg-white border rounded-xl p-4 items-end">
         <div>
           <label className="text-sm font-medium">العميل</label>
           <select
@@ -73,7 +77,7 @@ export default function CustomerLedgerPage() {
         <div className="flex items-end">
           <button
               onClick={loadLedger}
-              className="w-full bg-purple-600 text-white rounded-lg p-2"
+               className="w-full bg-purple-600 text-white rounded-lg h-[42px]"
             >
             بحث
           </button>
@@ -93,24 +97,47 @@ export default function CustomerLedgerPage() {
 
         <tbody>
           {(() => {
-            let balance = 0;
+            let balance = openingBalance;
 
-            return data.map((row) => {
-              balance += Number(row.balanceImpact ?? 0);
-
-              return (
-                <tr key={row.id}>
-                  <td className="p-2 border">{row.entryDate}</td>
-                  <td className="p-2 border">{row.entryType}</td>
-                  <td className="p-2 border">{row.debit}</td>
-                  <td className="p-2 border">{row.credit}</td>
-                  <td className="p-2 border font-bold">{balance}</td>
+            return (
+              <>
+                <tr className="bg-gray-50">
+                  <td className="p-2 border text-gray-400">—</td>
+                  <td className="p-2 border font-semibold">رصيد سابق</td>
+                  <td className="p-2 border">0</td>
+                  <td className="p-2 border">0</td>
+                  <td className="p-2 border font-bold text-blue-600">
+                    {openingBalance}
+                  </td>
                 </tr>
-              );
-            });
+
+                {data.map((row) => {
+                  balance += Number(row.balanceImpact ?? 0);
+
+                  return (
+                    <tr key={row.id}>
+                      <td className="p-2 border">{row.entryDate}</td>
+
+                      <td className="p-2 border">
+                        {row.entryType === "invoice"
+                          ? "فاتورة"
+                          : row.entryType === "receipt"
+                          ? "سند قبض"
+                          : row.entryType === "advance"
+                          ? "دفعة مقدمة"
+                          : row.entryType}
+                      </td>
+                      <td className="p-2 border">{row.debit}</td>
+                      <td className="p-2 border">{row.credit}</td>
+                      <td className="p-2 border font-bold">{balance}</td>
+                    </tr>
+                  );
+                })}
+              </>
+            );
           })()}
         </tbody>
       </table>
-    </div>
-  );
-}
+      </div>
+    );
+  }
