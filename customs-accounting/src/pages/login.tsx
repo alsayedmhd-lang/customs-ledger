@@ -1,4 +1,5 @@
 import { useCompanySettings } from "@/lib/company-settings-context";
+import { COLOR_PRESETS, useDisplaySettings } from "@/lib/display-settings-context";
 import { useState, FormEvent, useRef, KeyboardEvent } from "react";
 import { useAuth, type OtpPending } from "@/lib/auth-context";
 import { useLocation } from "wouter";
@@ -61,7 +62,36 @@ export default function LoginPage() {
   const [, setLocation] = useLocation();
   const { lang, setLang } = useLanguage();
   const isAR = lang === "ar";
+  const isDark = true; // حاليا ثابت
   const { settings } = useCompanySettings();
+  const { display } = useDisplaySettings();
+  const displayPrimary = COLOR_PRESETS[display.primaryColor] ?? COLOR_PRESETS.blue;
+  const primaryColor = "hsl(var(--primary))";
+  const primaryShadow = "0 6px 20px hsl(var(--primary) / 0.35)";
+  const logoShadow = `drop-shadow(0 0 24px ${displayPrimary.hex}66)`;
+
+  const loginTheme = isDark
+    ? {
+        pageBg: `linear-gradient(135deg, ${primaryColor} 0%, #111827 45%, ${primaryColor} 100%)`,
+        cardBg: "rgba(255,255,255,0.08)",
+        cardBorder: "rgba(255,255,255,0.15)",
+        textMain: "#ffffff",
+        textMuted: "rgba(255,255,255,0.7)",
+        inputBg: "rgba(255,255,255,0.1)",
+        inputText: "#ffffff",
+        inputPlaceholder: "rgba(255,255,255,0.4)",
+      }
+    : {
+        pageBg: "#f1f5f9",
+        cardBg: "#ffffff",
+        cardBorder: "#e2e8f0",
+        textMain: "#0f172a",
+        textMuted: "#64748b",
+        inputBg: "#ffffff",
+        inputText: "#0f172a",
+        inputPlaceholder: "#94a3b8",
+      };
+
   
   // Login state
   const [username, setUsername] = useState("");
@@ -279,21 +309,15 @@ export default function LoginPage() {
     return parts.join(isAR ? " أو " : " or ");
   }
 
-  const inputCls = "w-full px-4 py-3 bg-white/10 border border-white/25 rounded-xl text-white placeholder-white/30 outline-none focus:ring-2 focus:ring-blue-300/50 focus:border-blue-300 transition-all text-sm font-medium";
+  const inputCls =
+  "w-full px-4 py-3 bg-white/90 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-blue-400/60 focus:border-blue-400 transition-all text-sm font-medium shadow-sm";
 
   return (
     <div
       className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden"
       dir={isAR ? "rtl" : "ltr"}
-      style={{ background: "linear-gradient(135deg, #0f172a 0%, #1e3a5f 40%, #0f172a 100%)" }}
+      style={{ background: loginTheme.pageBg }}
     >
-      {/* Decorative circles */}
-      <div className="absolute top-[-120px] right-[-120px] w-[420px] h-[420px] rounded-full opacity-10"
-        style={{ background: "radial-gradient(circle, #3b82f6, transparent)" }} />
-      <div className="absolute bottom-[-80px] left-[-80px] w-[320px] h-[320px] rounded-full opacity-10"
-        style={{ background: "radial-gradient(circle, #6366f1, transparent)" }} />
-      <div className="absolute top-1/2 left-1/4 w-[200px] h-[200px] rounded-full opacity-5"
-        style={{ background: "radial-gradient(circle, #38bdf8, transparent)" }} />
 
       <motion.div
         initial={{ opacity: 0, y: 24 }}
@@ -308,12 +332,18 @@ export default function LoginPage() {
               src={settings.logoBase64 || LOGO}
               alt="اسم الشركة "
               className="w-36 h-36 object-contain drop-shadow-2xl"
-              style={{ filter: "drop-shadow(0 0 24px rgba(59,130,246,0.4))" }}
+              style={{ filter: logoShadow }}
               onError={(e) => { e.currentTarget.style.display = "none"; }}
             />
             <div>
-              <h1 className="text-3xl font-black text-white leading-tight tracking-wide">{isAR ? settings.nameAr || "اسم الشركة " : settings.nameEn || "Around The World"}</h1>
-              <p className="text-blue-300 font-semibold mt-0.5 text-sm tracking-widest uppercase"> {isAR ? settings.subtitleAr || "نشاط الشركة" : settings.subtitleEn || "Customs Clearance"}</p>
+              <h1
+                className="text-3xl font-black leading-tight tracking-wide"
+                style={{ color: loginTheme.textMain }}
+              >{isAR ? settings.nameAr || "اسم الشركة " : settings.nameEn || "Around The World"}</h1>
+              <p
+              className="font-semibold mt-0.5 text-sm tracking-widest uppercase"
+              style={{ color: loginTheme.textMuted }}
+            > {isAR ? settings.subtitleAr || "نشاط الشركة" : settings.subtitleEn || "Customs Clearance"}</p>
             </div>
           </div>
         </div>
@@ -322,12 +352,19 @@ export default function LoginPage() {
           {/* ── LOGIN ── */}
           {mode === "login" && (
             <motion.div key="login" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}
-              className="bg-white/10 backdrop-blur-xl border border-white/15 rounded-3xl p-8 shadow-2xl"
+              className="rounded-3xl p-8 shadow-xl backdrop-blur-xl"
+              style={{
+                background: loginTheme.cardBg,
+                borderColor: loginTheme.cardBorder,
+              }}
             >
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-2">
                   <div className="p-2 rounded-xl bg-blue-500/20"><LogIn className="w-5 h-5 text-blue-300" /></div>
-                  <h2 className="text-lg font-bold text-white">{isAR ? "تسجيل الدخول - SQLite" : "Sign In - SQLite"}</h2>
+                  <h2
+                className="text-lg font-bold"
+                style={{ color: loginTheme.textMain }}
+              >{isAR ? "تسجيل الدخول - SQLite" : "Sign In - SQLite"}</h2>
                 </div>
                 <button type="button" onClick={() => setLang(isAR ? "en" : "ar")}
                   className="text-white/35 hover:text-white/80 text-xs font-semibold tracking-widest transition-colors uppercase"
@@ -338,11 +375,13 @@ export default function LoginPage() {
 
               <form onSubmit={handleLogin} className="space-y-4">
                 <div className="space-y-1.5">
-                  <label className="block text-xs font-semibold text-blue-200 uppercase tracking-wider">{isAR ? "اسم المستخدم" : "Username"}</label>
+                  <label className="block text-xs font-semibold uppercase tracking-wider"
+                    style={{ color: loginTheme.textMuted }}>{isAR ? "اسم المستخدم" : "Username"}</label>
                   <input type="text" value={username} onChange={e => setUsername(e.target.value)} className={inputCls} placeholder={isAR ? "أدخل اسم المستخدم" : "Enter username"} autoComplete="username" required dir="ltr" />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="block text-xs font-semibold text-blue-200 uppercase tracking-wider">{isAR ? "كلمة السر" : "Password"}</label>
+                  <label className="block text-xs font-semibold uppercase tracking-wider"
+                    style={{ color: loginTheme.textMuted }}>{isAR ? "كلمة السر" : "Password"}</label>
                   <div className="relative">
                     <input type={showPass ? "text" : "password"} value={password} onChange={e => setPassword(e.target.value)} className={`${inputCls} pl-12`} placeholder="••••••••" autoComplete="current-password" required />
                     <button type="button" onClick={() => setShowPass(v => !v)} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors">
@@ -357,9 +396,15 @@ export default function LoginPage() {
                   >{error}</motion.div>
                 )}
 
-                <button type="submit" disabled={loading}
-                  className="w-full bg-gradient-to-l from-blue-500 to-blue-600 hover:from-blue-400 hover:to-blue-500 disabled:opacity-50 text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-blue-900/40 flex items-center justify-center gap-2 mt-2"
-                >
+                <button
+                    type="submit"
+                    disabled={loading}
+                    style={{
+                      background: `linear-gradient(to left, ${primaryColor}, ${primaryColor})`,
+                      boxShadow: primaryShadow,
+                    }}
+                    className="w-full text-white font-bold py-3 rounded-xl transition-all shadow-lg flex items-center justify-center gap-2 mt-2 disabled:opacity-50"
+                  >
                   {loading ? <span className="flex items-center gap-2"><svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>{isAR ? "جارٍ التحقق..." : "Signing in..."}</span> : <><LogIn className="w-4 h-4" />{isAR ? "دخول" : "Sign In"}</>}
                 </button>
               </form>
@@ -385,12 +430,19 @@ export default function LoginPage() {
           {/* ── REGISTER ── */}
           {mode === "register" && (
             <motion.div key="register" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}
-              className="bg-white/10 backdrop-blur-xl border border-white/15 rounded-3xl p-8 shadow-2xl"
+              className="rounded-3xl p-8 shadow-xl backdrop-blur-xl"
+              style={{
+                background: loginTheme.cardBg,
+                borderColor: loginTheme.cardBorder,
+              }}
             >
               <div className="flex items-center justify-between mb-5">
                 <div className="flex items-center gap-2">
                   <div className="p-2 rounded-xl bg-emerald-500/20"><UserPlus className="w-5 h-5 text-emerald-300" /></div>
-                  <h2 className="text-lg font-bold text-white">{isAR ? "إنشاء حساب جديد" : "Create New Account"}</h2>
+                  <h2
+                  className="text-lg font-bold"
+                  style={{ color: loginTheme.textMain }}
+                >{isAR ? "إنشاء حساب جديد" : "Create New Account"}</h2>
                 </div>
                 <button type="button" onClick={() => setLang(isAR ? "en" : "ar")}
                   className="text-white/35 hover:text-white/80 text-xs font-semibold tracking-widest transition-colors uppercase"
@@ -401,23 +453,28 @@ export default function LoginPage() {
 
               <form onSubmit={handleRegister} className="space-y-3" autoComplete="off">
                 <div className="space-y-1">
-                  <label className="block text-xs font-semibold text-blue-200 uppercase tracking-wider">{isAR ? "الاسم الكامل" : "Full Name"} <span className="text-red-400">*</span></label>
+                  <label className="block text-xs font-semibold uppercase tracking-wider"
+                    style={{ color: loginTheme.textMuted }}>{isAR ? "الاسم الكامل" : "Full Name"} <span className="text-red-400">*</span></label>
                   <input type="text" value={reg.displayName} onChange={e => setReg(p => ({ ...p, displayName: e.target.value }))} className={inputCls} placeholder={isAR ? "محمد أحمد" : "John Smith"} required autoComplete="off" />
                 </div>
                 <div className="space-y-1">
-                  <label className="block text-xs font-semibold text-blue-200 uppercase tracking-wider">{isAR ? "اسم المستخدم (للدخول)" : "Username (for login)"} <span className="text-red-400">*</span></label>
+                  <label className="block text-xs font-semibold uppercase tracking-wider"
+                    style={{ color: loginTheme.textMuted }}>{isAR ? "اسم المستخدم (للدخول)" : "Username (for login)"} <span className="text-red-400">*</span></label>
                   <input type="text" value={reg.username} onChange={e => setReg(p => ({ ...p, username: e.target.value }))} className={inputCls} placeholder="mohammed123" required dir="ltr" autoComplete="off" />
                 </div>
                 <div className="space-y-1">
-                  <label className="block text-xs font-semibold text-blue-200 uppercase tracking-wider">{isAR ? "البريد الإلكتروني" : "Email"}</label>
+                  <label className="block text-xs font-semibold uppercase tracking-wider"
+                    style={{ color: loginTheme.textMuted }}>{isAR ? "البريد الإلكتروني" : "Email"}</label>
                   <input type="email" value={reg.email} onChange={e => setReg(p => ({ ...p, email: e.target.value }))} className={inputCls} placeholder="user@example.com" dir="ltr" autoComplete="off" />
                 </div>
                 <div className="space-y-1">
-                  <label className="block text-xs font-semibold text-blue-200 uppercase tracking-wider">{isAR ? "رقم الهاتف" : "Phone Number"}</label>
+                  <label className="block text-xs font-semibold uppercase tracking-wider"
+                    style={{ color: loginTheme.textMuted }}>{isAR ? "رقم الهاتف" : "Phone Number"}</label>
                   <input type="tel" value={reg.phone} onChange={e => setReg(p => ({ ...p, phone: e.target.value }))} className={inputCls} placeholder="974XXXXXXXX" dir="ltr" autoComplete="off" />
                 </div>
                 <div className="space-y-1">
-                  <label className="block text-xs font-semibold text-blue-200 uppercase tracking-wider">{isAR ? "كلمة السر" : "Password"} <span className="text-red-400">*</span></label>
+                  <label className="block text-xs font-semibold uppercase tracking-wider"
+                    style={{ color: loginTheme.textMuted }}>{isAR ? "كلمة السر" : "Password"} <span className="text-red-400">*</span></label>
                   <div className="relative">
                     <input type={showRegPass ? "text" : "password"} value={reg.password} onChange={e => setReg(p => ({ ...p, password: e.target.value }))} className={`${inputCls} pl-10`} placeholder={isAR ? "6 أحرف على الأقل" : "At least 6 characters"} required autoComplete="new-password" />
                     <button type="button" onClick={() => setShowRegPass(v => !v)} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors">
@@ -426,7 +483,8 @@ export default function LoginPage() {
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <label className="block text-xs font-semibold text-blue-200 uppercase tracking-wider">{isAR ? "تأكيد كلمة السر" : "Confirm Password"} <span className="text-red-400">*</span></label>
+                  <label className="block text-xs font-semibold uppercase tracking-wider"
+                    style={{ color: loginTheme.textMuted }}>{isAR ? "تأكيد كلمة السر" : "Confirm Password"} <span className="text-red-400">*</span></label>
                   <div className="relative">
                     <input type={showRegConfirm ? "text" : "password"} value={reg.confirm} onChange={e => setReg(p => ({ ...p, confirm: e.target.value }))} className={`${inputCls} pl-10`} placeholder="••••••••" required autoComplete="new-password" />
                     <button type="button" onClick={() => setShowRegConfirm(v => !v)} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 hover:text-white transition-colors">
@@ -485,7 +543,11 @@ export default function LoginPage() {
           {/* ── OTP ── */}
           {mode === "otp" && (
             <motion.div key="otp" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}
-              className="bg-white/10 backdrop-blur-xl border border-white/15 rounded-3xl p-8 shadow-2xl"
+              className="rounded-3xl p-8 shadow-xl backdrop-blur-xl"
+              style={{
+                background: loginTheme.cardBg,
+                borderColor: loginTheme.cardBorder,
+              }}
             >
               <div className="flex flex-col items-center mb-6">
                 <div className="bg-blue-500/20 p-3 rounded-2xl mb-3 ring-1 ring-blue-400/30">
@@ -549,12 +611,19 @@ export default function LoginPage() {
           {/* ── FORGOT PASSWORD ── */}
           {mode === "forgot" && (
             <motion.div key="forgot" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}
-              className="bg-white/10 backdrop-blur-xl border border-white/15 rounded-3xl p-8 shadow-2xl"
+              className="rounded-3xl p-8 shadow-xl backdrop-blur-xl"
+              style={{
+                background: loginTheme.cardBg,
+                borderColor: loginTheme.cardBorder,
+              }}
             >
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-2">
                   <div className="p-2 rounded-xl bg-amber-500/20"><KeyRound className="w-5 h-5 text-amber-300" /></div>
-                  <h2 className="text-lg font-bold text-white">{isAR ? "نسيت كلمة المرور؟" : "Forgot Password?"}</h2>
+                  <h2
+                  className="text-lg font-bold"
+                  style={{ color: loginTheme.textMain }}
+                >{isAR ? "نسيت كلمة المرور؟" : "Forgot Password?"}</h2>
                 </div>
                 <button type="button" onClick={() => setLang(isAR ? "en" : "ar")}
                   className="text-white/35 hover:text-white/80 text-xs font-semibold tracking-widest transition-colors uppercase"
@@ -569,7 +638,8 @@ export default function LoginPage() {
 
               <form onSubmit={handleForgotPassword} className="space-y-4">
                 <div className="space-y-1.5">
-                  <label className="block text-xs font-semibold text-blue-200 uppercase tracking-wider">{isAR ? "اسم المستخدم" : "Username"}</label>
+                  <label className="block text-xs font-semibold uppercase tracking-wider"
+                    style={{ color: loginTheme.textMuted }}>{isAR ? "اسم المستخدم" : "Username"}</label>
                   <input type="text" value={forgotUsername} onChange={e => setForgotUsername(e.target.value)}
                     className={inputCls} placeholder={isAR ? "أدخل اسم المستخدم" : "Enter username"} dir="ltr" required autoComplete="username" />
                 </div>
@@ -601,7 +671,11 @@ export default function LoginPage() {
           {/* ── RESET OTP ── */}
           {mode === "reset-otp" && (
             <motion.div key="reset-otp" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}
-              className="bg-white/10 backdrop-blur-xl border border-white/15 rounded-3xl p-8 shadow-2xl"
+              className="rounded-3xl p-8 shadow-xl backdrop-blur-xl"
+              style={{
+                background: loginTheme.cardBg,
+                borderColor: loginTheme.cardBorder,
+              }}
             >
               <div className="flex flex-col items-center mb-6">
                 <div className="bg-amber-500/20 p-3 rounded-2xl mb-3 ring-1 ring-amber-400/30">
@@ -658,16 +732,24 @@ export default function LoginPage() {
           {/* ── NEW PASSWORD ── */}
           {mode === "new-password" && (
             <motion.div key="new-password" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}
-              className="bg-white/10 backdrop-blur-xl border border-white/15 rounded-3xl p-8 shadow-2xl"
+              className="rounded-3xl p-8 shadow-xl backdrop-blur-xl"
+              style={{
+                background: loginTheme.cardBg,
+                borderColor: loginTheme.cardBorder,
+              }}
             >
               <div className="flex items-center gap-2 mb-6">
                 <div className="p-2 rounded-xl bg-emerald-500/20"><KeyRound className="w-5 h-5 text-emerald-300" /></div>
-                <h2 className="text-lg font-bold text-white">{isAR ? "تعيين كلمة مرور جديدة" : "Set New Password"}</h2>
+                <h2
+                className="text-lg font-bold"
+                style={{ color: loginTheme.textMain }}
+              >{isAR ? "تعيين كلمة مرور جديدة" : "Set New Password"}</h2>
               </div>
 
               <form onSubmit={handleSetNewPassword} className="space-y-4">
                 <div className="space-y-1.5">
-                  <label className="block text-xs font-semibold text-blue-200 uppercase tracking-wider">{isAR ? "كلمة السر الجديدة" : "New Password"}</label>
+                  <label className="block text-xs font-semibold uppercase tracking-wider"
+                    style={{ color: loginTheme.textMuted }}>{isAR ? "كلمة السر الجديدة" : "New Password"}</label>
                   <div className="relative">
                     <input type={showNewPass ? "text" : "password"} value={newPassword} onChange={e => setNewPassword(e.target.value)}
                       className={`${inputCls} ${isAR ? "pr-4 pl-12" : "pl-4 pr-12"}`}
@@ -680,7 +762,8 @@ export default function LoginPage() {
                 </div>
 
                 <div className="space-y-1.5">
-                  <label className="block text-xs font-semibold text-blue-200 uppercase tracking-wider">{isAR ? "تأكيد كلمة السر" : "Confirm Password"}</label>
+                  <label className="block text-xs font-semibold uppercase tracking-wider"
+                    style={{ color: loginTheme.textMuted }}>{isAR ? "تأكيد كلمة السر" : "Confirm Password"}</label>
                   <div className="relative">
                     <input type={showConfirmPass ? "text" : "password"} value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)}
                       className={`${inputCls} ${isAR ? "pr-4 pl-12" : "pl-4 pr-12"}`}
