@@ -54,6 +54,8 @@ release/win-unpacked/resources/api-server/.env
 
 # Build output (Electron)
 release/
+dist/
+node_modules/
 
 # Specific build files (احتياط)
 *.exe
