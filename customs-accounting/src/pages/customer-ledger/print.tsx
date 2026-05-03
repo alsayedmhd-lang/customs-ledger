@@ -178,22 +178,27 @@ export default function CustomerLedgerPrintPage() {
         </Link>
 
         <button
-          onClick={async () => {
-            await savePdf(isAR ? "كشف ملخص الحساب" : "Account Summary");
-          }}
-          className="flex items-center gap-2 px-5 py-2 bg-blue-700 text-white rounded-lg font-medium hover:bg-blue-800"
+        onClick={async () => {
+            const fileName = isAR
+            ? `كشف-ملخص-الحساب-${clientName}-${from || today}-${to || today}`
+            : `Customer-Ledger-${clientName}-${from || today}-${to || today}`;
+
+            await savePdf(fileName);
+        }}
+        className="flex items-center gap-2 px-5 py-2 bg-blue-700 text-white rounded-lg font-medium hover:bg-blue-800"
         >
-          <Printer className="w-4 h-4" />
-          {isAR ? "طباعة pdf" : "Print Account Summary"}
+        <Printer className="w-4 h-4" />
+        {isAR ? "طباعة PDF" : "Print Account Summary"}
         </button>
 
         <button
-          onClick={exportExcel}
-          className="flex items-center gap-2 px-4 py-2 border border-green-600 rounded-lg bg-white text-green-700 hover:bg-green-50 font-medium"
-        >
-          <FileDown className="w-4 h-4" />
-          {isAR ? "طباعة Excel" : "Print Excel"}
-        </button>
+            onClick={exportExcel}
+            disabled={!rows.length}
+            className="flex items-center gap-2 px-5 py-2 border border-green-600 rounded-lg bg-white text-green-700 hover:bg-green-50 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+            <FileDown className="w-4 h-4" />
+            {isAR ? "تصدير Excel" : "Export Excel"}
+            </button>
 
         {settings.showStampOnStatements && (
           <label className="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg bg-white cursor-pointer select-none hover:bg-gray-50">
