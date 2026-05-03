@@ -54,7 +54,7 @@ export default function SettingsPage() {
   const { display, update: updateDisplay } = useDisplaySettings();
   const { settings, refresh, setSettings, logoSrc, stampSrc, watermarkSrc } = useCompanySettings();
   const { toast } = useToast();
-  const [form, setForm] = useState<CompanySettings>({ ...DEFAULT_SETTINGS });
+  const [form, setForm] = useState<any>({ masterPassword: "", ...DEFAULT_SETTINGS });
   const [saving, setSaving] = useState(false);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [stampPreview, setStampPreview] = useState<string | null>(null);
@@ -71,6 +71,7 @@ export default function SettingsPage() {
   const [importPassword, setImportPassword] = useState("");
   const [showBackupPassword, setShowBackupPassword] = useState(false);
   const [showImportPassword, setShowImportPassword] = useState(false);
+  const [showMasterPassword, setShowMasterPassword] = useState(false);
   const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
 
@@ -977,6 +978,37 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                   </div>
                  </div>
 
+                 <div
+                  className="flex items-center justify-between border rounded-lg px-3 py-2 mt-2 w-full"
+                  dir={isAR ? "rtl" : "ltr"}
+                >
+                  <span className="text-sm whitespace-nowrap">
+                    {isAR ? "كلمة مرور الطوارئ (الماستر)" : "Master Emergency Password"}
+                  </span>
+
+                  <div className="relative">
+                    <input
+                      type={showMasterPassword ? "text" : "password"}
+                      value={form.masterPassword || ""}
+                      onChange={(e) => setForm((f) => ({ ...f, masterPassword: e.target.value }))}
+                      placeholder={isAR ? "اتركها فارغة لعدم التغيير" : "Leave empty to keep unchanged"}
+                      className={`h-8 w-40 rounded-md border text-xs ${
+                        isAR ? "pl-8 pr-2" : "pr-8 pl-2"
+                      }`}
+                    />
+
+                    <button
+                      type="button"
+                      onClick={() => setShowMasterPassword((v) => !v)}
+                      className={`absolute top-1/2 -translate-y-1/2 ${
+                        isAR ? "left-2" : "right-2"
+                      } text-gray-600`}
+                    >
+                      {showMasterPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                    </button>
+                  </div>
+                </div>
+
                   <input
                     id="full-import"
                     type="file"
@@ -1081,6 +1113,8 @@ const decryptBackupData = async (backupFile: any, password: string) => {
               </div>
             </Section>
           )}
+
+          
 
           {/* ── Display Tab ── */}
 

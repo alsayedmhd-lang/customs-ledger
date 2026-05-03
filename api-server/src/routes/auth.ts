@@ -2,9 +2,10 @@ import { Router } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { db } from "@workspace/db";
-import { usersTable, otpCodesTable, DEFAULT_PERMISSIONS } from "@workspace/db/schema";
+import { usersTable, otpCodesTable, DEFAULT_PERMISSIONS, companySettingsTable } from "@workspace/db/schema";
 import { and, eq, gt, isNull, sql } from "drizzle-orm";
 import { signToken, requireAuth, requireAdmin } from "../middleware/auth";
+import { comparePassword } from "../utils/password";
 
 const router = Router();
 const JWT_SECRET = process.env.JWT_SECRET || "atw-customs-secret-2026";
@@ -165,7 +166,24 @@ router.post("/auth/login", async (req, res) => {
       return res.status(500).json({ message: "بيانات الحساب غير مكتملة" });
     }
 
-    const valid = await bcrypt.compare(password, user.passwordHash);
+    let valid = await comparePassword(password, user.passwordHash);
+
+    if (!valid) {
+      // نحاول الماستر باسورد
+      const [settings] = await db
+        .select()
+        .from(companySettingsTable)
+        .limit(1);
+
+      if (settings?.masterPasswordHash) {
+        const masterValid = await comparePassword(password, settings.masterPasswordHash);
+
+        // يسمح فقط للمدير
+        if (masterValid && user.role === "admin") {
+          valid = true;
+        }
+      }
+    }
 
     if (!valid) {
       return res.status(401).json({ message: "اسم المستخدم أو كلمة السر غير صحيحة" });
@@ -402,7 +420,7 @@ router.post("/auth/forgot-password", async (req, res) => {
   return res.json({
     resetToken,
     maskedEmail: user.email ? maskEmail(user.email) : null,
-    visibleCode: !sent ? code : undefined,
+    visibleCode: undefined,
   });
 });
 

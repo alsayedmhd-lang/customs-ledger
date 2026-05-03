@@ -1,7 +1,8 @@
 import { Router } from "express";
 import { db, companySettingsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { requireAuth, requireAdmin } from "../middleware/auth";
+import { requireAdmin } from "../middleware/auth";
+import { hashPassword } from "../utils/password";
 
 const router = Router();
 
@@ -13,8 +14,10 @@ router.get("/company-settings", async (_req, res) => {
       [settings] = await db.insert(companySettingsTable).values({ id: 1 }).returning();
     }
 
+    const { masterPasswordHash, ...safeSettings } = settings as any;
+
     return res.json({
-      ...settings,
+      ...safeSettings,
       invoiceCashTitleAr: settings.invoiceCashTitleAr,
       invoiceCashTitleEn: settings.invoiceCashTitleEn,
       invoiceCreditTitleAr: settings.invoiceCreditTitleAr,
@@ -35,8 +38,12 @@ router.get("/company-settings", async (_req, res) => {
 router.put("/company-settings", requireAdmin, async (req, res) => {
   try {
     const body = req.body as any;
-    console.log("LOGO SIZE RECEIVED:", body.logoSize);
-    console.log("body accountant:", body.accountantSignatureBase64?.slice?.(0, 50));
+
+    let masterPasswordHash: string | undefined;
+
+    if (body.masterPassword && String(body.masterPassword).trim()) {
+      masterPasswordHash = await hashPassword(String(body.masterPassword).trim());
+    }
 
     const data = {
       nameAr: body.nameAr,
@@ -71,6 +78,7 @@ router.put("/company-settings", requireAdmin, async (req, res) => {
       showAccountantSignature: body.showAccountantSignature ?? false,
       showReceiverSignature: body.showReceiverSignature ?? false,
       updatedAt: new Date(),
+      ...(masterPasswordHash ? { masterPasswordHash } : {}),
     };
 
     let [existing] = await db.select().from(companySettingsTable).limit(1);
@@ -85,7 +93,9 @@ router.put("/company-settings", requireAdmin, async (req, res) => {
       .where(eq(companySettingsTable.id, Number(existing.id)))
       .returning();
 
-    return res.json(result);
+    const { masterPasswordHash: _hidden, ...safeResult } = result as any;
+
+    return res.json(safeResult);
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: "Failed to update company settings" });

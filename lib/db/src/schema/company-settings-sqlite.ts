@@ -34,6 +34,7 @@ export const companySettingsTableSqlite = sqliteTable("company_settings", {
   showAccountantSignature: integer("show_accountant_signature", { mode: "boolean" }).default(true),
   showReceiverSignature: integer("show_receiver_signature", { mode: "boolean" }).default(true),
   updatedAt: integer("updated_at", { mode: "timestamp_ms" }),
+  masterPasswordHash: text("master_password_hash"),
 });
 
 export type CompanySettingsSqlite = typeof companySettingsTableSqlite.$inferSelect;

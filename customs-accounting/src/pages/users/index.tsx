@@ -6,6 +6,7 @@ import {
   FileText, ReceiptText, UserCog, PackageSearch, Shield, Mail, Phone, UserCheck, Clock, KeyRound
 } from "lucide-react";
 
+
 const API_BASE =
   (import.meta.env.VITE_API_BASE_URL || "http://localhost:3000").replace(/\/$/, "");
 interface AppUser {
@@ -86,6 +87,12 @@ export default function UsersPage() {
   const { user: me } = useAuth();
   const { lang } = useLanguage();
   const isAR = lang === "ar";
+
+  const [showPwd, setShowPwd] = useState({
+    current: false,
+    new: false,
+    confirm: false,
+  });
 
   const [users, setUsers] = useState<AppUser[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -621,7 +628,26 @@ export default function UsersPage() {
             {pwdId === me?.id && (
               <Field label={isAR ? "كلمة السر الحالية" : "Current Password"}><input type="password" value={pwdForm.currentPassword} onChange={e => setPwdForm(p => ({ ...p, currentPassword: e.target.value }))} className={inputCls} required /></Field>
             )}
-            <Field label={isAR ? "كلمة السر الجديدة" : "New Password"}><input type="password" value={pwdForm.newPassword} onChange={e => setPwdForm(p => ({ ...p, newPassword: e.target.value }))} className={inputCls} required /></Field>
+            <Field label={isAR ? "كلمة السر الجديدة" : "New Password"}>
+              <div className="relative w-full">
+                <input
+                  type={showPwd.new ? "text" : "password"}
+                  value={pwdForm.newPassword}
+                  onChange={e => setPwdForm(p => ({ ...p, newPassword: e.target.value }))}
+                  className={`${inputCls} ${isAR ? "pl-10 pr-3" : "pr-10 pl-3"}`}
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPwd(s => ({ ...s, new: !s.new }))}
+                  className={`absolute top-1/2 -translate-y-1/2 ${
+                    isAR ? "left-3" : "right-3"
+                  } text-gray-600`}
+                >
+                  {showPwd.new ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+            </Field>
             <Field label={isAR ? "تأكيد كلمة السر" : "Confirm Password"}><input type="password" value={pwdForm.confirmPassword} onChange={e => setPwdForm(p => ({ ...p, confirmPassword: e.target.value }))} className={inputCls} required /></Field>
             <div className="flex gap-3 pt-2">
               <button type="submit" className="flex-1 bg-primary text-primary-foreground py-2.5 rounded-xl font-medium">{isAR ? "تغيير" : "Change"}</button>
