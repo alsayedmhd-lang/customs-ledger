@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useLocation } from "wouter";
 
 export default function CustomerLedgerPage() {
   const [data, setData] = useState<any[]>([]);
@@ -10,6 +11,8 @@ export default function CustomerLedgerPage() {
     localStorage.getItem("token") ||
     sessionStorage.getItem("auth_token") ||
     localStorage.getItem("auth_token");
+
+  const [, navigate] = useLocation();
 
   useEffect(() => {
     fetch("http://127.0.0.1:3000/api/clients", {
@@ -43,6 +46,24 @@ export default function CustomerLedgerPage() {
   return (
     <div className="p-6 space-y-4">
       <h1 className="text-2xl font-bold">ملخص العميل المالي</h1>
+
+      <button
+        onClick={() => {
+          const from = (document.getElementById("fromDate") as HTMLInputElement)?.value || "";
+          const to = (document.getElementById("toDate") as HTMLInputElement)?.value || "";
+
+          if (!clientId) return;
+
+          navigate(`/customer-ledger/print?clientId=${clientId}&from=${from}&to=${to}`);
+        }}
+        style={{
+          padding: "8px 12px",
+          marginBottom: "10px",
+          cursor: "pointer",
+        }}
+      >
+        الطباعة
+      </button>
 
       <div className="grid grid-cols-4 gap-3 bg-white border rounded-xl p-4 items-end">
         <div>

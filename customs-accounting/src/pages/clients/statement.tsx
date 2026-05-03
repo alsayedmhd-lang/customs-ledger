@@ -116,7 +116,7 @@ export default function ClientStatement() {
           className="flex items-center gap-2 px-5 py-2 bg-blue-700 text-white rounded-lg font-medium hover:bg-blue-800"
         >
           <Printer className="w-4 h-4" />
-          {isAR ? "طباعة كشف الحساب" : "Print Statement"}
+          {isAR ? "طباعة pdf" : "Print pdf"}
         </button>
         {settings.showStampOnStatements && (
           <label className="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg bg-white cursor-pointer select-none hover:bg-gray-50">

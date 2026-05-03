@@ -6,6 +6,7 @@ import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { LanguageProvider } from "@/lib/language-context";
 import { CompanySettingsProvider } from "@/lib/company-settings-context";
 import { DisplaySettingsProvider } from "@/lib/display-settings-context";
+import CustomerLedgerPrintPage from "@/pages/customer-ledger/print";
 import NotFound from "@/pages/not-found";
 
 // Layout
@@ -74,6 +75,7 @@ function ProtectedRouter() {
         <Route path="/trash" component={TrashPage} />
         <Route path="/settings" component={SettingsPage} />
         <Route path="/customer-ledger" component={CustomerLedgerPage} />
+        <Route path="/customer-ledger/print" component={CustomerLedgerPrintPage} />
         <Route component={NotFound} />
       </Switch>
     </RouteWrapper>

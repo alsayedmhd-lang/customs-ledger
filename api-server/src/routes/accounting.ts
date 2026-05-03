@@ -1,188 +1,216 @@
-import { Router, type IRouter } from "express";
-import { db, invoicesTable, clientsTable, invoiceAccountingTable, customerLedgerTableSqlite } from "@workspace/db";
-import { eq, isNull, desc, and, gte, lte, lt } from "drizzle-orm";
-import { requireAuth } from "../middleware/auth";
+  import { Router, type IRouter } from "express";
+  import { db, invoicesTable, receiptsTable, invoiceAccountingTable } from "@workspace/db";
+  import { and, eq, inArray, isNull } from "drizzle-orm";
+  import { requireAuth } from "../middleware/auth";
 
-const router: IRouter = Router();
+  const router: IRouter = Router();
 
-function toNumber(value: unknown): number {
-  const n = parseFloat(String(value ?? "0"));
-  return Number.isFinite(n) ? n : 0;
-}
+  type LedgerRow = {
+    id: string;
+    clientId: number;
+    invoiceId: number | null;
+    receiptId: number | null;
+    entryDate: string;
+    entryType: "invoice" | "advance" | "receipt";
+    descriptionAr: string;
+    descriptionEn: string;
+    referenceType: "invoice" | "receipt";
+    referenceNumber: string;
+    debit: number;
+    credit: number;
+    balanceImpact: number;
+    createdBy: number | null;
+  };
 
-router.get("/customer-ledger/:clientId", requireAuth, async (req, res) => {
-  try {
-    const clientId = Number(req.params.clientId);
+  router.get("/customer-ledger/:clientId", requireAuth, async (req, res) => {
+    try {
+      const clientId = Number(req.params.clientId);
+      const from = req.query.from ? String(req.query.from) : "";
+      const to = req.query.to ? String(req.query.to) : "";
 
-      if (Number.isNaN(clientId)) {
-        return res.status(400).json({ error: "Invalid client id" });
+      if (!Number.isInteger(clientId) || clientId <= 0) {
+        return res.status(400).json({ error: "Invalid clientId" });
       }
 
-      const { from, to } = req.query;
-
-  let whereClause = eq(customerLedgerTableSqlite.clientId, clientId);
-
-  if (from && to) {
-    whereClause = and(
-      eq(customerLedgerTableSqlite.clientId, clientId),
-      gte(customerLedgerTableSqlite.entryDate, String(from)),
-      lte(customerLedgerTableSqlite.entryDate, String(to))
-    );
-  }
-
-  let openingBalance = 0;
-
-if (from) {
-  const previous = await db
-    .select()
-    .from(customerLedgerTableSqlite)
-    .where(
-      and(
-        eq(customerLedgerTableSqlite.clientId, clientId),
-        lt(customerLedgerTableSqlite.entryDate, String(from))
-      )
-    );
-
-  openingBalance = previous.reduce(
-    (sum, r) => sum + Number(r.balanceImpact ?? 0),
-    0
-  );
-}
-
-  const rows = await db
-    .select()
-    .from(customerLedgerTableSqlite)
-    .where(whereClause)
-    .orderBy(customerLedgerTableSqlite.entryDate, customerLedgerTableSqlite.id);
-
-    res.json({
-  rows,
-  openingBalance,
-});
-
-  } catch (err) {
-    console.error("[GET /customer-ledger/:clientId ERROR]", err);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
-
-router.get("/accounting", requireAuth, async (req, res) => {
-  try {
-    const isAdmin = req.user!.role === "admin" || req.user!.role === "supervisor";
-    const userId = req.user!.userId;
-
-    const whereClause = isAdmin
-      ? isNull(invoicesTable.deletedAt)
-      : and(isNull(invoicesTable.deletedAt), eq(invoicesTable.createdBy, userId));
-
-    const rows = await db
-      .select({
-        id: invoicesTable.id,
-        invoiceNumber: invoicesTable.invoiceNumber,
-        clientId: invoicesTable.clientId,
-        clientName: clientsTable.name,
-        issueDate: invoicesTable.issueDate,
-        subtotal: invoicesTable.subtotal,
-        total: invoicesTable.total,
-        accId: invoiceAccountingTable.id,
-        payments: invoiceAccountingTable.payments,
-        transportation: invoiceAccountingTable.transportation,
-        driverName: invoiceAccountingTable.driverName,
-        unloadLocation: invoiceAccountingTable.unloadLocation,
-        labor: invoiceAccountingTable.labor,
-        otherExpenses: invoiceAccountingTable.otherExpenses,
-        transportationPaid: invoiceAccountingTable.transportationPaid,
-        laborPaid: invoiceAccountingTable.laborPaid,
-        otherExpensesPaid: invoiceAccountingTable.otherExpensesPaid,
-      })
-      .from(invoicesTable)
-      .innerJoin(clientsTable, eq(invoicesTable.clientId, clientsTable.id))
-      .leftJoin(invoiceAccountingTable, eq(invoiceAccountingTable.invoiceId, invoicesTable.id))
-      .where(whereClause)
-      .orderBy(desc(invoicesTable.createdAt));
-
-    res.json(
-      rows.map((r) => ({
-        id: r.id,
-        invoiceNumber: r.invoiceNumber,
-        clientName: r.clientName,
-        issueDate: r.issueDate,
-        subtotal: toNumber(r.subtotal),
-        total: toNumber(r.total),
-        payments: toNumber(r.payments),
-        transportation: toNumber(r.transportation),
-        driverName: r.driverName ?? "",
-        unloadLocation: r.unloadLocation ?? "",
-        labor: toNumber(r.labor),
-        otherExpenses: toNumber(r.otherExpenses),
-        transportationPaid: r.transportationPaid ?? false,
-        laborPaid: r.laborPaid ?? false,
-        otherExpensesPaid: r.otherExpensesPaid ?? false,
-      }))
-    );
-  } catch (err) {
-    console.error("[GET /accounting ERROR]", err);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
-
-router.patch("/accounting/:invoiceId", requireAuth, async (req, res) => {
-  try {
-    const invoiceId = parseInt(req.params.invoiceId);
-    const {
-      payments,
-      transportation,
-      driverName,
-      unloadLocation,
-      labor,
-      otherExpenses,
-      transportationPaid,
-      laborPaid,
-      otherExpensesPaid,
-    } = req.body;
-
-    if (Number.isNaN(invoiceId)) {
-      return res.status(400).json({ error: "Invalid invoice id" });
-    }
-
-    const isAdmin = req.user!.role === "admin" || req.user!.role === "supervisor";
-    const userId = req.user!.userId;
-
-    const invoiceWhere = isAdmin
-      ? and(eq(invoicesTable.id, invoiceId), isNull(invoicesTable.deletedAt))
-      : and(
-          eq(invoicesTable.id, invoiceId),
-          eq(invoicesTable.createdBy, userId),
-          isNull(invoicesTable.deletedAt)
+      const invoiceRows = await db
+        .select()
+        .from(invoicesTable)
+        .where(
+          and(
+            eq(invoicesTable.clientId, clientId),
+            isNull(invoicesTable.deletedAt),
+            inArray(invoicesTable.status, ["issued", "paid"])
+          )
         );
 
-    const [invoice] = await db
-      .select({ id: invoicesTable.id })
-      .from(invoicesTable)
-      .where(invoiceWhere)
-      .limit(1);
+      const receiptRows = await db
+        .select()
+        .from(receiptsTable)
+        .where(and(eq(receiptsTable.clientId, clientId), isNull(receiptsTable.deletedAt)));
 
-    if (!invoice) {
-      return res.status(404).json({ error: "Invoice not found" });
+      const allRows: LedgerRow[] = [];
+
+      for (const inv of invoiceRows) {
+        const advance = Number(inv.advancePayment || 0);
+        const grossTotal = Number(inv.subtotal || 0) + Number(inv.taxAmount || 0);
+
+        allRows.push({
+          id: `invoice-${inv.id}`,
+          clientId,
+          invoiceId: inv.id,
+          receiptId: null,
+          entryDate: inv.issueDate,
+          entryType: "invoice",
+          descriptionAr: `فاتورة رقم ${inv.invoiceNumber}`,
+          descriptionEn: `Invoice ${inv.invoiceNumber}`,
+          referenceType: "invoice",
+          referenceNumber: inv.invoiceNumber,
+          debit: grossTotal,
+          credit: 0,
+          balanceImpact: grossTotal,
+          createdBy: inv.createdBy ?? null,
+        });
+
+        const hasReceipt = receiptRows.some(r => r.invoiceId === inv.id);
+
+        if (advance > 0 && !hasReceipt) {
+          allRows.push({
+            id: `advance-${inv.id}`,
+            clientId,
+            invoiceId: inv.id,
+            receiptId: null,
+            entryDate: inv.issueDate,
+            entryType: "advance",
+            descriptionAr: `دفعة مقدمة على فاتورة رقم ${inv.invoiceNumber}`,
+            descriptionEn: `Advance payment for invoice ${inv.invoiceNumber}`,
+            referenceType: "invoice",
+            referenceNumber: inv.invoiceNumber,
+            debit: 0,
+            credit: advance,
+            balanceImpact: -advance,
+            createdBy: inv.createdBy ?? null,
+          });
+        }
+      }
+
+      for (const rec of receiptRows) {
+        const amount = Number(rec.amount || 0);
+
+        allRows.push({
+          id: `receipt-${rec.id}`,
+          clientId,
+          invoiceId: rec.invoiceId ?? null,
+          receiptId: rec.id,
+          entryDate: rec.receiptDate,
+          entryType: "receipt",
+          descriptionAr: `سند قبض رقم ${rec.receiptNumber}`,
+          descriptionEn: `Receipt ${rec.receiptNumber}`,
+          referenceType: "receipt",
+          referenceNumber: rec.receiptNumber,
+          debit: 0,
+          credit: amount,
+          balanceImpact: -amount,
+          createdBy: rec.createdBy ?? null,
+        });
+      }
+
+      const sortedRows = allRows
+        .filter((row) => {
+          if (from && row.entryDate < from) return false;
+          if (to && row.entryDate > to) return false;
+          return true;
+        })
+        .sort((a, b) => {
+          if (a.entryDate === b.entryDate) return a.id.localeCompare(b.id);
+          return a.entryDate.localeCompare(b.entryDate);
+        });
+
+      const previousRows = allRows.filter((row) => from && row.entryDate < from);
+      const openingBalance = previousRows.reduce((sum, row) => sum + row.balanceImpact, 0);
+
+      res.json({
+        rows: sortedRows,
+        openingBalance,
+      });
+    } catch (err) {
+      console.error("[GET /customer-ledger/:clientId ERROR]", err);
+      res.status(500).json({ error: "Internal server error" });
     }
+  });
 
-    const toNum = (v: unknown) =>
-      v !== undefined && v !== null && v !== "" ? String(parseFloat(String(v))) : "0";
+  router.patch("/accounting/:invoiceId", requireAuth, async (req, res) => {
+    try {
+      const invoiceId = parseInt(req.params.invoiceId);
+      const {
+        payments,
+        transportation,
+        driverName,
+        unloadLocation,
+        labor,
+        otherExpenses,
+        transportationPaid,
+        laborPaid,
+        otherExpensesPaid,
+      } = req.body;
 
-    const toStr = (v: unknown) => (v !== undefined && v !== null && String(v).trim() !== "" ? String(v) : null);
+      if (Number.isNaN(invoiceId)) {
+        return res.status(400).json({ error: "Invalid invoice id" });
+      }
 
-    const toBool = (v: unknown) => (v === true || v === "true" ? true : false);
+      const isAdmin = req.user!.role === "admin" || req.user!.role === "supervisor";
+      const userId = req.user!.userId;
 
-    const existing = await db
-      .select()
-      .from(invoiceAccountingTable)
-      .where(eq(invoiceAccountingTable.invoiceId, invoiceId))
-      .limit(1);
+      const invoiceWhere = isAdmin
+        ? and(eq(invoicesTable.id, invoiceId), isNull(invoicesTable.deletedAt))
+        : and(
+            eq(invoicesTable.id, invoiceId),
+            eq(invoicesTable.createdBy, userId),
+            isNull(invoicesTable.deletedAt)
+          );
 
-    if (existing.length > 0) {
-      await db
-        .update(invoiceAccountingTable)
-        .set({
+      const [invoice] = await db
+        .select({ id: invoicesTable.id })
+        .from(invoicesTable)
+        .where(invoiceWhere)
+        .limit(1);
+
+      if (!invoice) {
+        return res.status(404).json({ error: "Invoice not found" });
+      }
+
+      const toNum = (v: unknown) =>
+        v !== undefined && v !== null && v !== "" ? String(parseFloat(String(v))) : "0";
+
+      const toStr = (v: unknown) =>
+        v !== undefined && v !== null && String(v).trim() !== "" ? String(v) : null;
+
+      const toBool = (v: unknown) => v === true || v === "true";
+
+      const existing = await db
+        .select()
+        .from(invoiceAccountingTable)
+        .where(eq(invoiceAccountingTable.invoiceId, invoiceId))
+        .limit(1);
+
+      if (existing.length > 0) {
+        await db
+          .update(invoiceAccountingTable)
+          .set({
+            payments: toNum(payments),
+            transportation: toNum(transportation),
+            driverName: toStr(driverName),
+            unloadLocation: toStr(unloadLocation),
+            labor: toNum(labor),
+            otherExpenses: toNum(otherExpenses),
+            transportationPaid: toBool(transportationPaid),
+            laborPaid: toBool(laborPaid),
+            otherExpensesPaid: toBool(otherExpensesPaid),
+            updatedAt: new Date(),
+          })
+          .where(eq(invoiceAccountingTable.invoiceId, invoiceId));
+      } else {
+        await db.insert(invoiceAccountingTable).values({
+          invoiceId,
           payments: toNum(payments),
           transportation: toNum(transportation),
           driverName: toStr(driverName),
@@ -192,29 +220,14 @@ router.patch("/accounting/:invoiceId", requireAuth, async (req, res) => {
           transportationPaid: toBool(transportationPaid),
           laborPaid: toBool(laborPaid),
           otherExpensesPaid: toBool(otherExpensesPaid),
-          updatedAt: new Date(),
-        })
-        .where(eq(invoiceAccountingTable.invoiceId, invoiceId));
-    } else {
-      await db.insert(invoiceAccountingTable).values({
-        invoiceId,
-        payments: toNum(payments),
-        transportation: toNum(transportation),
-        driverName: toStr(driverName),
-        unloadLocation: toStr(unloadLocation),
-        labor: toNum(labor),
-        otherExpenses: toNum(otherExpenses),
-        transportationPaid: toBool(transportationPaid),
-        laborPaid: toBool(laborPaid),
-        otherExpensesPaid: toBool(otherExpensesPaid),
-      });
+        });
+      }
+
+      res.json({ ok: true });
+    } catch (err) {
+      console.error("[PATCH /accounting/:invoiceId ERROR]", err);
+      res.status(500).json({ error: "Internal server error" });
     }
+  });
 
-    res.json({ ok: true });
-  } catch (err) {
-    console.error("[PATCH /accounting/:invoiceId ERROR]", err);
-    res.status(500).json({ error: "Internal server error" });
-  }
-});
-
-export default router;
+  export default router;
