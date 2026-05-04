@@ -1,10 +1,13 @@
 const { app, BrowserWindow, ipcMain, dialog } = require("electron");
+const { autoUpdater } = require("electron-updater");
 const { spawn } = require("child_process");
 const path = require("path");
 const fs = require("fs");
 
 let backendProcess;
 let mainWindow;
+let updateInfo;
+let updateDownloaded = false;
 
 function safeFileName(name) {
   return String(name || "document")
@@ -97,6 +100,46 @@ function createWindow() {
   }, 3000);
 }
 
+function sendUpdateStatus(channel, payload = {}) {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  mainWindow.webContents.send(channel, payload);
+}
+
+autoUpdater.autoDownload = false;
+autoUpdater.autoInstallOnAppQuit = false;
+
+autoUpdater.on("checking-for-update", () => {
+  sendUpdateStatus("update-checking");
+});
+
+autoUpdater.on("update-available", (info) => {
+  updateInfo = info;
+  updateDownloaded = false;
+  sendUpdateStatus("update-available", info);
+});
+
+autoUpdater.on("update-not-available", (info) => {
+  updateInfo = info;
+  updateDownloaded = false;
+  sendUpdateStatus("update-not-available", info);
+});
+
+autoUpdater.on("download-progress", (progress) => {
+  sendUpdateStatus("update-download-progress", progress);
+});
+
+autoUpdater.on("update-downloaded", (info) => {
+  updateInfo = info;
+  updateDownloaded = true;
+  sendUpdateStatus("update-downloaded", info);
+});
+
+autoUpdater.on("error", (error) => {
+  sendUpdateStatus("update-error", {
+    message: error?.message || String(error),
+  });
+});
+
 ipcMain.handle("save-current-page-pdf", async (event, fileName) => {
   try {
     if (!mainWindow) {
@@ -130,6 +173,38 @@ ipcMain.handle("save-current-page-pdf", async (event, fileName) => {
     console.error("PDF save error:", error);
     return { success: false, error: error.message };
   }
+});
+
+ipcMain.handle("check-for-updates", async () => {
+  if (!app.isPackaged) {
+    const payload = { message: "Updates are only available in the packaged app." };
+    sendUpdateStatus("update-error", payload);
+    return { success: false, ...payload };
+  }
+
+  updateDownloaded = false;
+  const result = await autoUpdater.checkForUpdates();
+  return { success: true, updateInfo: result?.updateInfo || updateInfo || null };
+});
+
+ipcMain.handle("download-update", async () => {
+  if (!app.isPackaged) {
+    const payload = { message: "Updates are only available in the packaged app." };
+    sendUpdateStatus("update-error", payload);
+    return { success: false, ...payload };
+  }
+
+  const files = await autoUpdater.downloadUpdate();
+  return { success: true, files };
+});
+
+ipcMain.handle("install-update", async () => {
+  if (!updateDownloaded) {
+    return { success: false, message: "No downloaded update is ready to install." };
+  }
+
+  autoUpdater.quitAndInstall(false, true);
+  return { success: true };
 });
 
 app.whenReady().then(() => {

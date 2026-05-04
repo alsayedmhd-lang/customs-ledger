@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 import { useDisplaySettings, COLOR_PRESETS, SIDEBAR_COLOR_PRESETS, type PrimaryColor, type BorderRadius, type Density, type SidebarColor, type BgType } from "@/lib/display-settings-context";
 
-type TabId = "preview" | "backup" | "company" | "branding" | "print" | "display";
+type TabId = "preview" | "backup" | "company" | "branding" | "print" | "display" | "update";
 type BackupView = "backup-import" | "database-sync";
 type DatabaseMode = "local" | "online";
 type SyncMode = "local-to-online" | "online-to-local" | "bidirectional";
@@ -63,6 +63,104 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
       <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide">{label}</label>
       {children}
       {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
+    </div>
+  );
+}
+
+type TitleDisplayOptions = {
+  enabled: boolean;
+  align: "left" | "center" | "right";
+  bold: boolean;
+  subtitleAr: string;
+  subtitleEn: string;
+  subtitleSize: number;
+};
+
+function TitleOptionsGrid({
+  title,
+  isAR,
+  value,
+  onChange,
+}: {
+  title: string;
+  isAR: boolean;
+  value: TitleDisplayOptions;
+  onChange: (next: TitleDisplayOptions) => void;
+}) {
+  const update = (patch: Partial<TitleDisplayOptions>) => onChange({ ...value, ...patch });
+
+  return (
+    <div className="space-y-2">
+      <div className="text-xs font-bold text-muted-foreground">{title}</div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+        <div className="space-y-1">
+          <div className="text-[11px] font-medium text-muted-foreground">{isAR ? "تفعيل" : "Toggle"}</div>
+          <label className="flex items-center gap-2 rounded-xl border border-border bg-background px-3 py-2 text-sm">
+            <input
+              type="checkbox"
+              checked={value.enabled}
+              onChange={(e) => update({ enabled: e.target.checked })}
+              className="h-4 w-4 accent-primary"
+            />
+            <span>{isAR ? "إظهار العنوان" : "Show title"}</span>
+          </label>
+        </div>
+
+        <Field label={isAR ? "المحاذاة" : "Align"}>
+          <select
+            value={value.align}
+            onChange={(e) => update({ align: e.target.value as TitleDisplayOptions["align"] })}
+            className={inp}
+            dir="ltr"
+          >
+            <option value="right">right</option>
+            <option value="center">center</option>
+            <option value="left">left</option>
+          </select>
+        </Field>
+
+        <div className="space-y-1">
+          <div className="text-[11px] font-medium text-muted-foreground">{isAR ? "عريض" : "Bold"}</div>
+          <label className="flex items-center gap-2 rounded-xl border border-border bg-background px-3 py-2 text-sm">
+            <input
+              type="checkbox"
+              checked={value.bold}
+              onChange={(e) => update({ bold: e.target.checked })}
+              className="h-4 w-4 accent-primary"
+            />
+            <span>{isAR ? "عريض" : "Bold"}</span>
+          </label>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+        <Field label={isAR ? "العربية" : "Arabic"}>
+          <input
+            value={value.subtitleAr}
+            onChange={(e) => update({ subtitleAr: e.target.value })}
+            className={inp}
+          />
+        </Field>
+
+        <Field label={isAR ? "English" : "English"}>
+          <input
+            value={value.subtitleEn}
+            onChange={(e) => update({ subtitleEn: e.target.value })}
+            className={inp}
+            dir="ltr"
+          />
+        </Field>
+
+        <Field label={isAR ? "الحجم" : "Size"}>
+          <input
+            type="number"
+            value={value.subtitleSize}
+            onChange={(e) => update({ subtitleSize: Number(e.target.value) })}
+            className={inp}
+          />
+        </Field>
+      </div>
     </div>
   );
 }
@@ -289,7 +387,20 @@ function SettingsPrintPreviews({
             style={{ fontFamily: "'Cairo', 'Arial', sans-serif" }}
           >
             <PrintWatermark kind="statement" override={override} />
-            <StatementPrintHeader statementRef="CL-PREVIEW-2026" dateText={today} override={override} />
+            <StatementPrintHeader
+              statementRef="CL-PREVIEW-2026"
+              dateText={today}
+              titleAr={settings.statementTitleAr}
+              titleEn={settings.statementTitleEn}
+              titleFontSize={settings.statementTitleFontSize}
+              titleVisible={settings.statementTitleVisible}
+              titleAlign={settings.statementTitleAlign}
+              titleBold={settings.statementTitleBold}
+              subtitleAr={settings.statementSubtitleAr}
+              subtitleEn={settings.statementSubtitleEn}
+              subtitleFontSize={settings.statementSubtitleFontSize}
+              override={override}
+            />
             <div className="px-6 py-3 border-b border-gray-300 relative z-10">
               <div className="grid grid-cols-2 gap-6">
                 <div className="text-right">
@@ -340,6 +451,76 @@ function SettingsPrintPreviews({
               <StatementStamp override={override} />
             </div>
             <PrintDocumentFooter kind="statement" reference="CL-PREVIEW-2026" count={2} override={override} />
+          </div>
+        </PreviewShell>
+
+        <PreviewShell title={isAR ? "معاينة ملخص العميل المالي" : "Customer Financial Summary Preview"} size="small" scale={statementPreviewScale}>
+          <div
+            className="bg-white shadow-xl border border-gray-200 relative overflow-hidden"
+            style={{ fontFamily: "'Cairo', 'Arial', sans-serif" }}
+          >
+            <PrintWatermark kind="statement" override={override} />
+            <StatementPrintHeader
+              statementRef="CL-SUMMARY-2026"
+              dateText={today}
+              titleAr={settings.customerLedgerTitleAr}
+              titleEn={settings.customerLedgerTitleEn}
+              titleFontSize={settings.customerLedgerTitleFontSize}
+              titleVisible={settings.customerLedgerTitleVisible}
+              titleAlign={settings.customerLedgerTitleAlign}
+              titleBold={settings.customerLedgerTitleBold}
+              subtitleAr={settings.customerLedgerSubtitleAr}
+              subtitleEn={settings.customerLedgerSubtitleEn}
+              subtitleFontSize={settings.customerLedgerSubtitleFontSize}
+              override={override}
+            />
+            <div className="px-6 py-3 border-b border-gray-300 relative z-10">
+              <div className="grid grid-cols-2 gap-6">
+                <div className="text-right">
+                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">بيانات العميل / CLIENT DETAILS</p>
+                  <p className="text-base font-black text-gray-900">{isAR ? "عميل تجريبي" : "Sample Client"}</p>
+                  <p className="text-sm text-gray-600 mt-0.5">{isAR ? "الدوحة، قطر" : "Doha, Qatar"}</p>
+                </div>
+                <div className="border-2 border-gray-700 rounded text-sm">
+                  <div className="bg-gray-800 text-white text-center py-1 font-bold text-xs uppercase tracking-widest">ملخص الحساب / ACCOUNT SUMMARY</div>
+                  <div className="divide-y divide-gray-200">
+                    <div className="flex justify-between px-4 py-1.5"><span>إجمالي المدين / Total Debit</span><span className="font-mono font-bold">QR 4,750.00</span></div>
+                    <div className="flex justify-between px-4 py-1.5"><span>إجمالي الدائن / Total Credit</span><span className="font-mono font-bold text-green-700">QR 1,250.00</span></div>
+                    <div className="flex justify-between px-4 py-2 bg-gray-50"><span className="font-black">الرصيد / Balance</span><span className="font-mono font-black text-red-700">QR 3,500.00</span></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="px-6 pt-4 relative z-10">
+              <table className="w-full text-sm border-collapse">
+                <thead>
+                  <tr className="border-y-2 border-gray-700 bg-gray-100">
+                    <th className="text-right py-2 px-2 font-bold text-gray-700 w-10">#</th>
+                    <th className="text-right py-2 px-3 font-bold text-gray-700">التاريخ / Date</th>
+                    <th className="text-right py-2 px-3 font-bold text-gray-700">البيان / Description</th>
+                    <th className="text-left py-2 px-2 font-bold text-gray-700 w-24">مدين / Debit</th>
+                    <th className="text-left py-2 px-2 font-bold text-green-700 w-24">دائن / Credit</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr className="border-b border-dashed border-gray-300">
+                    <td className="py-2 px-2 text-center font-mono text-xs">001</td>
+                    <td className="py-2 px-3">{today}</td>
+                    <td className="py-2 px-3 font-semibold">فاتورة رقم INV-PREVIEW</td>
+                    <td className="py-2 px-2 text-left font-mono font-bold">4,750.00</td>
+                    <td className="py-2 px-2 text-left font-mono text-gray-300">-</td>
+                  </tr>
+                  <tr className="border-b border-dashed border-gray-300">
+                    <td className="py-2 px-2 text-center font-mono text-xs">002</td>
+                    <td className="py-2 px-3">{today}</td>
+                    <td className="py-2 px-3 font-semibold">سند قبض RV-PREVIEW</td>
+                    <td className="py-2 px-2 text-left font-mono text-gray-300">-</td>
+                    <td className="py-2 px-2 text-left font-mono font-bold text-green-700">1,250.00</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <PrintDocumentFooter kind="statement" reference="CL-SUMMARY-2026" count={2} override={override} />
           </div>
         </PreviewShell>
       </div>
@@ -721,6 +902,11 @@ export default function SettingsPage() {
     lastSyncTime: "-",
     status: "idle",
   });
+  const [updateStatus, setUpdateStatus] = useState(isAR ? "جاهز" : "Ready");
+  const [updateVersion, setUpdateVersion] = useState("");
+  const [updateProgress, setUpdateProgress] = useState(0);
+  const [updateReady, setUpdateReady] = useState(false);
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
   const [showBackupPassword, setShowBackupPassword] = useState(false);
   const [showImportPassword, setShowImportPassword] = useState(false);
   const [showMasterPassword, setShowMasterPassword] = useState(false);
@@ -732,6 +918,56 @@ const bufferToBase64 = (buffer: ArrayBuffer) =>
 
 const base64ToBuffer = (base64: string) =>
   Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+
+  useEffect(() => {
+    const api = (window as any).electronAPI;
+    if (!api?.onUpdateStatus) return;
+
+    const off = api.onUpdateStatus(({ channel, payload }: { channel: string; payload?: any }) => {
+      if (channel === "update-checking") {
+        setCheckingUpdate(true);
+        setUpdateReady(false);
+        setUpdateProgress(0);
+        setUpdateStatus(isAR ? "جاري البحث عن تحديث..." : "Checking for updates...");
+      }
+
+      if (channel === "update-available") {
+        setCheckingUpdate(false);
+        setUpdateReady(false);
+        setUpdateVersion(payload?.version || "");
+        setUpdateStatus(isAR ? "يوجد تحديث جديد، جاهز للتحميل." : "Update available, ready to download.");
+      }
+
+      if (channel === "update-not-available") {
+        setCheckingUpdate(false);
+        setUpdateReady(false);
+        setUpdateProgress(0);
+        setUpdateVersion(payload?.version || "");
+        setUpdateStatus(isAR ? "لا توجد تحديثات جديدة." : "No updates available.");
+      }
+
+      if (channel === "update-download-progress") {
+        const percent = Math.round(Number(payload?.percent || 0));
+        setUpdateProgress(percent);
+        setUpdateStatus(isAR ? `جاري تحميل التحديث ${percent}%` : `Downloading update ${percent}%`);
+      }
+
+      if (channel === "update-downloaded") {
+        setCheckingUpdate(false);
+        setUpdateReady(true);
+        setUpdateProgress(100);
+        setUpdateVersion(payload?.version || "");
+        setUpdateStatus(isAR ? "تم تحميل التحديث. يمكن تثبيته الآن." : "Update downloaded. Ready to install.");
+      }
+
+      if (channel === "update-error") {
+        setCheckingUpdate(false);
+        setUpdateStatus(payload?.message || (isAR ? "فشل التحديث." : "Update failed."));
+      }
+    });
+
+    return () => off?.();
+  }, [isAR]);
 
 const deriveBackupKey = async (password: string, salt: Uint8Array) => {
   const keyMaterial = await crypto.subtle.importKey(
@@ -1189,6 +1425,12 @@ const decryptBackupData = async (backupFile: any, password: string) => {
           invoiceCashTitleEn: rawPayload.invoiceCashTitleEn ?? "",
           invoiceCreditTitleAr: rawPayload.invoiceCreditTitleAr ?? "",
           invoiceCreditTitleEn: rawPayload.invoiceCreditTitleEn ?? "",
+          statementTitleAr: rawPayload.statementTitleAr ?? "كشف حساب",
+          statementTitleEn: rawPayload.statementTitleEn ?? "Statement",
+          statementTitleFontSize: Number(rawPayload.statementTitleFontSize ?? 18),
+          customerLedgerTitleAr: rawPayload.customerLedgerTitleAr ?? "ملخص العميل المالي",
+          customerLedgerTitleEn: rawPayload.customerLedgerTitleEn ?? "Customer Financial Summary",
+          customerLedgerTitleFontSize: Number(rawPayload.customerLedgerTitleFontSize ?? 18),
           showWatermark: rawPayload.showWatermark ?? true,
           showStampOnInvoices: rawPayload.showStampOnInvoices ?? true,
           showStampOnReceipts: rawPayload.showStampOnReceipts ?? true,
@@ -1258,6 +1500,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
   { id: "branding", icon: Image, labelAr: "الشعارات", labelEn: "Branding", color: "text-purple-500" },
   { id: "print", icon: Printer, labelAr: "أدوات الطباعة", labelEn: "Print Tools", color: "text-rose-500" },
   { id: "backup", icon: Shield, labelAr: "النسخ الاحتياطي", labelEn: "Backup", color: "text-emerald-500" },
+  { id: "update", icon: RefreshCw, labelAr: "تحديث البرنامج", labelEn: "Software Update", color: "text-cyan-500" },
 
   { id: "display", icon: Palette, labelAr: "المظهر", labelEn: "Display", color: "text-fuchsia-500" }, // آخر واحد
 ];
@@ -1340,6 +1583,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
               {activeTab === "branding" && (isAR ? "الشعارات" : "Branding")}
               {activeTab === "print" && (isAR ? "أدوات الطباعة" : "Print Tools")}
               {activeTab === "backup" && (isAR ? "النسخ الاحتياطي" : "Backup")}
+              {activeTab === "update" && (isAR ? "تحديث البرنامج" : "Software Update")}
               {activeTab === "display" && (isAR ? "المظهر" : "Display")}
             </h1>
             <p className="text-sm text-muted-foreground mt-0.5">
@@ -1348,6 +1592,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
               {activeTab === "branding" && (isAR ? "إدارة الشعار والختم والعلامة المائية والتوقيعات" : "Manage logo, stamp, watermark, and signatures")}
               {activeTab === "print" && (isAR ? "ضبط عناوين الفواتير وأدوات الطباعة" : "Configure invoice titles and print tools")}
               {activeTab === "backup" && (isAR ? "تصدير واستيراد النسخ الاحتياطية بأمان" : "Securely export and import backups")}
+              {activeTab === "update" && (isAR ? "البحث عن تحديثات البرنامج وتثبيتها من داخل التطبيق" : "Check and install application updates from inside the app")}
               {activeTab === "display" && (isAR ? "ضبط ألوان ومظهر واجهة البرنامج" : "Customize application colors and appearance")}
             </p>
           </div>
@@ -1848,6 +2093,121 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                 </div>
                   </>
                 )}
+              </div>
+            </Section>
+          )}
+
+          {activeTab === "update" && (
+            <Section
+              icon={RefreshCw}
+              title={isAR ? "تحديث البرنامج" : "Software Update"}
+              color="bg-cyan-500/5"
+            >
+              <div className="space-y-4" dir={isAR ? "rtl" : "ltr"}>
+                <div className={`${isAR ? "text-right" : "text-left"}`}>
+                  <h3 className="text-sm font-bold text-foreground">
+                    {isAR ? "التحديث التلقائي" : "Automatic Updates"}
+                  </h3>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {isAR
+                      ? "يتم فحص تحديثات GitHub Releases وتنزيلها ثم تثبيتها بدون التأثير على قاعدة بيانات AppData."
+                      : "Checks GitHub Releases, downloads updates, and installs them without touching the AppData database."}
+                  </p>
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-sm">
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                    <div className="rounded-xl border border-border bg-background p-3">
+                      <div className="text-xs font-semibold uppercase text-muted-foreground">
+                        {isAR ? "الإصدار الحالي" : "Current Version"}
+                      </div>
+                      <div className="mt-1 font-mono text-sm font-bold text-foreground">
+                        {import.meta.env.VITE_APP_VERSION || "2.0.0"}
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl border border-border bg-background p-3 md:col-span-2">
+                      <div className="text-xs font-semibold uppercase text-muted-foreground">
+                        {isAR ? "حالة التحديث" : "Update Status"}
+                      </div>
+                      <div className="mt-1 text-sm font-semibold text-foreground">{updateStatus}</div>
+                      {updateVersion && (
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          {isAR ? "الإصدار المتاح:" : "Available version:"} <span className="font-mono">{updateVersion}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="mt-4 h-2 overflow-hidden rounded-full bg-muted">
+                    <div
+                      className="h-full bg-primary transition-all"
+                      style={{ width: `${updateProgress}%` }}
+                    />
+                  </div>
+
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      disabled={checkingUpdate}
+                      onClick={async () => {
+                        const api = (window as any).electronAPI;
+                        if (!api?.checkForUpdates) {
+                          setUpdateStatus(isAR ? "التحديث متاح فقط داخل نسخة Electron." : "Updates are only available in the Electron app.");
+                          return;
+                        }
+
+                        setCheckingUpdate(true);
+                        try {
+                          await api.checkForUpdates();
+                        } catch (error: any) {
+                          setCheckingUpdate(false);
+                          setUpdateStatus(error?.message || (isAR ? "فشل البحث عن تحديث." : "Failed to check for updates."));
+                        }
+                      }}
+                      className="h-9 rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
+                    >
+                      {checkingUpdate ? (isAR ? "جاري البحث..." : "Checking...") : (isAR ? "البحث عن تحديث" : "Check for Updates")}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const api = (window as any).electronAPI;
+                        if (!api?.downloadUpdate) {
+                          setUpdateStatus(isAR ? "تحميل التحديث متاح فقط داخل نسخة Electron." : "Update download is only available in the Electron app.");
+                          return;
+                        }
+
+                        try {
+                          await api.downloadUpdate();
+                        } catch (error: any) {
+                          setUpdateStatus(error?.message || (isAR ? "فشل تحميل التحديث." : "Failed to download update."));
+                        }
+                      }}
+                      className="h-9 rounded-lg border border-blue-200 bg-blue-50 px-3 text-xs font-semibold text-blue-700 hover:bg-blue-100"
+                    >
+                      {isAR ? "تحميل التحديث" : "Download Update"}
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={!updateReady}
+                      onClick={async () => {
+                        const api = (window as any).electronAPI;
+                        if (!api?.installUpdate) {
+                          setUpdateStatus(isAR ? "تثبيت التحديث متاح فقط داخل نسخة Electron." : "Update install is only available in the Electron app.");
+                          return;
+                        }
+
+                        await api.installUpdate();
+                      }}
+                      className="h-9 rounded-lg border border-emerald-200 bg-emerald-50 px-3 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 disabled:opacity-50"
+                    >
+                      {isAR ? "تثبيت التحديث" : "Install Update"}
+                    </button>
+                  </div>
+                </div>
               </div>
             </Section>
           )}
@@ -2511,6 +2871,142 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                     className={inp}
                   />
                 </Field>
+
+                <TitleOptionsGrid
+                  title={isAR ? "خصائص عنوان الفاتورة" : "Invoice Title Properties"}
+                  isAR={isAR}
+                  value={{
+                    enabled: !!form.invoiceTitleVisible,
+                    align: form.invoiceTitleAlign || "center",
+                    bold: !!form.invoiceTitleBold,
+                    subtitleAr: form.invoiceSubtitleAr || "",
+                    subtitleEn: form.invoiceSubtitleEn || "",
+                    subtitleSize: Number(form.invoiceSubtitleFontSize ?? 12),
+                  }}
+                  onChange={(next) =>
+                    setForm((p) => ({
+                      ...p,
+                      invoiceTitleVisible: next.enabled,
+                      invoiceTitleAlign: next.align,
+                      invoiceTitleBold: next.bold,
+                      invoiceSubtitleAr: next.subtitleAr,
+                      invoiceSubtitleEn: next.subtitleEn,
+                      invoiceSubtitleFontSize: next.subtitleSize,
+                    }))
+                  }
+                />
+
+                <div className="space-y-2">
+                  <div className="text-xs font-bold text-muted-foreground">
+                    {isAR ? "عنوان كشف الحساب" : "Statement Title"}
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                    <Field label={isAR ? "عربي" : "Arabic"}>
+                      <input
+                        value={form.statementTitleAr}
+                        onChange={e => setForm(p => ({ ...p, statementTitleAr: e.target.value }))}
+                        className={inp}
+                      />
+                    </Field>
+
+                    <Field label="English">
+                      <input
+                        value={form.statementTitleEn}
+                        onChange={e => setForm(p => ({ ...p, statementTitleEn: e.target.value }))}
+                        className={inp}
+                      />
+                    </Field>
+
+                    <Field label={isAR ? "الحجم" : "Size"}>
+                      <input
+                        type="number"
+                        value={form.statementTitleFontSize}
+                        onChange={e => setForm(p => ({ ...p, statementTitleFontSize: Number(e.target.value) }))}
+                        className={inp}
+                      />
+                    </Field>
+                  </div>
+                </div>
+
+                <TitleOptionsGrid
+                  title={isAR ? "خصائص عنوان كشف الحساب" : "Statement Title Properties"}
+                  isAR={isAR}
+                  value={{
+                    enabled: !!form.statementTitleVisible,
+                    align: form.statementTitleAlign || "center",
+                    bold: !!form.statementTitleBold,
+                    subtitleAr: form.statementSubtitleAr || "",
+                    subtitleEn: form.statementSubtitleEn || "",
+                    subtitleSize: Number(form.statementSubtitleFontSize ?? 12),
+                  }}
+                  onChange={(next) =>
+                    setForm((p) => ({
+                      ...p,
+                      statementTitleVisible: next.enabled,
+                      statementTitleAlign: next.align,
+                      statementTitleBold: next.bold,
+                      statementSubtitleAr: next.subtitleAr,
+                      statementSubtitleEn: next.subtitleEn,
+                      statementSubtitleFontSize: next.subtitleSize,
+                    }))
+                  }
+                />
+
+                <div className="space-y-2">
+                  <div className="text-xs font-bold text-muted-foreground">
+                    {isAR ? "عنوان ملخص العميل المالي" : "Customer Financial Summary Title"}
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                    <Field label={isAR ? "عربي" : "Arabic"}>
+                      <input
+                        value={form.customerLedgerTitleAr}
+                        onChange={e => setForm(p => ({ ...p, customerLedgerTitleAr: e.target.value }))}
+                        className={inp}
+                      />
+                    </Field>
+
+                    <Field label="English">
+                      <input
+                        value={form.customerLedgerTitleEn}
+                        onChange={e => setForm(p => ({ ...p, customerLedgerTitleEn: e.target.value }))}
+                        className={inp}
+                      />
+                    </Field>
+
+                    <Field label={isAR ? "الحجم" : "Size"}>
+                      <input
+                        type="number"
+                        value={form.customerLedgerTitleFontSize}
+                        onChange={e => setForm(p => ({ ...p, customerLedgerTitleFontSize: Number(e.target.value) }))}
+                        className={inp}
+                      />
+                    </Field>
+                  </div>
+                </div>
+
+                <TitleOptionsGrid
+                  title={isAR ? "خصائص عنوان ملخص العميل المالي" : "Customer Financial Summary Title Properties"}
+                  isAR={isAR}
+                  value={{
+                    enabled: !!form.customerLedgerTitleVisible,
+                    align: form.customerLedgerTitleAlign || "center",
+                    bold: !!form.customerLedgerTitleBold,
+                    subtitleAr: form.customerLedgerSubtitleAr || "",
+                    subtitleEn: form.customerLedgerSubtitleEn || "",
+                    subtitleSize: Number(form.customerLedgerSubtitleFontSize ?? 12),
+                  }}
+                  onChange={(next) =>
+                    setForm((p) => ({
+                      ...p,
+                      customerLedgerTitleVisible: next.enabled,
+                      customerLedgerTitleAlign: next.align,
+                      customerLedgerTitleBold: next.bold,
+                      customerLedgerSubtitleAr: next.subtitleAr,
+                      customerLedgerSubtitleEn: next.subtitleEn,
+                      customerLedgerSubtitleFontSize: next.subtitleSize,
+                    }))
+                  }
+                />
 
                 <Field
                   label={isAR ? "نص التذييل في صفحات الطباعة" : "Footer text on print pages"}

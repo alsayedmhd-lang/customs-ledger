@@ -8,6 +8,7 @@ import { Printer, ArrowRight, ArrowLeft, Stamp } from "lucide-react";
 import Barcode from "react-barcode";
 import { useLanguage } from "@/lib/language-context";
 import { useCompanySettings } from "@/lib/company-settings-context";
+import { PrintTitleBlock } from "@/components/print-document-parts";
 
 const STATUS_AR: Record<string, string> = {
   draft: "مسودة",
@@ -185,11 +186,18 @@ export default function ClientStatement() {
             <div className="font-bold text-gray-800">
               Ref : <span className="font-mono text-blue-800">{statementRef}</span>
             </div>
-            <div className="text-center font-bold text-gray-800 text-lg">
-              كشف حساب
-              <span className="mx-2 text-gray-400 text-sm">|</span>
-              <span className="text-sm font-normal text-gray-600">ACCOUNT STATEMENT</span>
-            </div>
+            <PrintTitleBlock
+              visible={settings.statementTitleVisible}
+              align={settings.statementTitleAlign || "center"}
+              bold={settings.statementTitleBold}
+              titleAr={settings.statementTitleAr || "كشف حساب"}
+              titleEn={settings.statementTitleEn || "Statement"}
+              titleFontSize={settings.statementTitleFontSize || 18}
+              subtitleAr={settings.statementSubtitleAr || ""}
+              subtitleEn={settings.statementSubtitleEn || ""}
+              subtitleFontSize={settings.statementSubtitleFontSize || 12}
+              className="flex-1"
+            />
             <div className="font-bold text-gray-800 text-left">
               Date : <span className="font-mono">{new Date().toLocaleDateString("en-CA")}</span>
             </div>

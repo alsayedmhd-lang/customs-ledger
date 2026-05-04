@@ -1,10 +1,51 @@
 import { Router } from "express";
-import { db, companySettingsTable } from "@workspace/db";
+import { db, sqlite, companySettingsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { requireAdmin } from "../middleware/auth";
 import { hashPassword } from "../utils/password";
 
 const router = Router();
+
+function ensureCompanySettingsPrintTitleColumns() {
+  if (!sqlite) return;
+  const table = sqlite.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'company_settings'").get();
+  if (!table) return;
+
+  const columns = sqlite.prepare("PRAGMA table_info(company_settings)").all() as Array<{ name: string }>;
+  const existing = new Set(columns.map((column) => column.name));
+  const statements = [
+    ["invoice_title_visible", "ALTER TABLE company_settings ADD COLUMN invoice_title_visible INTEGER DEFAULT 1"],
+    ["invoice_title_align", "ALTER TABLE company_settings ADD COLUMN invoice_title_align TEXT DEFAULT 'center'"],
+    ["invoice_title_bold", "ALTER TABLE company_settings ADD COLUMN invoice_title_bold INTEGER DEFAULT 1"],
+    ["invoice_subtitle_ar", "ALTER TABLE company_settings ADD COLUMN invoice_subtitle_ar TEXT DEFAULT ''"],
+    ["invoice_subtitle_en", "ALTER TABLE company_settings ADD COLUMN invoice_subtitle_en TEXT DEFAULT ''"],
+    ["invoice_subtitle_font_size", "ALTER TABLE company_settings ADD COLUMN invoice_subtitle_font_size INTEGER DEFAULT 12"],
+    ["statement_title_ar", "ALTER TABLE company_settings ADD COLUMN statement_title_ar TEXT DEFAULT 'كشف حساب'"],
+    ["statement_title_en", "ALTER TABLE company_settings ADD COLUMN statement_title_en TEXT DEFAULT 'Statement'"],
+    ["statement_title_font_size", "ALTER TABLE company_settings ADD COLUMN statement_title_font_size INTEGER DEFAULT 18"],
+    ["statement_title_visible", "ALTER TABLE company_settings ADD COLUMN statement_title_visible INTEGER DEFAULT 1"],
+    ["statement_title_align", "ALTER TABLE company_settings ADD COLUMN statement_title_align TEXT DEFAULT 'center'"],
+    ["statement_title_bold", "ALTER TABLE company_settings ADD COLUMN statement_title_bold INTEGER DEFAULT 1"],
+    ["statement_subtitle_ar", "ALTER TABLE company_settings ADD COLUMN statement_subtitle_ar TEXT DEFAULT ''"],
+    ["statement_subtitle_en", "ALTER TABLE company_settings ADD COLUMN statement_subtitle_en TEXT DEFAULT ''"],
+    ["statement_subtitle_font_size", "ALTER TABLE company_settings ADD COLUMN statement_subtitle_font_size INTEGER DEFAULT 12"],
+    ["customer_ledger_title_ar", "ALTER TABLE company_settings ADD COLUMN customer_ledger_title_ar TEXT DEFAULT 'ملخص العميل المالي'"],
+    ["customer_ledger_title_en", "ALTER TABLE company_settings ADD COLUMN customer_ledger_title_en TEXT DEFAULT 'Customer Financial Summary'"],
+    ["customer_ledger_title_font_size", "ALTER TABLE company_settings ADD COLUMN customer_ledger_title_font_size INTEGER DEFAULT 18"],
+    ["customer_ledger_title_visible", "ALTER TABLE company_settings ADD COLUMN customer_ledger_title_visible INTEGER DEFAULT 1"],
+    ["customer_ledger_title_align", "ALTER TABLE company_settings ADD COLUMN customer_ledger_title_align TEXT DEFAULT 'center'"],
+    ["customer_ledger_title_bold", "ALTER TABLE company_settings ADD COLUMN customer_ledger_title_bold INTEGER DEFAULT 1"],
+    ["customer_ledger_subtitle_ar", "ALTER TABLE company_settings ADD COLUMN customer_ledger_subtitle_ar TEXT DEFAULT ''"],
+    ["customer_ledger_subtitle_en", "ALTER TABLE company_settings ADD COLUMN customer_ledger_subtitle_en TEXT DEFAULT ''"],
+    ["customer_ledger_subtitle_font_size", "ALTER TABLE company_settings ADD COLUMN customer_ledger_subtitle_font_size INTEGER DEFAULT 12"],
+  ];
+
+  for (const [column, sql] of statements) {
+    if (!existing.has(column)) sqlite.exec(sql);
+  }
+}
+
+ensureCompanySettingsPrintTitleColumns();
 
 router.get("/company-settings", async (_req, res) => {
   try {
@@ -23,6 +64,30 @@ router.get("/company-settings", async (_req, res) => {
       invoiceCreditTitleAr: settings.invoiceCreditTitleAr,
       invoiceCreditTitleEn: settings.invoiceCreditTitleEn,
       invoiceTitleFontSize: settings.invoiceTitleFontSize,
+      invoiceTitleVisible: settings.invoiceTitleVisible ?? true,
+      invoiceTitleAlign: settings.invoiceTitleAlign || "center",
+      invoiceTitleBold: settings.invoiceTitleBold ?? true,
+      invoiceSubtitleAr: settings.invoiceSubtitleAr || "",
+      invoiceSubtitleEn: settings.invoiceSubtitleEn || "",
+      invoiceSubtitleFontSize: settings.invoiceSubtitleFontSize || 12,
+      statementTitleAr: settings.statementTitleAr || "كشف حساب",
+      statementTitleEn: settings.statementTitleEn || "Statement",
+      statementTitleFontSize: settings.statementTitleFontSize || 18,
+      statementTitleVisible: settings.statementTitleVisible ?? true,
+      statementTitleAlign: settings.statementTitleAlign || "center",
+      statementTitleBold: settings.statementTitleBold ?? true,
+      statementSubtitleAr: settings.statementSubtitleAr || "",
+      statementSubtitleEn: settings.statementSubtitleEn || "",
+      statementSubtitleFontSize: settings.statementSubtitleFontSize || 12,
+      customerLedgerTitleAr: settings.customerLedgerTitleAr || "ملخص العميل المالي",
+      customerLedgerTitleEn: settings.customerLedgerTitleEn || "Customer Financial Summary",
+      customerLedgerTitleFontSize: settings.customerLedgerTitleFontSize || 18,
+      customerLedgerTitleVisible: settings.customerLedgerTitleVisible ?? true,
+      customerLedgerTitleAlign: settings.customerLedgerTitleAlign || "center",
+      customerLedgerTitleBold: settings.customerLedgerTitleBold ?? true,
+      customerLedgerSubtitleAr: settings.customerLedgerSubtitleAr || "",
+      customerLedgerSubtitleEn: settings.customerLedgerSubtitleEn || "",
+      customerLedgerSubtitleFontSize: settings.customerLedgerSubtitleFontSize || 12,
 
       accountantSignatureBase64: settings.accountantSignatureBase64,
       receiverSignatureBase64: settings.receiverSignatureBase64,
@@ -73,6 +138,30 @@ router.put("/company-settings", requireAdmin, async (req, res) => {
       invoiceCreditTitleAr: body.invoiceCreditTitleAr,
       invoiceCreditTitleEn: body.invoiceCreditTitleEn,
       invoiceTitleFontSize: Number(body.invoiceTitleFontSize),
+      invoiceTitleVisible: body.invoiceTitleVisible ?? true,
+      invoiceTitleAlign: body.invoiceTitleAlign || "center",
+      invoiceTitleBold: body.invoiceTitleBold ?? true,
+      invoiceSubtitleAr: body.invoiceSubtitleAr || "",
+      invoiceSubtitleEn: body.invoiceSubtitleEn || "",
+      invoiceSubtitleFontSize: Number(body.invoiceSubtitleFontSize ?? 12),
+      statementTitleAr: body.statementTitleAr || "كشف حساب",
+      statementTitleEn: body.statementTitleEn || "Statement",
+      statementTitleFontSize: Number(body.statementTitleFontSize ?? 18),
+      statementTitleVisible: body.statementTitleVisible ?? true,
+      statementTitleAlign: body.statementTitleAlign || "center",
+      statementTitleBold: body.statementTitleBold ?? true,
+      statementSubtitleAr: body.statementSubtitleAr || "",
+      statementSubtitleEn: body.statementSubtitleEn || "",
+      statementSubtitleFontSize: Number(body.statementSubtitleFontSize ?? 12),
+      customerLedgerTitleAr: body.customerLedgerTitleAr || "ملخص العميل المالي",
+      customerLedgerTitleEn: body.customerLedgerTitleEn || "Customer Financial Summary",
+      customerLedgerTitleFontSize: Number(body.customerLedgerTitleFontSize ?? 18),
+      customerLedgerTitleVisible: body.customerLedgerTitleVisible ?? true,
+      customerLedgerTitleAlign: body.customerLedgerTitleAlign || "center",
+      customerLedgerTitleBold: body.customerLedgerTitleBold ?? true,
+      customerLedgerSubtitleAr: body.customerLedgerSubtitleAr || "",
+      customerLedgerSubtitleEn: body.customerLedgerSubtitleEn || "",
+      customerLedgerSubtitleFontSize: Number(body.customerLedgerSubtitleFontSize ?? 12),
       accountantSignatureBase64: body.accountantSignatureBase64 ?? null,
       receiverSignatureBase64: body.receiverSignatureBase64 ?? null,
       showAccountantSignature: body.showAccountantSignature ?? false,

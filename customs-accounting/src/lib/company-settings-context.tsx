@@ -33,6 +33,30 @@ export interface CompanySettings {
   invoiceCreditTitleAr: string;
   invoiceCreditTitleEn: string;
   invoiceTitleFontSize: number;
+  invoiceTitleVisible: boolean;
+  invoiceTitleAlign: "left" | "center" | "right";
+  invoiceTitleBold: boolean;
+  invoiceSubtitleAr: string;
+  invoiceSubtitleEn: string;
+  invoiceSubtitleFontSize: number;
+  statementTitleAr: string;
+  statementTitleEn: string;
+  statementTitleFontSize: number;
+  statementTitleVisible: boolean;
+  statementTitleAlign: "left" | "center" | "right";
+  statementTitleBold: boolean;
+  statementSubtitleAr: string;
+  statementSubtitleEn: string;
+  statementSubtitleFontSize: number;
+  customerLedgerTitleAr: string;
+  customerLedgerTitleEn: string;
+  customerLedgerTitleFontSize: number;
+  customerLedgerTitleVisible: boolean;
+  customerLedgerTitleAlign: "left" | "center" | "right";
+  customerLedgerTitleBold: boolean;
+  customerLedgerSubtitleAr: string;
+  customerLedgerSubtitleEn: string;
+  customerLedgerSubtitleFontSize: number;
   accountantSignatureBase64: string | null;
   receiverSignatureBase64: string | null;
   showAccountantSignature: boolean;
@@ -62,16 +86,40 @@ export const DEFAULT_SETTINGS: CompanySettings = {
   showStampOnReceipts: true,
   showStampOnStatements: true,
   footerText: "",
-  invoiceCashTitleAr: "فاتورة نقدًا",
+  invoiceCashTitleAr: "فاتورة نقداً",
   invoiceCashTitleEn: "Cash Invoice",
-  invoiceCreditTitleAr: "فاتورة نقدا / على الحساب",
+  invoiceCreditTitleAr: "فاتورة نقداً / على الحساب",
   invoiceCreditTitleEn: "Cash / Credit Invoice",
   invoiceTitleFontSize: 25,
+  invoiceTitleVisible: true,
+  invoiceTitleAlign: "center",
+  invoiceTitleBold: true,
+  invoiceSubtitleAr: "",
+  invoiceSubtitleEn: "",
+  invoiceSubtitleFontSize: 12,
+  statementTitleAr: "كشف حساب",
+  statementTitleEn: "Statement",
+  statementTitleFontSize: 18,
+  statementTitleVisible: true,
+  statementTitleAlign: "center",
+  statementTitleBold: true,
+  statementSubtitleAr: "",
+  statementSubtitleEn: "",
+  statementSubtitleFontSize: 12,
+  customerLedgerTitleAr: "ملخص العميل المالي",
+  customerLedgerTitleEn: "Customer Financial Summary",
+  customerLedgerTitleFontSize: 18,
+  customerLedgerTitleVisible: true,
+  customerLedgerTitleAlign: "center",
+  customerLedgerTitleBold: true,
+  customerLedgerSubtitleAr: "",
+  customerLedgerSubtitleEn: "",
+  customerLedgerSubtitleFontSize: 12,
   accountantSignatureBase64: null,
   receiverSignatureBase64: null,
   showAccountantSignature: true,
   showReceiverSignature: true,
-  };
+};
 
 interface CompanySettingsCtx {
   settings: CompanySettings;
@@ -106,22 +154,21 @@ export function CompanySettingsProvider({ children }: { children: ReactNode }) {
 
   const { token } = useAuth();
 
-const refresh = useCallback(async () => {
-  try {
-    const res = await fetch(`${API_BASE}/company-settings?ts=${Date.now()}`, {
-      headers: {
-        Authorization: `Bearer ${token || sessionStorage.getItem("auth_token") || ""}`,
-      },
-    });
+  const refresh = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE}/company-settings?ts=${Date.now()}`, {
+        headers: {
+          Authorization: `Bearer ${token || sessionStorage.getItem("auth_token") || ""}`,
+        },
+      });
 
-    if (!res.ok) return;
+      if (!res.ok) return;
 
-    const data = await res.json();
-
-    const merged = {
-      ...DEFAULT_SETTINGS,
-      ...data,
-    };
+      const data = await res.json();
+      const merged = {
+        ...DEFAULT_SETTINGS,
+        ...data,
+      };
 
       setSettings(merged);
       localStorage.setItem(LS_KEY, JSON.stringify(merged));
@@ -136,7 +183,6 @@ const refresh = useCallback(async () => {
 
   const logoSrc = settings.logoBase64 || defaultLogoSrc;
   const stampSrc = settings.stampBase64 || defaultStampSrc;
-  // watermark: use dedicated watermark image if set, else fall back to logo
   const watermarkSrc = settings.watermarkBase64 || logoSrc;
 
   return (

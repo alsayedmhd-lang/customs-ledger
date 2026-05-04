@@ -10,6 +10,54 @@ type SettingsOverride = {
   watermarkSrc?: string;
 };
 
+type TitleAlign = "left" | "center" | "right";
+
+export function PrintTitleBlock({
+  visible = true,
+  align = "center",
+  bold = true,
+  titleAr,
+  titleEn,
+  titleFontSize = 18,
+  subtitleAr,
+  subtitleEn,
+  subtitleFontSize = 12,
+  className = "",
+}: {
+  visible?: boolean;
+  align?: TitleAlign;
+  bold?: boolean;
+  titleAr?: string | null;
+  titleEn?: string | null;
+  titleFontSize?: number;
+  subtitleAr?: string | null;
+  subtitleEn?: string | null;
+  subtitleFontSize?: number;
+  className?: string;
+}) {
+  if (!visible) return null;
+
+  const alignClass = align === "left" ? "items-start text-left" : align === "right" ? "items-end text-right" : "items-center text-center";
+
+  return (
+    <div className={`flex flex-col gap-0.5 ${alignClass} ${className}`}>
+      {(titleAr || titleEn) && (
+        <div style={{ textAlign: align, fontWeight: bold ? 700 : 400, fontSize: titleFontSize, lineHeight: 1.15 }}>
+          {titleAr && <div>{titleAr}</div>}
+          {titleEn && <div className="text-sm font-normal text-gray-600" dir="ltr">{titleEn}</div>}
+        </div>
+      )}
+
+      {(subtitleAr || subtitleEn) && (
+        <div style={{ textAlign: align, fontSize: subtitleFontSize, lineHeight: 1.15, opacity: 0.7 }}>
+          {subtitleAr && <div>{subtitleAr}</div>}
+          {subtitleEn && <div dir="ltr">{subtitleEn}</div>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function usePrintSettings(override?: SettingsOverride) {
   const ctx = useCompanySettings();
 
@@ -110,13 +158,40 @@ export function ReceiptPrintHeader({
 export function StatementPrintHeader({
   statementRef,
   dateText,
+  titleAr,
+  titleEn,
+  titleFontSize,
+  titleVisible,
+  titleAlign,
+  titleBold,
+  subtitleAr,
+  subtitleEn,
+  subtitleFontSize,
   override,
 }: {
   statementRef: string;
   dateText: string;
+  titleAr?: string;
+  titleEn?: string;
+  titleFontSize?: number;
+  titleVisible?: boolean;
+  titleAlign?: TitleAlign;
+  titleBold?: boolean;
+  subtitleAr?: string;
+  subtitleEn?: string;
+  subtitleFontSize?: number;
   override?: SettingsOverride;
 }) {
   const { settings, logoSrc } = usePrintSettings(override);
+  const resolvedTitleAr = titleAr || settings.statementTitleAr || "كشف حساب";
+  const resolvedTitleEn = titleEn || settings.statementTitleEn || "Statement";
+  const resolvedTitleFontSize = titleFontSize || settings.statementTitleFontSize || 18;
+  const resolvedTitleVisible = titleVisible ?? settings.statementTitleVisible ?? true;
+  const resolvedTitleAlign = titleAlign || settings.statementTitleAlign || "center";
+  const resolvedTitleBold = titleBold ?? settings.statementTitleBold ?? true;
+  const resolvedSubtitleAr = subtitleAr ?? settings.statementSubtitleAr ?? "";
+  const resolvedSubtitleEn = subtitleEn ?? settings.statementSubtitleEn ?? "";
+  const resolvedSubtitleFontSize = subtitleFontSize || settings.statementSubtitleFontSize || 12;
 
   return (
     <>
@@ -156,11 +231,18 @@ export function StatementPrintHeader({
           <div className="font-bold text-gray-800" dir="ltr">
             Date : <span className="font-mono">{dateText}</span>
           </div>
-          <div className="text-center font-bold text-gray-800 text-lg">
-            كشف ملخص الحساب
-            <span className="mx-2 text-gray-400 text-sm">|</span>
-            <span className="text-sm font-normal text-gray-600">ACCOUNT SUMMARY</span>
-          </div>
+          <PrintTitleBlock
+            visible={resolvedTitleVisible}
+            align={resolvedTitleAlign}
+            bold={resolvedTitleBold}
+            titleAr={resolvedTitleAr}
+            titleEn={resolvedTitleEn}
+            titleFontSize={resolvedTitleFontSize}
+            subtitleAr={resolvedSubtitleAr}
+            subtitleEn={resolvedSubtitleEn}
+            subtitleFontSize={resolvedSubtitleFontSize}
+            className="flex-1"
+          />
           <div className="font-bold text-gray-800 text-left" dir="ltr">
             Ref : <span className="font-mono text-blue-800">{statementRef}</span>
           </div>

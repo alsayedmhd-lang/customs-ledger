@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, FileDown, Printer, Stamp } from "lucide-react";
 import Barcode from "react-barcode";
-import { PrintDocumentFooter, StatementPrintHeader } from "@/components/print-document-parts";
+import { PrintDocumentFooter, PrintTitleBlock, StatementPrintHeader } from "@/components/print-document-parts";
 
 import { useAuth } from "@/lib/auth-context";
 import { savePdf } from "@/lib/pdf";
@@ -252,7 +252,19 @@ export default function CustomerLedgerPrintPage() {
         )}
 
         {/* LETTERHEAD */}
-        <StatementPrintHeader statementRef={statementRef} dateText={today} />
+        <StatementPrintHeader
+          statementRef={statementRef}
+          dateText={today}
+          titleAr={settings.customerLedgerTitleAr}
+          titleEn={settings.customerLedgerTitleEn}
+          titleFontSize={settings.customerLedgerTitleFontSize}
+          titleVisible={settings.customerLedgerTitleVisible}
+          titleAlign={settings.customerLedgerTitleAlign}
+          titleBold={settings.customerLedgerTitleBold}
+          subtitleAr={settings.customerLedgerSubtitleAr}
+          subtitleEn={settings.customerLedgerSubtitleEn}
+          subtitleFontSize={settings.customerLedgerSubtitleFontSize}
+        />
         <div className="hidden">
           <div className="flex items-start justify-between flex-row-reverse">
             <div className="text-left" dir="ltr">
@@ -286,11 +298,18 @@ export default function CustomerLedgerPrintPage() {
               Date : <span className="font-mono">{today}</span>
             </div>
 
-            <div className="text-center font-bold text-gray-800 text-lg">
-              كشف ملخص الحساب
-              <span className="mx-2 text-gray-400 text-sm">|</span>
-              <span className="text-sm font-normal text-gray-600">ACCOUNT SUMMARY</span>
-            </div>
+            <PrintTitleBlock
+              visible={settings.customerLedgerTitleVisible}
+              align={settings.customerLedgerTitleAlign || "center"}
+              bold={settings.customerLedgerTitleBold}
+              titleAr={settings.customerLedgerTitleAr || "ملخص العميل المالي"}
+              titleEn={settings.customerLedgerTitleEn || "Customer Financial Summary"}
+              titleFontSize={settings.customerLedgerTitleFontSize || 18}
+              subtitleAr={settings.customerLedgerSubtitleAr || ""}
+              subtitleEn={settings.customerLedgerSubtitleEn || ""}
+              subtitleFontSize={settings.customerLedgerSubtitleFontSize || 12}
+              className="flex-1"
+            />
 
             <div className="font-bold text-gray-800 text-left" dir="ltr">
               Ref : <span className="font-mono text-blue-800">{statementRef}</span>
