@@ -50,6 +50,7 @@ async function fetchAccounting(): Promise<AccountingRow[]> {
     headers: { Authorization: `Bearer ${getToken()}` },
   });
   if (!res.ok) throw new Error("Failed to fetch");
+
   return res.json();
 }
 

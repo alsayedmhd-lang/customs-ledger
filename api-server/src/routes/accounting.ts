@@ -1,6 +1,6 @@
   import { Router, type IRouter } from "express";
-  import { db, invoicesTable, receiptsTable, invoiceAccountingTable } from "@workspace/db";
-  import { and, eq, inArray, isNull } from "drizzle-orm";
+  import { db, invoicesTable, receiptsTable, invoiceAccountingTable, clientsTable } from "@workspace/db";
+  import { and, desc, eq, inArray, isNull } from "drizzle-orm";
   import { requireAuth } from "../middleware/auth";
 
   const router: IRouter = Router();
@@ -37,7 +37,7 @@
         .from(invoicesTable)
         .where(
           and(
-            eq(invoicesTable.clientId, clientId),
+            clientId > 0 ? eq(invoicesTable.clientId, clientId) : undefined,
             isNull(invoicesTable.deletedAt),
             inArray(invoicesTable.status, ["issued", "paid"])
           )
@@ -227,6 +227,67 @@
     } catch (err) {
       console.error("[PATCH /accounting/:invoiceId ERROR]", err);
       res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  router.get("/accounting", requireAuth, async (req, res) => {
+    try {
+      const isAdmin = req.user!.role === "admin" || req.user!.role === "supervisor";
+      const userId = req.user!.userId;
+      const filters = [isNull(invoicesTable.deletedAt)];
+
+      if (!isAdmin) {
+        filters.push(eq(invoicesTable.createdBy, userId));
+      }
+
+      const rows = await db
+        .select({
+          id: invoicesTable.id,
+          invoiceId: invoicesTable.id,
+          invoiceNumber: invoicesTable.invoiceNumber,
+          clientName: clientsTable.name,
+          issueDate: invoicesTable.issueDate,
+          subtotal: invoicesTable.subtotal,
+          total: invoicesTable.total,
+          payments: invoiceAccountingTable.payments,
+          transportation: invoiceAccountingTable.transportation,
+          driverName: invoiceAccountingTable.driverName,
+          unloadLocation: invoiceAccountingTable.unloadLocation,
+          labor: invoiceAccountingTable.labor,
+          otherExpenses: invoiceAccountingTable.otherExpenses,
+          transportationPaid: invoiceAccountingTable.transportationPaid,
+          laborPaid: invoiceAccountingTable.laborPaid,
+          otherExpensesPaid: invoiceAccountingTable.otherExpensesPaid,
+        })
+        .from(invoicesTable)
+        .innerJoin(clientsTable, eq(invoicesTable.clientId, clientsTable.id))
+        .leftJoin(invoiceAccountingTable, eq(invoiceAccountingTable.invoiceId, invoicesTable.id))
+        .where(and(...filters))
+        .orderBy(desc(invoicesTable.id));
+
+      res.json(
+        rows.map((row) => ({
+          id: row.id,
+          invoiceId: row.invoiceId,
+          invoiceNumber: row.invoiceNumber,
+          clientName: row.clientName,
+          issueDate: row.issueDate,
+          subtotal: Number(row.subtotal ?? 0),
+          total: Number(row.total ?? 0),
+          payments: Number(row.payments ?? 0),
+          transportation: Number(row.transportation ?? 0),
+          driverName: row.driverName ?? null,
+          unloadLocation: row.unloadLocation ?? null,
+          labor: Number(row.labor ?? 0),
+          otherExpenses: Number(row.otherExpenses ?? 0),
+          transportationPaid: row.transportationPaid ?? false,
+          laborPaid: row.laborPaid ?? false,
+          otherExpensesPaid: row.otherExpensesPaid ?? false,
+        }))
+      );
+    } catch (err) {
+      console.error("[GET /accounting ERROR]", err);
+      res.status(500).json({ error: "Failed to load accounting" });
     }
   });
 
