@@ -27,6 +27,16 @@ export default function InvoicePrintHeader({
             </div>
             <div className="text-sm font-bold text-gray-700">{company.subtitleEn}</div>
             <div className="text-[10px] text-gray-500">{company.taglineEn}</div>
+            <div className="text-[10px] text-gray-500">
+              Tel: {company.phone} · {company.poBox} {company.address}
+            </div>
+            {(company.crNumber || company.taxNumber) && (
+              <div className="text-[10px] text-gray-500">
+                {company.crNumber ? `CR: ${company.crNumber}` : ""}
+                {company.crNumber && company.taxNumber ? " · " : ""}
+                {company.taxNumber ? `Tax: ${company.taxNumber}` : ""}
+              </div>
+            )}
           </div>
 
           {/* Logo - fixed center */}
@@ -46,6 +56,16 @@ export default function InvoicePrintHeader({
             </div>
             <div className="text-sm font-bold text-gray-700">{company.subtitleAr}</div>
             <div className="text-[10px] text-gray-500">{company.taglineAr}</div>
+            <div className="text-[10px] text-gray-500">
+              {company.address} · {company.poBox} · {company.phone}
+            </div>
+            {(company.crNumber || company.taxNumber) && (
+              <div className="text-[10px] text-gray-500">
+                {company.crNumber ? `س.ت: ${company.crNumber}` : ""}
+                {company.crNumber && company.taxNumber ? " · " : ""}
+                {company.taxNumber ? `ضريبي: ${company.taxNumber}` : ""}
+              </div>
+            )}
           </div>
         </div>
       </div>

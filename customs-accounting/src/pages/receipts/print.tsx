@@ -3,6 +3,7 @@ import { savePdf } from "@/lib/pdf";
 import { useParams, Link } from "wouter";
 import { Printer, ArrowRight, ArrowLeft, Stamp } from "lucide-react";
 import Barcode from "react-barcode";
+import { PrintDocumentFooter, ReceiptPrintHeader } from "@/components/print-document-parts";
 import { formatNumber, formatDate } from "@/lib/utils";
 import { useLanguage } from "@/lib/language-context";
 import { useCompanySettings } from "@/lib/company-settings-context";
@@ -285,7 +286,8 @@ export default function ReceiptPrint() {
 
         {/* ══ LETTERHEAD / راس السند والشعار ════════════════════════════ */}
 
-        <div className="border-b-4 border-double border-gray-800 pb-1 pt-1 px-5" style={{ position: "relative", zIndex: 1 }}>
+        <ReceiptPrintHeader receiptNumber={receiptNum} />
+        <div className="hidden">
           <div className="flex items-center justify-between">
             <div className="text-right">
               <div className="text-sm font-black text-gray-900 leading-tight">
@@ -498,7 +500,8 @@ export default function ReceiptPrint() {
               </div>
             )}
             </div>
-          <div className="text-center text-xs text-gray-400 mt-1">
+          <PrintDocumentFooter kind="receipt" reference={receipt.receiptNumber} />
+          <div className="hidden">
             طُبع في{" "}
             {new Date().toLocaleDateString("ar-EG-u-nu-latn", {
               year: "numeric",

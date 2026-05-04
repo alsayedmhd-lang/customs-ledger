@@ -1,4 +1,12 @@
 import InvoicePrintHeader from "@/components/invoice-print-header";
+import {
+  PrintDocumentFooter,
+  PrintSignaturesStamp,
+  PrintWatermark,
+  ReceiptPrintHeader,
+  StatementPrintHeader,
+  StatementStamp,
+} from "@/components/print-document-parts";
 import { useState, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useAuth } from "@/lib/auth-context";
@@ -19,16 +27,27 @@ type TabId = "preview" | "backup" | "company" | "branding" | "print" | "display"
 
 const API_BASE = `${import.meta.env.VITE_API_BASE_URL}/api`;
 
-function Section({ icon: Icon, title, color, children }: {
-  icon: React.ElementType; title: string; color: string; children: React.ReactNode;
+const formatDateYMD = (value: Date | string | null | undefined = new Date()) => {
+  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  if (!value) return new Date().toISOString().slice(0, 10);
+
+  const normalized = String(value).trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(normalized)) return normalized.slice(0, 10);
+
+  const parsed = new Date(normalized);
+  return Number.isNaN(parsed.getTime()) ? normalized : parsed.toISOString().slice(0, 10);
+};
+
+function Section({ icon: Icon, title, color, children, contentClassName }: {
+  icon: React.ElementType; title: string; color: string; children: React.ReactNode; contentClassName?: string;
 }) {
   return (
-    <div className="bg-card rounded-2xl border border-border/50 shadow-sm overflow-hidden">
+    <div className="w-full bg-card rounded-2xl border border-border/50 shadow-sm overflow-hidden">
       <div className={`flex items-center gap-2 px-5 py-3.5 border-b border-border/40 ${color}`}>
         <Icon className="w-3.5 h-3.5" />
         <h2 className="text-sm font-bold">{title}</h2>
       </div>
-      <div className="p-5">{children}</div>
+      <div className={cn("w-full p-5", contentClassName)}>{children}</div>
     </div>
   );
 }
@@ -40,6 +59,332 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
       {children}
       {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
     </div>
+  );
+}
+
+function PreviewShell({
+  title,
+  size,
+  scale,
+  children,
+}: {
+  title: string;
+  size: "large" | "medium" | "small";
+  scale: number;
+  children: React.ReactNode;
+}) {
+  const preview = {
+    large: {
+      sourceWidth: 1120,
+      sourceHeight: 900,
+      initialHeight: 700,
+      minHeight: 420,
+    },
+    medium: {
+      sourceWidth: 840,
+      sourceHeight: 700,
+      initialHeight: 560,
+      minHeight: 320,
+    },
+    small: {
+      sourceWidth: 840,
+      sourceHeight: 720,
+      initialHeight: 560,
+      minHeight: 320,
+    },
+  }[size];
+  const scaledWidth = Math.ceil(preview.sourceWidth * scale);
+  const scaledHeight = Math.ceil(preview.sourceHeight * scale);
+
+  return (
+    <div className="w-full rounded-xl border border-border bg-muted/20 overflow-hidden">
+      <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-card">
+        <h3 className="text-sm font-bold text-foreground">{title}</h3>
+        <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Print Preview</span>
+      </div>
+      <div
+        className="overflow-auto bg-slate-100 p-1"
+        style={{
+          height: preview.initialHeight,
+          minHeight: preview.minHeight,
+          maxHeight: "none",
+          resize: "vertical",
+        }}
+      >
+        <div
+          className="relative mx-auto"
+          style={{
+            width: scaledWidth,
+            minWidth: scaledWidth,
+            minHeight: scaledHeight,
+          }}
+        >
+          <div
+            className="absolute top-0"
+            style={{
+              left: (scaledWidth - preview.sourceWidth) / 2,
+              width: preview.sourceWidth,
+              transform: `scale(${scale})`,
+              transformOrigin: "top center",
+            }}
+          >
+            {children}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SettingsPrintPreviews({
+  settings,
+  logoSrc,
+  stampSrc,
+  watermarkSrc,
+  isAR,
+  invoicePreviewScale,
+  receiptPreviewScale,
+  statementPreviewScale,
+}: {
+  settings: CompanySettings;
+  logoSrc: string;
+  stampSrc: string;
+  watermarkSrc: string;
+  isAR: boolean;
+  invoicePreviewScale: number;
+  receiptPreviewScale: number;
+  statementPreviewScale: number;
+}) {
+  const override = { settings, logoSrc, stampSrc, watermarkSrc };
+  const receiverSignature = settings.receiverSignatureBase64;
+  const today = formatDateYMD();
+
+  return (
+    <div className="w-full max-w-none space-y-4">
+      <PreviewShell title={isAR ? "معاينة الفاتورة" : "Invoice Preview"} size="large" scale={invoicePreviewScale}>
+        <div
+          className="bg-white shadow-xl border border-gray-200 relative overflow-hidden"
+          style={{ fontFamily: "'Cairo', 'Arial', sans-serif" }}
+        >
+          <PrintWatermark kind="invoice" override={override} />
+          <div className="relative z-10">
+            <InvoicePrintHeader
+              company={settings}
+              logoSrc={logoSrc}
+              isAR={isAR}
+              invoiceNumber="INV-PREVIEW"
+              statusText={isAR ? "معاينة" : "Preview"}
+            />
+            <div className="border-b-2 border-gray-700" dir="ltr">
+              {[
+                ["Customer / العميل", isAR ? "عميل تجريبي" : "Sample Client", "Inv. Date", today],
+                ["Sales Man / المندوب", isAR ? "المحاسب" : "Accountant", "B.L / M AWB", "BL-2026-001"],
+                ["منفذ الدخول / Port", isAR ? "ميناء حمد" : "Hamad Port", "Weight / الوزن", "1,250 Kg"],
+              ].map((row) => (
+                <div key={row.join("-")} className="grid grid-cols-2 border-b border-dashed border-gray-200 last:border-b-0">
+                  <div className="px-5 py-1.5 border-r border-dashed border-gray-200">
+                    <div className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">{row[0]}</div>
+                    <div className="text-[13px] leading-tight font-bold text-gray-900">{row[1]}</div>
+                  </div>
+                  <div className="px-5 py-1.5">
+                    <div className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">{row[2]}</div>
+                    <div className="text-[13px] leading-tight font-bold text-gray-900 font-mono">{row[3]}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="px-6 pt-3">
+              <table className="w-full text-sm border-collapse">
+                <thead>
+                  <tr className="border-y-2 border-gray-700">
+                    <th className="text-right py-2 px-2 font-bold text-gray-700 w-10">#</th>
+                    <th className="text-right py-2 px-3 font-bold text-gray-700">Description / الوصف</th>
+                    <th className="text-center py-2 px-2 font-bold text-gray-700 w-16">الكمية</th>
+                    <th className="text-center py-2 px-2 font-bold text-gray-700 w-24">سعر الوحدة</th>
+                    <th className="text-left py-2 px-3 font-bold text-gray-700 w-32">Total Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr className="border-b border-dashed border-gray-300">
+                    <td className="py-2 px-2 text-gray-500 text-center font-mono text-xs">0001</td>
+                    <td className="py-2 px-3 text-gray-800">{isAR ? "خدمة تخليص جمركي" : "Customs clearance service"}</td>
+                    <td className="py-2 px-2 text-center text-gray-700">1</td>
+                    <td className="py-2 px-2 text-center font-mono text-gray-700">1,250.00</td>
+                    <td className="py-2 px-3 text-left font-mono font-bold text-gray-800">1,250.00</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div className="px-6 pb-2 pt-3">
+              <div className="flex justify-between items-center border-t-2 border-double border-gray-700 pt-2">
+                <span className="font-black text-base text-gray-800">الإجمالي الكلي / Grand Total</span>
+                <span className="font-black font-mono text-base text-gray-900">1,250.00 QR</span>
+              </div>
+            </div>
+            <PrintSignaturesStamp kind="invoice" receiverSignature={receiverSignature} override={override} />
+            <PrintDocumentFooter kind="invoice" reference="INV-PREVIEW" override={override} />
+          </div>
+        </div>
+      </PreviewShell>
+
+      <div className="grid w-full grid-cols-1 xl:grid-cols-2 gap-4">
+        <PreviewShell title={isAR ? "معاينة سند القبض" : "Receipt Preview"} size="medium" scale={receiptPreviewScale}>
+          <div
+            className="bg-white shadow-lg border border-gray-200 relative overflow-hidden"
+            style={{ fontFamily: "'Cairo', 'Arial', sans-serif" }}
+          >
+            <PrintWatermark kind="receipt" override={override} />
+            <ReceiptPrintHeader receiptNumber="RV-PREVIEW" override={override} />
+            <div className="border-b border-gray-400 px-5 py-1.5 relative z-10">
+              <table className="w-full text-xs border-collapse border border-gray-300">
+                <tbody>
+                  {[
+                    ["العميل", isAR ? "عميل تجريبي" : "Sample Client", "Customer"],
+                    ["طريقة الدفع", isAR ? "تحويل بنكي" : "Bank Transfer", "Payment Method"],
+                    ["رقم الفاتورة", "INV-PREVIEW", "Invoice No"],
+                    ["التاريخ", today, "Date"],
+                  ].map((row) => (
+                    <tr key={row[0]} className="border-b border-gray-200 last:border-b-0">
+                      <td className="px-3 py-1.5 font-bold text-gray-700 text-right bg-gray-50 w-32 border-l border-gray-200">{row[0]}</td>
+                      <td className="px-3 py-1.5 font-semibold text-gray-900 text-center border-l border-gray-200">{row[1]}</td>
+                      <td className="px-3 py-1.5 font-bold text-gray-400 text-left bg-gray-50 w-32 tracking-wide">{row[2]}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="px-5 py-2 relative z-10">
+              <table className="w-full text-sm border-collapse border border-gray-700">
+                <thead>
+                  <tr className="border-b-2 border-gray-700 bg-gray-100">
+                    <th className="text-right py-1.5 px-3 font-bold text-gray-700">البيان / Description</th>
+                    <th className="text-left py-1.5 px-3 font-bold text-gray-700 w-36 border-r border-gray-700">QR</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td className="py-2.5 px-3 text-right font-medium text-gray-800">استلام مبلغ مقابل INV-PREVIEW</td>
+                    <td className="py-2.5 px-3 text-left font-mono font-bold text-gray-800 border-r border-gray-300">1,250.00</td>
+                  </tr>
+                </tbody>
+              </table>
+              <div className="flex justify-between items-center border-t-2 border-double border-gray-700 pt-1.5">
+                <span className="font-black text-sm text-gray-800">Grand Total / الإجمالي الكلي</span>
+                <span className="font-black font-mono text-lg text-gray-900">1,250.00 QR</span>
+              </div>
+            </div>
+            <PrintSignaturesStamp kind="receipt" receiverSignature={receiverSignature} receiverName={isAR ? "المستلم" : "Receiver"} override={override} />
+            <PrintDocumentFooter kind="receipt" reference="RV-PREVIEW" override={override} />
+          </div>
+        </PreviewShell>
+
+        <PreviewShell title={isAR ? "معاينة كشف الحساب" : "Customer Statement Preview"} size="small" scale={statementPreviewScale}>
+          <div
+            className="bg-white shadow-xl border border-gray-200 relative overflow-hidden"
+            style={{ fontFamily: "'Cairo', 'Arial', sans-serif" }}
+          >
+            <PrintWatermark kind="statement" override={override} />
+            <StatementPrintHeader statementRef="CL-PREVIEW-2026" dateText={today} override={override} />
+            <div className="px-6 py-3 border-b border-gray-300 relative z-10">
+              <div className="grid grid-cols-2 gap-6">
+                <div className="text-right">
+                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">بيانات العميل / CLIENT DETAILS</p>
+                  <p className="text-base font-black text-gray-900">{isAR ? "عميل تجريبي" : "Sample Client"}</p>
+                  <p className="text-sm text-gray-600 mt-0.5">{isAR ? "الدوحة، قطر" : "Doha, Qatar"}</p>
+                </div>
+                <div className="border-2 border-gray-700 rounded text-sm">
+                  <div className="bg-gray-800 text-white text-center py-1 font-bold text-xs uppercase tracking-widest">ملخص الحساب / ACCOUNT SUMMARY</div>
+                  <div className="divide-y divide-gray-200">
+                    <div className="flex justify-between px-4 py-1.5"><span>إجمالي المدين / Total Debit</span><span className="font-mono font-bold">QR 4,750.00</span></div>
+                    <div className="flex justify-between px-4 py-1.5"><span>إجمالي الدائن / Total Credit</span><span className="font-mono font-bold text-green-700">QR 1,250.00</span></div>
+                    <div className="flex justify-between px-4 py-2 bg-gray-50"><span className="font-black">الرصيد / Balance</span><span className="font-mono font-black text-red-700">QR 3,500.00</span></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="px-6 pt-4 relative z-10">
+              <table className="w-full text-sm border-collapse">
+                <thead>
+                  <tr className="border-y-2 border-gray-700 bg-gray-100">
+                    <th className="text-right py-2 px-2 font-bold text-gray-700 w-10">#</th>
+                    <th className="text-right py-2 px-3 font-bold text-gray-700">التاريخ / Date</th>
+                    <th className="text-right py-2 px-3 font-bold text-gray-700">البيان / Description</th>
+                    <th className="text-left py-2 px-2 font-bold text-gray-700 w-24">مدين / Debit</th>
+                    <th className="text-left py-2 px-2 font-bold text-green-700 w-24">دائن / Credit</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr className="border-b border-dashed border-gray-300">
+                    <td className="py-2 px-2 text-center font-mono text-xs">001</td>
+                    <td className="py-2 px-3">{today}</td>
+                    <td className="py-2 px-3 font-semibold">فاتورة رقم INV-PREVIEW</td>
+                    <td className="py-2 px-2 text-left font-mono font-bold">4,750.00</td>
+                    <td className="py-2 px-2 text-left font-mono text-gray-300">—</td>
+                  </tr>
+                  <tr className="border-b border-dashed border-gray-300">
+                    <td className="py-2 px-2 text-center font-mono text-xs">002</td>
+                    <td className="py-2 px-3">{today}</td>
+                    <td className="py-2 px-3 font-semibold">سند قبض RV-PREVIEW</td>
+                    <td className="py-2 px-2 text-left font-mono text-gray-300">—</td>
+                    <td className="py-2 px-2 text-left font-mono font-bold text-green-700">1,250.00</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div className="relative px-6 pb-3 pt-4 z-10">
+              <StatementStamp override={override} />
+            </div>
+            <PrintDocumentFooter kind="statement" reference="CL-PREVIEW-2026" count={2} override={override} />
+          </div>
+        </PreviewShell>
+      </div>
+    </div>
+  );
+}
+
+function PreviewScaleControl({
+  label,
+  value,
+  min,
+  max,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  onChange: (value: number) => void;
+}) {
+  return (
+    <label className="min-w-0 space-y-1">
+      <div className="flex items-center justify-between gap-3 text-xs font-semibold text-muted-foreground">
+        <span>{label}</span>
+        <span className="font-mono text-foreground">{Math.round(value * 100)}%</span>
+      </div>
+      <div className="flex items-center gap-2">
+        <input
+          type="range"
+          min={min}
+          max={max}
+          step={0.02}
+          value={value}
+          onChange={(e) => onChange(Number(e.target.value))}
+          className="w-full accent-primary"
+        />
+        <input
+          type="number"
+          min={Math.round(min * 100)}
+          max={Math.round(max * 100)}
+          step={2}
+          value={Math.round(value * 100)}
+          onChange={(e) => {
+            const next = (Number(e.target.value) || Math.round(min * 100)) / 100;
+            onChange(Math.min(max, Math.max(min, next)));
+          }}
+          className="h-8 w-20 rounded-md border border-border bg-background px-2 text-xs font-mono outline-none focus:ring-2 focus:ring-primary/20"
+        />
+      </div>
+    </label>
   );
 }
 
@@ -67,6 +412,9 @@ export default function SettingsPage() {
   const stampRef = useRef<HTMLInputElement>(null);
   const watermarkRef = useRef<HTMLInputElement>(null);
   const [activeTab, setActiveTab] = useState<TabId>("preview");
+  const [invoicePreviewScale, setInvoicePreviewScale] = useState(0.76);
+  const [receiptPreviewScale, setReceiptPreviewScale] = useState(0.8);
+  const [statementPreviewScale, setStatementPreviewScale] = useState(0.78);
   const [backupPassword, setBackupPassword] = useState("");
   const [importPassword, setImportPassword] = useState("");
   const [showBackupPassword, setShowBackupPassword] = useState(false);
@@ -620,7 +968,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       dir={isRTL ? "rtl" : "ltr"}
-      className="flex gap-5 pb-10 items-start"
+      className="flex w-full gap-5 pb-10 items-start"
     >
       {/* ── Sticky Sidebar ─────────────────────────────────────── */}
       <div className="sticky top-4 self-start w-48 shrink-0 space-y-3">
@@ -677,7 +1025,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
       </div>
 
       {/* ── Content Area ───────────────────────────────────────── */}
-      <div className="flex-1 min-w-0 space-y-5">
+      <div className="flex-1 min-w-0 w-full space-y-5">
 
         {/* Section title */}
         <div className="flex items-center justify-between">
@@ -705,13 +1053,61 @@ const decryptBackupData = async (backupFile: any, password: string) => {
           {/* ── Preview Tab Content ── */}
 
           {activeTab === "preview" && (
-              <div className="bg-gradient-to-br from-primary/5 to-transparent p-4 rounded-2xl border border-primary/10">
+              <div className="w-full max-w-none bg-gradient-to-br from-primary/5 to-transparent p-2 rounded-2xl border border-primary/10">
                 <Section
                   icon={Eye}
                   title={isAR ? "المعاينة" : "Preview"}
                   color="bg-primary/5"
+                  contentClassName="p-3"
                 >
-                <div className="mb-6 rounded-xl border bg-background/80 backdrop-blur-sm p-4 transition-all hover:shadow-lg hover:border-primary/30">
+                <div className="mb-4 w-full rounded-xl border border-border/60 bg-background/80 p-3">
+                  <div className="mb-3 flex items-center gap-2 text-sm font-bold text-foreground">
+                    <SlidersHorizontal className="h-4 w-4 text-primary" />
+                    <span>{isAR ? "تكبير وتصغير المستندات" : "Document Zoom"}</span>
+                  </div>
+                  <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+                    <PreviewScaleControl
+                      label={isAR ? "تكبير الفاتورة" : "Invoice zoom"}
+                      value={invoicePreviewScale}
+                      min={0.55}
+                      max={1.1}
+                      onChange={setInvoicePreviewScale}
+                    />
+                    <PreviewScaleControl
+                      label={isAR ? "تكبير سند القبض" : "Receipt zoom"}
+                      value={receiptPreviewScale}
+                      min={0.55}
+                      max={1.1}
+                      onChange={setReceiptPreviewScale}
+                    />
+                    <PreviewScaleControl
+                      label={isAR ? "تكبير كشف الحساب" : "Statement zoom"}
+                      value={statementPreviewScale}
+                      min={0.55}
+                      max={1.1}
+                      onChange={setStatementPreviewScale}
+                    />
+                  </div>
+                </div>
+                <SettingsPrintPreviews
+                  settings={{
+                    ...settings,
+                    ...form,
+                    logoBase64: logoPreview ?? form.logoBase64,
+                    stampBase64: stampPreview ?? form.stampBase64,
+                    watermarkBase64: watermarkPreview ?? form.watermarkBase64,
+                    accountantSignatureBase64: accountantSignaturePreview ?? form.accountantSignatureBase64,
+                    receiverSignatureBase64: receiverSignaturePreview ?? form.receiverSignatureBase64,
+                  }}
+                  logoSrc={currentLogoSrc}
+                  stampSrc={currentStampSrc}
+                  watermarkSrc={currentWatermarkSrc}
+                  isAR={isAR}
+                  invoicePreviewScale={invoicePreviewScale}
+                  receiptPreviewScale={receiptPreviewScale}
+                  statementPreviewScale={statementPreviewScale}
+                />
+                <div className="hidden">
                   <h3 className="text-sm font-bold mb-3 text-primary">
                     {isAR ? "🔍 معاينة مباشرة للمستندات" : "🔍 Live Document Preview"}
                   </h3>

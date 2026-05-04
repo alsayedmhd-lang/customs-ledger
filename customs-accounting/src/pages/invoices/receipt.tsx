@@ -4,6 +4,8 @@ import { useParams, Link } from "wouter";
 import { useGetInvoice } from "@workspace/api-client-react";
 import { Printer, ArrowRight, ArrowLeft, Stamp, Calculator } from "lucide-react";
 import Barcode from "react-barcode";
+import InvoicePrintHeader from "@/components/invoice-print-header";
+import { PrintDocumentFooter } from "@/components/print-document-parts";
 import { arabicNums, formatNumber } from "@/lib/utils";
 import { useLanguage } from "@/lib/language-context";
 import { useCompanySettings } from "@/lib/company-settings-context";
@@ -308,7 +310,14 @@ const impExpValue =
         )}
 
         {/* ══ LETTERHEAD / راس الفاتورة والشعار ════════════════════════════ */}
-        <div className="border-b-4 border-double border-gray-800 pb-3 pt-4 px-6">
+        <InvoicePrintHeader
+          company={company}
+          logoSrc={logoSrc}
+          isAR={isAR}
+          invoiceNumber={invNum}
+          statusText={STATUS_AR[invoice.status] ?? invoice.status}
+        />
+        <div className="hidden">
           <div className="relative flex items-start justify-between gap-4">
             <div className="text-right flex-1 min-w-0">
               <div className="text-2xl font-black text-gray-900 leading-tight break-words">
@@ -343,7 +352,7 @@ const impExpValue =
           </div>
         </div>
         {/* ══ INVOICE META ════════════════════════════════════════════════ */}
-        <div className="flex items-stretch border-b-2 border-gray-700 bg-gray-50" dir="ltr">
+        <div className="hidden" dir="ltr">
           <div className="flex flex-col justify-center px-6 py-2.5" style={{ width: "40%", borderRight: "1px solid #d1d5db" }}>
             <div className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Invoice No</div>
             <div className="font-mono font-black text-blue-800 text-xl leading-none">{invNum}</div>
@@ -589,7 +598,8 @@ const impExpValue =
           )}
         </div>
         {/* ══ FOOTER ══════════════════════════════════════════════════════ */}
-        <div className="border-t-4 border-double border-gray-700 px-6 py-3 bg-gray-50">
+        <PrintDocumentFooter kind="invoice" reference={invNum} />
+        <div className="hidden">
           <div className="flex items-center justify-between text-xs text-gray-600">
             <span>✉ {printEmail}</span>
             <span className="font-bold text-gray-800">

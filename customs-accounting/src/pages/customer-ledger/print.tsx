@@ -3,6 +3,7 @@ import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, FileDown, Printer, Stamp } from "lucide-react";
 import Barcode from "react-barcode";
+import { PrintDocumentFooter, StatementPrintHeader } from "@/components/print-document-parts";
 
 import { useAuth } from "@/lib/auth-context";
 import { savePdf } from "@/lib/pdf";
@@ -13,6 +14,17 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL;
 
 function getToken() {
   return sessionStorage.getItem("auth_token");
+}
+
+function formatDateYMD(value: Date | string | null | undefined = new Date()) {
+  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  if (!value) return new Date().toISOString().slice(0, 10);
+
+  const normalized = String(value).trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(normalized)) return normalized.slice(0, 10);
+
+  const parsed = new Date(normalized);
+  return Number.isNaN(parsed.getTime()) ? normalized : parsed.toISOString().slice(0, 10);
 }
 
 async function fetchCustomerLedger(clientId: string, from?: string | null, to?: string | null) {
@@ -105,7 +117,9 @@ export default function CustomerLedgerPrintPage() {
   const clientAddress = client.address || client.city || "";
 
   const statementRef = `CL-${clientId}-${new Date().getFullYear()}`;
-  const today = new Date().toLocaleDateString(isAR ? "ar-EG-u-nu-latn" : "en-CA");
+  const today = formatDateYMD();
+  const fromDateText = formatDateYMD(from);
+  const toDateText = formatDateYMD(to);
 
   const totalDebit = rows.reduce((sum: number, row: any) => sum + Number(row.debit || 0), 0);
   const totalCredit = rows.reduce((sum: number, row: any) => sum + Number(row.credit || 0), 0);
@@ -149,8 +163,8 @@ export default function CustomerLedgerPrintPage() {
     const a = document.createElement("a");
     a.href = url;
     const fileName = isAR
-    ? `كشف-ملخص-الحساب-${clientName}-${from || today}-${to || today}.csv`
-    : `Customer-Ledger-${clientName}-${from || today}-${to || today}.csv`;
+    ? `كشف-ملخص-الحساب-${clientName}-${fromDateText}-${toDateText}.csv`
+    : `Customer-Ledger-${clientName}-${fromDateText}-${toDateText}.csv`;
     a.download = fileName;
     a.click();
     URL.revokeObjectURL(url);
@@ -180,8 +194,8 @@ export default function CustomerLedgerPrintPage() {
         <button
         onClick={async () => {
             const fileName = isAR
-            ? `كشف-ملخص-الحساب-${clientName}-${from || today}-${to || today}`
-            : `Customer-Ledger-${clientName}-${from || today}-${to || today}`;
+            ? `كشف-ملخص-الحساب-${clientName}-${fromDateText}-${toDateText}`
+            : `Customer-Ledger-${clientName}-${fromDateText}-${toDateText}`;
 
             await savePdf(fileName);
         }}
@@ -238,7 +252,8 @@ export default function CustomerLedgerPrintPage() {
         )}
 
         {/* LETTERHEAD */}
-        <div className="border-b-4 border-double border-gray-800 pb-3 pt-4 px-6 relative z-10">
+        <StatementPrintHeader statementRef={statementRef} dateText={today} />
+        <div className="hidden">
           <div className="flex items-start justify-between flex-row-reverse">
             <div className="text-left" dir="ltr">
               <div className="text-2xl font-black text-gray-900 leading-tight uppercase">
@@ -265,10 +280,10 @@ export default function CustomerLedgerPrintPage() {
         </div>
 
         {/* TITLE / META */}
-        <div className="border-b border-gray-400 px-6 py-2 bg-gray-50 relative z-10">
+        <div className="hidden">
           <div className="flex items-center justify-between text-sm">
             <div className="font-bold text-gray-800" dir="ltr">
-              Date : <span className="font-mono">{new Date().toLocaleDateString("en-CA")}</span>
+              Date : <span className="font-mono">{today}</span>
             </div>
 
             <div className="text-center font-bold text-gray-800 text-lg">
@@ -321,7 +336,7 @@ export default function CustomerLedgerPrintPage() {
                     من تاريخ / From Date
                     </div>
                     <div className="mt-1 font-mono text-gray-900">
-                    {from || today}
+                    {fromDateText}
                     </div>
                 </div>
 
@@ -330,7 +345,7 @@ export default function CustomerLedgerPrintPage() {
                     إلى تاريخ / To Date
                     </div>
                     <div className="mt-1 font-mono text-gray-900">
-                    {to || today}
+                    {toDateText}
                     </div>
                 </div>
                 </div>
@@ -422,7 +437,7 @@ export default function CustomerLedgerPrintPage() {
                       </td>
 
                       <td className="py-2 px-3 text-gray-600">
-                        {row.entryDate}
+                        {formatDateYMD(row.entryDate)}
                       </td>
 
                       <td className="py-2 px-3 font-semibold text-gray-800">
@@ -506,7 +521,8 @@ export default function CustomerLedgerPrintPage() {
         </div>
 
         {/* FOOTER */}
-        <div className="border-t-4 border-double border-gray-700 px-6 py-3 bg-gray-50 relative z-10">
+        <PrintDocumentFooter kind="statement" reference={statementRef} count={rows.length} />
+        <div className="hidden">
           <div className="flex items-center justify-between text-xs text-gray-600">
             <span>✉ {settings.email}</span>
 
