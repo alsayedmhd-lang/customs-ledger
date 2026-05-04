@@ -14,43 +14,54 @@ function safeFileName(name) {
 }
 
 function createWindow() {
-  const backendEntry = path.join(
-    process.resourcesPath,
-    "api-server",
-    "dist",
-    "index.cjs"
-  );
+  const basePath = process.resourcesPath;
+  const apiPath = path.join(basePath, "api-server");
+  const serverFile = path.join(apiPath, "dist", "index.cjs");
+  const starterDbPath = path.join(apiPath, "lib", "db", "local.db");
+  const userDataPath = app.getPath("userData");
+  const appDataDbPath = path.join(userDataPath, "local.db");
 
-  const backendCwd = path.join(process.resourcesPath, "api-server");
+  console.log("AppData DB path:", appDataDbPath);
+  console.log("Starter DB path:", starterDbPath);
+
+  if (!fs.existsSync(userDataPath)) {
+    fs.mkdirSync(userDataPath, { recursive: true });
+  }
+
+  if (!fs.existsSync(appDataDbPath)) {
+    if (!fs.existsSync(starterDbPath)) {
+      throw new Error(`Starter SQLite database not found: ${starterDbPath}`);
+    }
+
+    fs.copyFileSync(starterDbPath, appDataDbPath);
+    console.log("Copied starter DB:", appDataDbPath);
+  }
+
+  console.log("Starting backend from:", serverFile);
+  console.log("Using SQLite DB:", appDataDbPath);
 
   backendProcess = spawn(
     process.execPath,
-    [backendEntry],
+    ["dist/index.cjs"],
     {
-      cwd: backendCwd,
+      cwd: apiPath,
       windowsHide: true,
       stdio: ["ignore", "pipe", "pipe"],
       env: {
         ...process.env,
-        NODE_ENV: "production",
         ELECTRON_RUN_AS_NODE: "1",
-        SQLITE_DB_PATH: path.join(
-          process.resourcesPath,
-          "api-server",
-          "lib",
-          "db",
-          "local.db"
-        ),
+        NODE_ENV: "production",
+        SQLITE_DB_PATH: appDataDbPath,
       },
       detached: false,
     }
   );
   backendProcess.stdout.on("data", (data) => {
-    console.log("[backend stdout]", data.toString());
+    console.log("API:", data.toString());
   });
 
   backendProcess.stderr.on("data", (data) => {
-    console.error("[backend stderr]", data.toString());
+    console.error("API ERR:", data.toString());
   });
 
   backendProcess.on("error", (err) => {

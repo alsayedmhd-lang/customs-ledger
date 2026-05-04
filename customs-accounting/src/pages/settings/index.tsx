@@ -19,11 +19,16 @@ import {
   Stamp, Eye, EyeOff, Shield, Printer, Info, Image, RotateCcw, User,
   Palette, Sun, Moon, Monitor, Zap, ZapOff, Layers, RectangleHorizontal, Square, Minus,
   AlignVerticalJustifyStart, AlignVerticalJustifyCenter, AlignVerticalSpaceAround,
-  Wallpaper, SlidersHorizontal, Ban, Blend,
+  Wallpaper, SlidersHorizontal, Ban, Blend, Database, Cloud,
 } from "lucide-react";
 import { useDisplaySettings, COLOR_PRESETS, SIDEBAR_COLOR_PRESETS, type PrimaryColor, type BorderRadius, type Density, type SidebarColor, type BgType } from "@/lib/display-settings-context";
 
 type TabId = "preview" | "backup" | "company" | "branding" | "print" | "display";
+type BackupView = "backup-import" | "database-sync";
+type DatabaseMode = "local" | "online";
+type SyncMode = "local-to-online" | "online-to-local" | "bidirectional";
+type AutoSyncTiming = "startup" | "interval";
+type SyncStatus = "idle" | "success" | "failed" | "in-progress";
 
 const API_BASE = `${import.meta.env.VITE_API_BASE_URL}/api`;
 
@@ -388,6 +393,277 @@ function PreviewScaleControl({
   );
 }
 
+function DatabaseSyncPanel({
+  isAR,
+  databaseMode,
+  setDatabaseMode,
+  databaseConfig,
+  setDatabaseConfig,
+  syncConfig,
+  setSyncConfig,
+}: {
+  isAR: boolean;
+  databaseMode: DatabaseMode;
+  setDatabaseMode: (mode: DatabaseMode) => void;
+  databaseConfig: {
+    localPath: string;
+    connectionStatus: string;
+    host: string;
+    port: string;
+    databaseName: string;
+    username: string;
+    password: string;
+    useConnectionString: boolean;
+    connectionString: string;
+  };
+  setDatabaseConfig: React.Dispatch<React.SetStateAction<{
+    localPath: string;
+    connectionStatus: string;
+    host: string;
+    port: string;
+    databaseName: string;
+    username: string;
+    password: string;
+    useConnectionString: boolean;
+    connectionString: string;
+  }>>;
+  syncConfig: {
+    mode: SyncMode;
+    autoSync: boolean;
+    timing: AutoSyncTiming;
+    intervalMinutes: number;
+    lastSyncTime: string;
+    status: SyncStatus;
+  };
+  setSyncConfig: React.Dispatch<React.SetStateAction<{
+    mode: SyncMode;
+    autoSync: boolean;
+    timing: AutoSyncTiming;
+    intervalMinutes: number;
+    lastSyncTime: string;
+    status: SyncStatus;
+  }>>;
+}) {
+  return (
+    <div className="space-y-4" dir={isAR ? "rtl" : "ltr"}>
+      <div className={`${isAR ? "text-right" : "text-left"}`}>
+        <h3 className="text-sm font-bold text-foreground">
+          {isAR ? "قاعدة البيانات والمزامنة" : "Database & Sync"}
+        </h3>
+        <p className="mt-1 text-xs text-muted-foreground">
+          {isAR
+            ? "واجهة مبدئية لاختيار مصدر قاعدة البيانات وتجهيز إعدادات المزامنة بدون تنفيذ اتصال فعلي حاليًا."
+            : "Feature-ready controls for choosing a database source and preparing sync settings without running real connections yet."}
+        </p>
+      </div>
+
+      <div className="rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-sm">
+        <div className="mb-4 flex items-center gap-2 text-sm font-bold text-foreground">
+          <Database className="h-4 w-4 text-primary" />
+          <span>{isAR ? "نوع قاعدة البيانات" : "Database Type"}</span>
+        </div>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          {[
+            { id: "local" as DatabaseMode, icon: Database, labelAr: "قاعدة محلية (SQLite)", labelEn: "Local Database (SQLite)" },
+            { id: "online" as DatabaseMode, icon: Cloud, labelAr: "قاعدة أونلاين (PostgreSQL / MySQL لاحقًا)", labelEn: "Online Database (PostgreSQL / MySQL later)" },
+          ].map((option) => (
+            <button
+              key={option.id}
+              type="button"
+              onClick={() => setDatabaseMode(option.id)}
+              className={cn(
+                "flex items-center gap-3 rounded-xl border p-3 text-sm transition",
+                databaseMode === option.id
+                  ? "border-primary bg-primary/5 text-primary shadow-sm"
+                  : "border-border bg-background hover:border-primary/40"
+              )}
+            >
+              <option.icon className="h-4 w-4 shrink-0" />
+              <span className="font-semibold">{isAR ? option.labelAr : option.labelEn}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {databaseMode === "local" && (
+        <div className="rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-sm">
+          <div className="mb-4 flex items-center gap-2 text-sm font-bold text-foreground">
+            <Database className="h-4 w-4 text-emerald-600" />
+            <span>{isAR ? "قاعدة البيانات المحلية" : "Local Database"}</span>
+          </div>
+          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+            <Field label={isAR ? "مسار قاعدة البيانات" : "Database Path"}>
+              <input
+                value={databaseConfig.localPath}
+                onChange={(e) => setDatabaseConfig((p) => ({ ...p, localPath: e.target.value }))}
+                className={inp}
+              />
+            </Field>
+            <Field label={isAR ? "حالة الاتصال" : "Connection Status"}>
+              <div className="flex h-10 items-center justify-between rounded-xl border border-border bg-background px-3 text-sm">
+                <span className={cn("font-semibold", databaseConfig.connectionStatus === "Connected" ? "text-emerald-600" : "text-red-600")}>
+                  {databaseConfig.connectionStatus === "Connected" ? (isAR ? "متصل" : "Connected") : (isAR ? "غير متصل" : "Not Connected")}
+                </span>
+                <span className={cn("h-2.5 w-2.5 rounded-full", databaseConfig.connectionStatus === "Connected" ? "bg-emerald-500" : "bg-red-500")} />
+              </div>
+            </Field>
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button type="button" className="h-9 rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground hover:bg-primary/90">
+              {isAR ? "إنشاء قاعدة جديدة" : "Generate New Database"}
+            </button>
+            <button type="button" className="h-9 rounded-lg border border-border bg-background px-3 text-xs font-semibold hover:bg-muted">
+              {isAR ? "تحميل ملف SQL لإنشاء قاعدة جديدة" : "Upload SQL File"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {databaseMode === "online" && (
+        <div className="rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-sm">
+          <div className="mb-4 flex items-center gap-2 text-sm font-bold text-foreground">
+            <Cloud className="h-4 w-4 text-blue-600" />
+            <span>{isAR ? "إعدادات قاعدة البيانات الأونلاين" : "Online Database Settings"}</span>
+          </div>
+          <label className="mb-4 flex items-center gap-2 text-sm font-semibold text-foreground">
+            <input
+              type="checkbox"
+              checked={databaseConfig.useConnectionString}
+              onChange={(e) => setDatabaseConfig((p) => ({ ...p, useConnectionString: e.target.checked }))}
+              className="h-4 w-4 accent-primary"
+            />
+            <span>{isAR ? "استخدام Connection String كامل" : "Use full Connection String"}</span>
+          </label>
+
+          {databaseConfig.useConnectionString ? (
+            <Field label="Connection String">
+              <input
+                type="password"
+                value={databaseConfig.connectionString}
+                onChange={(e) => setDatabaseConfig((p) => ({ ...p, connectionString: e.target.value }))}
+                placeholder="postgresql://user:password@host:5432/database"
+                dir="ltr"
+                className={inp}
+              />
+            </Field>
+          ) : (
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+              <Field label="Host">
+                <input value={databaseConfig.host} onChange={(e) => setDatabaseConfig((p) => ({ ...p, host: e.target.value }))} className={inp} dir="ltr" />
+              </Field>
+              <Field label="Port">
+                <input value={databaseConfig.port} onChange={(e) => setDatabaseConfig((p) => ({ ...p, port: e.target.value }))} className={inp} dir="ltr" />
+              </Field>
+              <Field label={isAR ? "اسم قاعدة البيانات" : "Database Name"}>
+                <input value={databaseConfig.databaseName} onChange={(e) => setDatabaseConfig((p) => ({ ...p, databaseName: e.target.value }))} className={inp} dir="ltr" />
+              </Field>
+              <Field label={isAR ? "اسم المستخدم" : "Username"}>
+                <input value={databaseConfig.username} onChange={(e) => setDatabaseConfig((p) => ({ ...p, username: e.target.value }))} className={inp} dir="ltr" />
+              </Field>
+              <Field label={isAR ? "كلمة المرور" : "Password"}>
+                <input type="password" value={databaseConfig.password} onChange={(e) => setDatabaseConfig((p) => ({ ...p, password: e.target.value }))} className={inp} dir="ltr" />
+              </Field>
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-sm">
+        <div className="mb-4 flex flex-wrap gap-2">
+          <button type="button" className="h-9 rounded-lg border border-blue-200 bg-blue-50 px-3 text-xs font-semibold text-blue-700 hover:bg-blue-100">
+            {isAR ? "اختبار الاتصال" : "Test Connection"}
+          </button>
+          <button type="button" className="h-9 rounded-lg border border-emerald-200 bg-emerald-50 px-3 text-xs font-semibold text-emerald-700 hover:bg-emerald-100">
+            {isAR ? "حفظ الإعدادات" : "Save Configuration"}
+          </button>
+          <button type="button" className="h-9 rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground hover:bg-primary/90">
+            {isAR ? "اتصال" : "Connect"}
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+          <div>
+            <div className="mb-3 flex items-center gap-2 text-sm font-bold text-foreground">
+              <RefreshCw className="h-4 w-4 text-primary" />
+              <span>{isAR ? "خيارات المزامنة" : "Sync Options"}</span>
+            </div>
+            <div className="grid grid-cols-1 gap-2">
+              {[
+                { id: "local-to-online" as SyncMode, labelAr: "مزامنة المحلي إلى الأونلاين", labelEn: "Sync Local -> Online" },
+                { id: "online-to-local" as SyncMode, labelAr: "مزامنة الأونلاين إلى المحلي", labelEn: "Sync Online -> Local" },
+                { id: "bidirectional" as SyncMode, labelAr: "مزامنة ثنائية الاتجاه", labelEn: "Sync Both (Bidirectional)" },
+              ].map((mode) => (
+                <label key={mode.id} className="flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-sm">
+                  <input
+                    type="radio"
+                    checked={syncConfig.mode === mode.id}
+                    onChange={() => setSyncConfig((p) => ({ ...p, mode: mode.id }))}
+                    className="h-4 w-4 accent-primary"
+                  />
+                  <span>{isAR ? mode.labelAr : mode.labelEn}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <div className="mb-3 flex items-center gap-2 text-sm font-bold text-foreground">
+              <SlidersHorizontal className="h-4 w-4 text-primary" />
+              <span>{isAR ? "التحكم في المزامنة" : "Sync Control"}</span>
+            </div>
+            <div className="space-y-3 rounded-xl border border-border bg-background p-3">
+              <label className="flex items-center justify-between gap-3 text-sm font-semibold">
+                <span>{isAR ? "تشغيل تلقائي" : "Auto Sync"}</span>
+                <button type="button" onClick={() => setSyncConfig((p) => ({ ...p, autoSync: !p.autoSync }))} className={tog(syncConfig.autoSync)}>
+                  <span className={`absolute top-0.5 left-0.5 h-3.5 w-3.5 rounded-full bg-white shadow transition-transform ${syncConfig.autoSync ? "translate-x-5" : ""}`} />
+                </button>
+              </label>
+              <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                <label className="flex items-center gap-2 text-sm">
+                  <input type="radio" checked={syncConfig.timing === "startup"} onChange={() => setSyncConfig((p) => ({ ...p, timing: "startup" }))} className="h-4 w-4 accent-primary" />
+                  <span>{isAR ? "عند فتح البرنامج" : "Every app start"}</span>
+                </label>
+                <label className="flex items-center gap-2 text-sm">
+                  <input type="radio" checked={syncConfig.timing === "interval"} onChange={() => setSyncConfig((p) => ({ ...p, timing: "interval" }))} className="h-4 w-4 accent-primary" />
+                  <span>{isAR ? "كل X دقيقة" : "Every X minutes"}</span>
+                </label>
+              </div>
+              <Field label={isAR ? "الفاصل بالدقائق" : "Interval Minutes"}>
+                <input
+                  type="number"
+                  min={1}
+                  value={syncConfig.intervalMinutes}
+                  onChange={(e) => setSyncConfig((p) => ({ ...p, intervalMinutes: Math.max(1, Number(e.target.value) || 1) }))}
+                  className={inp}
+                />
+              </Field>
+              <button type="button" className="h-9 w-full rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground hover:bg-primary/90">
+                {isAR ? "بدء المزامنة" : "Start Sync"}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+          <div className="rounded-xl border border-border bg-background p-3">
+            <div className="text-xs font-semibold uppercase text-muted-foreground">{isAR ? "آخر مزامنة" : "Last Sync Time"}</div>
+            <div className="mt-1 font-mono text-sm text-foreground">{syncConfig.lastSyncTime}</div>
+          </div>
+          <div className="rounded-xl border border-border bg-background p-3">
+            <div className="text-xs font-semibold uppercase text-muted-foreground">{isAR ? "الحالة" : "Status"}</div>
+            <div className="mt-1 text-sm font-bold text-muted-foreground">
+              {syncConfig.status === "success" && (isAR ? "نجاح" : "Success")}
+              {syncConfig.status === "failed" && (isAR ? "فشل" : "Failed")}
+              {syncConfig.status === "in-progress" && (isAR ? "قيد التنفيذ" : "In Progress")}
+              {syncConfig.status === "idle" && (isAR ? "جاهز" : "Ready")}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const inp = "w-full px-3 py-2 text-sm bg-background border border-border rounded-xl outline-none focus:ring-2 focus:ring-primary/20 transition-colors";
 const tog = (on: boolean) =>
   `relative w-11 h-6 rounded-full transition-colors cursor-pointer ${on ? "bg-primary" : "bg-muted-foreground/30"}`;
@@ -417,6 +693,34 @@ export default function SettingsPage() {
   const [statementPreviewScale, setStatementPreviewScale] = useState(0.78);
   const [backupPassword, setBackupPassword] = useState("");
   const [importPassword, setImportPassword] = useState("");
+  const [backupView, setBackupView] = useState<BackupView>("backup-import");
+  const [databaseMode, setDatabaseMode] = useState<DatabaseMode>("local");
+  const [databaseConfig, setDatabaseConfig] = useState({
+    localPath: "lib/db/local.db",
+    connectionStatus: "Connected",
+    host: "",
+    port: "5432",
+    databaseName: "",
+    username: "",
+    password: "",
+    useConnectionString: false,
+    connectionString: "",
+  });
+  const [syncConfig, setSyncConfig] = useState<{
+    mode: SyncMode;
+    autoSync: boolean;
+    timing: AutoSyncTiming;
+    intervalMinutes: number;
+    lastSyncTime: string;
+    status: SyncStatus;
+  }>({
+    mode: "local-to-online",
+    autoSync: false,
+    timing: "startup",
+    intervalMinutes: 15,
+    lastSyncTime: "-",
+    status: "idle",
+  });
   const [showBackupPassword, setShowBackupPassword] = useState(false);
   const [showImportPassword, setShowImportPassword] = useState(false);
   const [showMasterPassword, setShowMasterPassword] = useState(false);
@@ -1245,6 +1549,42 @@ const decryptBackupData = async (backupFile: any, password: string) => {
             >
               <div className="space-y-4">
                 {/* Program Data - خارج الإطار */}
+                <div className="grid grid-cols-1 gap-2 rounded-xl border border-border/60 bg-muted/20 p-1 md:grid-cols-2" dir={isAR ? "rtl" : "ltr"}>
+                  {[
+                    { id: "backup-import" as BackupView, icon: Shield, labelAr: "النسخ والاستيراد", labelEn: "Backup & Import" },
+                    { id: "database-sync" as BackupView, icon: Database, labelAr: "قاعدة البيانات والمزامنة", labelEn: "Database & Sync" },
+                  ].map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => setBackupView(item.id)}
+                      className={cn(
+                        "flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition",
+                        backupView === item.id
+                          ? "bg-background text-primary shadow-sm ring-1 ring-primary/20"
+                          : "text-muted-foreground hover:bg-background/70 hover:text-foreground"
+                      )}
+                    >
+                      <item.icon className="h-4 w-4" />
+                      <span>{isAR ? item.labelAr : item.labelEn}</span>
+                    </button>
+                  ))}
+                </div>
+
+                {backupView === "database-sync" && (
+                  <DatabaseSyncPanel
+                    isAR={isAR}
+                    databaseMode={databaseMode}
+                    setDatabaseMode={setDatabaseMode}
+                    databaseConfig={databaseConfig}
+                    setDatabaseConfig={setDatabaseConfig}
+                    syncConfig={syncConfig}
+                    setSyncConfig={setSyncConfig}
+                  />
+                )}
+
+                {backupView === "backup-import" && (
+                  <>
                 <div className={`${isAR ? "text-right" : "text-left"}`}>
                   <h3 className="text-sm font-bold text-foreground">
                     {isAR ? "بيانات البرنامج" : "Program Data"}
@@ -1506,6 +1846,8 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                     </div>
                   </div>
                 </div>
+                  </>
+                )}
               </div>
             </Section>
           )}
