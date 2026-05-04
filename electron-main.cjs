@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog } = require("electron");
+const { app, BrowserWindow, ipcMain, dialog, Menu } = require("electron");
 const { autoUpdater } = require("electron-updater");
 const { spawn } = require("child_process");
 const path = require("path");
@@ -86,6 +86,31 @@ function createWindow() {
     },
   });
 
+  mainWindow.webContents.on("context-menu", (event, params) => {
+    const template = [];
+
+    if (params.isEditable) {
+      template.push(
+        { role: "undo", label: "Undo" },
+        { role: "redo", label: "Redo" },
+        { type: "separator" },
+        { role: "cut", label: "Cut" },
+        { role: "copy", label: "Copy" },
+        { role: "paste", label: "Paste" },
+        { role: "selectAll", label: "Select All" }
+      );
+    } else {
+      template.push(
+        { role: "copy", label: "Copy", enabled: !!params.selectionText },
+        { role: "selectAll", label: "Select All" }
+      );
+    }
+
+    Menu.buildFromTemplate(template).popup({
+      window: mainWindow,
+    });
+  });
+
   setTimeout(() => {
     mainWindow.loadFile(
       path.join(
@@ -98,6 +123,46 @@ function createWindow() {
       )
     );
   }, 3000);
+}
+
+function setupApplicationMenu() {
+  const template = [
+    {
+      label: "File",
+      submenu: [
+        { role: "reload", label: "Reload" },
+        { role: "forceReload", label: "Force Reload" },
+        { type: "separator" },
+        { role: "quit", label: "Exit" },
+      ],
+    },
+    {
+      label: "Edit",
+      submenu: [
+        { role: "undo", label: "Undo" },
+        { role: "redo", label: "Redo" },
+        { type: "separator" },
+        { role: "cut", label: "Cut" },
+        { role: "copy", label: "Copy" },
+        { role: "paste", label: "Paste" },
+        { role: "selectAll", label: "Select All" },
+      ],
+    },
+    {
+      label: "View",
+      submenu: [
+        { role: "toggleDevTools", label: "Developer Tools" },
+        { role: "resetZoom", label: "Reset Zoom" },
+        { role: "zoomIn", label: "Zoom In" },
+        { role: "zoomOut", label: "Zoom Out" },
+        { type: "separator" },
+        { role: "togglefullscreen", label: "Full Screen" },
+      ],
+    },
+  ];
+
+  const menu = Menu.buildFromTemplate(template);
+  Menu.setApplicationMenu(menu);
 }
 
 function sendUpdateStatus(channel, payload = {}) {
@@ -209,6 +274,7 @@ ipcMain.handle("install-update", async () => {
 
 app.whenReady().then(() => {
   createWindow();
+  setupApplicationMenu();
 });
 
 app.on("window-all-closed", () => {

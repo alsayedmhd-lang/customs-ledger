@@ -217,6 +217,22 @@ const impExpValue =
   (invoice as any).impExp ||
   "-";
 
+  const getInvoicePdfFileName = () =>
+    `${invoice.invoiceNumber || "invoice"} - ${invoice.clientName || "client"}.pdf`;
+
+  const handleCopyFileName = async () => {
+    try {
+      const fileName =
+        typeof getInvoicePdfFileName === "function"
+          ? getInvoicePdfFileName().replace(/\.pdf$/i, "")
+          : "invoice";
+
+      await navigator.clipboard.writeText(fileName);
+    } catch (error) {
+      console.error("Failed to copy file name:", error);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-100 print:bg-white" dir="rtl">
       <style>{`
@@ -273,6 +289,14 @@ const impExpValue =
           >
           <Printer className="w-4 h-4" />
           {isAR ? "الطباعة" : "Print Invoice"}
+        </button>
+
+        <button
+          type="button"
+          onClick={handleCopyFileName}
+          className="no-print flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-700 hover:bg-gray-50 text-sm font-medium"
+        >
+          نسخ اسم الملف
         </button>
 
         <Link href={`/accounting?invoice=${encodeURIComponent(invoice.invoiceNumber)}`}>
