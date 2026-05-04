@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { savePdf } from "@/lib/pdf";
 import { useParams, Link } from "wouter";
 import { Printer, ArrowRight, ArrowLeft, Stamp } from "lucide-react";
 import Barcode from "react-barcode";
@@ -228,8 +227,8 @@ export default function ReceiptPrint() {
         </Link>
 
         <button
-          onClick={async () => {
-            await savePdf(`${receipt.receiptNumber} - ${receipt.clientName}`);
+          onClick={() => {
+            window.print();
           }}
           className="flex items-center gap-2 px-4 py-2 bg-blue-700 text-white rounded-lg text-sm font-medium hover:bg-blue-800"
         >

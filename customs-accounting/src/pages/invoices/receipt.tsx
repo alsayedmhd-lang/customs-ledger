@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { savePdf } from "@/lib/pdf";
 import { useParams, Link } from "wouter";
 import { useGetInvoice } from "@workspace/api-client-react";
 import { Printer, ArrowRight, ArrowLeft, Stamp, Calculator } from "lucide-react";
@@ -217,13 +216,41 @@ const impExpValue =
   (invoice as any).importerExporterName ||
   (invoice as any).impExp ||
   "-";
-  
+
   return (
     <div className="min-h-screen bg-gray-100 print:bg-white" dir="rtl">
       <style>{`
         @media print {
-          @page { size: A4 portrait; margin: 10mm 10mm 10mm 15mm; }
-          body { margin: 0; }
+          @page {
+            size: A4;
+            margin: 5mm;
+          }
+
+          html, body {
+            margin: 0 !important;
+            padding: 0 !important;
+            background: white !important;
+            height: 100%;
+          }
+
+          .print-page {
+            width: 100% !important;
+            min-height: 100vh !important;
+            background: white !important;
+            margin: 0 !important;
+            padding: 5mm !important;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+          }
+
+          .print-content {
+            flex: 1;
+          }
+
+          .print-footer {
+            margin-top: auto;
+          }
         }
       `}</style>
 
@@ -237,8 +264,10 @@ const impExpValue =
         </Link>
 
           <button
-            onClick={async () => {
-              await savePdf(`${invNum} - ${invoice.clientName}`);
+            onClick={() => {
+              setTimeout(() => {
+                window.print();
+              }, 300);
             }}
             className="flex items-center gap-2 px-5 py-2 bg-blue-700 text-white rounded-lg font-medium hover:bg-blue-800"
           >
@@ -284,9 +313,10 @@ const impExpValue =
       {/* ── A4 Invoice ────────────────────────────────────────────────────── */}
       <div
         id="invoice-print"
-        className="max-w-4xl mx-auto print:max-w-none print:w-full print:mx-0 bg-white shadow-xl print:shadow-none border border-gray-200 print:border-none relative overflow-hidden"
+        className="print-page max-w-4xl mx-auto print:max-w-none print:w-full print:mx-0 bg-white shadow-xl print:shadow-none border border-gray-200 print:border-none relative overflow-hidden"
         style={{ fontFamily: "'Cairo', 'Arial', sans-serif" }}
       >
+        <div className="print-content">
         {/* ══ WATERMARK ═══════════════════════════════════════════════════ */}
         {company.showWatermark && (
           <div
@@ -462,29 +492,29 @@ const impExpValue =
         </div>
 
         {/* ══ ITEMS TABLE ═════════════════════════════════════════════════ */}
-        <div className="px-6 pt-3">
+        <div className="w-full max-w-none pt-3">
           <table className="w-full text-sm border-collapse">
             <thead>
-              <tr className="border-y-2 border-gray-700">
-                <th className="text-right py-2 px-2 font-bold text-gray-700 w-10">#</th>
-                <th className="text-right py-2 px-3 font-bold text-gray-700">Description / الوصف</th>
-                <th className="text-center py-2 px-2 font-bold text-gray-700 w-16">الكمية</th>
-                <th className="text-center py-2 px-2 font-bold text-gray-700 w-24">سعر الوحدة</th>
-                <th className="text-left py-2 px-3 font-bold text-gray-700 w-32">Total Amount</th>
+              <tr className="border-y border-slate-700">
+                <th className="text-right py-1 px-2 font-bold text-gray-700 w-10">#</th>
+                <th className="text-right py-1 px-2 font-bold text-gray-700">Description / الوصف</th>
+                <th className="text-center py-1 px-2 font-bold text-gray-700 w-16">الكمية</th>
+                <th className="text-center py-1 px-2 font-bold text-gray-700 w-24">سعر الوحدة</th>
+                <th className="text-left py-1 px-2 font-bold text-gray-700 w-32">Total Amount</th>
               </tr>
             </thead>
             <tbody>
               {invoice.items.map((item, idx) => (
-                <tr key={item.id} className="border-b border-dashed border-gray-300">
-                  <td className="py-2 px-2 text-gray-500 text-center font-mono text-xs">
+                <tr key={item.id} className="border-b border-dashed border-slate-300">
+                  <td className="py-1 px-2 text-gray-500 text-center font-mono text-xs">
                     {arabicNums(String(idx + 1).padStart(4, "0"))}
                   </td>
-                  <td className="py-2 px-3 text-gray-800">{item.description}</td>
-                  <td className="py-2 px-2 text-center text-gray-700">{arabicNums(item.quantity)}</td>
-                  <td className="py-2 px-2 text-center font-mono text-gray-700">
+                  <td className="py-1 px-2 text-gray-800">{item.description}</td>
+                  <td className="py-1 px-2 text-center text-gray-700">{arabicNums(item.quantity)}</td>
+                  <td className="py-1 px-2 text-center font-mono text-gray-700">
                     {formatNumber(item.unitPrice, 2)}
                   </td>
-                  <td className="py-2 px-3 text-left font-mono font-bold text-gray-800">
+                  <td className="py-1 px-2 text-left font-mono font-bold text-gray-800">
                     {formatNumber(item.total, 2)}
                   </td>
                 </tr>
@@ -492,12 +522,12 @@ const impExpValue =
 
               {invoice.items.length < 1 &&
                 Array.from({ length: 1 - invoice.items.length }).map((_, i) => (
-                  <tr key={`empty-${i}`} className="border-b border-dashed border-gray-200">
-                    <td className="py-3 px-2" />
-                    <td className="py-3 px-3" />
-                    <td className="py-3 px-2" />
-                    <td className="py-3 px-2" />
-                    <td className="py-3 px-3" />
+                  <tr key={`empty-${i}`} className="border-b border-dashed border-slate-300">
+                    <td className="py-1 px-2" />
+                    <td className="py-1 px-2" />
+                    <td className="py-1 px-2" />
+                    <td className="py-1 px-2" />
+                    <td className="py-1 px-2" />
                   </tr>
                 ))}
             </tbody>
@@ -505,8 +535,8 @@ const impExpValue =
         </div>
 
         {/* ══ TOTALS ══════════════════════════════════════════════════════ */}
-        <div className="px-6 pb-2">
-          <div className="border-t-2 border-gray-700 pt-2 space-y-1">
+        <div className="w-full max-w-none pb-2">
+          <div className="border-t border-slate-700 pt-2 space-y-1">
             <TotalRow label="إجمالي الفاتورة / Invoice Amount" value={invoice.subtotal} />
             {invoice.taxRate > 0 && (
               <TotalRow label={`ضريبة / Tax (${arabicNums(invoice.taxRate)}%)`} value={invoice.taxAmount} />
@@ -515,7 +545,7 @@ const impExpValue =
               <TotalRow label="الدفعة المقدمة / Advance Payment" value={(invoice as any).advancePayment} negative />
             )}
 
-            <div className="flex justify-between items-center border-t-2 border-double border-gray-700 pt-2 mt-1">
+            <div className="flex justify-between items-center border-t border-slate-700 pt-2 mt-1 px-2">
               <span className="font-black text-base text-gray-800">الإجمالي الكلي / Grand Total</span>
               <span className="font-black font-mono text-base text-gray-900">
                 {formatNumber(invoice.total, 2)} {currencySymbol}
@@ -523,30 +553,32 @@ const impExpValue =
             </div>
           </div>
 
-          <div className="border border-gray-300 bg-gray-50 rounded px-3 py-2 mt-3">
+          <div className="border border-slate-300 bg-gray-50 rounded px-3 py-2 mt-3">
             <div className="text-sm text-right" dir="rtl">
               <span className="font-bold text-gray-600">المبلغ الأجمالي : </span>
               <span className="font-bold text-gray-800">{amountWords}</span>
             </div>
-            <div className="text-sm text-left border-t border-gray-200 mt-1.5 pt-1.5" dir="ltr">
+            <div className="text-sm text-left border-t border-slate-300 mt-1.5 pt-1.5" dir="ltr">
               <span className="font-bold text-gray-600">Amount Total: </span>
               <span className="font-bold text-gray-800">{amountWordsEn}</span>
             </div>
           </div>
 
           {invoice.notes && (
-            <div className="mt-3 text-xs text-gray-500 border-t border-dashed border-gray-300 pt-2">
+            <div className="mt-3 text-xs text-gray-500 border-t border-dashed border-slate-300 pt-2">
               <span className="font-bold">ملاحظات: </span>
               {invoice.notes}
             </div>
           )}
         </div>
+        </div>
 
         {/* ══ SIGNATURES / STAMP ══════════════════════════════════════════ */}
-        <div className="relative grid grid-cols-2 gap-4 px-6 pb-2 pt-3 border-t border-gray-300 mt-2">
+        <div className="print-footer relative">
+        <div className="grid grid-cols-2 gap-4 px-6 pb-2 pt-3 mt-2">
           <div className="text-center">
             <div className="h-12 flex items-end justify-center">
-              <div className="w-full border-b-2 border-gray-400" />
+              <div className="w-full border-b border-slate-300 opacity-45" />
             </div>
             <p className="text-xs text-gray-500 mt-1 font-bold">توقيع المستلم</p>
             <p className="text-xs text-gray-400">Received By</p>
@@ -554,7 +586,7 @@ const impExpValue =
 
           <div className="text-center">
             <div className="h-12 flex items-end justify-center">
-              <div className="w-full border-b-2 border-gray-400" />
+              <div className="w-full border-b border-slate-300 opacity-45" />
             </div>
             <p className="text-xs text-gray-500 mt-1 font-bold">توقيع المحاسب</p>
             <p className="text-xs text-gray-400">Accountant</p>
@@ -584,15 +616,22 @@ const impExpValue =
           )}
 
           {company.showStampOnInvoices && showStamp && (
-            <div
-              className="absolute inset-0 flex items-center justify-center pointer-events-none"
-              style={{ zIndex: 2 }}
-            >
+            <div className="contents">
               <img
                 src={stampSrc}
                 alt="الختم الرسمي"
                 className="w-auto object-contain"
-                style={{ height: "130px", maxWidth: "200px", opacity: 0.92 }}
+                style={{
+                  position: "absolute",
+                  left: "50%",
+                  transform: "translateX(-50%)",
+                  bottom: "8mm",
+                  zIndex: 20,
+                  pointerEvents: "none",
+                  height: "130px",
+                  maxWidth: "200px",
+                  opacity: 0.92,
+                }}
               />
             </div>
           )}
@@ -624,6 +663,7 @@ const impExpValue =
             {" — "}رقم الفاتورة: {invNum}
           </div>
         </div>
+        </div>
       </div>
     </div>
   );
@@ -640,7 +680,7 @@ function TotalRow({
   negative?: boolean;
 }) {
   return (
-    <div className="flex justify-between items-center text-sm">
+    <div className="flex justify-between items-center text-sm px-2">
       <span className="text-gray-700">{label}</span>
       <span className={`font-mono font-bold ${negative ? "text-green-700" : "text-gray-800"}`}>
         {negative ? "- " : ""}

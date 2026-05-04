@@ -6,7 +6,6 @@ import Barcode from "react-barcode";
 import { PrintDocumentFooter, PrintTitleBlock, StatementPrintHeader } from "@/components/print-document-parts";
 
 import { useAuth } from "@/lib/auth-context";
-import { savePdf } from "@/lib/pdf";
 import { useCompanySettings } from "@/lib/company-settings-context";
 import { useLanguage } from "@/lib/language-context";
 
@@ -179,6 +178,9 @@ export default function CustomerLedgerPrintPage() {
           @page { size: A4 portrait; margin: 10mm; }
           body { margin: 0; background: white !important; }
           .print\\:hidden { display: none !important; }
+          .print-page { min-height: 297mm; display: flex; flex-direction: column; }
+          .print-content { flex: 1; }
+          .print-footer { margin-top: auto; }
         }
       `}</style>
 
@@ -192,12 +194,8 @@ export default function CustomerLedgerPrintPage() {
         </Link>
 
         <button
-        onClick={async () => {
-            const fileName = isAR
-            ? `كشف-ملخص-الحساب-${clientName}-${fromDateText}-${toDateText}`
-            : `Customer-Ledger-${clientName}-${fromDateText}-${toDateText}`;
-
-            await savePdf(fileName);
+        onClick={() => {
+            window.print();
         }}
         className="flex items-center gap-2 px-5 py-2 bg-blue-700 text-white rounded-lg font-medium hover:bg-blue-800"
         >
@@ -232,9 +230,10 @@ export default function CustomerLedgerPrintPage() {
 
       {/* A4 DOCUMENT */}
       <div
-        className="max-w-4xl mx-auto print:max-w-none print:w-full print:mx-0 bg-white shadow-xl print:shadow-none border border-gray-200 print:border-none relative overflow-hidden"
+        className="print-page max-w-4xl mx-auto print:max-w-none print:w-full print:mx-0 bg-white shadow-xl print:shadow-none border border-gray-200 print:border-none relative overflow-hidden"
         style={{ fontFamily: "'Cairo', 'Arial', sans-serif" }}
       >
+        <main className="print-content">
         {/* WATERMARK */}
         {settings.showWatermark && (
           <div
@@ -539,7 +538,10 @@ export default function CustomerLedgerPrintPage() {
           )}
         </div>
 
+        </main>
+
         {/* FOOTER */}
+        <footer className="print-footer">
         <PrintDocumentFooter kind="statement" reference={statementRef} count={rows.length} />
         <div className="hidden">
           <div className="flex items-center justify-between text-xs text-gray-600">
@@ -566,6 +568,7 @@ export default function CustomerLedgerPrintPage() {
             {" — "}عدد الحركات: {rows.length}
           </div>
         </div>
+        </footer>
       </div>
     </div>
   );
