@@ -1,5 +1,4 @@
 import { useAuth } from "@/lib/auth-context";
-import { savePdf } from "@/lib/pdf";
 import { useState, useEffect } from "react";
 import { useParams, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
@@ -100,6 +99,9 @@ export default function ClientStatement() {
           @page { size: A4 portrait; margin: 10mm 10mm 10mm 15mm; }
           body { margin: 0; }
           .print\\:hidden { display: none !important; }
+          .print-page { min-height: 297mm; display: flex; flex-direction: column; }
+          .print-content { flex: 1; }
+          .print-footer { margin-top: auto; }
         }
       `}</style>
 
@@ -111,13 +113,13 @@ export default function ClientStatement() {
           </button>
         </Link>
         <button
-          onClick={async () => {
-                await savePdf(`ST-${client?.id || "0"} - ${client?.name || "client"}`);
-              }}
+          onClick={() => {
+            window.print();
+          }}
           className="flex items-center gap-2 px-5 py-2 bg-blue-700 text-white rounded-lg font-medium hover:bg-blue-800"
         >
           <Printer className="w-4 h-4" />
-          {isAR ? "طباعة pdf" : "Print pdf"}
+          {isAR ? "طباعة " : "Print "}
         </button>
         {settings.showStampOnStatements && (
           <label className="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg bg-white cursor-pointer select-none hover:bg-gray-50">
@@ -135,9 +137,10 @@ export default function ClientStatement() {
 
       {/* ── A4 Statement Document ────────────────────────────────────────────── */}
       <div
-        className="max-w-4xl mx-auto print:max-w-none print:w-full print:mx-0 bg-white shadow-xl print:shadow-none border border-gray-200 print:border-none relative overflow-hidden"
+        className="print-page max-w-4xl mx-auto print:max-w-none print:w-full print:mx-0 bg-white shadow-xl print:shadow-none border border-gray-200 print:border-none relative overflow-hidden"
         style={{ fontFamily: "'Cairo', 'Arial', sans-serif" }}
       >
+        <main className="print-content">
         {/* ══ WATERMARK ═══════════════════════════════════════════════════ */}
         {settings.showWatermark && (
           <div
@@ -364,8 +367,10 @@ export default function ClientStatement() {
           )}
         </div>
 
+        </main>
+
         {/* ══ FOOTER ══════════════════════════════════════════════════════ */}
-        <div className="border-t-4 border-double border-gray-700 px-6 py-3 bg-gray-50" style={{ position: "relative", zIndex: 1 }}>
+        <footer className="print-footer border-t-4 border-double border-gray-700 px-6 py-3 bg-gray-50" style={{ position: "relative", zIndex: 1 }}>
           <div className="flex items-center justify-between text-xs text-gray-600">
             <span>✉ {printEmail}</span>
             <span className="font-bold text-gray-800">{settings.nameAr} · {settings.nameEn.split(" ").slice(0, 3).join(" ")} C.C</span>
@@ -379,7 +384,7 @@ export default function ClientStatement() {
             {" — "}المرجع: {statementRef}
             {" — "}عدد الفواتير: {arabicNums(invoices.length)}
           </div>
-        </div>
+        </footer>
       </div>
     </div>
   );
