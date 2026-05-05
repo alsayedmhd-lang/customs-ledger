@@ -81,6 +81,8 @@ export default function AppLayout({ children }: AppLayoutProps) {
     return () => mq.removeEventListener("change", applySystemTheme);
   }, []);
 
+  const isClient = user?.role === "client";
+  const clientAllowedHrefs = new Set(["/", "/invoices", "/receipts", "/statements"]);
   const navItems = [
     { name: t("dashboard"), href: "/", icon: LayoutDashboard, color: "text-blue-400" },
     { name: t("invoices"), href: "/invoices", icon: FileText, color: "text-sky-400" },
@@ -99,7 +101,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
         ]
       : []),
     { name: t("trash"), href: "/trash", icon: Trash2, color: "text-red-400" },
-  ];
+  ].filter((item) => !isClient || clientAllowedHrefs.has(item.href));
 
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const resolvedName = (isAR ? user?.displayNameAr : user?.displayNameEn) || user?.displayName || "";

@@ -162,6 +162,7 @@ export default function InvoiceReceipt() {
   const { settings: company, logoSrc, stampSrc, watermarkSrc } = useCompanySettings();
   const isAR = lang === "ar";
   const { user } = useAuth();
+  const isClient = user?.role === "client";
 
   const canCustomize = user?.permissions?.canCustomizePrintContact;
   const printPhone = canCustomize && user?.phone ? user.phone : company.phone;
@@ -273,7 +274,7 @@ const impExpValue =
       {/* Controls - hidden on print */}
       <div className="print:hidden flex items-center gap-3 p-6 max-w-4xl mx-auto flex-wrap" dir={isAR ? "rtl" : "ltr"}>
         <Link href={`/invoices/${invoice.id}/edit`}>
-          <button className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-700 hover:bg-gray-50 font-medium">
+          <button className={`${isClient ? "hidden" : ""} flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-700 hover:bg-gray-50 font-medium`}>
             {isAR ? <ArrowRight className="w-4 h-4" /> : <ArrowLeft className="w-4 h-4" />}
             {isAR ? "العودة للتعديل" : "Back to Edit"}
           </button>
@@ -294,19 +295,19 @@ const impExpValue =
         <button
           type="button"
           onClick={handleCopyFileName}
-          className="no-print flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-700 hover:bg-gray-50 text-sm font-medium"
+          className={`${isClient ? "hidden" : ""} no-print flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-700 hover:bg-gray-50 text-sm font-medium`}
         >
           نسخ اسم الملف
         </button>
 
         <Link href={`/accounting?invoice=${encodeURIComponent(invoice.invoiceNumber)}`}>
-          <button className="flex items-center gap-2 px-4 py-2 border border-emerald-400 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-medium">
+          <button className={`${isClient ? "hidden" : ""} flex items-center gap-2 px-4 py-2 border border-emerald-400 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-medium`}>
             <Calculator className="w-4 h-4" />
             {isAR ? "الحسابات" : "Calculate Invoice"}
           </button>
         </Link>
 
-        {company.showStampOnInvoices && (
+        {!isClient && company.showStampOnInvoices && (
           <label className="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg bg-white cursor-pointer select-none hover:bg-gray-50">
             <input
               type="checkbox"
@@ -321,7 +322,7 @@ const impExpValue =
           </label>
         )}
 
-        <label className="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg bg-white cursor-pointer select-none hover:bg-gray-50">
+        {!isClient && <label className="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg bg-white cursor-pointer select-none hover:bg-gray-50">
           <input
             type="checkbox"
             checked={showSignatures}
@@ -331,7 +332,7 @@ const impExpValue =
           <span className="text-sm font-medium text-gray-700">
             {isAR ? "إظهار التوقيع" : "Show Signatures"}
           </span>
-        </label>
+        </label>}
       </div>
 
       {/* ── A4 Invoice ────────────────────────────────────────────────────── */}

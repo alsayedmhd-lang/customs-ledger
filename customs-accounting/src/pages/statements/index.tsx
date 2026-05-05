@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { BookOpen, FileText, TrendingDown, TrendingUp, User, Printer, Eye, EyeOff } from "lucide-react";
 import { useLanguage } from "@/lib/language-context";
+import { useAuth } from "@/lib/auth-context";
 const API_BASE = import.meta.env.VITE_API_BASE_URL;
 
 function getToken() {
@@ -29,6 +30,8 @@ async function fetchInvoices() {
 
 export default function StatementsIndex() {
   const { t, lang } = useLanguage();
+  const { user } = useAuth();
+  const isClient = user?.role === "client";
   const isAR = lang === "ar";
   const [, setLocation] = useLocation();
   const [showAmounts, setShowAmounts] = useState(false);
@@ -118,7 +121,7 @@ export default function StatementsIndex() {
       <div className="bg-card border border-border/50 shadow-sm rounded-2xl overflow-hidden">
         <div className="p-5 border-b border-border/50 flex items-center gap-2">
           <BookOpen className="w-5 h-5 text-primary" />
-          <h2 className="font-bold text-base">{t("allClientsStatement")}</h2>
+          <h2 className="font-bold text-base">{isClient ? t("statements") : t("allClientsStatement")}</h2>
         </div>
         <div className="overflow-x-auto overflow-y-auto max-h-[360px]">
           <table className="w-full text-sm">
@@ -184,12 +187,14 @@ export default function StatementsIndex() {
                     </td>
                     <td className="px-5 py-4">
                       <div className="flex items-center gap-2">
-                        <Link href={`/clients/${client.id}`}>
-                          <button className="flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground rounded-lg font-semibold text-xs transition-all">
-                            <BookOpen className="w-3.5 h-3.5" />
-                            {t("viewStatement")}
-                          </button>
-                        </Link>
+                        {!isClient && (
+                          <Link href={`/clients/${client.id}`}>
+                            <button className="flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground rounded-lg font-semibold text-xs transition-all">
+                              <BookOpen className="w-3.5 h-3.5" />
+                              {t("viewStatement")}
+                            </button>
+                          </Link>
+                        )}
                           <button
                             onClick={() => setLocation(`/clients/${client.id}/statement`)}
                             className="flex items-center gap-1.5 px-3 py-1.5 bg-muted/10 text-muted-foreground hover:bg-muted/20 rounded-lg font-semibold text-xs transition-all"

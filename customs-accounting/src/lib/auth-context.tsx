@@ -37,6 +37,13 @@ export interface AuthUser {
   phone?: string | null;
   email?: string | null;
   receiverSignatureBase64?: string | null;
+  clientId?: number | null;
+  clientViewPermissions?: {
+    canViewInvoices: boolean;
+    canViewReceipts: boolean;
+    canViewStatement: boolean;
+    canViewSummary: boolean;
+  } | null;
 }
 
 export interface OtpPending {

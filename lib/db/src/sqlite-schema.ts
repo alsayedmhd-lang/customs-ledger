@@ -2,6 +2,7 @@ export {
   usersTableSqlite as usersTable,
   otpCodesTable,
   DEFAULT_PERMISSIONS,
+  DEFAULT_CLIENT_VIEW_PERMISSIONS,
 } from "./schema/users-sqlite";
 
 export {

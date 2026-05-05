@@ -874,6 +874,10 @@ export default function SettingsPage() {
   const [allowManagerEditLegalInfo, setAllowManagerEditLegalInfo] = useState(false);
   const [allowManagerEditPrintSettings, setAllowManagerEditPrintSettings] = useState(false);
   const [allowManagerEditBranding, setAllowManagerEditBranding] = useState(false);
+  const [allowManagerViewPreview, setAllowManagerViewPreview] = useState(false);
+  const [allowManagerViewUpdate, setAllowManagerViewUpdate] = useState(false);
+  const [allowManagerEditRegistrationSettings, setAllowManagerEditRegistrationSettings] = useState(false);
+  const [allowManagerEditSensitiveUsers, setAllowManagerEditSensitiveUsers] = useState(false);
   const [lockCompanyIdentity, setLockCompanyIdentity] = useState(false);
   const [lockCompanyName, setLockCompanyName] = useState(false);
   const [lockLogo, setLockLogo] = useState(false);
@@ -881,9 +885,9 @@ export default function SettingsPage() {
   const [lockLegalInfo, setLockLegalInfo] = useState(false);
   const [lockFooterBranding, setLockFooterBranding] = useState(false);
   const developerUnlocked = sessionStorage.getItem("developer_unlocked") === "true";
-  const roleCanEdit = user?.role === "admin" || developerUnlocked;
+  const roleCanEdit = user?.role === "admin";
   const canEditAccountantSignature = roleCanEdit || allowManagerEditAccountantSignature;
-  const canEditAppearance = roleCanEdit || allowManagerEditAppearance;
+  const canEditAppearance = true;
   const canEditBranding = (roleCanEdit || allowManagerEditBranding || allowManagerEditAppearance) && !lockCompanyIdentity;
   const canEditCompanyName = canEditBranding && !lockCompanyName;
   const canEditLogo = canEditBranding && !lockLogo;
@@ -891,7 +895,7 @@ export default function SettingsPage() {
   const canEditLegalInfo = (roleCanEdit || allowManagerEditLegalInfo) && !lockLegalInfo;
   const canEditPrintSettings = (roleCanEdit || allowManagerEditPrintSettings) && !lockFooterBranding;
   const canEditBrandIdentity = canEditBranding;
-  const canUseInvoicesBackupImport = developerUnlocked || allowManagerEditInvoicesBackupImport;
+  const canUseInvoicesBackupImport = roleCanEdit || allowManagerEditInvoicesBackupImport;
   const [activeTab, setActiveTab] = useState<TabId>("preview");
   const [invoicePreviewScale, setInvoicePreviewScale] = useState(0.76);
   const [receiptPreviewScale, setReceiptPreviewScale] = useState(0.8);
@@ -1065,32 +1069,47 @@ const decryptBackupData = async (backupFile: any, password: string) => {
   }, [settings]);
 
   useEffect(() => {
-    if (developerUnlocked) {
-      setAllowManagerEditAccountantSignature(true);
-      setAllowManagerEditAppearance(true);
-      setAllowManagerEditInvoicesBackupImport(true);
-      return;
-    }
-
     const token = sessionStorage.getItem("auth_token");
 
-    fetch(`${API_BASE}/developer/settings`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-    })
-      .then((res) => (res.ok ? res.json() : Promise.reject()))
-      .then((data) => {
+    const applyDeveloperSettings = (data: any) => {
         setAllowManagerEditAccountantSignature(!!data.allowManagerEditAccountantSignature);
         setAllowManagerEditAppearance(!!data.allowManagerEditAppearance);
         setAllowManagerEditInvoicesBackupImport(!!data.allowManagerEditInvoicesBackupImport);
         setAllowManagerEditLegalInfo(!!data.allowManagerEditLegalInfo);
         setAllowManagerEditPrintSettings(!!data.allowManagerEditPrintSettings);
         setAllowManagerEditBranding(!!data.allowManagerEditBranding);
+        setAllowManagerViewPreview(!!data.allowManagerViewPreview);
+        setAllowManagerViewUpdate(!!data.allowManagerViewUpdate);
+        setAllowManagerEditRegistrationSettings(!!data.allowManagerEditRegistrationSettings);
+        setAllowManagerEditSensitiveUsers(!!data.allowManagerEditSensitiveUsers);
         setLockCompanyIdentity(!!data.lockCompanyIdentity);
         setLockCompanyName(!!data.lockCompanyName);
         setLockLogo(!!data.lockLogo);
         setLockStamp(!!data.lockStamp);
         setLockLegalInfo(!!data.lockLegalInfo);
         setLockFooterBranding(!!data.lockFooterBranding);
+    };
+
+    const cached = sessionStorage.getItem("developer_settings");
+    if (cached) {
+      try {
+        applyDeveloperSettings(JSON.parse(cached));
+      } catch {
+        sessionStorage.removeItem("developer_settings");
+      }
+    }
+
+    fetch(`${API_BASE}/developer/settings?t=${Date.now()}`, {
+      cache: "no-store",
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        "Cache-Control": "no-cache",
+      },
+    })
+      .then((res) => (res.ok ? res.json() : Promise.reject()))
+      .then((data) => {
+        sessionStorage.setItem("developer_settings", JSON.stringify(data));
+        applyDeveloperSettings(data);
       })
       .catch(() => {
         setAllowManagerEditAccountantSignature(false);
@@ -1099,6 +1118,10 @@ const decryptBackupData = async (backupFile: any, password: string) => {
         setAllowManagerEditLegalInfo(false);
         setAllowManagerEditPrintSettings(false);
         setAllowManagerEditBranding(false);
+        setAllowManagerViewPreview(false);
+        setAllowManagerViewUpdate(false);
+        setAllowManagerEditRegistrationSettings(false);
+        setAllowManagerEditSensitiveUsers(false);
         setLockCompanyIdentity(false);
         setLockCompanyName(false);
         setLockLogo(false);
@@ -1106,7 +1129,22 @@ const decryptBackupData = async (backupFile: any, password: string) => {
         setLockLegalInfo(false);
         setLockFooterBranding(false);
       });
-  }, [developerUnlocked]);
+
+    const handler = (event: Event) => {
+      if (event instanceof StorageEvent) {
+        if (event.key !== "developer_settings" || !event.newValue) return;
+        applyDeveloperSettings(JSON.parse(event.newValue));
+        return;
+      }
+      applyDeveloperSettings((event as CustomEvent).detail || {});
+    };
+    window.addEventListener("developer-settings-updated", handler);
+    window.addEventListener("storage", handler);
+    return () => {
+      window.removeEventListener("developer-settings-updated", handler);
+      window.removeEventListener("storage", handler);
+    };
+  }, []);
 
   // Export invoices backup
   const exportInvoices = async () => {
@@ -1368,7 +1406,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
     };
 
 
-  if (user?.role !== "admin") {
+  if (!["admin", "manager", "supervisor"].includes(user?.role || "")) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 text-muted-foreground">
         <Shield className="w-16 h-16 opacity-20" />
@@ -1605,6 +1643,38 @@ const decryptBackupData = async (backupFile: any, password: string) => {
     ? (user?.role === "admin" ? "مدير" : user?.role === "supervisor" ? "مشرف" : "مستخدم")
     : (user?.role === "admin" ? "Admin" : user?.role === "supervisor" ? "Supervisor" : "User");
   const canSeeDeveloperLink = user?.role === "admin" || user?.role === "manager";
+  const isAdminSettings = user?.role === "admin";
+  const canViewSettingsTab = (tabId: TabId) => {
+    if (isAdminSettings) return true;
+    if (tabId === "preview") return true;
+    if (tabId === "display") return true;
+    if (tabId === "company") return allowManagerEditLegalInfo;
+    if (tabId === "branding") return allowManagerEditBranding;
+    if (tabId === "print") return allowManagerEditPrintSettings;
+    if (tabId === "backup") return allowManagerEditInvoicesBackupImport;
+    if (tabId === "update") return allowManagerViewUpdate;
+    return false;
+  };
+  const visibleTabs = TABS.filter((tab) => canViewSettingsTab(tab.id));
+  const visibleTabIds = visibleTabs.map((tab) => tab.id).join("|");
+
+  useEffect(() => {
+    if (visibleTabs.length > 0 && !visibleTabs.some((tab) => tab.id === activeTab)) {
+      setActiveTab(visibleTabs[0].id);
+    }
+    if (activeTab === "backup" && backupView === "database-sync") {
+      setBackupView("backup-import");
+    }
+  }, [activeTab, backupView, visibleTabIds]);
+
+  if (visibleTabs.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 text-muted-foreground">
+        <Shield className="w-16 h-16 opacity-20" />
+        <p className="text-lg font-semibold">{isAR ? "لا توجد صلاحيات إعدادات مفعلة لهذا المستخدم" : "No settings permissions are enabled for this user"}</p>
+      </div>
+    );
+  }
 
   return (
     <motion.div
@@ -1645,7 +1715,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
 
         {/* Tab list */}
         <nav className="bg-card rounded-2xl border border-border/50 shadow-sm p-2 space-y-0.5">
-          {TABS.map(tab => (
+          {visibleTabs.map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
@@ -1902,10 +1972,9 @@ const decryptBackupData = async (backupFile: any, password: string) => {
             >
               <div className="space-y-4">
                 {/* Program Data - خارج الإطار */}
-                <div className="grid grid-cols-1 gap-2 rounded-xl border border-border/60 bg-muted/20 p-1 md:grid-cols-2" dir={isAR ? "rtl" : "ltr"}>
+                <div className="grid grid-cols-1 gap-2 rounded-xl border border-border/60 bg-muted/20 p-1" dir={isAR ? "rtl" : "ltr"}>
                   {[
                     { id: "backup-import" as BackupView, icon: Shield, labelAr: "النسخ والاستيراد", labelEn: "Backup & Import" },
-                    { id: "database-sync" as BackupView, icon: Database, labelAr: "قاعدة البيانات والمزامنة", labelEn: "Database & Sync" },
                   ].map((item) => (
                     <button
                       key={item.id}
@@ -1923,18 +1992,6 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                     </button>
                   ))}
                 </div>
-
-                {backupView === "database-sync" && (
-                  <DatabaseSyncPanel
-                    isAR={isAR}
-                    databaseMode={databaseMode}
-                    setDatabaseMode={setDatabaseMode}
-                    databaseConfig={databaseConfig}
-                    setDatabaseConfig={setDatabaseConfig}
-                    syncConfig={syncConfig}
-                    setSyncConfig={setSyncConfig}
-                  />
-                )}
 
                 {backupView === "backup-import" && (
                   <>

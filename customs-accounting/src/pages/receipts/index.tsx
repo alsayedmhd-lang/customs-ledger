@@ -46,7 +46,8 @@ const PAYMENT_METHOD_COLORS: Record<string, string> = {
 };
 
 export default function ReceiptsList() {
-  const { can } = useAuth();
+  const { user, can } = useAuth();
+  const isClient = user?.role === "client";
   const { t, lang } = useLanguage();
   const isAR = lang === "ar";
   const [search, setSearch] = useState("");
@@ -123,12 +124,12 @@ const getClientName = (receipt: { clientName?: string | null; clientId?: number 
             {showAmounts ? (isAR ? "إخفاء الأرقام" : "Hide") : (isAR ? "إظهار الأرقام" : "Show")}
           </button>
 
-          <Link href="/receipts/new">
+          {!isClient && <Link href="/receipts/new">
             <Button className="gap-2">
               <Plus className="w-4 h-4" />
               {t("newReceiptBtn")}
             </Button>
-          </Link>
+          </Link>}
         </div>
       </div>
 
@@ -272,7 +273,7 @@ const getClientName = (receipt: { clientName?: string | null; clientId?: number 
                           </Button>
                         </Link>
 
-                        {can("canEditReceipts") && (
+                        {!isClient && can("canEditReceipts") && (
                           <Link href={`/receipts/${receipt.id}/edit`}>
                             <Button
                               variant="ghost"
@@ -285,7 +286,7 @@ const getClientName = (receipt: { clientName?: string | null; clientId?: number 
                           </Link>
                         )}
 
-                        {can("canDeleteReceipts") && (
+                        {!isClient && can("canDeleteReceipts") && (
                           <Button
                             variant="ghost"
                             size="icon"

@@ -62,6 +62,8 @@ export const companySettingsTableSqlite = sqliteTable("company_settings", {
   allowManagerEditInvoicesBackupImport: integer("allow_manager_edit_invoices_backup_import", { mode: "boolean" }).default(false),
   allowManagerEditAppearance: integer("allow_manager_edit_appearance", { mode: "boolean" }).default(false),
   allowManagerEditPrintSettings: integer("allow_manager_edit_print_settings", { mode: "boolean" }).default(false),
+  allowManagerViewPreview: integer("allow_manager_view_preview", { mode: "boolean" }).default(false),
+  allowManagerViewUpdate: integer("allow_manager_view_update", { mode: "boolean" }).default(false),
   allowManagerEditBranding: integer("allow_manager_edit_branding", { mode: "boolean" }).default(false),
   allowManagerEditRegistrationSettings: integer("allow_manager_edit_registration_settings", { mode: "boolean" }).default(false),
   allowManagerEditSensitiveUsers: integer("allow_manager_edit_sensitive_users", { mode: "boolean" }).default(false),

@@ -73,7 +73,7 @@ export default function CustomerLedgerPrintPage() {
   const [showStamp, setShowStamp] = useState(true);
 
   useEffect(() => {
-    if (!user?.permissions?.canViewStatements) {
+    if (user?.role === "client" || !user?.permissions?.canViewStatements) {
       navigate("/");
     }
   }, [user, navigate]);
@@ -90,7 +90,7 @@ export default function CustomerLedgerPrintPage() {
     enabled: !!clientId && !!user?.permissions?.canViewStatements,
   });
 
-  if (!user?.permissions?.canViewStatements) return null;
+  if (user?.role === "client" || !user?.permissions?.canViewStatements) return null;
   if (!clientId) return <div className="p-8">Missing clientId</div>;
   if (isLoading) return <div className="p-8 text-center">Loading...</div>;
 

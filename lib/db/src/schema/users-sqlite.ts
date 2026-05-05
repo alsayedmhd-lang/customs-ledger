@@ -13,6 +13,13 @@ export interface UserPermissions {
   canCustomizePrintContact: boolean;
 }
 
+export interface ClientViewPermissions {
+  canViewInvoices: boolean;
+  canViewReceipts: boolean;
+  canViewStatement: boolean;
+  canViewSummary: boolean;
+}
+
 export const DEFAULT_PERMISSIONS: UserPermissions = {
   canEditInvoices: true,
   canDeleteInvoices: true,
@@ -26,6 +33,13 @@ export const DEFAULT_PERMISSIONS: UserPermissions = {
   canCustomizePrintContact: false,
 };
 
+export const DEFAULT_CLIENT_VIEW_PERMISSIONS: ClientViewPermissions = {
+  canViewInvoices: true,
+  canViewReceipts: true,
+  canViewStatement: true,
+  canViewSummary: true,
+};
+
 export const usersTableSqlite = sqliteTable("users", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   username: text("username").notNull(),
@@ -37,6 +51,8 @@ export const usersTableSqlite = sqliteTable("users", {
   isActive: integer("is_active", { mode: "boolean" }).default(true),
   pendingApproval: integer("pending_approval", { mode: "boolean" }).default(false),
   permissions: text("permissions", { mode: "json" }).default(JSON.stringify(DEFAULT_PERMISSIONS)),
+  clientId: integer("client_id"),
+  clientViewPermissions: text("client_view_permissions", { mode: "json" }).default(JSON.stringify(DEFAULT_CLIENT_VIEW_PERMISSIONS)),
   email: text("email"),
   phone: text("phone"),
   whatsappApiKey: text("whatsapp_api_key"),

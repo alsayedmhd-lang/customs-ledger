@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
+import { useAuth } from "@/lib/auth-context";
 
 type Client = {
   id: number;
@@ -25,6 +26,7 @@ function formatMoney(value: number) {
 }
 
 export default function CustomerLedgerPage() {
+  const { user } = useAuth();
   const [data, setData] = useState<LedgerRow[]>([]);
   const [openingBalance, setOpeningBalance] = useState(0);
   const [clients, setClients] = useState<Client[]>([]);
@@ -34,6 +36,10 @@ export default function CustomerLedgerPage() {
   const [isLoading, setIsLoading] = useState(false);
 
   const [, navigate] = useLocation();
+
+  useEffect(() => {
+    if (user?.role === "client") navigate("/statements");
+  }, [user, navigate]);
 
   const token =
     localStorage.getItem("token") ||
@@ -100,6 +106,10 @@ export default function CustomerLedgerPage() {
       `/customer-ledger/print?clientId=${clientId}&from=${fromDate}&to=${toDate}`
     );
   };
+
+  if (user?.role === "client") {
+    return <div className="p-8 text-center text-muted-foreground">403</div>;
+  }
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto" dir="rtl">

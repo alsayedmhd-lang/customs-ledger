@@ -531,6 +531,8 @@ router.get("/auth/me", requireAuth, async (req, res) => {
     displayNameEn: user.displayNameEn ?? null,
     role: user.role,
     permissions,
+    clientId: user.clientId ?? null,
+    clientViewPermissions: user.clientViewPermissions ?? null,
     phone: user.phone ?? null,
     email: user.email ?? null,
     receiverSignatureBase64: user.receiverSignatureBase64 ?? null,

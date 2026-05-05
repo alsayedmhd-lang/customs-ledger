@@ -1,15 +1,36 @@
 import { Router, type IRouter } from "express";
-import { db, clientsTable, invoicesTable, invoiceItemsTable } from "@workspace/db";
+import { db, clientsTable, invoicesTable, invoiceItemsTable, usersTable } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
 
 const router: IRouter = Router();
 
-router.get("/clients", async (_req, res) => {
+async function getClientScope(req: any) {
+  if (req.user?.role !== "client") return null;
+  const [user] = await db
+    .select({ clientId: usersTable.clientId, clientViewPermissions: usersTable.clientViewPermissions })
+    .from(usersTable)
+    .where(eq(usersTable.id, req.user.userId))
+    .limit(1);
+  return user?.clientId ? { clientId: Number(user.clientId), permissions: user.clientViewPermissions as any } : { clientId: null, permissions: null };
+}
+
+function rejectClientWrite(req: any, res: any) {
+  if (req.user?.role !== "client") return false;
+  res.status(403).json({ error: "Client users have read-only access" });
+  return true;
+}
+
+router.get("/clients", async (req, res) => {
   try {
-    const clients = await db
+    const clientScope = await getClientScope(req);
+    if (clientScope && !clientScope.clientId) return res.status(403).json({ error: "Client is not linked" });
+    const query = db
       .select()
       .from(clientsTable)
       .orderBy(desc(clientsTable.createdAt));
+    const clients = clientScope
+      ? await db.select().from(clientsTable).where(eq(clientsTable.id, clientScope.clientId))
+      : await query;
     res.json(clients.map(formatClient));
   } catch (err) {
     console.error(err);
@@ -19,6 +40,7 @@ router.get("/clients", async (_req, res) => {
 
 router.post("/clients", async (req, res) => {
   try {
+    if (rejectClientWrite(req, res)) return;
     const { name, email, phone, address, taxId, notes } = req.body;
     if (!name) {
       res.status(400).json({ error: "name is required" });
@@ -38,6 +60,8 @@ router.post("/clients", async (req, res) => {
 router.get("/clients/:id", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
+    const clientScope = await getClientScope(req);
+    if (clientScope && clientScope.clientId !== id) return res.status(403).json({ error: "Client is not allowed" });
     const [client] = await db.select().from(clientsTable).where(eq(clientsTable.id, id));
     if (!client) {
       res.status(404).json({ error: "Client not found" });
@@ -52,6 +76,7 @@ router.get("/clients/:id", async (req, res) => {
 
 router.put("/clients/:id", async (req, res) => {
   try {
+    if (rejectClientWrite(req, res)) return;
     const id = parseInt(req.params.id);
     const { name, email, phone, address, taxId, notes } = req.body;
     if (!name) {
@@ -76,6 +101,7 @@ router.put("/clients/:id", async (req, res) => {
 
 router.delete("/clients/:id", async (req, res) => {
   try {
+    if (rejectClientWrite(req, res)) return;
     const id = parseInt(req.params.id);
     await db.delete(clientsTable).where(eq(clientsTable.id, id));
     res.status(204).send();
@@ -88,6 +114,10 @@ router.delete("/clients/:id", async (req, res) => {
 router.get("/clients/:id/statement", async (req, res) => {
   try {
     const id = parseInt(req.params.id);
+    const clientScope = await getClientScope(req);
+    if (clientScope && (clientScope.clientId !== id || clientScope.permissions?.canViewStatement === false)) {
+      return res.status(403).json({ error: "Statement is not allowed for this client user" });
+    }
     const [client] = await db.select().from(clientsTable).where(eq(clientsTable.id, id));
     if (!client) {
       res.status(404).json({ error: "Client not found" });
@@ -181,6 +211,7 @@ function formatItem(item: typeof invoiceItemsTable.$inferSelect) {
 
 router.post("/clients/import", async (req: any, res: any) => {
   try {
+    if (rejectClientWrite(req, res)) return;
     const rows = req.body.data;
 
     if (!Array.isArray(rows)) {

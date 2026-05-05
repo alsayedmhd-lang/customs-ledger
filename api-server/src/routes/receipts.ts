@@ -5,6 +5,22 @@ import { requireAuth } from "../middleware/auth";
 
 const router: IRouter = Router();
 
+async function getClientScope(req: any) {
+  if (req.user?.role !== "client") return null;
+  const [user] = await db
+    .select({ clientId: usersTable.clientId, clientViewPermissions: usersTable.clientViewPermissions })
+    .from(usersTable)
+    .where(eq(usersTable.id, req.user.userId))
+    .limit(1);
+  return user?.clientId ? { clientId: Number(user.clientId), permissions: user.clientViewPermissions as any } : { clientId: null, permissions: null };
+}
+
+function rejectClientWrite(req: any, res: any) {
+  if (req.user?.role !== "client") return false;
+  res.status(403).json({ error: "Client users have read-only access" });
+  return true;
+}
+
 function removeUniqueActiveReceiptPerInvoice() {
   if (!sqlite) return;
 
@@ -154,8 +170,12 @@ async function generateReceiptNumber(): Promise<string> {
 // List all receipts (non-deleted)
 router.get("/receipts", requireAuth, async (req, res) => {
   try {
-    const clientId = req.query.clientId ? parseInt(req.query.clientId as string) : null;
-    const isAdmin = req.user!.role === "admin" || req.user!.role === "supervisor";
+    const clientScope = await getClientScope(req);
+    if (clientScope && (!clientScope.clientId || clientScope.permissions?.canViewReceipts === false)) {
+      return res.status(403).json({ error: "Receipts are not allowed for this client user" });
+    }
+    const clientId = clientScope?.clientId ?? (req.query.clientId ? parseInt(req.query.clientId as string) : null);
+    const isAdmin = req.user!.role === "admin" || req.user!.role === "supervisor" || req.user!.role === "client";
     const userId = req.user!.userId;
 
     const buildFilters = (extra: ReturnType<typeof and>[] = []) => {
@@ -237,7 +257,11 @@ router.get("/receipts/by-invoice/:invoiceId", requireAuth, async (req, res) => {
       return res.status(400).json({ error: "Invalid invoice id" });
     }
 
-    const isAdmin = req.user!.role === "admin" || req.user!.role === "supervisor";
+    const clientScope = await getClientScope(req);
+    if (clientScope && (!clientScope.clientId || clientScope.permissions?.canViewReceipts === false)) {
+      return res.status(403).json({ error: "Receipts are not allowed for this client user" });
+    }
+    const isAdmin = req.user!.role === "admin" || req.user!.role === "supervisor" || req.user!.role === "client";
     const userId = req.user!.userId;
 
     const invoiceRows = await db
@@ -245,7 +269,9 @@ router.get("/receipts/by-invoice/:invoiceId", requireAuth, async (req, res) => {
       .from(invoicesTable)
       .where(
         isAdmin
-          ? eq(invoicesTable.id, invoiceId)
+          ? clientScope
+            ? and(eq(invoicesTable.id, invoiceId), eq(invoicesTable.clientId, clientScope.clientId))
+            : eq(invoicesTable.id, invoiceId)
           : and(eq(invoicesTable.id, invoiceId), eq(invoicesTable.createdBy, userId)),
       )
       .limit(1);
@@ -276,6 +302,7 @@ router.get("/receipts/by-invoice/:invoiceId", requireAuth, async (req, res) => {
 // Create receipt
 router.post("/receipts", requireAuth, async (req, res) => {
   try {
+    if (rejectClientWrite(req, res)) return;
     const invoiceId =
       req.body.invoiceId === "" ||
       req.body.invoiceId === null ||
@@ -394,6 +421,7 @@ router.post("/receipts", requireAuth, async (req, res) => {
 //------Soft update receipt----------
 router.put("/receipts/:id", requireAuth, async (req, res) => {
   try {
+    if (rejectClientWrite(req, res)) return;
     const id = parseInt(req.params.id);
 
     if (isNaN(id)) {
@@ -516,6 +544,7 @@ router.put("/receipts/:id", requireAuth, async (req, res) => {
 // Soft delete receipt (move to trash)
 router.delete("/receipts/:id", requireAuth, async (req, res) => {
   try {
+    if (rejectClientWrite(req, res)) return;
     const id = parseInt(req.params.id);
 
     const [receipt] = await db
@@ -577,6 +606,11 @@ router.get("/receipts/:id", requireAuth, async (req, res) => {
     }
 
     const row = rows[0];
+    const clientScope = await getClientScope(req);
+    const receiptClientId = row.receipts.clientId ?? row.invoices?.clientId ?? null;
+    if (clientScope && (!clientScope.clientId || receiptClientId !== clientScope.clientId || clientScope.permissions?.canViewReceipts === false)) {
+      return res.status(403).json({ error: "Receipt is not allowed for this client user" });
+    }
 
     res.json(
       formatReceipt(
@@ -594,6 +628,7 @@ router.get("/receipts/:id", requireAuth, async (req, res) => {
 
 router.post("/receipts/import", requireAuth, async (req, res) => {
   try {
+    if (rejectClientWrite(req, res)) return;
     const rows = req.body.data;
 
     if (!Array.isArray(rows)) {

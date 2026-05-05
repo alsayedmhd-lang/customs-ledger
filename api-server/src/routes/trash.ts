@@ -13,6 +13,13 @@ import { Router } from "express";
 
 const router = Router();
 
+router.use((req, res, next) => {
+  if ((req as any).user?.role === "client") {
+    return res.status(403).json({ error: "Trash is not allowed for client users" });
+  }
+  next();
+});
+
 // ─── Invoices Trash ───────────────────────────────────────────────────────────
 
 // List deleted invoices

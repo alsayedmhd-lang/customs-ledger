@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth, type UserPermissions } from "@/lib/auth-context";
 import { useLanguage } from "@/lib/language-context";
 import {
@@ -26,6 +26,20 @@ interface AppUser {
   twoFactorWhatsapp: boolean;
   createdAt: string;
   receiverSignatureBase64?: string | null;
+  clientId?: number | null;
+  clientViewPermissions?: ClientViewPermissions;
+}
+
+interface ClientOption {
+  id: number;
+  name: string;
+}
+
+interface ClientViewPermissions {
+  canViewInvoices: boolean;
+  canViewReceipts: boolean;
+  canViewStatement: boolean;
+  canViewSummary: boolean;
 }
 
 function authFetch(url: string, opts: RequestInit = {}) {
@@ -83,6 +97,13 @@ const DEFAULT_PERMS: UserPermissions = {
   canViewAccounting: true, canCustomizePrintContact: false,
 };
 
+const DEFAULT_CLIENT_VIEW_PERMS: ClientViewPermissions = {
+  canViewInvoices: true,
+  canViewReceipts: true,
+  canViewStatement: true,
+  canViewSummary: true,
+};
+
 export default function UsersPage() {
   const { user: me } = useAuth();
   const { lang } = useLanguage();
@@ -95,6 +116,7 @@ export default function UsersPage() {
   });
 
   const [users, setUsers] = useState<AppUser[]>([]);
+  const [clients, setClients] = useState<ClientOption[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
@@ -103,11 +125,11 @@ export default function UsersPage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  const [form, setForm] = useState({ username: "", password: "", displayName: "", displayNameAr: "", 
-    displayNameEn: "", role: "user"  });
+  const [form, setForm] = useState({ username: "", password: "", displayName: "", displayNameAr: "",
+    displayNameEn: "", role: "user", clientId: "", clientViewPermissions: DEFAULT_CLIENT_VIEW_PERMS });
   const [editForm, setEditForm] = useState({ displayName: "", displayNameAr: "", 
     displayNameEn: "", role: "user", isActive: true, email: "", phone: "", receiverSignatureBase64: "", 
-    whatsappApiKey: "", twoFactorWhatsapp: false,twoFactorEmail: false });
+    whatsappApiKey: "", twoFactorWhatsapp: false,twoFactorEmail: false, clientId: "", clientViewPermissions: DEFAULT_CLIENT_VIEW_PERMS });
   const [pwdForm, setPwdForm] = useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
   const [permForm, setPermForm] = useState<UserPermissions>(DEFAULT_PERMS);
   const [resetResult, setResetResult] = useState<{ userId: number; sent: boolean; visibleCode?: string; maskedEmail: string | null; message: string } | null>(null);
@@ -117,7 +139,15 @@ export default function UsersPage() {
     if (res.ok) { setUsers(await res.json()); setLoaded(true); }
   }
 
-  if (!loaded) { loadUsers(); }
+  async function loadClients() {
+    const res = await authFetch(`${API_BASE}/api/clients`);
+    if (res.ok) setClients(await res.json());
+  }
+
+  useEffect(() => {
+    void loadUsers();
+    void loadClients();
+  }, []);
 
   async function handleActivate(id: number) {
     const res = await authFetch(`${API_BASE}/api/users/${id}`, {
@@ -140,12 +170,16 @@ export default function UsersPage() {
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
+    if (form.role === "client" && !form.clientId) {
+      flash(isAR ? "يجب اختيار العميل المرتبط بالمستخدم" : "Client users require a linked client", true);
+      return;
+    }
     const res = await authFetch(`${API_BASE}/api/users`, { method: "POST", body: JSON.stringify(form) });
     if (res.ok) {
       const u = await res.json();
       setUsers(prev => [...prev, u]);
       setShowAdd(false);
-      setForm({ username: "", password: "", displayName: "", displayNameAr: "", displayNameEn: "", role: "user" });
+      setForm({ username: "", password: "", displayName: "", displayNameAr: "", displayNameEn: "", role: "user", clientId: "", clientViewPermissions: DEFAULT_CLIENT_VIEW_PERMS });
       flash(isAR ? "تم إضافة المستخدم" : "User added successfully");
     } else {
       const err = await res.json().catch(() => ({}));
@@ -155,6 +189,10 @@ export default function UsersPage() {
 
   async function handleEdit(e: React.FormEvent) {
     e.preventDefault();
+    if (editForm.role === "client" && !editForm.clientId) {
+      flash(isAR ? "يجب اختيار العميل المرتبط بالمستخدم" : "Client users require a linked client", true);
+      return;
+    }
     const res = await authFetch(`${API_BASE}/api/users/${editId}`, { method: "PATCH", body: JSON.stringify(editForm) });
     if (res.ok) {
       const u = await res.json();
@@ -347,6 +385,11 @@ export default function UsersPage() {
                         <Shield className="w-3 h-3" />
                         {isAR ? "مشرف" : "Supervisor"}
                       </span>
+                    ) : u.role === "client" ? (
+                      <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
+                        <UserCheck className="w-3 h-3" />
+                        {isAR ? "عميل" : "Client"}
+                      </span>
                     ) : (
                       <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
                         <User className="w-3 h-3" />
@@ -359,6 +402,11 @@ export default function UsersPage() {
                       <span className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
                         <Clock className="w-3 h-3" />
                         {isAR ? "في انتظار التفعيل" : "Pending"}
+                      </span>
+                    ) : u.role === "client" ? (
+                      <span className="text-xs text-emerald-600 font-medium flex items-center gap-1">
+                        <UserCheck className="w-3.5 h-3.5" />
+                        {isAR ? "اطلاع فقط" : "Read only"}
                       </span>
                     ) : (
                       <span className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full font-medium ${u.isActive ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-700"}`}>
@@ -386,11 +434,11 @@ export default function UsersPage() {
                   <td className="px-5 py-4">
                     <div className="flex items-center gap-2">
                       <button
-                        onClick={() => { setEditId(u.id); setEditForm({ displayName: u.displayName, displayNameAr: u.displayNameAr ?? "", 
+                        onClick={() => { setEditId(u.id); setEditForm({ displayName: u.displayName, displayNameAr: u.displayNameAr ?? "",
                           displayNameEn: u.displayNameEn ?? "", role: u.role, isActive: u.isActive, email: u.email ?? "", 
                           phone: u.phone ?? "", receiverSignatureBase64: u.receiverSignatureBase64 ?? "", 
                           whatsappApiKey: u.whatsappApiKey ?? "" ,twoFactorWhatsapp: u.twoFactorWhatsapp ?? false, 
-                          twoFactorEmail: u.twoFactorEmail ?? false,}); }}
+                          twoFactorEmail: u.twoFactorEmail ?? false, clientId: u.clientId ? String(u.clientId) : "", clientViewPermissions: u.clientViewPermissions ?? DEFAULT_CLIENT_VIEW_PERMS }); }}
                         className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
                         title={isAR ? "تعديل" : "Edit"}
                       >
@@ -452,12 +500,22 @@ export default function UsersPage() {
             <Field label={isAR ? "اسم المستخدم (للدخول)" : "Username (for login)"}><input value={form.username} onChange={e => setForm(p => ({ ...p, username: e.target.value }))} className={inputCls} required /></Field>
             <Field label={isAR ? "كلمة السر" : "Password"}><input type="password" value={form.password} onChange={e => setForm(p => ({ ...p, password: e.target.value }))} className={inputCls} required /></Field>
             <Field label={isAR ? "الدور" : "Role"}>
-              <select value={form.role} onChange={e => setForm(p => ({ ...p, role: e.target.value }))} className={inputCls}>
+              <select value={form.role} onChange={e => setForm(p => ({ ...p, role: e.target.value, clientId: e.target.value === "client" ? p.clientId : "" }))} className={inputCls}>
                 <option value="user">{isAR ? "مستخدم" : "User"}</option>
                 <option value="supervisor">{isAR ? "مشرف" : "Supervisor"}</option>
-                <option value="admin">{isAR ? "مدير" : "Admin"}</option>
+                <option value="client">{isAR ? "عميل" : "Client"}</option>
               </select>
             </Field>
+            {form.role === "client" && (
+              <ClientAccessFields
+                isAR={isAR}
+                clients={clients}
+                clientId={form.clientId}
+                permissions={form.clientViewPermissions}
+                onClientChange={(clientId) => setForm((p) => ({ ...p, clientId }))}
+                onPermissionsChange={(clientViewPermissions) => setForm((p) => ({ ...p, clientViewPermissions }))}
+              />
+            )}
             <div className="flex gap-3 pt-2">
               <button type="submit" className="flex-1 bg-primary text-primary-foreground py-2.5 rounded-xl font-medium">{isAR ? "إضافة" : "Add"}</button>
               <button type="button" onClick={() => setShowAdd(false)} className="flex-1 bg-muted text-foreground py-2.5 rounded-xl font-medium">{isAR ? "إلغاء" : "Cancel"}</button>
@@ -480,12 +538,22 @@ export default function UsersPage() {
             </div>
             <Field label={isAR ? "الاسم الكامل (احتياطي)" : "Full Name (fallback)"}><input value={editForm.displayName} onChange={e => setEditForm(p => ({ ...p, displayName: e.target.value }))} className={inputCls} required /></Field>
             <Field label={isAR ? "الدور" : "Role"}>
-              <select value={editForm.role} onChange={e => setEditForm(p => ({ ...p, role: e.target.value }))} className={inputCls}>
+              <select value={editForm.role} onChange={e => setEditForm(p => ({ ...p, role: e.target.value, clientId: e.target.value === "client" ? p.clientId : "" }))} className={inputCls}>
                 <option value="user">{isAR ? "مستخدم" : "User"}</option>
                 <option value="supervisor">{isAR ? "مشرف" : "Supervisor"}</option>
-                <option value="admin">{isAR ? "مدير" : "Admin"}</option>
+                <option value="client">{isAR ? "عميل" : "Client"}</option>
               </select>
             </Field>
+            {editForm.role === "client" && (
+              <ClientAccessFields
+                isAR={isAR}
+                clients={clients}
+                clientId={editForm.clientId}
+                permissions={editForm.clientViewPermissions}
+                onClientChange={(clientId) => setEditForm((p) => ({ ...p, clientId }))}
+                onPermissionsChange={(clientViewPermissions) => setEditForm((p) => ({ ...p, clientViewPermissions }))}
+              />
+            )}
             <Field label={isAR ? "الحالة" : "Status"}>
               <select value={editForm.isActive ? "true" : "false"} onChange={e => setEditForm(p => ({ ...p, isActive: e.target.value === "true" }))} className={inputCls}>
                 <option value="true">{isAR ? "نشط" : "Active"}</option>
@@ -764,6 +832,56 @@ const inputCls = "w-full px-3 py-2 bg-background border border-border rounded-xl
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return <div><label className="block text-sm font-medium mb-1">{label}</label>{children}</div>;
+}
+
+function ClientAccessFields({
+  isAR,
+  clients,
+  clientId,
+  permissions,
+  onClientChange,
+  onPermissionsChange,
+}: {
+  isAR: boolean;
+  clients: ClientOption[];
+  clientId: string;
+  permissions: ClientViewPermissions;
+  onClientChange: (clientId: string) => void;
+  onPermissionsChange: (permissions: ClientViewPermissions) => void;
+}) {
+  const items: Array<{ key: keyof ClientViewPermissions; labelAr: string; labelEn: string }> = [
+    { key: "canViewInvoices", labelAr: "فواتيره فقط", labelEn: "Own invoices only" },
+    { key: "canViewReceipts", labelAr: "سندات قبضه فقط", labelEn: "Own receipts only" },
+    { key: "canViewStatement", labelAr: "كشف حسابه فقط", labelEn: "Own statement only" },
+    { key: "canViewSummary", labelAr: "ملخص حساب العميل فقط", labelEn: "Own account summary only" },
+  ];
+
+  return (
+    <div className="rounded-xl border border-border p-3 space-y-3">
+      <Field label={isAR ? "العميل المرتبط" : "Linked client"}>
+        <select value={clientId} onChange={(event) => onClientChange(event.target.value)} className={inputCls} required>
+          <option value="">{isAR ? "اختر العميل" : "Select client"}</option>
+          {clients.map((client) => (
+            <option key={client.id} value={client.id}>{client.name}</option>
+          ))}
+        </select>
+      </Field>
+      <div className="space-y-2">
+        <div className="text-xs font-semibold text-muted-foreground">{isAR ? "صلاحيات الاطلاع فقط" : "Read-only access"}</div>
+        {items.map((item) => (
+          <label key={item.key} className="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2 text-sm">
+            <span>{isAR ? item.labelAr : item.labelEn}</span>
+            <input
+              type="checkbox"
+              checked={permissions[item.key]}
+              onChange={(event) => onPermissionsChange({ ...permissions, [item.key]: event.target.checked })}
+              className="h-4 w-4 accent-primary"
+            />
+          </label>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 function Modal({ title, onClose, children, isAR, wide }: { title: string; onClose: () => void; children: React.ReactNode; isAR: boolean; wide?: boolean }) {

@@ -16,6 +16,22 @@ import { requireAuth } from "../middleware/auth";
 
 const router: IRouter = Router();
 
+async function getClientScope(req: any) {
+  if (req.user?.role !== "client") return null;
+  const [user] = await db
+    .select({ clientId: usersTable.clientId, clientViewPermissions: usersTable.clientViewPermissions })
+    .from(usersTable)
+    .where(eq(usersTable.id, req.user.userId))
+    .limit(1);
+  return user?.clientId ? { clientId: Number(user.clientId), permissions: user.clientViewPermissions as any } : { clientId: null, permissions: null };
+}
+
+function rejectClientWrite(req: any, res: any) {
+  if (req.user?.role !== "client") return false;
+  res.status(403).json({ error: "Client users have read-only access" });
+  return true;
+}
+
 const invoiceDescriptionAr = (invoiceNumber: string) =>
   `\u0641\u0627\u062a\u0648\u0631\u0629 \u0631\u0642\u0645 ${invoiceNumber}`;
 const advancePaymentDescriptionAr = (invoiceNumber: string) =>
@@ -163,8 +179,12 @@ async function createDirectClosingReceipt(input: {
 
 router.get("/invoices", requireAuth, async (req, res) => {
   try {
-    const clientId = req.query.clientId ? parseInt(req.query.clientId as string) : null;
-    const isAdmin = req.user!.role === "admin" || req.user!.role === "supervisor";
+    const clientScope = await getClientScope(req);
+    if (clientScope && (!clientScope.clientId || clientScope.permissions?.canViewInvoices === false)) {
+      return res.status(403).json({ error: "Invoices are not allowed for this client user" });
+    }
+    const clientId = clientScope?.clientId ?? (req.query.clientId ? parseInt(req.query.clientId as string) : null);
+    const isAdmin = req.user!.role === "admin" || req.user!.role === "supervisor" || req.user!.role === "client";
     const userId = req.user!.userId;
 
     // Non-admins/supervisors only see their own invoices
@@ -220,6 +240,7 @@ router.get("/invoices", requireAuth, async (req, res) => {
 
 router.post("/invoices", requireAuth, async (req, res) => {
   try {
+    if (rejectClientWrite(req, res)) return;
     const {
       clientId,
       createdBy,
@@ -440,6 +461,10 @@ router.get("/invoices/:id", async (req, res) => {
     }
 
     const row = rows[0];
+    const clientScope = await getClientScope(req);
+    if (clientScope && (!clientScope.clientId || row.invoices.clientId !== clientScope.clientId || clientScope.permissions?.canViewInvoices === false)) {
+      return res.status(403).json({ error: "Invoice is not allowed for this client user" });
+    }
     const items = await db
       .select()
       .from(invoiceItemsTable)
@@ -468,6 +493,9 @@ router.get("/invoices/:id", async (req, res) => {
 router.get("/invoices/:id/audit-logs", requireAuth, async (req, res) => {
   try {
     const id = parseInt(req.params.id);
+    if (req.user?.role === "client") {
+      return res.status(403).json({ error: "Audit logs are not allowed for client users" });
+    }
 
     const logs = await db
       .select()
@@ -484,6 +512,7 @@ router.get("/invoices/:id/audit-logs", requireAuth, async (req, res) => {
 
 router.put("/invoices/:id", async (req, res) => {
   try {
+    if (rejectClientWrite(req, res)) return;
     const id = parseInt(req.params.id);
 
     const [beforeInvoice] = await db
@@ -771,6 +800,7 @@ for (let i = 0; i < maxItemsLength; i++) {
 // Soft delete invoice (move to trash)
 router.delete("/invoices/:id", async (req, res) => {
   try {
+    if (rejectClientWrite(req, res)) return;
     const id = parseInt(req.params.id);
      const [oldInvoice] = await db
       .select()
@@ -848,6 +878,7 @@ function getShipmentBase(value: unknown) {
 
 router.post("/invoices/import", requireAuth, async (req, res) => {
   try {
+    if (rejectClientWrite(req, res)) return;
     const rows = req.body.data;
 
     if (!Array.isArray(rows)) {

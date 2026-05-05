@@ -21,7 +21,8 @@ import {
 } from "@/components/ui/alert-dialog";
 
 export default function InvoicesList() {
-  const { can } = useAuth();
+  const { user, can } = useAuth();
+  const isClient = user?.role === "client";
   const { t } = useLanguage();
   const { data: invoices = [], isLoading } = useListInvoices();
   const [search, setSearch] = useState("");
@@ -84,12 +85,12 @@ export default function InvoicesList() {
           <h1 className="text-2xl font-bold text-foreground">{t("invoices")}</h1>
           <p className="text-muted-foreground text-sm mt-0.5">{t("invoicesDesc")}</p>
         </div>
-        <Link href="/invoices/new">
+        {!isClient && <Link href="/invoices/new">
           <button className="bg-primary hover:bg-primary/90 text-primary-foreground px-4 py-2.5 rounded-xl font-medium shadow-lg shadow-primary/25 hover:shadow-xl hover:-translate-y-0.5 transition-all flex items-center gap-2 text-sm">
             <Plus className="w-4 h-4" />
             {t("createInvoiceBtn")}
           </button>
-        </Link>
+        </Link>}
       </div>
 
       <div className="bg-card border border-border/50 shadow-sm rounded-2xl overflow-hidden">
@@ -135,12 +136,16 @@ export default function InvoicesList() {
                 filtered.map((inv, idx) => (
                   <tr key={inv.id} className={`transition-colors group hover:bg-primary/5 ${idx % 2 !== 0 ? "bg-muted/20" : ""}`}>
                     <td className="px-4 py-3">
-                                          <Link
-                      href={`/invoices/${inv.id}/edit`}
-                      className="font-mono font-bold text-primary text-sm hover:underline"
-                    >
-                      {inv.invoiceNumber}
-                    </Link>
+                      {isClient ? (
+                        <span className="font-mono font-bold text-primary text-sm">{inv.invoiceNumber}</span>
+                      ) : (
+                        <Link
+                          href={`/invoices/${inv.id}/edit`}
+                          className="font-mono font-bold text-primary text-sm hover:underline"
+                        >
+                          {inv.invoiceNumber}
+                        </Link>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <span className="font-medium text-sm">{inv.clientName}</span>
@@ -165,19 +170,19 @@ export default function InvoicesList() {
                           onClick={() => {
                             setCopyId(inv.id);
                           }}
-                          className="p-1.5 text-muted-foreground hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                          className={`${isClient ? "hidden" : ""} p-1.5 text-muted-foreground hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors`}
                           title={t("copy")}
                         >
                           📄
                         </button>
-                        {can("canEditInvoices") && (
+                        {!isClient && can("canEditInvoices") && (
                           <Link href={`/invoices/${inv.id}/edit`}>
                             <button className="p-1.5 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg transition-colors" title={t("edit")}>
                               <Edit2 className="w-3.5 h-3.5" />
                             </button>
                           </Link>
                         )}
-                        {can("canDeleteInvoices") && (
+                        {!isClient && can("canDeleteInvoices") && (
                           <button
                             onClick={() => setDeleteId(inv.id)}
                             className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg transition-colors"

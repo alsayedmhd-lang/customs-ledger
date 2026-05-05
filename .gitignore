@@ -51,6 +51,7 @@ Thumbs.db
 # Local DB & env
 lib/db/local.db
 release/win-unpacked/resources/api-server/.env
+api-server/.env
 
 # Build output (Electron)
 release/
@@ -64,4 +65,6 @@ build/*
 *.asar
 *.blockmap
 *.db
-
+# logs
+electron-stdout.log
+electron-stderr.log

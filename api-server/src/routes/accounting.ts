@@ -36,9 +36,24 @@
     createdBy: number | null;
   };
 
+  async function getClientScope(req: any) {
+    if (req.user?.role !== "client") return null;
+    const { usersTable } = await import("@workspace/db");
+    const [user] = await db
+      .select({ clientId: usersTable.clientId, clientViewPermissions: usersTable.clientViewPermissions })
+      .from(usersTable)
+      .where(eq(usersTable.id, req.user.userId))
+      .limit(1);
+    return user?.clientId ? { clientId: Number(user.clientId), permissions: user.clientViewPermissions as any } : { clientId: null, permissions: null };
+  }
+
   router.get("/customer-ledger/:clientId", requireAuth, async (req, res) => {
     try {
       const clientId = Number(req.params.clientId);
+      const clientScope = await getClientScope(req);
+      if (clientScope) {
+        return res.status(403).json({ error: "Customer financial summary is not allowed for client users" });
+      }
       const from = req.query.from ? String(req.query.from) : "";
       const to = req.query.to ? String(req.query.to) : "";
 
@@ -152,6 +167,9 @@
 
   router.patch("/accounting/:invoiceId", requireAuth, async (req, res) => {
     try {
+      if (req.user?.role === "client") {
+        return res.status(403).json({ error: "Client users have read-only access" });
+      }
       const invoiceId = parseInt(req.params.invoiceId);
       const {
         payments,
@@ -244,6 +262,9 @@
 
   router.get("/accounting", requireAuth, async (req, res) => {
     try {
+      if (req.user?.role === "client") {
+        return res.status(403).json({ error: "Accounting is not allowed for client users" });
+      }
       const isAdmin = req.user!.role === "admin" || req.user!.role === "supervisor";
       const userId = req.user!.userId;
       const filters = [isNull(invoicesTable.deletedAt)];

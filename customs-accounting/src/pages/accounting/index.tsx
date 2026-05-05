@@ -144,11 +144,12 @@ export default function AccountingPage() {
   const { toast } = useToast();
   const { user, can } = useAuth();
   const queryClient = useQueryClient();
+  const isClient = user?.role === "client";
 
   const { data: rows = [], isLoading } = useQuery({
     queryKey: ["accounting"],
     queryFn: fetchAccounting,
-    enabled: user?.role === "admin" || can("canViewAccounting"),
+    enabled: !isClient && (user?.role === "admin" || can("canViewAccounting")),
   });
 
   const searchString = useSearch();

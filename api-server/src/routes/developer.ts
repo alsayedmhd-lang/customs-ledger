@@ -6,6 +6,7 @@ import os from "os";
 import path from "path";
 import crypto from "crypto";
 import packageJson from "../../../package.json";
+import { requireAdmin } from "../middleware/auth";
 
 const router = Router();
 
@@ -30,6 +31,8 @@ const developerPermissionColumns = [
     "allow_manager_edit_print_settings",
     "ALTER TABLE company_settings ADD COLUMN allow_manager_edit_print_settings INTEGER DEFAULT 0",
   ],
+  ["allow_manager_view_preview", "ALTER TABLE company_settings ADD COLUMN allow_manager_view_preview INTEGER DEFAULT 0"],
+  ["allow_manager_view_update", "ALTER TABLE company_settings ADD COLUMN allow_manager_view_update INTEGER DEFAULT 0"],
   ["allow_manager_edit_branding", "ALTER TABLE company_settings ADD COLUMN allow_manager_edit_branding INTEGER DEFAULT 0"],
   ["allow_manager_edit_registration_settings", "ALTER TABLE company_settings ADD COLUMN allow_manager_edit_registration_settings INTEGER DEFAULT 0"],
   ["allow_manager_edit_sensitive_users", "ALTER TABLE company_settings ADD COLUMN allow_manager_edit_sensitive_users INTEGER DEFAULT 0"],
@@ -94,6 +97,8 @@ function mapDeveloperPermissions(settings: any) {
     allowManagerEditInvoicesBackupImport: toBool(settings?.allowManagerEditInvoicesBackupImport),
     allowManagerEditAppearance: toBool(settings?.allowManagerEditAppearance),
     allowManagerEditPrintSettings: toBool(settings?.allowManagerEditPrintSettings),
+    allowManagerViewPreview: toBool(settings?.allowManagerViewPreview),
+    allowManagerViewUpdate: toBool(settings?.allowManagerViewUpdate),
     allowManagerEditBranding: toBool(settings?.allowManagerEditBranding),
     allowManagerEditRegistrationSettings: toBool(settings?.allowManagerEditRegistrationSettings),
     allowManagerEditSensitiveUsers: toBool(settings?.allowManagerEditSensitiveUsers),
@@ -126,6 +131,8 @@ async function getSettingsRow() {
 }
 
 ensureDeveloperSettingsColumns();
+
+router.use("/developer", requireAdmin);
 
 router.post("/developer/unlock", (req, res) => {
   const expectedPassword = process.env.DEVELOPER_PASSWORD;
@@ -198,6 +205,8 @@ router.put("/developer/settings", async (req, res) => {
         allowManagerEditInvoicesBackupImport: !!body.allowManagerEditInvoicesBackupImport,
         allowManagerEditAppearance: !!body.allowManagerEditAppearance,
         allowManagerEditPrintSettings: !!body.allowManagerEditPrintSettings,
+        allowManagerViewPreview: !!body.allowManagerViewPreview,
+        allowManagerViewUpdate: !!body.allowManagerViewUpdate,
         allowManagerEditBranding: !!body.allowManagerEditBranding,
         allowManagerEditRegistrationSettings: !!body.allowManagerEditRegistrationSettings,
         allowManagerEditSensitiveUsers: !!body.allowManagerEditSensitiveUsers,

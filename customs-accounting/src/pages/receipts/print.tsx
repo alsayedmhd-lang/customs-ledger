@@ -161,6 +161,7 @@ export default function ReceiptPrint() {
   const isAR = lang === "ar";
   const { settings, logoSrc, stampSrc, watermarkSrc } = useCompanySettings();
   const { user } = useAuth();
+  const isClient = user?.role === "client";
 
   const canCustomize = user?.permissions?.canCustomizePrintContact;
   const printPhone = canCustomize && user?.phone ? user.phone : settings.phone;
@@ -220,7 +221,7 @@ export default function ReceiptPrint() {
 
       <div className="print:hidden flex gap-3 p-4 max-w-2xl mx-auto flex-wrap" dir={isAR ? "rtl" : "ltr"}>
         <Link href="/receipts">
-          <button className="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-700 hover:bg-gray-50 text-sm font-medium">
+          <button className={`${isClient ? "hidden" : ""} flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-700 hover:bg-gray-50 text-sm font-medium`}>
             {isAR ? <ArrowRight className="w-4 h-4" /> : <ArrowLeft className="w-4 h-4" />}
             {isAR ? "العودة" : "Back"}
           </button>
@@ -236,7 +237,7 @@ export default function ReceiptPrint() {
           {isAR ? "طباعة السند" : "Print Receipt"}
         </button>
 
-        {settings.showStampOnReceipts && (
+        {!isClient && settings.showStampOnReceipts && (
           <label className="flex items-center gap-2 cursor-pointer px-3 py-2 border border-gray-300 rounded-lg bg-white hover:bg-gray-50 select-none">
             <input
               type="checkbox"
@@ -248,7 +249,7 @@ export default function ReceiptPrint() {
             <span className="text-sm font-medium text-gray-700">{isAR ? "إظهار الختم" : "Show Stamp"}</span>
           </label>
         )}
-        <label className="flex items-center gap-2 px-4 py-2 h-[42px] border border-gray-300 rounded-lg bg-white cursor-pointer select-none hover:bg-gray-50">
+        {!isClient && <label className="flex items-center gap-2 px-4 py-2 h-[42px] border border-gray-300 rounded-lg bg-white cursor-pointer select-none hover:bg-gray-50">
           <input
             type="checkbox"
             checked={showSignatures}
@@ -258,7 +259,7 @@ export default function ReceiptPrint() {
           <span className="text-sm font-medium text-gray-700">
             {isAR ? "إظهار التوقيع" : "Show Signatures"}
           </span>
-        </label>
+        </label>}
       </div>
 
       <div

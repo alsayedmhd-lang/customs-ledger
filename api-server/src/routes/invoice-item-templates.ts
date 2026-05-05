@@ -4,8 +4,11 @@ import { eq, desc } from "drizzle-orm";
 
 const router: IRouter = Router();
 
-router.get("/invoice-item-templates", async (_req, res) => {
+router.get("/invoice-item-templates", async (req, res) => {
   try {
+    if ((req as any).user?.role === "client") {
+      return res.status(403).json({ error: "Templates are not allowed for client users" });
+    }
     const templates = await db
       .select()
       .from(invoiceItemTemplatesTable)
@@ -19,6 +22,7 @@ router.get("/invoice-item-templates", async (_req, res) => {
 
 router.post("/invoice-item-templates", async (req, res) => {
   try {
+    if ((req as any).user?.role === "client") return res.status(403).json({ error: "Client users have read-only access" });
     const { description, defaultUnitPrice } = req.body;
     if (!description) {
       res.status(400).json({ error: "description is required" });
@@ -40,6 +44,7 @@ router.post("/invoice-item-templates", async (req, res) => {
 
 router.put("/invoice-item-templates/:id", async (req, res) => {
   try {
+    if ((req as any).user?.role === "client") return res.status(403).json({ error: "Client users have read-only access" });
     const id = parseInt(req.params.id);
     const { description, defaultUnitPrice } = req.body;
     if (!description) {
@@ -67,6 +72,7 @@ router.put("/invoice-item-templates/:id", async (req, res) => {
 
 router.delete("/invoice-item-templates/:id", async (req, res) => {
   try {
+    if ((req as any).user?.role === "client") return res.status(403).json({ error: "Client users have read-only access" });
     const id = parseInt(req.params.id);
     await db.delete(invoiceItemTemplatesTable).where(eq(invoiceItemTemplatesTable.id, id));
     res.status(204).send();
@@ -87,6 +93,7 @@ function formatTemplate(t: typeof invoiceItemTemplatesTable.$inferSelect) {
 
 router.post("/invoice-item-templates/import", async (req: any, res: any) => {
   try {
+    if (req.user?.role === "client") return res.status(403).json({ error: "Client users have read-only access" });
     const rows = req.body.data;
 
     if (!Array.isArray(rows)) {

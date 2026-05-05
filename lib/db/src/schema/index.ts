@@ -17,6 +17,7 @@ export {
   usersTableSqlite as usersTable,
   otpCodesTable as otpCodesTable,
   DEFAULT_PERMISSIONS,
+  DEFAULT_CLIENT_VIEW_PERMISSIONS,
 } from "./users-sqlite";
 
 export {
