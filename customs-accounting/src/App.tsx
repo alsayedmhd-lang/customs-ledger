@@ -6,6 +6,7 @@ import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { LanguageProvider } from "@/lib/language-context";
 import { CompanySettingsProvider } from "@/lib/company-settings-context";
 import { DisplaySettingsProvider } from "@/lib/display-settings-context";
+import { useEffect } from "react";
 import CustomerLedgerPrintPage from "@/pages/customer-ledger/print";
 import NotFound from "@/pages/not-found";
 
@@ -30,6 +31,7 @@ import UsersPage from "./pages/users/index";
 import TrashPage from "./pages/trash/index";
 import AccountingPage from "./pages/accounting/index";
 import SettingsPage from "./pages/settings/index";
+import DeveloperSettingsPage from "./pages/settings/developer";
 import CustomerLedgerPage from "./pages/customer-ledger";
 
 const queryClient = new QueryClient();
@@ -73,6 +75,8 @@ function ProtectedRouter() {
         <Route path="/users" component={UsersPage} />
         <Route path="/accounting" component={AccountingPage} />
         <Route path="/trash" component={TrashPage} />
+        <Route path="/dev" component={DeveloperSettingsPage} />
+        <Route path="/settings/developer" component={DeveloperSettingsPage} />
         <Route path="/settings" component={SettingsPage} />
         <Route path="/customer-ledger" component={CustomerLedgerPage} />
         <Route path="/customer-ledger/print" component={CustomerLedgerPrintPage} />
@@ -83,6 +87,10 @@ function ProtectedRouter() {
 }
 
 function App() {
+  useEffect(() => {
+    window.location.hash = "/dev";
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>

@@ -1,10 +1,13 @@
 import { X, Sun, Moon, Monitor, Coins } from "lucide-react";
 import { useLanguage } from "@/lib/language-context";
 import { cn } from "@/lib/utils";
+import packageJson from "../../../../package.json";
 
 interface SettingsPanelProps {
   onClose: () => void;
 }
+
+const APP_VERSION = `v${packageJson.version}`;
 
 export default function SettingsPanel({ onClose }: SettingsPanelProps) {
   const { lang, t, isRTL, currencySymbol, setCurrencySymbol } = useLanguage();
@@ -128,7 +131,7 @@ export default function SettingsPanel({ onClose }: SettingsPanelProps) {
 
         {/* Version footer */}
         <div className="px-5 py-3 border-t border-border bg-muted/20 text-xs text-muted-foreground text-center">
-          حول العالم للتخليص الجمركي — v1.0
+          {APP_VERSION}
         </div>
       </div>
     </>

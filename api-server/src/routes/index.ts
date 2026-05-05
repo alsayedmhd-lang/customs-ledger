@@ -9,6 +9,7 @@ import trashRouter from "./trash";
 import usersManagementRouter from "./users-management";
 import accountingRouter from "./accounting";
 import companySettingsRouter from "./company-settings";
+import developerRouter from "./developer";
 import { requireAuth } from "../middleware/auth";
 
 const router: IRouter = Router();
@@ -27,5 +28,6 @@ router.use(trashRouter);
 router.use(usersManagementRouter);
 router.use(accountingRouter);
 router.use(companySettingsRouter);
+router.use(developerRouter);
 
 export default router;

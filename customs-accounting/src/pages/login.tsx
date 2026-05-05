@@ -364,7 +364,7 @@ export default function LoginPage() {
                   <h2
                 className="text-lg font-bold"
                 style={{ color: loginTheme.textMain }}
-              >{isAR ? "تسجيل الدخول - SQLite" : "Sign In - SQLite"}</h2>
+              >{isAR ? "تسجيل الدخول " : "Sign In "}</h2>
                 </div>
                 <button type="button" onClick={() => setLang(isAR ? "en" : "ar")}
                   className="text-white/35 hover:text-white/80 text-xs font-semibold tracking-widest transition-colors uppercase"
@@ -811,7 +811,7 @@ export default function LoginPage() {
         </AnimatePresence>
 
         <p className="text-center text-white/25 text-xs mt-6 font-medium">
-          {isAR ? "نظام المحاسبة الداخلي للتخليص الجمركي - محمد سيد عبد العال - تلفون 60020446" : "Internal Accounting System For Customs Clearance - Mohamed Said Abou Elala - Phone 60020446"}
+          {isAR ? "نظام المحاسبة الداخلي للشركات - alsayed.mhd@gmail.com - تلفون  - 00201009697521 - 0097460020446 " : "Internal Accounting System For Companes - alsayed.mhd@gmail.com - Phone - 00201009697521 - 0097460020446"}
                   </p>
       </motion.div>
     </div>

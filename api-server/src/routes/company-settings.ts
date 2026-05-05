@@ -176,6 +176,41 @@ router.put("/company-settings", requireAdmin, async (req, res) => {
       [existing] = await db.insert(companySettingsTable).values({ id: 1 }).returning();
     }
 
+    const lockedChanges: string[] = [];
+    const isChanged = (key: string) => String((existing as any)[key] ?? "") !== String((data as any)[key] ?? "");
+
+    if ((existing as any).lockCompanyIdentity) {
+      for (const key of ["nameAr", "nameEn", "subtitleAr", "subtitleEn", "taglineAr", "taglineEn"]) {
+        if (isChanged(key)) lockedChanges.push(key);
+      }
+    }
+    if ((existing as any).lockCompanyName) {
+      for (const key of ["nameAr", "nameEn"]) {
+        if (isChanged(key)) lockedChanges.push(key);
+      }
+    }
+    if ((existing as any).lockLogo && isChanged("logoBase64")) lockedChanges.push("logoBase64");
+    if ((existing as any).lockStamp && isChanged("stampBase64")) lockedChanges.push("stampBase64");
+    if ((existing as any).lockLegalInfo) {
+      for (const key of ["crNumber", "taxNumber", "email", "phone", "address", "poBox", "website"]) {
+        if (isChanged(key)) lockedChanges.push(key);
+      }
+    }
+    if ((existing as any).lockFooterBranding && isChanged("footerText")) lockedChanges.push("footerText");
+    if ((existing as any).preventRebrandToAnotherCompany) {
+      const licensedName = String((existing as any).licensedCompanyName || "").trim();
+      if (licensedName && String(data.nameEn || data.nameAr || "").trim() !== licensedName) {
+        lockedChanges.push("licensedCompanyName");
+      }
+    }
+
+    if (lockedChanges.length > 0) {
+      return res.status(403).json({
+        error: "Developer lock prevents changing protected company settings",
+        lockedFields: Array.from(new Set(lockedChanges)),
+      });
+    }
+
     const [result] = await db
       .update(companySettingsTable)
       .set(data as any)

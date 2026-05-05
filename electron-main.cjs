@@ -112,16 +112,16 @@ function createWindow() {
   });
 
   setTimeout(() => {
-    mainWindow.loadFile(
-      path.join(
-        process.resourcesPath,
-        "app.asar",
-        "customs-accounting",
-        "dist",
-        "public",
-        "index.html"
-      )
+    const indexPath = path.join(
+      process.resourcesPath,
+      "app.asar",
+      "customs-accounting",
+      "dist",
+      "public",
+      "index.html"
     );
+    console.log("FRONTEND INDEX PATH =", indexPath);
+    mainWindow.loadFile(indexPath);
   }, 3000);
 }
 

@@ -868,6 +868,30 @@ export default function SettingsPage() {
   const receiverSignatureRef = useRef<HTMLInputElement>(null);
   const stampRef = useRef<HTMLInputElement>(null);
   const watermarkRef = useRef<HTMLInputElement>(null);
+  const [allowManagerEditAccountantSignature, setAllowManagerEditAccountantSignature] = useState(false);
+  const [allowManagerEditAppearance, setAllowManagerEditAppearance] = useState(false);
+  const [allowManagerEditInvoicesBackupImport, setAllowManagerEditInvoicesBackupImport] = useState(false);
+  const [allowManagerEditLegalInfo, setAllowManagerEditLegalInfo] = useState(false);
+  const [allowManagerEditPrintSettings, setAllowManagerEditPrintSettings] = useState(false);
+  const [allowManagerEditBranding, setAllowManagerEditBranding] = useState(false);
+  const [lockCompanyIdentity, setLockCompanyIdentity] = useState(false);
+  const [lockCompanyName, setLockCompanyName] = useState(false);
+  const [lockLogo, setLockLogo] = useState(false);
+  const [lockStamp, setLockStamp] = useState(false);
+  const [lockLegalInfo, setLockLegalInfo] = useState(false);
+  const [lockFooterBranding, setLockFooterBranding] = useState(false);
+  const developerUnlocked = sessionStorage.getItem("developer_unlocked") === "true";
+  const roleCanEdit = user?.role === "admin" || developerUnlocked;
+  const canEditAccountantSignature = roleCanEdit || allowManagerEditAccountantSignature;
+  const canEditAppearance = roleCanEdit || allowManagerEditAppearance;
+  const canEditBranding = (roleCanEdit || allowManagerEditBranding || allowManagerEditAppearance) && !lockCompanyIdentity;
+  const canEditCompanyName = canEditBranding && !lockCompanyName;
+  const canEditLogo = canEditBranding && !lockLogo;
+  const canEditStamp = canEditBranding && !lockStamp;
+  const canEditLegalInfo = (roleCanEdit || allowManagerEditLegalInfo) && !lockLegalInfo;
+  const canEditPrintSettings = (roleCanEdit || allowManagerEditPrintSettings) && !lockFooterBranding;
+  const canEditBrandIdentity = canEditBranding;
+  const canUseInvoicesBackupImport = developerUnlocked || allowManagerEditInvoicesBackupImport;
   const [activeTab, setActiveTab] = useState<TabId>("preview");
   const [invoicePreviewScale, setInvoicePreviewScale] = useState(0.76);
   const [receiptPreviewScale, setReceiptPreviewScale] = useState(0.8);
@@ -1040,8 +1064,57 @@ const decryptBackupData = async (backupFile: any, password: string) => {
     setReceiverSignaturePreview(settings.receiverSignatureBase64 || null);
   }, [settings]);
 
+  useEffect(() => {
+    if (developerUnlocked) {
+      setAllowManagerEditAccountantSignature(true);
+      setAllowManagerEditAppearance(true);
+      setAllowManagerEditInvoicesBackupImport(true);
+      return;
+    }
+
+    const token = sessionStorage.getItem("auth_token");
+
+    fetch(`${API_BASE}/developer/settings`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    })
+      .then((res) => (res.ok ? res.json() : Promise.reject()))
+      .then((data) => {
+        setAllowManagerEditAccountantSignature(!!data.allowManagerEditAccountantSignature);
+        setAllowManagerEditAppearance(!!data.allowManagerEditAppearance);
+        setAllowManagerEditInvoicesBackupImport(!!data.allowManagerEditInvoicesBackupImport);
+        setAllowManagerEditLegalInfo(!!data.allowManagerEditLegalInfo);
+        setAllowManagerEditPrintSettings(!!data.allowManagerEditPrintSettings);
+        setAllowManagerEditBranding(!!data.allowManagerEditBranding);
+        setLockCompanyIdentity(!!data.lockCompanyIdentity);
+        setLockCompanyName(!!data.lockCompanyName);
+        setLockLogo(!!data.lockLogo);
+        setLockStamp(!!data.lockStamp);
+        setLockLegalInfo(!!data.lockLegalInfo);
+        setLockFooterBranding(!!data.lockFooterBranding);
+      })
+      .catch(() => {
+        setAllowManagerEditAccountantSignature(false);
+        setAllowManagerEditAppearance(false);
+        setAllowManagerEditInvoicesBackupImport(false);
+        setAllowManagerEditLegalInfo(false);
+        setAllowManagerEditPrintSettings(false);
+        setAllowManagerEditBranding(false);
+        setLockCompanyIdentity(false);
+        setLockCompanyName(false);
+        setLockLogo(false);
+        setLockStamp(false);
+        setLockLegalInfo(false);
+        setLockFooterBranding(false);
+      });
+  }, [developerUnlocked]);
+
   // Export invoices backup
   const exportInvoices = async () => {
+    if (!canUseInvoicesBackupImport) {
+      alert(isAR ? "غير مسموح بتصدير الفواتير" : "Invoices export is not allowed");
+      return;
+    }
+
     try {
       const token = sessionStorage.getItem("auth_token");
 
@@ -1207,7 +1280,12 @@ const decryptBackupData = async (backupFile: any, password: string) => {
     };
 
     // Import invoices backup
-    const importInvoices = async (file: File) => {
+    const importInvoices = async (file: File, options: { bypassDeveloperPermission?: boolean } = {}) => {
+      if (!options.bypassDeveloperPermission && !canUseInvoicesBackupImport) {
+        alert(isAR ? "غير مسموح باستيراد الفواتير" : "Invoices import is not allowed");
+        return;
+      }
+
       const token = sessionStorage.getItem("auth_token");
       const data = JSON.parse(await file.text());
 
@@ -1441,6 +1519,22 @@ const decryptBackupData = async (backupFile: any, password: string) => {
           showReceiverSignature: rawPayload.showReceiverSignature ?? true,
           invoiceTitleFontSize: Number(rawPayload.invoiceTitleFontSize ?? 25),
         };
+
+        if (!canEditBrandIdentity) {
+          Object.assign(payload, {
+            nameAr: settings.nameAr ?? "",
+            nameEn: settings.nameEn ?? "",
+            logoBase64: settings.logoBase64 ?? null,
+            logoSize: Number(settings.logoSize ?? 80),
+            stampBase64: settings.stampBase64 ?? null,
+            watermarkBase64: settings.watermarkBase64 ?? null,
+            showWatermark: settings.showWatermark ?? true,
+            showStampOnInvoices: settings.showStampOnInvoices ?? true,
+            showStampOnReceipts: settings.showStampOnReceipts ?? true,
+            showStampOnStatements: settings.showStampOnStatements ?? true,
+          });
+        }
+
         console.log("payload accountant:", payload.accountantSignatureBase64?.slice?.(0, 50));
         const res = await fetch(`${API_BASE}/company-settings`, {
           method: "PUT",
@@ -1477,11 +1571,12 @@ const decryptBackupData = async (backupFile: any, password: string) => {
       }
     };
 
-  const Toggle = ({ field }: { field: keyof CompanySettings }) => (
+  const Toggle = ({ field, disabled = false }: { field: keyof CompanySettings; disabled?: boolean }) => (
     <button
       type="button"
+      disabled={disabled}
       onClick={() => setForm(p => ({ ...p, [field]: !p[field] }))}
-      className={tog(!!form[field])}
+      className={cn(tog(!!form[field]), disabled && "cursor-not-allowed opacity-50")}
     >
       <span
         className={`absolute top-0.5 left-0.5 w-3.5 h-3.5 rounded-full bg-white shadow transition-transform ${form[field] ? "translate-x-5" : ""}`}
@@ -1509,6 +1604,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
   const roleLabel = isAR
     ? (user?.role === "admin" ? "مدير" : user?.role === "supervisor" ? "مشرف" : "مستخدم")
     : (user?.role === "admin" ? "Admin" : user?.role === "supervisor" ? "Supervisor" : "User");
+  const canSeeDeveloperLink = user?.role === "admin" || user?.role === "manager";
 
   return (
     <motion.div
@@ -1530,7 +1626,19 @@ const decryptBackupData = async (backupFile: any, password: string) => {
               <p className="text-xs font-bold truncate leading-tight">
                 {isAR ? (resolvedName || user?.displayName) : (user?.displayNameEn || resolvedName || user?.displayName)}
               </p>
-              <span className="text-xs text-muted-foreground">{roleLabel}</span>
+              <div className="flex flex-col items-start">
+                <span className="text-sm font-medium text-muted-foreground">{roleLabel}</span>
+                {canSeeDeveloperLink && (
+                  <span
+                    onDoubleClick={() => {
+                      window.location.hash = "/settings/developer";
+                    }}
+                    className="mt-1 text-[10px] text-muted-foreground/40 hover:text-muted-foreground/70 select-none"
+                  >
+                    {import.meta.env.VITE_APP_VERSION || "v2.0.0"}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -2027,7 +2135,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                         await importItems(new File([new Blob([JSON.stringify(fullData.items)])], "items.json"));
                       }
                       if (fullData.invoices) {
-                        await importInvoices(new File([new Blob([JSON.stringify(fullData.invoices)])], "invoices.json"));
+                        await importInvoices(new File([new Blob([JSON.stringify(fullData.invoices)])], "invoices.json"), { bypassDeveloperPermission: true });
                       }
                       if (fullData.receipts) {
                         await importReceipts(new File([new Blob([JSON.stringify(fullData.receipts)])], "receipts.json"));
@@ -2042,10 +2150,10 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                     <div className="flex justify-between items-center border rounded-lg p-2">
                       <span className="text-sm">{isAR ? "الفواتير" : "Invoices"}</span>
                       <div className="flex gap-2">
-                        <button type="button" onClick={exportInvoices} className="h-8 px-3 text-xs bg-blue-50 rounded-md hover:bg-blue-100 transition">
+                        <button type="button" onClick={exportInvoices} disabled={!canUseInvoicesBackupImport} className={cn("h-8 px-3 text-xs bg-blue-50 rounded-md hover:bg-blue-100 transition", !canUseInvoicesBackupImport && "cursor-not-allowed opacity-50 hover:bg-blue-50")}>
                           {isAR ? "تصدير" : "Export"}
                         </button>
-                        <button type="button" className="h-8 px-3 text-xs bg-green-50 rounded-md hover:bg-green-100 transition">
+                        <button type="button" disabled={!canUseInvoicesBackupImport} onClick={() => { if (!canUseInvoicesBackupImport) return; }} className={cn("h-8 px-3 text-xs bg-green-50 rounded-md hover:bg-green-100 transition", !canUseInvoicesBackupImport && "cursor-not-allowed opacity-50 hover:bg-green-50")}>
                           {isAR ? "استيراد" : "Import"}
                         </button>
                       </div>
@@ -2216,7 +2324,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
 
           {/* ── Display Tab ── */}
 
-        {activeTab === "display" && (() => {
+        {activeTab === "display" && canEditAppearance && (() => {
           const storedTheme = sessionStorage.getItem("theme");
           const currentTheme = storedTheme === "dark" ? "dark" : storedTheme === "light" ? "light" : "system";
           const toggleTheme = (mode: "light" | "dark" | "system") => {
@@ -2562,7 +2670,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
         })()}
 
         {/* ── Identity Tab ── */}
-        {activeTab === "company" && (
+        {activeTab === "company" && canEditBranding && (
           <Section icon={Building2} title={isAR ? "هوية الشركة" : "Company Identity"} color="bg-blue-500/5">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Field label={isAR ? "اسم الشركة (عربي)" : "Company Name (Arabic)"}>
@@ -2593,7 +2701,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
         )}
 
         {/* ── Contact Tab ── */}
-        {activeTab === "company" &&(
+        {activeTab === "company" && canEditLegalInfo &&(
           <Section icon={Phone} title={isAR ? "معلومات التواصل" : "Contact Information"} color="bg-green-500/5">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Field label={isAR ? "البريد الإلكتروني" : "Email"}>
@@ -2628,7 +2736,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
         )}
 
         {/* ── Legal Tab ── */}
-        {activeTab === "company" && (
+        {activeTab === "company" && canEditLegalInfo && (
           <Section icon={Hash} title={isAR ? "القانونية والنسخ" : "Legal & Backup"} color="bg-amber-500/5">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Field label={isAR ? "رقم السجل التجاري" : "Commercial Registration No."}>
@@ -2649,11 +2757,11 @@ const decryptBackupData = async (backupFile: any, password: string) => {
         )}
 
         {/* ── Branding Tab ── */}
-        {activeTab === "branding" && (
+        {activeTab === "branding" && (canEditLogo || canEditStamp || canEditAccountantSignature || canEditBranding) && (
           <Section icon={Image} title={isAR ? "الشعار والختم والعلامة المائية" : "Logo, Stamp & Watermark"} color="bg-purple-500/5">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {/* Logo */}
-              <div className="space-y-3">
+              {canEditLogo && <div className="space-y-3">
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{isAR ? "شعار الشركة" : "Company Logo"}</p>
                 <div className="flex flex-col items-center justify-center gap-3 p-4 border-2 border-dashed border-border rounded-xl bg-muted/20 hover:bg-muted/30 transition-colors min-h-[160px]">
                   <img src={currentLogoSrc} alt="logo" className="h-16 w-auto object-contain" onError={(e) => { e.currentTarget.style.display = "none"; }} />
@@ -2687,9 +2795,9 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                   />
                 </div>   
               
-              </div>
+              </div>}
               {/* Stamp */}
-              <div className="space-y-3">
+              {canEditStamp && <div className="space-y-3">
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{isAR ? "ختم الشركة" : "Company Stamp"}</p>
                 <div className="flex flex-col items-center justify-center gap-3 p-4 border-2 border-dashed border-border rounded-xl bg-muted/20 hover:bg-muted/30 transition-colors min-h-[160px]">
                   <img src={currentStampSrc} alt="stamp" className="h-16 w-auto object-contain" onError={(e) => { e.currentTarget.style.display = "none"; }} />
@@ -2706,10 +2814,10 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                   <p className="text-xs text-muted-foreground text-center">{isAR ? "PNG شفاف · أقصى 2 MB" : "Transparent PNG · Max 2 MB"}</p>
                 </div>
                 <input ref={stampRef} type="file" accept="image/*" className="hidden" onChange={e => handleImageUpload(e, "stampBase64", setStampPreview)} />
-              </div>
+              </div>}
               
                 {/* Accountant Signature */}
-                <div className="space-y-3">
+                {canEditAccountantSignature && <div className="space-y-3">
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                   {isAR ? "توقيع المحاسب" : "Accountant Signature"}
                 </p>
@@ -2761,17 +2869,17 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                   className="hidden"
                   onChange={(e) => handleImageUpload(e, "accountantSignatureBase64", setAccountantSignaturePreview)}
                 />
-              </div>
+              </div>}
 
-              <div className="flex items-center justify-between gap-4 p-3 rounded-xl hover:bg-muted/30 transition-colors">
+              {canEditAccountantSignature && <div className="flex items-center justify-between gap-4 p-3 rounded-xl hover:bg-muted/30 transition-colors">
                 <span className="text-sm font-medium">
                   {isAR ? "إظهار توقيع المحاسب" : "Show Accountant Signature"}
                 </span>
                 <Toggle field="showAccountantSignature" />
-              </div>
+              </div>}
 
               {/* Watermark */}
-              <div className="space-y-3">
+              {canEditBranding && <div className="space-y-3">
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{isAR ? "العلامة المائية" : "Watermark"}</p>
                 <div className="flex flex-col items-center justify-center gap-3 p-4 border-2 border-dashed border-purple-400/40 rounded-xl bg-purple-500/5 hover:bg-purple-500/10 transition-colors min-h-[160px]">
                   <img src={currentWatermarkSrc} alt="watermark" className="h-16 w-auto object-contain opacity-40" onError={(e) => { e.currentTarget.style.display = "none"; }} />
@@ -2788,13 +2896,13 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                   <p className="text-xs text-muted-foreground text-center">{isAR ? "خلفية شفافة في الطباعة · يُستخدم الشعار بديلاً" : "Transparent print background · Falls back to logo"}</p>
                 </div>
                 <input ref={watermarkRef} type="file" accept="image/*" className="hidden" onChange={e => handleImageUpload(e, "watermarkBase64", setWatermarkPreview)} />
-              </div>
+              </div>}
             </div>
           </Section>
         )}
 
           {/* ── Print Tab ── */}
-          {activeTab === "print" && (
+          {activeTab === "print" && canEditPrintSettings && (
             <Section icon={Printer} title={isAR ? "خيارات الطباعة" : "Print Options"} color="bg-rose-500/5">
               <div className="space-y-4">
 

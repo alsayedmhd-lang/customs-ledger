@@ -6,6 +6,8 @@ import {
   invoiceItemsTable,
   clientsTable,
   usersTable,
+  sqlite,
+  receiptsTable,
   customerLedgerTableSqlite,
 } from "@workspace/db";
 import { invoiceAuditLogsTableSqlite } from "../../../lib/db/src/schema/invoices-sqlite";
@@ -13,6 +15,75 @@ import { eq, desc, isNull, and, like, isNotNull } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth";
 
 const router: IRouter = Router();
+
+const invoiceDescriptionAr = (invoiceNumber: string) =>
+  `\u0641\u0627\u062a\u0648\u0631\u0629 \u0631\u0642\u0645 ${invoiceNumber}`;
+const advancePaymentDescriptionAr = (invoiceNumber: string) =>
+  `\u062f\u0641\u0639\u0629 \u0645\u0642\u062f\u0645\u0629 \u0639\u0644\u0649 \u0641\u0627\u062a\u0648\u0631\u0629 \u0631\u0642\u0645 ${invoiceNumber}`;
+const directClosingPaymentDescriptionAr =
+  "\u0633\u062f\u0627\u062f \u0646\u0642\u062f\u064a \u0645\u0628\u0627\u0634\u0631 \u0639\u0646\u062f \u0625\u063a\u0644\u0627\u0642 \u0627\u0644\u0641\u0627\u062a\u0648\u0631\u0629";
+const directClosingPaymentDescriptionEn =
+  "Direct cash payment on invoice closing";
+
+try {
+  sqlite?.exec("DROP INDEX IF EXISTS receipts_invoice_id_unique_active;");
+} catch {}
+
+async function getActiveReceiptTotal(invoiceId: number): Promise<number> {
+  const receipts = await db
+    .select({ amount: receiptsTable.amount })
+    .from(receiptsTable)
+    .where(and(eq(receiptsTable.invoiceId, invoiceId), isNull(receiptsTable.deletedAt)));
+
+  return receipts.reduce((sum, receipt) => sum + Number(receipt.amount ?? 0), 0);
+}
+
+async function getExistingAutoClosingReceipt(invoiceId: number) {
+  const receipts = await db
+    .select({
+      id: receiptsTable.id,
+      amount: receiptsTable.amount,
+      notes: receiptsTable.notes,
+    })
+    .from(receiptsTable)
+    .where(and(eq(receiptsTable.invoiceId, invoiceId), isNull(receiptsTable.deletedAt)));
+
+  return receipts.find((receipt) => {
+    const notes = String(receipt.notes ?? "");
+    return (
+      notes.includes(directClosingPaymentDescriptionEn) ||
+      notes.includes(directClosingPaymentDescriptionAr)
+    );
+  });
+}
+
+function resolveInvoiceStatus(
+  requestedStatus: string | undefined,
+  paidAmount: number,
+  invoiceTotal: number
+) {
+  if (requestedStatus === "cancelled") return "cancelled";
+  if (paidAmount >= invoiceTotal) return "paid";
+  return requestedStatus === "paid" ? "issued" : requestedStatus ?? "draft";
+}
+
+function getOriginalInvoiceTotal(input: {
+  subtotal?: unknown;
+  taxAmount?: unknown;
+  total?: unknown;
+  advancePayment?: unknown;
+}) {
+  const subtotal = Number(input.subtotal ?? 0);
+  const taxAmount = Number(input.taxAmount ?? 0);
+  const grossTotal = subtotal + taxAmount;
+
+  if (grossTotal > 0) return grossTotal;
+  return Number(input.total ?? 0) + Number(input.advancePayment ?? 0);
+}
+
+function floorCurrency(value: number) {
+  return Math.floor((value + 0.000001) * 100) / 100;
+}
 
 async function generateInvoiceNumber(): Promise<string> {
   const year = new Date().getFullYear();
@@ -34,6 +105,60 @@ async function generateInvoiceNumber(): Promise<string> {
   }
 
   return `${prefix}${String(nextSeq).padStart(4, "0")}`;
+}
+
+async function generateReceiptNumber(): Promise<string> {
+  const year = new Date().getFullYear();
+  const count = await db.$count(receiptsTable);
+  const seq = String(count + 1).padStart(4, "0");
+  return `RCP-${year}-${seq}`;
+}
+
+async function createDirectClosingReceipt(input: {
+  clientId: number;
+  invoiceId: number;
+  amount: number;
+  receiptDate: string;
+  createdBy: number | null;
+}) {
+  const receiptNumber = await generateReceiptNumber();
+  const [receipt] = await db
+    .insert(receiptsTable)
+    .values({
+      receiptNumber,
+      clientId: input.clientId,
+      invoiceId: input.invoiceId,
+      amount: input.amount.toFixed(2),
+      paymentMethod: "cash",
+      notes: directClosingPaymentDescriptionEn,
+      receiptDate: input.receiptDate,
+      createdBy: input.createdBy,
+    })
+    .returning();
+
+  await db.insert(customerLedgerTableSqlite).values({
+    clientId: receipt.clientId,
+    invoiceId: receipt.invoiceId ?? null,
+    receiptId: receipt.id,
+
+    entryDate: receipt.receiptDate,
+    entryType: "receipt",
+
+    descriptionAr: directClosingPaymentDescriptionAr,
+    descriptionEn: directClosingPaymentDescriptionEn,
+
+    referenceType: "receipt",
+    referenceNumber: receipt.receiptNumber,
+
+    debit: 0,
+    credit: Number(receipt.amount ?? 0),
+
+    balanceImpact: -Number(receipt.amount ?? 0),
+
+    createdBy: input.createdBy,
+  });
+
+  return receipt;
 }
 
 router.get("/invoices", requireAuth, async (req, res) => {
@@ -146,7 +271,8 @@ router.post("/invoices", requireAuth, async (req, res) => {
       return sum + parseFloat(String(item.quantity)) * parseFloat(String(item.unitPrice));
     }, 0);
     const taxAmount = subtotal * (parsedTaxRate / 100);
-    const total = subtotal + taxAmount - parsedAdvancePayment;
+    const total = Number((subtotal + taxAmount).toFixed(2));
+    const resolvedStatus = resolveInvoiceStatus(status, parsedAdvancePayment, total);
 
     const deletedInvoiceWithSameShipment = shipmentRef
       ? await db
@@ -173,7 +299,7 @@ router.post("/invoices", requireAuth, async (req, res) => {
             clientId,
             issueDate,
             dueDate: dueDate ?? null,
-            status: status ?? "draft",
+            status: resolvedStatus,
             subtotal: subtotal.toFixed(2),
             taxRate: parsedTaxRate.toFixed(2),
             taxAmount: taxAmount.toFixed(2),
@@ -190,6 +316,7 @@ router.post("/invoices", requireAuth, async (req, res) => {
           })
           .returning();
         invoice = inserted;
+        const invoiceLedgerDebit = getOriginalInvoiceTotal(inserted);
 
         await db.insert(customerLedgerTableSqlite).values({
           clientId: inserted.clientId,
@@ -199,16 +326,16 @@ router.post("/invoices", requireAuth, async (req, res) => {
           entryDate: new Date().toISOString().split("T")[0],
           entryType: "invoice",
 
-          descriptionAr: `فاتورة رقم ${inserted.invoiceNumber}`,
+          descriptionAr: invoiceDescriptionAr(inserted.invoiceNumber),
           descriptionEn: `Invoice ${inserted.invoiceNumber}`,
 
           referenceType: "invoice",
           referenceNumber: inserted.invoiceNumber,
 
-          debit: Number(inserted.total ?? 0),
+          debit: invoiceLedgerDebit,
           credit: 0,
 
-          balanceImpact: Number(inserted.total ?? 0),
+          balanceImpact: invoiceLedgerDebit,
 
           createdBy: req.user?.userId ?? null,
         });
@@ -220,9 +347,9 @@ router.post("/invoices", requireAuth, async (req, res) => {
             receiptId: null,
 
             entryDate: new Date().toISOString().split("T")[0],
-            entryType: "advance",
+            entryType: "advance_payment",
 
-            descriptionAr: `دفعة مقدمة للفاتورة ${inserted.invoiceNumber}`,
+            descriptionAr: advancePaymentDescriptionAr(inserted.invoiceNumber),
             descriptionEn: `Advance payment for invoice ${inserted.invoiceNumber}`,
 
             referenceType: "invoice",
@@ -422,8 +549,7 @@ router.put("/invoices/:id", async (req, res) => {
     }
 
     const parsedTaxRate = parseFloat(taxRate ?? "0") || 0;
-    const effectiveAdvancePayment =
-      status === "paid" ? 0 : parseFloat(advancePayment ?? "0") || 0;
+    const effectiveAdvancePayment = parseFloat(advancePayment ?? "0") || 0;
 
     const subtotal = (items ?? []).reduce(
       (sum: number, item: { quantity: number; unitPrice: number }) => {
@@ -437,13 +563,53 @@ router.put("/invoices/:id", async (req, res) => {
     );
 
     const taxAmount = subtotal * (parsedTaxRate / 100);
-    const total = subtotal + taxAmount - effectiveAdvancePayment;
+    const total = Number((subtotal + taxAmount).toFixed(2));
+    let receiptTotal = await getActiveReceiptTotal(id);
+    const requestedPaid = status === "paid";
+    const remaining = total - (effectiveAdvancePayment + receiptTotal);
+
+    if (requestedPaid && remaining > 0.000001) {
+      const existingAutoReceipt = await getExistingAutoClosingReceipt(id);
+
+      if (!existingAutoReceipt) {
+        const createdByUser =
+          typeof createdBy !== "undefined" &&
+          createdBy !== null &&
+          createdBy !== "" &&
+          !Number.isNaN(Number(createdBy))
+            ? Number(createdBy)
+            : req.user?.userId ?? null;
+        const safeRemaining = Math.max(
+          total - (effectiveAdvancePayment + receiptTotal),
+          0
+        );
+        const receiptAmount = floorCurrency(safeRemaining);
+
+        if (receiptAmount > 0) {
+          await createDirectClosingReceipt({
+            clientId,
+            invoiceId: id,
+            amount: receiptAmount,
+            receiptDate: new Date().toISOString().split("T")[0],
+            createdBy: createdByUser,
+          });
+
+          receiptTotal += receiptAmount;
+        }
+      }
+    }
+
+    const resolvedStatus = resolveInvoiceStatus(
+      status,
+      effectiveAdvancePayment + receiptTotal,
+      total
+    );
 
     const updateData: any = {
       clientId,
       issueDate,
       dueDate: dueDate ?? null,
-      status: status ?? "draft",
+      status: resolvedStatus,
       subtotal: subtotal.toFixed(2),
       taxRate: parsedTaxRate.toFixed(2),
       taxAmount: taxAmount.toFixed(2),
@@ -758,7 +924,10 @@ router.post("/invoices/import", requireAuth, async (req, res) => {
         subtotal: Number(row.subtotal ?? 0),
         taxRate: Number(row.taxRate ?? 0),
         taxAmount: Number(row.taxAmount ?? 0),
-        total: Number(row.total ?? 0),
+        total:
+          Number(row.subtotal ?? 0) + Number(row.taxAmount ?? 0) > 0
+            ? Number(row.subtotal ?? 0) + Number(row.taxAmount ?? 0)
+            : Number(row.total ?? 0),
         advancePayment: Number(row.advancePayment ?? 0),
         notes: row.notes ? String(row.notes) : null,
         createdBy: row.createdBy ?? req.user?.userId ?? null,
@@ -793,20 +962,20 @@ router.post("/invoices/import", requireAuth, async (req, res) => {
 
         invoiceId = created.id;
 
-          const invoiceAmount =
-            Number(values.subtotal ?? 0) + Number(values.taxAmount ?? 0);
+          const invoiceAmount = getOriginalInvoiceTotal(values);
 
           await db.insert(customerLedgerTableSqlite).values({
             clientId: values.clientId,
 
             invoiceId: created.id,
+            receiptId: null,
 
-            entryDate: new Date().toISOString(),
+            entryDate: new Date().toISOString().split("T")[0],
 
             entryType: "invoice",
 
-            descriptionAr: "فاتورة",
-            descriptionEn: "Invoice",
+            descriptionAr: invoiceDescriptionAr(created.invoiceNumber),
+            descriptionEn: `Invoice ${created.invoiceNumber}`,
 
             referenceType: "invoice",
             referenceNumber: created.invoiceNumber,
@@ -818,6 +987,30 @@ router.post("/invoices/import", requireAuth, async (req, res) => {
 
             createdBy: null,
           });
+
+          if (Number(values.advancePayment ?? 0) > 0) {
+            await db.insert(customerLedgerTableSqlite).values({
+              clientId: values.clientId,
+              invoiceId: created.id,
+              receiptId: null,
+
+              entryDate: new Date().toISOString().split("T")[0],
+              entryType: "advance_payment",
+
+              descriptionAr: advancePaymentDescriptionAr(created.invoiceNumber),
+              descriptionEn: `Advance payment for invoice ${created.invoiceNumber}`,
+
+              referenceType: "invoice",
+              referenceNumber: created.invoiceNumber,
+
+              debit: 0,
+              credit: Number(values.advancePayment ?? 0),
+
+              balanceImpact: -Number(values.advancePayment ?? 0),
+
+              createdBy: null,
+            });
+          }
 
         inserted++;
       }

@@ -255,7 +255,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
       {/* Main Content */}
       <main className="flex-1 flex flex-col overflow-hidden relative">
         {/* App background layer */}
-        <div style={bgLayerStyle} />
+        <div className="pointer-events-none absolute inset-0" style={bgLayerStyle} />
 
         {/* Top Header */}
         <header className="h-14 flex items-center justify-between px-4 sm:px-6 bg-card border-b border-border/60 print-hidden sticky top-0 z-30 shadow-sm relative">

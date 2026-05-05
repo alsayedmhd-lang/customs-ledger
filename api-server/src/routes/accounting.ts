@@ -5,13 +5,27 @@
 
   const router: IRouter = Router();
 
+  function getOriginalInvoiceTotal(input: {
+    subtotal?: unknown;
+    taxAmount?: unknown;
+    total?: unknown;
+    advancePayment?: unknown;
+  }) {
+    const subtotal = Number(input.subtotal ?? 0);
+    const taxAmount = Number(input.taxAmount ?? 0);
+    const grossTotal = subtotal + taxAmount;
+
+    if (grossTotal > 0) return grossTotal;
+    return Number(input.total ?? 0) + Number(input.advancePayment ?? 0);
+  }
+
   type LedgerRow = {
     id: string;
     clientId: number;
     invoiceId: number | null;
     receiptId: number | null;
     entryDate: string;
-    entryType: "invoice" | "advance" | "receipt";
+    entryType: "invoice" | "advance_payment" | "receipt";
     descriptionAr: string;
     descriptionEn: string;
     referenceType: "invoice" | "receipt";
@@ -52,7 +66,7 @@
 
       for (const inv of invoiceRows) {
         const advance = Number(inv.advancePayment || 0);
-        const grossTotal = Number(inv.subtotal || 0) + Number(inv.taxAmount || 0);
+        const invoiceTotal = getOriginalInvoiceTotal(inv);
 
         allRows.push({
           id: `invoice-${inv.id}`,
@@ -61,27 +75,25 @@
           receiptId: null,
           entryDate: inv.issueDate,
           entryType: "invoice",
-          descriptionAr: `فاتورة رقم ${inv.invoiceNumber}`,
+          descriptionAr: `\u0641\u0627\u062a\u0648\u0631\u0629 \u0631\u0642\u0645 ${inv.invoiceNumber}`,
           descriptionEn: `Invoice ${inv.invoiceNumber}`,
           referenceType: "invoice",
           referenceNumber: inv.invoiceNumber,
-          debit: grossTotal,
+          debit: invoiceTotal,
           credit: 0,
-          balanceImpact: grossTotal,
+          balanceImpact: invoiceTotal,
           createdBy: inv.createdBy ?? null,
         });
 
-        const hasReceipt = receiptRows.some(r => r.invoiceId === inv.id);
-
-        if (advance > 0 && !hasReceipt) {
+        if (advance > 0) {
           allRows.push({
-            id: `advance-${inv.id}`,
+            id: `advance-payment-${inv.id}`,
             clientId,
             invoiceId: inv.id,
             receiptId: null,
             entryDate: inv.issueDate,
-            entryType: "advance",
-            descriptionAr: `دفعة مقدمة على فاتورة رقم ${inv.invoiceNumber}`,
+            entryType: "advance_payment",
+            descriptionAr: `\u062f\u0641\u0639\u0629 \u0645\u0642\u062f\u0645\u0629 \u0639\u0644\u0649 \u0641\u0627\u062a\u0648\u0631\u0629 \u0631\u0642\u0645 ${inv.invoiceNumber}`,
             descriptionEn: `Advance payment for invoice ${inv.invoiceNumber}`,
             referenceType: "invoice",
             referenceNumber: inv.invoiceNumber,

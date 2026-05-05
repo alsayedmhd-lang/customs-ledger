@@ -1,25 +1,21 @@
 import { Router, type IRouter } from "express";
 import { db, sqlite, receiptsTable, clientsTable, invoicesTable, customerLedgerTableSqlite, usersTable } from "@workspace/db";
-import { eq, desc, isNull, and } from "drizzle-orm";
+import { eq, desc, isNull, and, ne } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth";
 
 const router: IRouter = Router();
 
-function ensureUniqueActiveReceiptPerInvoice() {
+function removeUniqueActiveReceiptPerInvoice() {
   if (!sqlite) return;
 
   try {
-    sqlite.exec(`
-      CREATE UNIQUE INDEX IF NOT EXISTS receipts_invoice_id_unique_active
-      ON receipts(invoice_id)
-      WHERE invoice_id IS NOT NULL AND deleted_at IS NULL;
-    `);
+    sqlite.exec("DROP INDEX IF EXISTS receipts_invoice_id_unique_active;");
   } catch (error) {
-    console.error("Failed to ensure receipts invoice unique index:", error);
+    console.error("Failed to remove receipts invoice unique index:", error);
   }
 }
 
-ensureUniqueActiveReceiptPerInvoice();
+removeUniqueActiveReceiptPerInvoice();
 
 try {
   sqlite.exec(`ALTER TABLE receipts ADD COLUMN created_by INTEGER;`);
@@ -41,6 +37,111 @@ async function findActiveReceiptByInvoiceId(invoiceId: number) {
     .limit(1);
 
   return rows[0] ?? null;
+}
+
+function getOriginalInvoiceTotal(input: {
+  subtotal?: unknown;
+  taxAmount?: unknown;
+  total?: unknown;
+  advancePayment?: unknown;
+}) {
+  const subtotal = Number(input.subtotal ?? 0);
+  const taxAmount = Number(input.taxAmount ?? 0);
+  const grossTotal = subtotal + taxAmount;
+
+  if (grossTotal > 0) return grossTotal;
+  return Number(input.total ?? 0) + Number(input.advancePayment ?? 0);
+}
+
+async function getActiveReceiptTotal(
+  invoiceId: number,
+  excludeReceiptId?: number,
+): Promise<number> {
+  const filters = [
+    eq(receiptsTable.invoiceId, invoiceId),
+    isNull(receiptsTable.deletedAt),
+  ];
+
+  if (excludeReceiptId !== undefined) {
+    filters.push(ne(receiptsTable.id, excludeReceiptId));
+  }
+
+  const receipts = await db
+    .select({ amount: receiptsTable.amount })
+    .from(receiptsTable)
+    .where(and(...filters));
+
+  return receipts.reduce((sum, receipt) => sum + Number(receipt.amount ?? 0), 0);
+}
+
+async function validateReceiptDoesNotExceedRemaining(
+  invoiceId: number | null,
+  amount: unknown,
+  excludeReceiptId?: number,
+) {
+  if (invoiceId === null) return { ok: true as const };
+
+  const receiptAmount = Number(amount ?? 0);
+
+  if (!Number.isFinite(receiptAmount)) {
+    return { ok: false as const, status: 400, error: "Invalid amount" };
+  }
+
+  const [invoice] = await db
+    .select()
+    .from(invoicesTable)
+    .where(and(eq(invoicesTable.id, invoiceId), isNull(invoicesTable.deletedAt)))
+    .limit(1);
+
+  if (!invoice) {
+    return { ok: false as const, status: 400, error: "Invalid invoiceId" };
+  }
+
+  const originalTotal = getOriginalInvoiceTotal(invoice);
+  const paidSoFar =
+    Number(invoice.advancePayment ?? 0) +
+    (await getActiveReceiptTotal(invoice.id, excludeReceiptId));
+  const remaining = originalTotal - paidSoFar;
+
+  if (receiptAmount > remaining + 0.000001) {
+    return {
+      ok: false as const,
+      status: 400,
+      error: "قيمة سند القبض أكبر من المتبقي على الفاتورة",
+      errorEn: "Receipt amount exceeds the remaining invoice balance",
+    };
+  }
+
+  return { ok: true as const };
+}
+
+async function refreshInvoicePaidStatus(invoiceId: number | null | undefined) {
+  if (!invoiceId) return;
+
+  const [invoice] = await db
+    .select()
+    .from(invoicesTable)
+    .where(and(eq(invoicesTable.id, invoiceId), isNull(invoicesTable.deletedAt)))
+    .limit(1);
+
+  if (!invoice) return;
+  if (invoice.status === "cancelled") return;
+
+  const paidAmount =
+    Number(invoice.advancePayment ?? 0) + (await getActiveReceiptTotal(invoice.id));
+  const nextStatus =
+    paidAmount >= getOriginalInvoiceTotal(invoice)
+      ? "paid"
+      : invoice.status === "paid"
+        ? "issued"
+        : invoice.status;
+
+  if (invoice.status !== nextStatus) {
+    await db
+      .update(invoicesTable)
+      .set({ status: nextStatus, updatedAt: new Date() })
+      .where(eq(invoicesTable.id, invoice.id));
+  }
 }
 
 async function generateReceiptNumber(): Promise<string> {
@@ -197,6 +298,18 @@ router.post("/receipts", requireAuth, async (req, res) => {
       }
     }
 
+    const remainingValidation = await validateReceiptDoesNotExceedRemaining(
+      invoiceId,
+      req.body.amount,
+    );
+
+    if (!remainingValidation.ok) {
+      return res.status(remainingValidation.status).json({
+        error: remainingValidation.error,
+        errorEn: remainingValidation.errorEn,
+      });
+    }
+
     const receiptNumber = await generateReceiptNumber();
 
     const clientId =
@@ -247,6 +360,8 @@ router.post("/receipts", requireAuth, async (req, res) => {
         createdBy: (req as any).user?.id ?? 1,
       });
 
+    await refreshInvoicePaidStatus(receipt.invoiceId);
+
     const [client] = receipt.clientId
       ? await db
           .select()
@@ -283,6 +398,16 @@ router.put("/receipts/:id", requireAuth, async (req, res) => {
 
     if (isNaN(id)) {
       return res.status(400).json({ error: "Invalid receipt id" });
+    }
+
+    const [oldReceipt] = await db
+      .select()
+      .from(receiptsTable)
+      .where(eq(receiptsTable.id, id))
+      .limit(1);
+
+    if (!oldReceipt) {
+      return res.status(404).json({ error: "Receipt not found" });
     }
 
     const invoiceId =
@@ -332,6 +457,23 @@ router.put("/receipts/:id", requireAuth, async (req, res) => {
         ? null
         : req.body.amount;
 
+    const targetInvoiceId =
+      req.body.invoiceId === undefined ? oldReceipt.invoiceId ?? null : invoiceId;
+    const targetAmount =
+      req.body.amount === undefined ? oldReceipt.amount ?? 0 : amount ?? 0;
+    const remainingValidation = await validateReceiptDoesNotExceedRemaining(
+      targetInvoiceId,
+      targetAmount,
+      id,
+    );
+
+    if (!remainingValidation.ok) {
+      return res.status(remainingValidation.status).json({
+        error: remainingValidation.error,
+        errorEn: remainingValidation.errorEn,
+      });
+    }
+
       const patchData: any = {};
       
       if (req.body.receiptNumber !== undefined) patchData.receiptNumber = req.body.receiptNumber;
@@ -355,6 +497,10 @@ router.put("/receipts/:id", requireAuth, async (req, res) => {
       .update(receiptsTable)
       .set(patchData)
       .where(eq(receiptsTable.id, id));
+
+    await refreshInvoicePaidStatus(oldReceipt?.invoiceId);
+    await refreshInvoicePaidStatus(invoiceId);
+
     res.json({
       success: true,
       message: "Receipt updated successfully",
@@ -372,10 +518,18 @@ router.delete("/receipts/:id", requireAuth, async (req, res) => {
   try {
     const id = parseInt(req.params.id);
 
+    const [receipt] = await db
+      .select()
+      .from(receiptsTable)
+      .where(eq(receiptsTable.id, id))
+      .limit(1);
+
     await db
       .update(receiptsTable)
       .set({ deletedAt: new Date() })
       .where(and(eq(receiptsTable.id, id), isNull(receiptsTable.deletedAt)));
+
+    await refreshInvoicePaidStatus(receipt?.invoiceId);
 
     res.status(204).end();
   } catch (err) {
@@ -469,15 +623,32 @@ router.post("/receipts/import", requireAuth, async (req, res) => {
         deletedAt: null,
       };
 
+      const remainingValidation = await validateReceiptDoesNotExceedRemaining(
+        values.invoiceId,
+        values.amount,
+        existing?.id,
+      );
+
+      if (!remainingValidation.ok) {
+        return res.status(remainingValidation.status).json({
+          error: remainingValidation.error,
+          errorEn: remainingValidation.errorEn,
+          receiptNumber: values.receiptNumber,
+        });
+      }
+
       if (existing) {
         await db
           .update(receiptsTable)
           .set(values)
           .where(eq(receiptsTable.id, existing.id));
 
+        await refreshInvoicePaidStatus(existing.invoiceId);
+        await refreshInvoicePaidStatus(values.invoiceId);
         updated++;
       } else {
         await db.insert(receiptsTable).values(values);
+        await refreshInvoicePaidStatus(values.invoiceId);
         inserted++;
       }
     }
