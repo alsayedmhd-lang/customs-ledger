@@ -166,16 +166,29 @@ function TitleOptionsGrid({
 }
 
 function PreviewShell({
+  id,
   title,
   size,
   scale,
+  activePreview,
+  mainSize,
+  onSelect,
+  onMainSizeChange,
   children,
 }: {
+  id?: string;
   title: string;
   size: "large" | "medium" | "small";
   scale: number;
+  activePreview?: string;
+  mainSize?: { width: number; height: number };
+  onSelect?: (id: string) => void;
+  onMainSizeChange?: (size: { width: number; height: number }) => void;
   children: React.ReactNode;
 }) {
+  const shellRef = useRef<HTMLDivElement>(null);
+  const isInteractive = !!id && !!activePreview;
+  const isMain = isInteractive ? id === activePreview : size === "large";
   const preview = {
     large: {
       sourceWidth: 1120,
@@ -198,9 +211,46 @@ function PreviewShell({
   }[size];
   const scaledWidth = Math.ceil(preview.sourceWidth * scale);
   const scaledHeight = Math.ceil(preview.sourceHeight * scale);
+  const handleSaveSize = () => {
+    if (!isMain || !shellRef.current || !onMainSizeChange) return;
+    onMainSizeChange({
+      width: Math.round(shellRef.current.offsetWidth),
+      height: Math.round(shellRef.current.offsetHeight),
+    });
+  };
 
   return (
-    <div className="w-full rounded-xl border border-border bg-muted/20 overflow-hidden">
+    <div
+      ref={shellRef}
+      draggable={isInteractive && !isMain}
+      onClick={() => id && !isMain && onSelect?.(id)}
+      onDragStart={(e) => id && e.dataTransfer.setData("text/plain", id)}
+      onDragOver={(e) => isMain && e.preventDefault()}
+      onDrop={(e) => {
+        if (!isMain) return;
+        const next = e.dataTransfer.getData("text/plain");
+        if (next) onSelect?.(next);
+      }}
+      onMouseUp={handleSaveSize}
+      onTouchEnd={handleSaveSize}
+      className={cn(
+        "w-full rounded-xl border border-border bg-muted/20 overflow-hidden",
+        isInteractive && !isMain && "cursor-pointer transition hover:border-primary/60 hover:shadow-md",
+        isMain && "shadow-sm"
+      )}
+      style={{
+        order: isMain ? 0 : 1,
+        gridColumn: isMain ? "1 / -1" : undefined,
+        ...(isMain && mainSize ? {
+          width: mainSize.width,
+          height: mainSize.height,
+          maxWidth: "100%",
+          minWidth: 360,
+          minHeight: 360,
+          resize: "both" as const,
+        } : {}),
+      }}
+    >
       <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-card">
         <h3 className="text-sm font-bold text-foreground">{title}</h3>
         <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Print Preview</span>
@@ -208,10 +258,9 @@ function PreviewShell({
       <div
         className="overflow-auto bg-slate-100 p-1"
         style={{
-          height: preview.initialHeight,
-          minHeight: preview.minHeight,
+          height: isMain && mainSize ? "calc(100% - 37px)" : isInteractive ? 260 : preview.initialHeight,
+          minHeight: isMain ? preview.minHeight : isInteractive ? 220 : preview.minHeight,
           maxHeight: "none",
-          resize: "vertical",
         }}
       >
         <div
@@ -261,10 +310,50 @@ function SettingsPrintPreviews({
   const override = { settings, logoSrc, stampSrc, watermarkSrc };
   const receiverSignature = settings.receiverSignatureBase64;
   const today = formatDateYMD();
+  const previewStorageKey = "settings_preview_active";
+  const previewSizeStorageKey = "settings_preview_main_size";
+  const [activePreview, setActivePreviewState] = useState(() => {
+    try {
+      return localStorage.getItem(previewStorageKey) || "invoice";
+    } catch {
+      return "invoice";
+    }
+  });
+  const [mainSize, setMainSizeState] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(previewSizeStorageKey) || "{}");
+      return {
+        width: Number(saved.width) || 1120,
+        height: Number(saved.height) || 740,
+      };
+    } catch {
+      return { width: 1120, height: 740 };
+    }
+  });
+  const setActivePreview = (id: string) => {
+    setActivePreviewState(id);
+    try { localStorage.setItem(previewStorageKey, id); } catch {}
+  };
+  const setMainSize = (size: { width: number; height: number }) => {
+    const next = {
+      width: Math.min(1400, Math.max(360, size.width)),
+      height: Math.min(1200, Math.max(360, size.height)),
+    };
+    setMainSizeState(next);
+    try { localStorage.setItem(previewSizeStorageKey, JSON.stringify(next)); } catch {}
+  };
+  const previewShellProps = (id: string) => ({
+    id,
+    activePreview,
+    mainSize,
+    onSelect: setActivePreview,
+    onMainSizeChange: setMainSize,
+  });
 
   return (
     <div className="w-full max-w-none space-y-4">
-      <PreviewShell title={isAR ? "معاينة الفاتورة" : "Invoice Preview"} size="large" scale={invoicePreviewScale}>
+      <div className="grid w-full grid-cols-1 gap-4 lg:grid-cols-3">
+      <PreviewShell {...previewShellProps("invoice")} title={isAR ? "معاينة الفاتورة" : "Invoice Preview"} size="large" scale={invoicePreviewScale}>
         <div
           className="bg-white shadow-xl border border-gray-200 relative overflow-hidden"
           style={{ fontFamily: "'Cairo', 'Arial', sans-serif" }}
@@ -330,8 +419,7 @@ function SettingsPrintPreviews({
         </div>
       </PreviewShell>
 
-      <div className="grid w-full grid-cols-1 xl:grid-cols-2 gap-4">
-        <PreviewShell title={isAR ? "معاينة سند القبض" : "Receipt Preview"} size="medium" scale={receiptPreviewScale}>
+        <PreviewShell {...previewShellProps("receipt")} title={isAR ? "معاينة سند القبض" : "Receipt Preview"} size="medium" scale={receiptPreviewScale}>
           <div
             className="bg-white shadow-lg border border-gray-200 relative overflow-hidden"
             style={{ fontFamily: "'Cairo', 'Arial', sans-serif" }}
@@ -381,7 +469,7 @@ function SettingsPrintPreviews({
           </div>
         </PreviewShell>
 
-        <PreviewShell title={isAR ? "معاينة كشف الحساب" : "Customer Statement Preview"} size="small" scale={statementPreviewScale}>
+        <PreviewShell {...previewShellProps("statement")} title={isAR ? "معاينة كشف الحساب" : "Customer Statement Preview"} size="small" scale={statementPreviewScale}>
           <div
             className="bg-white shadow-xl border border-gray-200 relative overflow-hidden"
             style={{ fontFamily: "'Cairo', 'Arial', sans-serif" }}
@@ -454,7 +542,7 @@ function SettingsPrintPreviews({
           </div>
         </PreviewShell>
 
-        <PreviewShell title={isAR ? "معاينة ملخص العميل المالي" : "Customer Financial Summary Preview"} size="small" scale={statementPreviewScale}>
+        <PreviewShell {...previewShellProps("summary")} title={isAR ? "معاينة ملخص العميل المالي" : "Customer Financial Summary Preview"} size="small" scale={statementPreviewScale}>
           <div
             className="bg-white shadow-xl border border-gray-200 relative overflow-hidden"
             style={{ fontFamily: "'Cairo', 'Arial', sans-serif" }}
@@ -1643,9 +1731,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
     ? (user?.role === "admin" ? "مدير" : user?.role === "supervisor" ? "مشرف" : "مستخدم")
     : (user?.role === "admin" ? "Admin" : user?.role === "supervisor" ? "Supervisor" : "User");
   const canSeeDeveloperLink = user?.role === "admin" || user?.role === "manager";
-  const isAdminSettings = user?.role === "admin";
   const canViewSettingsTab = (tabId: TabId) => {
-    if (isAdminSettings) return true;
     if (tabId === "preview") return true;
     if (tabId === "display") return true;
     if (tabId === "company") return allowManagerEditLegalInfo;

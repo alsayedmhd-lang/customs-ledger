@@ -49,16 +49,27 @@
 
   router.get("/customer-ledger/:clientId", requireAuth, async (req, res) => {
     try {
-      const clientId = Number(req.params.clientId);
       const clientScope = await getClientScope(req);
-      if (clientScope) {
-        return res.status(403).json({ error: "Customer financial summary is not allowed for client users" });
+      if (clientScope && !clientScope.clientId) {
+        return res.status(403).json({ error: "Client is not linked" });
       }
+      const clientId = clientScope ? Number(clientScope.clientId) : Number(req.params.clientId);
       const from = req.query.from ? String(req.query.from) : "";
       const to = req.query.to ? String(req.query.to) : "";
+      const q = req.query.q ? String(req.query.q).trim().toLowerCase() : "";
 
       if (!Number.isInteger(clientId) || clientId <= 0) {
         return res.status(400).json({ error: "Invalid clientId" });
+      }
+
+      const [client] = await db
+        .select()
+        .from(clientsTable)
+        .where(eq(clientsTable.id, clientId))
+        .limit(1);
+
+      if (!client) {
+        return res.status(404).json({ error: "Client not found" });
       }
 
       const invoiceRows = await db
@@ -145,6 +156,14 @@
         .filter((row) => {
           if (from && row.entryDate < from) return false;
           if (to && row.entryDate > to) return false;
+          if (
+            q &&
+            !row.referenceNumber.toLowerCase().includes(q) &&
+            !row.descriptionAr.toLowerCase().includes(q) &&
+            !row.descriptionEn.toLowerCase().includes(q)
+          ) {
+            return false;
+          }
           return true;
         })
         .sort((a, b) => {
@@ -156,6 +175,13 @@
       const openingBalance = previousRows.reduce((sum, row) => sum + row.balanceImpact, 0);
 
       res.json({
+        client: {
+          id: client.id,
+          name: client.name,
+          email: client.email ?? null,
+          phone: client.phone ?? null,
+          address: client.address ?? null,
+        },
         rows: sortedRows,
         openingBalance,
       });

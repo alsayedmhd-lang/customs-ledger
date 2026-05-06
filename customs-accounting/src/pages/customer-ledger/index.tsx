@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/lib/auth-context";
+import { useLanguage } from "@/lib/language-context";
 
 type Client = {
   id: number;
@@ -13,6 +14,9 @@ type LedgerRow = {
   id: string;
   entryDate: string;
   entryType: "invoice" | "receipt" | "advance" | string;
+  descriptionAr?: string;
+  descriptionEn?: string;
+  referenceNumber?: string;
   debit?: number | string;
   credit?: number | string;
   balanceImpact?: number | string;
@@ -27,19 +31,23 @@ function formatMoney(value: number) {
 
 export default function CustomerLedgerPage() {
   const { user } = useAuth();
+  const { lang } = useLanguage();
+  const isAR = lang === "ar";
   const [data, setData] = useState<LedgerRow[]>([]);
   const [openingBalance, setOpeningBalance] = useState(0);
   const [clients, setClients] = useState<Client[]>([]);
+  const [ledgerClient, setLedgerClient] = useState<Client | null>(null);
+  const [selectedClientState, setSelectedClientState] = useState<Client | null>(null);
   const [clientId, setClientId] = useState<number | "">("");
+  const [hasSelectedClient, setHasSelectedClient] = useState(false);
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
+  const [referenceSearch, setReferenceSearch] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
   const [, navigate] = useLocation();
-
-  useEffect(() => {
-    if (user?.role === "client") navigate("/statements");
-  }, [user, navigate]);
+  const isClient = user?.role === "client";
+  const effectiveClientId = clientId;
 
   const token =
     localStorage.getItem("token") ||
@@ -55,19 +63,48 @@ export default function CustomerLedgerPage() {
       .catch(console.error);
   }, [token]);
 
+  const handleClientSelected = useCallback((nextClientId: number | "") => {
+    const nextClient =
+      nextClientId
+        ? clients.find((c) => Number(c.id) === Number(nextClientId)) ?? null
+        : null;
+
+    setClientId(nextClientId);
+    setSelectedClientState(nextClient);
+    setLedgerClient(nextClient);
+    setHasSelectedClient(Boolean(nextClientId));
+    setData([]);
+    setOpeningBalance(0);
+  }, [clients]);
+
   const selectedClient = useMemo(
-    () => clients.find((c) => c.id === clientId),
-    [clients, clientId]
+    () => selectedClientState || ledgerClient || clients.find((c) => c.id === effectiveClientId),
+    [clients, effectiveClientId, ledgerClient, selectedClientState]
+  );
+  const linkedClientId = Number(user?.clientId || clients[0]?.id || 0);
+  const visibleClients = useMemo(
+    () => isClient ? clients.filter((c) => Number(c.id) === linkedClientId) : clients,
+    [clients, isClient, linkedClientId]
   );
 
+  const filteredData = useMemo(() => {
+    const q = referenceSearch.trim().toLowerCase();
+    if (!q) return data;
+    return data.filter((row) =>
+      String(row.referenceNumber || "").toLowerCase().includes(q) ||
+      String(row.descriptionAr || "").toLowerCase().includes(q) ||
+      String(row.descriptionEn || "").toLowerCase().includes(q)
+    );
+  }, [data, referenceSearch]);
+
   const totalDebit = useMemo(
-    () => data.reduce((sum, row) => sum + Number(row.debit || 0), 0),
-    [data]
+    () => filteredData.reduce((sum, row) => sum + Number(row.debit || 0), 0),
+    [filteredData]
   );
 
   const totalCredit = useMemo(
-    () => data.reduce((sum, row) => sum + Number(row.credit || 0), 0),
-    [data]
+    () => filteredData.reduce((sum, row) => sum + Number(row.credit || 0), 0),
+    [filteredData]
   );
 
   const finalBalance = useMemo(
@@ -76,22 +113,29 @@ export default function CustomerLedgerPage() {
   );
 
   const loadLedger = async () => {
-    if (!clientId) return;
+    if (!effectiveClientId) return;
 
     setIsLoading(true);
 
     try {
+      const params = new URLSearchParams({
+        from: fromDate,
+        to: toDate,
+        q: referenceSearch.trim(),
+      });
       const res = await fetch(
-        `http://127.0.0.1:3000/api/customer-ledger/${clientId}?from=${fromDate}&to=${toDate}`,
+        `http://127.0.0.1:3000/api/customer-ledger/${effectiveClientId}?${params.toString()}`,
         {
           headers: { Authorization: `Bearer ${token}` },
         }
       );
 
+      if (!res.ok) throw new Error(`Failed to load customer ledger: ${res.status}`);
       const json = await res.json();
 
       setData(Array.isArray(json) ? json : json.rows ?? []);
       setOpeningBalance(Number(json.openingBalance ?? 0));
+      setLedgerClient(json.client ?? null);
     } catch (err) {
       console.error(err);
     } finally {
@@ -99,17 +143,18 @@ export default function CustomerLedgerPage() {
     }
   };
 
+  useEffect(() => {
+    if (!isClient || !hasSelectedClient || !effectiveClientId) return;
+    loadLedger();
+  }, [isClient, hasSelectedClient, effectiveClientId]);
+
   const openPrintPage = () => {
-    if (!clientId) return;
+    if (!effectiveClientId) return;
 
     navigate(
-      `/customer-ledger/print?clientId=${clientId}&from=${fromDate}&to=${toDate}`
+      `/customer-ledger/print?clientId=${effectiveClientId}&from=${fromDate}&to=${toDate}&q=${encodeURIComponent(referenceSearch)}`
     );
   };
-
-  if (user?.role === "client") {
-    return <div className="p-8 text-center text-muted-foreground">403</div>;
-  }
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto" dir="rtl">
@@ -127,7 +172,7 @@ export default function CustomerLedgerPage() {
         <button
           type="button"
           onClick={openPrintPage}
-          disabled={!clientId}
+          disabled={!effectiveClientId}
           className="px-5 py-2 rounded-xl bg-primary text-white shadow hover:bg-primary/90 transition disabled:opacity-50 disabled:cursor-not-allowed"
         >
           الطباعة
@@ -156,13 +201,12 @@ export default function CustomerLedgerPage() {
               className="w-full border rounded-xl px-3 py-2 mt-1 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500"
               value={clientId}
               onChange={(e) => {
-                setClientId(e.target.value ? Number(e.target.value) : "");
-                setData([]);
-                setOpeningBalance(0);
+                handleClientSelected(e.target.value ? Number(e.target.value) : "");
               }}
             >
-              <option value="">اختر العميل</option>
-              {clients.map((c) => (
+              {!isClient && <option value="">اختر العميل</option>}
+              {isClient && <option value="">&#1575;&#1582;&#1578;&#1585; &#1575;&#1604;&#1593;&#1605;&#1610;&#1604;</option>}
+              {visibleClients.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.nameAr || c.nameEn || c.name}
                 </option>
@@ -194,10 +238,22 @@ export default function CustomerLedgerPage() {
             />
           </div>
 
+          <div>
+            <label className="text-sm font-medium text-gray-700">
+              {isAR ? "رقم الفاتورة أو سند القبض" : "Invoice or receipt number"}
+            </label>
+            <input
+              value={referenceSearch}
+              onChange={(e) => setReferenceSearch(e.target.value)}
+              placeholder={isAR ? "رقم الفاتورة أو سند القبض" : "Invoice or receipt number"}
+              className="w-full border rounded-xl px-3 py-2 mt-1 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+            />
+          </div>
+
           <button
             type="button"
             onClick={loadLedger}
-            disabled={!clientId || isLoading}
+            disabled={!hasSelectedClient || !effectiveClientId || isLoading}
             className="h-[42px] rounded-xl bg-primary text-white shadow hover:bg-primary/90 transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isLoading ? "جاري البحث..." : "بحث"}
@@ -275,7 +331,7 @@ export default function CustomerLedgerPage() {
                     </td>
                   </tr>
 
-                  {data.map((row) => {
+                  {filteredData.map((row) => {
                     balance += Number(row.balanceImpact ?? 0);
 
                     return (
@@ -307,7 +363,7 @@ export default function CustomerLedgerPage() {
                     );
                   })}
 
-                  {data.length === 0 && (
+                  {filteredData.length === 0 && (
                     <tr>
                       <td colSpan={5} className="p-8 text-center text-gray-500">
                         اختر العميل ثم اضغط بحث لعرض الحركات

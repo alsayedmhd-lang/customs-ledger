@@ -55,6 +55,7 @@ export default function ClientStatement() {
   const { lang } = useLanguage();
   const { user } = useAuth();
   const isAR = lang === "ar";
+  const isClient = user?.role === "client";
   const { settings, logoSrc, stampSrc, watermarkSrc, currentUser } = useCompanySettings();
   const currencySymbol = lang === "en" ? "QAR" : "ر.ق";
   const canCustomize = user?.permissions?.canCustomizePrintContact;
@@ -107,11 +108,13 @@ export default function ClientStatement() {
 
       {/* Controls */}
       <div className="print:hidden flex items-center gap-3 p-6 max-w-4xl mx-auto flex-wrap" dir={isAR ? "rtl" : "ltr"}>
-        <Link href={`/clients/${id}`}>
-          <button className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-700 hover:bg-gray-50 font-medium">
-            {isAR ? <ArrowRight className="w-4 h-4" /> : <ArrowLeft className="w-4 h-4" />} {isAR ? "العودة للعميل" : "Back to Client"}
-          </button>
-        </Link>
+        {!isClient && (
+          <Link href={`/clients/${id}`}>
+            <button className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-700 hover:bg-gray-50 font-medium">
+              {isAR ? <ArrowRight className="w-4 h-4" /> : <ArrowLeft className="w-4 h-4" />} {isAR ? "العودة للعميل" : "Back to Client"}
+            </button>
+          </Link>
+        )}
         <button
           onClick={() => {
             window.print();
@@ -121,7 +124,7 @@ export default function ClientStatement() {
           <Printer className="w-4 h-4" />
           {isAR ? "طباعة " : "Print "}
         </button>
-        {settings.showStampOnStatements && (
+        {!isClient && settings.showStampOnStatements && (
           <label className="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg bg-white cursor-pointer select-none hover:bg-gray-50">
             <input
               type="checkbox"

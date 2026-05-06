@@ -51,6 +51,9 @@ export default function ReceiptsList() {
   const { t, lang } = useLanguage();
   const isAR = lang === "ar";
   const [search, setSearch] = useState("");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
+  const [paymentMethodFilter, setPaymentMethodFilter] = useState("");
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [showAmounts, setShowAmounts] = useState(false);
   const hidden = <span className="tracking-widest opacity-35 font-mono">••••••</span>;
@@ -75,11 +78,15 @@ const getClientName = (receipt: { clientName?: string | null; clientId?: number 
 
   const filtered = (receipts ?? []).filter((r) => {
     const q = search.toLowerCase();
+    const receiptDate = String((r as any).receiptDate || (r as any).receivedAt || "").slice(0, 10);
     return (
-      (r.receiptNumber ?? "").toLowerCase().includes(q) ||
-      getClientName(r).toLowerCase().includes(q) ||
-      (r.invoiceNumber?.toLowerCase().includes(q) ?? false) ||
-      (r.notes?.toLowerCase().includes(q) ?? false)
+      ((r.receiptNumber ?? "").toLowerCase().includes(q) ||
+        getClientName(r).toLowerCase().includes(q) ||
+        (r.invoiceNumber?.toLowerCase().includes(q) ?? false) ||
+        (r.notes?.toLowerCase().includes(q) ?? false)) &&
+      (!fromDate || receiptDate >= fromDate) &&
+      (!toDate || receiptDate <= toDate) &&
+      (!paymentMethodFilter || r.paymentMethod === paymentMethodFilter)
     );
   });
 
@@ -155,14 +162,28 @@ const getClientName = (receipt: { clientName?: string | null; clientId?: number 
         </div>
       </motion.div>
 
-      <div className="relative">
-        <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
-        <Input
-          placeholder={t("searchReceiptPlaceholder")}
-          className="pr-9"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+        <div className="relative">
+          <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
+          <Input
+            placeholder={t("searchReceiptPlaceholder")}
+            className="pr-9"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        <Input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
+        <Input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
+        <select
+          value={paymentMethodFilter}
+          onChange={(e) => setPaymentMethodFilter(e.target.value)}
+          className="h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+        >
+          <option value="">{t("paymentMethod")}</option>
+          <option value="cash">{t("cash")}</option>
+          <option value="transfer">{t("transfer")}</option>
+          <option value="check">{t("check")}</option>
+        </select>
       </div>
 
       {isLoading ? (

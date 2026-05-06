@@ -82,13 +82,19 @@ export default function AppLayout({ children }: AppLayoutProps) {
   }, []);
 
   const isClient = user?.role === "client";
-  const clientAllowedHrefs = new Set(["/", "/invoices", "/receipts", "/statements"]);
+  const clientCanViewStatement = isClient && user?.clientViewPermissions?.canViewStatement !== false;
+  const clientCanViewSummary = isClient && user?.clientViewPermissions?.canViewSummary !== false;
+  const clientAllowedHrefs = new Set(["/", "/invoices", "/receipts", "/statements", "/customer-ledger"]);
   const navItems = [
     { name: t("dashboard"), href: "/", icon: LayoutDashboard, color: "text-blue-400" },
     { name: t("invoices"), href: "/invoices", icon: FileText, color: "text-sky-400" },
     { name: t("receipts"), href: "/receipts", icon: ReceiptText, color: "text-emerald-400" },
-    { name: "customerLedger", href: "/customer-ledger", icon: FileText, color: "text-indigo-400" },
-    { name: t("statements"), href: "/statements", icon: BookOpen, color: "text-teal-400" },
+    ...(!isClient || clientCanViewSummary
+      ? [{ name: isClient ? (isAR ? "ملخص العميل المالي" : "Customer Financial Summary") : "customerLedger", href: "/customer-ledger", icon: FileText, color: "text-indigo-400" }]
+      : []),
+    ...(!isClient || clientCanViewStatement
+      ? [{ name: isClient ? (isAR ? "كشف الحساب" : "Account Statement") : t("statements"), href: "/statements", icon: BookOpen, color: "text-teal-400" }]
+      : []),
     { name: t("templates"), href: "/templates", icon: PackageSearch, color: "text-amber-400" },
     { name: t("clients"), href: "/clients", icon: Users, color: "text-violet-400" },
     ...(user?.role === "admin" || user?.permissions?.canViewAccounting

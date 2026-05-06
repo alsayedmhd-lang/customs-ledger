@@ -62,39 +62,49 @@ export default function CustomerLedgerPrintPage() {
   const { user } = useAuth();
   const { lang } = useLanguage();
   const isAR = lang === "ar";
+  const isClient = user?.role === "client";
 
   const { settings, logoSrc, stampSrc, watermarkSrc } = useCompanySettings();
 
   const params = new URLSearchParams(window.location.search);
-  const clientId = params.get("clientId");
+  const clientId = isClient && user?.clientId ? String(user.clientId) : params.get("clientId");
   const from = params.get("from");
   const to = params.get("to");
+  const referenceSearch = params.get("q") || "";
 
   const [showStamp, setShowStamp] = useState(true);
 
   useEffect(() => {
-    if (user?.role === "client" || !user?.permissions?.canViewStatements) {
+    if (!isClient && !user?.permissions?.canViewStatements) {
       navigate("/");
     }
-  }, [user, navigate]);
+  }, [isClient, user, navigate]);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["customer-ledger-print", clientId, from, to],
+    queryKey: ["customer-ledger-print", clientId, from, to, referenceSearch],
     queryFn: () => fetchCustomerLedger(clientId || "", from, to),
-    enabled: !!clientId && !!user?.permissions?.canViewStatements,
+    enabled: !!clientId && (isClient || !!user?.permissions?.canViewStatements),
   });
 
   const { data: clients = [] } = useQuery<any[]>({
     queryKey: ["customer-ledger-print-clients"],
     queryFn: fetchClients,
-    enabled: !!clientId && !!user?.permissions?.canViewStatements,
+    enabled: !!clientId && (isClient || !!user?.permissions?.canViewStatements),
   });
 
-  if (user?.role === "client" || !user?.permissions?.canViewStatements) return null;
+  if (!isClient && !user?.permissions?.canViewStatements) return null;
   if (!clientId) return <div className="p-8">Missing clientId</div>;
   if (isLoading) return <div className="p-8 text-center">Loading...</div>;
 
-  const rows = data?.rows || [];
+  const q = referenceSearch.trim().toLowerCase();
+  const rows = (data?.rows || []).filter((row: any) => {
+    if (!q) return true;
+    return (
+      String(row.referenceNumber || "").toLowerCase().includes(q) ||
+      String(row.descriptionAr || "").toLowerCase().includes(q) ||
+      String(row.descriptionEn || "").toLowerCase().includes(q)
+    );
+  });
   const openingBalance = Number(data?.openingBalance || 0);
 
   const client =
@@ -186,12 +196,14 @@ export default function CustomerLedgerPrintPage() {
 
       {/* CONTROLS */}
       <div className="print:hidden flex items-center justify-center gap-3 p-6 flex-wrap" dir={isAR ? "rtl" : "ltr"}>
+        {!isClient && (
         <Link href="/customer-ledger">
           <button className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-700 hover:bg-gray-50 font-medium">
             <ArrowRight className="w-4 h-4" />
             {isAR ? "العودة للكشوف" : "Back to Client"}
           </button>
         </Link>
+        )}
 
         <button
         onClick={() => {
@@ -203,6 +215,7 @@ export default function CustomerLedgerPrintPage() {
         {isAR ? "طباعة PDF" : "Print Account Summary"}
         </button>
 
+        {!isClient && (
         <button
             onClick={exportExcel}
             disabled={!rows.length}
@@ -211,8 +224,9 @@ export default function CustomerLedgerPrintPage() {
             <FileDown className="w-4 h-4" />
             {isAR ? "تصدير Excel" : "Export Excel"}
             </button>
+        )}
 
-        {settings.showStampOnStatements && (
+        {!isClient && settings.showStampOnStatements && (
           <label className="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg bg-white cursor-pointer select-none hover:bg-gray-50">
             <input
               type="checkbox"

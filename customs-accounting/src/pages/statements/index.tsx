@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { BookOpen, FileText, TrendingDown, TrendingUp, User, Printer, Eye, EyeOff } from "lucide-react";
+import { BookOpen, FileText, TrendingDown, TrendingUp, User, Printer, Eye, EyeOff, Search } from "lucide-react";
 import { useLanguage } from "@/lib/language-context";
 import { useAuth } from "@/lib/auth-context";
 const API_BASE = import.meta.env.VITE_API_BASE_URL;
@@ -35,6 +35,9 @@ export default function StatementsIndex() {
   const isAR = lang === "ar";
   const [, setLocation] = useLocation();
   const [showAmounts, setShowAmounts] = useState(false);
+  const [search, setSearch] = useState("");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
   const hidden = <span className="tracking-widest opacity-35 font-mono">••••••</span>;
   const { data: clients = [], isLoading: loadingClients } = useQuery<any[]>({
     queryKey: ["clients"],
@@ -53,7 +56,17 @@ export default function StatementsIndex() {
   const loading = loadingClients || loadingInvoices;
 
   const clientSummaries = (clients?.map(client => {
-    const invoices = allInvoices?.filter(inv => inv.clientId === client.id) || [];
+    const q = search.trim().toLowerCase();
+    const invoices = allInvoices?.filter(inv => {
+      const issueDate = String(inv.issueDate || "").slice(0, 10);
+      const matchesClient = inv.clientId === client.id;
+      const matchesSearch =
+        !q ||
+        String(inv.invoiceNumber || "").toLowerCase().includes(q) ||
+        String(inv.shipmentRef || "").toLowerCase().includes(q) ||
+        String(inv.billOfLading || "").toLowerCase().includes(q);
+      return matchesClient && matchesSearch && (!fromDate || issueDate >= fromDate) && (!toDate || issueDate <= toDate);
+    }) || [];
     const totalInvoiced = invoices.reduce((sum, inv) => sum + inv.total, 0);
     const totalPaid = invoices.filter(i => i.status === "paid").reduce((sum, inv) => sum + inv.total, 0);
     const balance = totalInvoiced - totalPaid;
@@ -86,6 +99,30 @@ export default function StatementsIndex() {
         </button>
       </div>
 
+      <div className="hidden">
+        <div className="relative">
+          <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={isAR ? "بحث برقم الفاتورة أو البيان أو البوليصة" : "Search invoice, shipment ref, or bill of lading"}
+            className="w-full pr-9 pl-3 py-2 bg-card border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm"
+          />
+        </div>
+        <input
+          type="date"
+          value={fromDate}
+          onChange={(e) => setFromDate(e.target.value)}
+          className="w-full px-3 py-2 bg-card border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm"
+        />
+        <input
+          type="date"
+          value={toDate}
+          onChange={(e) => setToDate(e.target.value)}
+          className="w-full px-3 py-2 bg-card border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm"
+        />
+      </div>
+
       {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-card border border-border/50 rounded-2xl p-5 shadow-sm flex items-center gap-4">
@@ -115,6 +152,30 @@ export default function StatementsIndex() {
             <p className="text-2xl font-black font-mono text-destructive mt-0.5">{showAmounts ? formatCurrency(totalOutstanding) : hidden}</p>
           </div>
         </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="relative">
+          <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={isAR ? "بحث برقم الفاتورة أو البيان أو البوليصة" : "Search invoice, shipment ref, or bill of lading"}
+            className="w-full pr-9 pl-3 py-2 bg-card border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm"
+          />
+        </div>
+        <input
+          type="date"
+          value={fromDate}
+          onChange={(e) => setFromDate(e.target.value)}
+          className="w-full px-3 py-2 bg-card border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm"
+        />
+        <input
+          type="date"
+          value={toDate}
+          onChange={(e) => setToDate(e.target.value)}
+          className="w-full px-3 py-2 bg-card border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm"
+        />
       </div>
 
       {/* Clients Table */}

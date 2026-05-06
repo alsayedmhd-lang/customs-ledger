@@ -26,6 +26,9 @@ export default function InvoicesList() {
   const { t } = useLanguage();
   const { data: invoices = [], isLoading } = useListInvoices();
   const [search, setSearch] = useState("");
+  const [fromDate, setFromDate] = useState("");
+  const [toDate, setToDate] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [, setLocation] = useLocation();
   const [copyId, setCopyId] = useState<number | null>(null);
@@ -60,12 +63,18 @@ export default function InvoicesList() {
   }, [invoiceToCopy, setLocation]);
   
   const q = search.toLowerCase();
-  const filtered = invoices?.filter(i =>
-    i.invoiceNumber.toLowerCase().includes(q) ||
-    i.clientName.toLowerCase().includes(q) ||
-    (i.shipmentRef && i.shipmentRef.toLowerCase().includes(q)) ||
-    (i.billOfLading && i.billOfLading.toLowerCase().includes(q))
-  ) || [];
+  const filtered = invoices?.filter(i => {
+    const issueDate = String(i.issueDate || "").slice(0, 10);
+    const matchesSearch =
+      i.invoiceNumber.toLowerCase().includes(q) ||
+      i.clientName.toLowerCase().includes(q) ||
+      (i.shipmentRef && i.shipmentRef.toLowerCase().includes(q)) ||
+      (i.billOfLading && i.billOfLading.toLowerCase().includes(q));
+    const matchesFrom = !fromDate || issueDate >= fromDate;
+    const matchesTo = !toDate || issueDate <= toDate;
+    const matchesStatus = !statusFilter || i.status === statusFilter;
+    return matchesSearch && matchesFrom && matchesTo && matchesStatus;
+  }) || [];
 
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -105,6 +114,29 @@ export default function InvoicesList() {
               className="w-full pr-9 pl-4 py-2 bg-muted/50 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm"
             />
           </div>
+          <input
+            type="date"
+            value={fromDate}
+            onChange={(e) => setFromDate(e.target.value)}
+            className="w-full sm:w-auto px-3 py-2 bg-muted/50 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm"
+          />
+          <input
+            type="date"
+            value={toDate}
+            onChange={(e) => setToDate(e.target.value)}
+            className="w-full sm:w-auto px-3 py-2 bg-muted/50 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm"
+          />
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="w-full sm:w-auto px-3 py-2 bg-muted/50 border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm"
+          >
+            <option value="">{t("status")}</option>
+            <option value="draft">{t("draft")}</option>
+            <option value="issued">{t("issued")}</option>
+            <option value="paid">{t("paid")}</option>
+            <option value="cancelled">{t("cancelled")}</option>
+          </select>
           {!isLoading && (
             <span className="text-xs text-muted-foreground shrink-0">
               {search
