@@ -14,6 +14,7 @@ import { useLanguage } from "@/lib/language-context";
 import { useCompanySettings, DEFAULT_SETTINGS, type CompanySettings } from "@/lib/company-settings-context";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { getRoleLabel } from "@/lib/role-labels";
 import {
   Building2, Globe, Phone, Mail, MapPin, Hash, Upload, Save, RefreshCw,
   Stamp, Eye, EyeOff, Shield, Printer, Info, Image, RotateCcw, User,
@@ -234,20 +235,19 @@ function PreviewShell({
       onMouseUp={handleSaveSize}
       onTouchEnd={handleSaveSize}
       className={cn(
-        "w-full rounded-xl border border-border bg-muted/20 overflow-hidden",
+        "min-w-0 w-full rounded-xl border border-border bg-muted/20 overflow-hidden",
+        (size === "large" || isMain) && "lg:col-span-2",
         isInteractive && !isMain && "cursor-pointer transition hover:border-primary/60 hover:shadow-md",
         isMain && "shadow-sm"
       )}
       style={{
         order: isMain ? 0 : 1,
-        gridColumn: isMain ? "1 / -1" : undefined,
         ...(isMain && mainSize ? {
-          width: mainSize.width,
+          width: "100%",
           height: mainSize.height,
-          maxWidth: "100%",
-          minWidth: 360,
+          minWidth: 0,
           minHeight: 360,
-          resize: "both" as const,
+          resize: "vertical" as const,
         } : {}),
       }}
     >
@@ -297,6 +297,7 @@ function SettingsPrintPreviews({
   invoicePreviewScale,
   receiptPreviewScale,
   statementPreviewScale,
+  customerLedgerPreviewScale,
 }: {
   settings: CompanySettings;
   logoSrc: string;
@@ -306,6 +307,7 @@ function SettingsPrintPreviews({
   invoicePreviewScale: number;
   receiptPreviewScale: number;
   statementPreviewScale: number;
+  customerLedgerPreviewScale: number;
 }) {
   const override = { settings, logoSrc, stampSrc, watermarkSrc };
   const receiverSignature = settings.receiverSignatureBase64;
@@ -352,7 +354,7 @@ function SettingsPrintPreviews({
 
   return (
     <div className="w-full max-w-none space-y-4">
-      <div className="grid w-full grid-cols-1 gap-4 lg:grid-cols-3">
+      <div className="grid w-full grid-cols-[repeat(auto-fit,minmax(320px,1fr))] gap-4">
       <PreviewShell {...previewShellProps("invoice")} title={isAR ? "معاينة الفاتورة" : "Invoice Preview"} size="large" scale={invoicePreviewScale}>
         <div
           className="bg-white shadow-xl border border-gray-200 relative overflow-hidden"
@@ -542,7 +544,7 @@ function SettingsPrintPreviews({
           </div>
         </PreviewShell>
 
-        <PreviewShell {...previewShellProps("summary")} title={isAR ? "معاينة ملخص العميل المالي" : "Customer Financial Summary Preview"} size="small" scale={statementPreviewScale}>
+        <PreviewShell {...previewShellProps("summary")} title={isAR ? "معاينة ملخص العميل المالي" : "Customer Financial Summary Preview"} size="small" scale={customerLedgerPreviewScale}>
           <div
             className="bg-white shadow-xl border border-gray-200 relative overflow-hidden"
             style={{ fontFamily: "'Cairo', 'Arial', sans-serif" }}
@@ -936,6 +938,27 @@ function DatabaseSyncPanel({
 const inp = "w-full px-3 py-2 text-sm bg-background border border-border rounded-xl outline-none focus:ring-2 focus:ring-primary/20 transition-colors";
 const tog = (on: boolean) =>
   `relative w-11 h-6 rounded-full transition-colors cursor-pointer ${on ? "bg-primary" : "bg-muted-foreground/30"}`;
+const previewZoomStorageKeys = {
+  invoice: "settings_preview_invoice_zoom",
+  receipt: "settings_preview_receipt_zoom",
+  statement: "settings_preview_statement_zoom",
+  customerLedger: "settings_preview_customer_ledger_zoom",
+} as const;
+
+const readPreviewZoom = (key: string, fallback: number) => {
+  try {
+    const saved = Number(localStorage.getItem(key));
+    return Number.isFinite(saved) && saved > 0 ? saved : fallback;
+  } catch {
+    return fallback;
+  }
+};
+
+const writePreviewZoom = (key: string, value: number) => {
+  try {
+    localStorage.setItem(key, String(value));
+  } catch {}
+};
 
 export default function SettingsPage() {
   const { user } = useAuth();
@@ -985,9 +1008,30 @@ export default function SettingsPage() {
   const canEditBrandIdentity = canEditBranding;
   const canUseInvoicesBackupImport = roleCanEdit || allowManagerEditInvoicesBackupImport;
   const [activeTab, setActiveTab] = useState<TabId>("preview");
-  const [invoicePreviewScale, setInvoicePreviewScale] = useState(0.76);
-  const [receiptPreviewScale, setReceiptPreviewScale] = useState(0.8);
-  const [statementPreviewScale, setStatementPreviewScale] = useState(0.78);
+  const [invoicePreviewScale, setInvoicePreviewScale] = useState(() =>
+    readPreviewZoom(previewZoomStorageKeys.invoice, 0.76)
+  );
+  const [receiptPreviewScale, setReceiptPreviewScale] = useState(() =>
+    readPreviewZoom(previewZoomStorageKeys.receipt, 0.8)
+  );
+  const [statementPreviewScale, setStatementPreviewScale] = useState(() =>
+    readPreviewZoom(previewZoomStorageKeys.statement, 0.78)
+  );
+  const [customerLedgerPreviewScale, setCustomerLedgerPreviewScale] = useState(() =>
+    readPreviewZoom(previewZoomStorageKeys.customerLedger, 0.78)
+  );
+  useEffect(() => {
+    writePreviewZoom(previewZoomStorageKeys.invoice, invoicePreviewScale);
+  }, [invoicePreviewScale]);
+  useEffect(() => {
+    writePreviewZoom(previewZoomStorageKeys.receipt, receiptPreviewScale);
+  }, [receiptPreviewScale]);
+  useEffect(() => {
+    writePreviewZoom(previewZoomStorageKeys.statement, statementPreviewScale);
+  }, [statementPreviewScale]);
+  useEffect(() => {
+    writePreviewZoom(previewZoomStorageKeys.customerLedger, customerLedgerPreviewScale);
+  }, [customerLedgerPreviewScale]);
   const [backupPassword, setBackupPassword] = useState("");
   const [importPassword, setImportPassword] = useState("");
   const [backupView, setBackupView] = useState<BackupView>("backup-import");
@@ -1727,9 +1771,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
 ];
 
   const resolvedName = (isAR ? user?.displayNameAr : user?.displayNameEn) || user?.displayName || "";
-  const roleLabel = isAR
-    ? (user?.role === "admin" ? "مدير" : user?.role === "supervisor" ? "مشرف" : "مستخدم")
-    : (user?.role === "admin" ? "Admin" : user?.role === "supervisor" ? "Supervisor" : "User");
+  const roleLabel = getRoleLabel(user?.role, isAR);
   const canSeeDeveloperLink = user?.role === "admin" || user?.role === "manager";
   const canViewSettingsTab = (tabId: TabId) => {
     if (tabId === "preview") return true;
@@ -1878,7 +1920,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                     <SlidersHorizontal className="h-4 w-4 text-primary" />
                     <span>{isAR ? "تكبير وتصغير المستندات" : "Document Zoom"}</span>
                   </div>
-                  <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+                  <div className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3">
                     <PreviewScaleControl
                       label={isAR ? "تكبير الفاتورة" : "Invoice zoom"}
                       value={invoicePreviewScale}
@@ -1900,6 +1942,13 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                       max={1.1}
                       onChange={setStatementPreviewScale}
                     />
+                    <PreviewScaleControl
+                      label={isAR ? "تكبير ملخص العميل المالي" : "Customer ledger zoom"}
+                      value={customerLedgerPreviewScale}
+                      min={0.55}
+                      max={1.1}
+                      onChange={setCustomerLedgerPreviewScale}
+                    />
                   </div>
                 </div>
                 <SettingsPrintPreviews
@@ -1919,6 +1968,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                   invoicePreviewScale={invoicePreviewScale}
                   receiptPreviewScale={receiptPreviewScale}
                   statementPreviewScale={statementPreviewScale}
+                  customerLedgerPreviewScale={customerLedgerPreviewScale}
                 />
                 <div className="hidden">
                   <h3 className="text-sm font-bold mb-3 text-primary">
