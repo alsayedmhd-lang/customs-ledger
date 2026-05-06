@@ -29,6 +29,21 @@ function formatMoney(value: number) {
   });
 }
 
+function formatDateInput(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function getDefaultDateRange() {
+  const today = new Date();
+  return {
+    from: formatDateInput(new Date(today.getFullYear(), today.getMonth(), 1)),
+    to: formatDateInput(today),
+  };
+}
+
 export default function CustomerLedgerPage() {
   const { user } = useAuth();
   const { lang } = useLanguage();
@@ -40,8 +55,8 @@ export default function CustomerLedgerPage() {
   const [selectedClientState, setSelectedClientState] = useState<Client | null>(null);
   const [clientId, setClientId] = useState<number | "">("");
   const [hasSelectedClient, setHasSelectedClient] = useState(false);
-  const [fromDate, setFromDate] = useState("");
-  const [toDate, setToDate] = useState("");
+  const [fromDate, setFromDate] = useState(() => getDefaultDateRange().from);
+  const [toDate, setToDate] = useState(() => getDefaultDateRange().to);
   const [referenceSearch, setReferenceSearch] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 

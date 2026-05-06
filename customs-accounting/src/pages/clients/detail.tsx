@@ -4,7 +4,7 @@ import { useGetClient, useListInvoices, useUpdateClient, getGetClientQueryKey } 
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { StatusBadge } from "../dashboard";
 import { Building2, Mail, Phone, MapPin, FileText, Printer, ArrowRight, ArrowLeft, Edit2 } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Modal } from "@/components/ui/modal";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -22,6 +22,21 @@ const clientSchema = z.object({
   notes: z.string().optional(),
 });
 
+function formatDateInput(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function getDefaultDateRange() {
+  const today = new Date();
+  return {
+    from: formatDateInput(new Date(today.getFullYear(), today.getMonth(), 1)),
+    to: formatDateInput(today),
+  };
+}
+
 export default function ClientDetail() {
   const { id } = useParams<{ id: string }>();
   const clientId = parseInt(id || "0");
@@ -32,12 +47,30 @@ export default function ClientDetail() {
   const { data: invoices, isLoading: loadingInvoices } = useListInvoices({ clientId });
   
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const [fromDate, setFromDate] = useState(() => getDefaultDateRange().from);
+  const [toDate, setToDate] = useState(() => getDefaultDateRange().to);
+
+  const filteredInvoices = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return (invoices ?? []).filter((inv: any) => {
+      const issueDate = String(inv.issueDate || "").slice(0, 10);
+      const matchesDate = (!fromDate || issueDate >= fromDate) && (!toDate || issueDate <= toDate);
+      const matchesSearch =
+        !q ||
+        String(inv.invoiceNumber || "").toLowerCase().includes(q) ||
+        String(inv.shipmentRef || "").toLowerCase().includes(q) ||
+        String(inv.billOfLading || "").toLowerCase().includes(q);
+
+      return matchesDate && matchesSearch;
+    });
+  }, [invoices, search, fromDate, toDate]);
 
   if (loadingClient) return <div className="p-8 text-center animate-pulse">جارٍ تحميل بيانات العميل...</div>;
   if (!client) return <div className="p-8 text-center text-destructive">العميل غير موجود</div>;
 
-  const totalInvoiced = invoices?.reduce((sum, inv) => sum + inv.total, 0) || 0;
-  const totalPaid = invoices?.filter(i => i.status === 'paid').reduce((sum, inv) => sum + inv.total, 0) || 0;
+  const totalInvoiced = filteredInvoices.reduce((sum, inv) => sum + inv.total, 0) || 0;
+  const totalPaid = filteredInvoices.filter(i => i.status === 'paid').reduce((sum, inv) => sum + inv.total, 0) || 0;
   const balance = totalInvoiced - totalPaid;
 
   return (
@@ -123,7 +156,27 @@ export default function ClientDetail() {
               <button className="text-sm font-medium text-primary hover:underline">إنشاء فاتورة</button>
             </Link>
           </div>
-          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 p-4 border-b border-border/50 bg-muted/10">
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={isAR ? "بحث برقم الفاتورة أو البيان أو البوليصة" : "Search invoice, declaration, or B/L"}
+              className="w-full px-3 py-2 bg-card border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm"
+            />
+            <input
+              type="date"
+              value={fromDate}
+              onChange={(e) => setFromDate(e.target.value)}
+              className="w-full px-3 py-2 bg-card border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm"
+            />
+            <input
+              type="date"
+              value={toDate}
+              onChange={(e) => setToDate(e.target.value)}
+              className="w-full px-3 py-2 bg-card border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm"
+            />
+          </div>
+
           <div className="flex-1 overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-muted/30 text-muted-foreground font-medium border-b border-border/50">
@@ -137,10 +190,10 @@ export default function ClientDetail() {
               <tbody>
                 {loadingInvoices ? (
                   <tr><td colSpan={4} className="text-center py-8 text-muted-foreground">جارٍ التحميل...</td></tr>
-                ) : invoices?.length === 0 ? (
+                ) : filteredInvoices.length === 0 ? (
                   <tr><td colSpan={4} className="text-center py-8 text-muted-foreground">لا توجد فواتير بعد.</td></tr>
                 ) : (
-                  invoices?.map(inv => (
+                  filteredInvoices.map(inv => (
                     <tr key={inv.id} className="border-b border-border/50 last:border-0 hover:bg-muted/20 transition-colors">
                       <td className="px-6 py-4 font-medium text-primary hover:underline">
                         <Link href={`/invoices/${inv.id}/edit`}>{inv.invoiceNumber}</Link>

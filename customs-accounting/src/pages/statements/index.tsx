@@ -28,6 +28,21 @@ async function fetchInvoices() {
   return res.json();
 }
 
+function formatDateInput(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function getDefaultDateRange() {
+  const today = new Date();
+  return {
+    from: formatDateInput(new Date(today.getFullYear(), today.getMonth(), 1)),
+    to: formatDateInput(today),
+  };
+}
+
 export default function StatementsIndex() {
   const { t, lang } = useLanguage();
   const { user } = useAuth();
@@ -36,8 +51,8 @@ export default function StatementsIndex() {
   const [, setLocation] = useLocation();
   const [showAmounts, setShowAmounts] = useState(false);
   const [search, setSearch] = useState("");
-  const [fromDate, setFromDate] = useState("");
-  const [toDate, setToDate] = useState("");
+  const [fromDate, setFromDate] = useState(() => getDefaultDateRange().from);
+  const [toDate, setToDate] = useState(() => getDefaultDateRange().to);
   const hidden = <span className="tracking-widest opacity-35 font-mono">••••••</span>;
   const { data: clients = [], isLoading: loadingClients } = useQuery<any[]>({
     queryKey: ["clients"],
