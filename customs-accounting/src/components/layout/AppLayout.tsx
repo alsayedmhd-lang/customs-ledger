@@ -119,7 +119,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const SidebarContent = () => (
     <div className="flex flex-col h-full">
       {/* Logo */}
-      <div className="p-5 flex items-center gap-3 border-b border-white/10">
+      <div className="p-5 flex items-center gap-3 border-b" style={{ borderColor: "var(--sb-border, rgba(255,255,255,0.1))" }}>
         <img
           src={logoSrc}
           alt="شعار الشركة"
@@ -131,12 +131,12 @@ export default function AppLayout({ children }: AppLayoutProps) {
           }}
         />
         <div className="min-w-0">
-          <h1 className="font-black text-white text-sm leading-tight truncate">
+          <h1 className="font-black text-sm leading-tight truncate" style={{ color: "var(--sb-foreground, #ffffff)" }}>
             {isAR
               ? (settings.nameAr || "").split(" ").slice(0, 2).join(" ")
               : (settings.nameEn || "").split(" ").slice(0, 3).join(" ")}
           </h1>
-          <p className="text-white/50 text-[11px] font-medium mt-0.5 truncate">
+          <p className="text-[11px] font-medium mt-0.5 truncate" style={{ color: "var(--sb-muted-foreground, rgba(255,255,255,0.5))" }}>
             {isAR ? settings.subtitleAr : settings.subtitleEn}
           </p>
         </div>
@@ -153,15 +153,31 @@ export default function AppLayout({ children }: AppLayoutProps) {
               <div
                 className={cn(
                   "flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium transition-all duration-200 cursor-pointer group",
-                  isActive
-                    ? "bg-white text-slate-900 shadow-lg nav-active-glow"
-                    : "text-white/60 hover:bg-white/10 hover:text-white"
+                  isActive && "shadow-lg nav-active-glow"
                 )}
+                style={{
+                  background: isActive ? "var(--sb-active-bg, #ffffff)" : undefined,
+                  color: isActive ? "var(--sb-active-fg, #0f172a)" : "var(--sb-muted-foreground, rgba(255,255,255,0.6))",
+                }}
+                onMouseEnter={(e) => {
+                  if (!isActive) {
+                    e.currentTarget.style.background = "var(--sb-hover-bg, rgba(255,255,255,0.1))";
+                    e.currentTarget.style.color = "var(--sb-foreground, #ffffff)";
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActive) {
+                    e.currentTarget.style.background = "";
+                    e.currentTarget.style.color = "var(--sb-muted-foreground, rgba(255,255,255,0.6))";
+                  }
+                }}
               >
                 <div className={cn(
                   "w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors",
-                  isActive ? "bg-primary/15" : "bg-white/5 group-hover:bg-white/10"
-                )}>
+                  isActive && "bg-primary/15"
+                )}
+                  style={{ background: isActive ? undefined : "var(--sb-hover-bg, rgba(255,255,255,0.05))" }}
+                >
                   <item.icon className={cn(
                     "w-4 h-4",
                     isActive ? "text-primary" : item.color
@@ -181,21 +197,22 @@ export default function AppLayout({ children }: AppLayoutProps) {
       </nav>
 
       {/* User + Logout */}
-      <div className="p-3 border-t border-white/10">
-        <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-white/5 mb-1">
+      <div className="p-3 border-t" style={{ borderColor: "var(--sb-border, rgba(255,255,255,0.1))" }}>
+        <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl mb-1" style={{ background: "var(--sb-hover-bg, rgba(255,255,255,0.05))" }}>
           <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-black text-sm flex-shrink-0 shadow-md">
             {initial}
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-bold text-white truncate">{isAR ? resolvedName : user?.displayNameEn || resolvedName}</p>
-            <p className="text-xs text-white/40 font-medium">{user?.role === "admin" ? t("admin") : t("user")}</p>
+            <p className="text-sm font-bold truncate" style={{ color: "var(--sb-foreground, #ffffff)" }}>{isAR ? resolvedName : user?.displayNameEn || resolvedName}</p>
+            <p className="text-xs font-medium" style={{ color: "var(--sb-muted-foreground, rgba(255,255,255,0.4))" }}>{user?.role === "admin" ? t("admin") : t("user")}</p>
           </div>
         </div>
         <button
           onClick={logout}
-          className="flex w-full items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-white/50 hover:bg-red-500/15 hover:text-red-300 transition-all duration-200 group"
+          className="flex w-full items-center gap-3 px-3 py-2.5 rounded-xl font-medium hover:bg-red-500/15 hover:text-red-500 transition-all duration-200 group"
+          style={{ color: "var(--sb-muted-foreground, rgba(255,255,255,0.5))" }}
         >
-          <div className="w-8 h-8 rounded-lg bg-white/5 group-hover:bg-red-500/15 flex items-center justify-center flex-shrink-0 transition-colors">
+          <div className="w-8 h-8 rounded-lg group-hover:bg-red-500/15 flex items-center justify-center flex-shrink-0 transition-colors" style={{ background: "var(--sb-hover-bg, rgba(255,255,255,0.05))" }}>
             <LogOut className="w-4 h-4" />
           </div>
           <span className="text-sm font-semibold">{t("logout")}</span>
@@ -217,7 +234,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
         )}
         style={{
           background: "linear-gradient(180deg, var(--sb-from, #0f172a) 0%, var(--sb-to, #1e293b) 100%)",
-          borderColor: "rgba(255,255,255,0.07)",
+          borderColor: "var(--sb-border, rgba(255,255,255,0.07))",
         }}
       >
         <SidebarContent />
@@ -248,9 +265,10 @@ export default function AppLayout({ children }: AppLayoutProps) {
               <button
                 onClick={() => setMobileOpen(false)}
                 className={cn(
-                  "absolute top-4 p-2 text-white/50 hover:text-white transition-colors z-50",
+                  "absolute top-4 p-2 transition-colors z-50",
                   isRTL ? "left-4" : "right-4"
                 )}
+                style={{ color: "var(--sb-muted-foreground, rgba(255,255,255,0.5))" }}
               >
                 <X className="w-5 h-5" />
               </button>

@@ -344,7 +344,7 @@ export default function LoginPage() {
 
   return (
     <div
-      className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden"
+      className="min-h-dvh flex items-center justify-center px-4 py-6 relative overflow-y-auto"
       dir={isAR ? "rtl" : "ltr"}
       style={{ background: loginTheme.pageBg }}
     >

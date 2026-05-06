@@ -2511,7 +2511,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
 
               {/* ─ Primary Color ─ */}
               <SectionCard icon={Palette} title={isAR ? "اللون الأساسي" : "Primary Color"} color="bg-fuchsia-500/5">
-                <div className="grid grid-cols-7 gap-2">
+                <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-7 gap-2">
                   {(Object.entries(COLOR_PRESETS) as [PrimaryColor, typeof COLOR_PRESETS[PrimaryColor]][]).map(([key, preset]) => (
                     <button key={key} onClick={() => updateDisplay({ primaryColor: key })}
                       title={isAR ? preset.labelAr : preset.labelEn}
@@ -2529,12 +2529,19 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                 <div className="mt-3 pt-3 border-t border-border/40 flex items-center gap-3">
                   <span className="text-xs text-muted-foreground">{isAR ? "معاينة:" : "Preview:"}</span>
                   <div className="flex items-center gap-2">
-                    <span className="h-6 px-3 rounded-full text-xs font-bold flex items-center text-white"
-                      style={{ background: COLOR_PRESETS[display.primaryColor].hex }}>
+                    <span className="h-6 px-3 rounded-full text-xs font-bold flex items-center"
+                      style={{
+                        background: COLOR_PRESETS[display.primaryColor].hex,
+                        color: `hsl(${COLOR_PRESETS[display.primaryColor].foreground ?? "210 40% 98%"})`,
+                        border: `1px solid hsl(${COLOR_PRESETS[display.primaryColor].border ?? COLOR_PRESETS[display.primaryColor].light})`,
+                      }}>
                       {isAR ? "زر أساسي" : "Primary Button"}
                     </span>
                     <span className="h-6 px-3 rounded-full text-xs font-bold flex items-center border-2"
-                      style={{ borderColor: COLOR_PRESETS[display.primaryColor].hex, color: COLOR_PRESETS[display.primaryColor].hex }}>
+                      style={{
+                        borderColor: `hsl(${COLOR_PRESETS[display.primaryColor].border ?? COLOR_PRESETS[display.primaryColor].light})`,
+                        color: `hsl(${COLOR_PRESETS[display.primaryColor].foreground ? "222 47% 11%" : COLOR_PRESETS[display.primaryColor].light})`,
+                      }}>
                       {isAR ? "حد ملوّن" : "Outline"}
                     </span>
                   </div>
