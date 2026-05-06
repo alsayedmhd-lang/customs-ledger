@@ -205,6 +205,8 @@ autoUpdater.on("error", (error) => {
   });
 });
 
+ipcMain.handle("app:get-version", () => app.getVersion());
+
 ipcMain.handle("save-current-page-pdf", async (event, fileName) => {
   try {
     if (!mainWindow) {

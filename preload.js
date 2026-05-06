@@ -1,6 +1,7 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("electronAPI", {
+  getAppVersion: () => ipcRenderer.invoke("app:get-version"),
   saveCurrentPagePDF: (fileName) =>
     ipcRenderer.invoke("save-current-page-pdf", fileName),
   checkForUpdates: () => ipcRenderer.invoke("check-for-updates"),

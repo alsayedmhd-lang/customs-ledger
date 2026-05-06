@@ -1,6 +1,6 @@
 import { useCompanySettings } from "@/lib/company-settings-context";
 import { COLOR_PRESETS, useDisplaySettings } from "@/lib/display-settings-context";
-import { useState, FormEvent, useRef, KeyboardEvent } from "react";
+import { useState, FormEvent, useRef, KeyboardEvent, useEffect } from "react";
 import { useAuth, type OtpPending } from "@/lib/auth-context";
 import { useLocation } from "wouter";
 import { useLanguage } from "@/lib/language-context";
@@ -57,6 +57,10 @@ function OtpInput({ value, onChange }: { value: string; onChange: (v: string) =>
 
 type Mode = "login" | "register" | "otp" | "registered" | "forgot" | "reset-otp" | "new-password";
 
+type ElectronAPI = {
+  getAppVersion?: () => Promise<string>;
+};
+
 export default function LoginPage() {
   const { login, verifyOtp, resendOtp } = useAuth();
   const [, setLocation] = useLocation();
@@ -108,6 +112,29 @@ export default function LoginPage() {
   const [mode, setMode] = useState<Mode>("login");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [appVersion, setAppVersion] = useState("2.0.0");
+
+  useEffect(() => {
+    let active = true;
+    const api = (window as Window & { electronAPI?: ElectronAPI }).electronAPI;
+
+    if (!api?.getAppVersion) {
+      setAppVersion("2.0.0");
+      return;
+    }
+
+    api.getAppVersion()
+      .then((version) => {
+        if (active) setAppVersion(version || "2.0.0");
+      })
+      .catch(() => {
+        if (active) setAppVersion("2.0.0");
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   // Forgot password state
   const [forgotUsername, setForgotUsername] = useState("");
@@ -813,6 +840,9 @@ export default function LoginPage() {
         <p className="text-center text-white/25 text-xs mt-6 font-medium">
           {isAR ? "نظام المحاسبة الداخلي للشركات - alsayed.mhd@gmail.com - تلفون  - 00201009697521 - 0097460020446 " : "Internal Accounting System For Companes - alsayed.mhd@gmail.com - Phone - 00201009697521 - 0097460020446"}
                   </p>
+        <p className="text-center text-white/25 text-xs mt-2 font-medium">
+          Version {appVersion}
+        </p>
       </motion.div>
     </div>
   );
