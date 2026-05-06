@@ -1,5 +1,16 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
+window.addEventListener(
+  "wheel",
+  (event) => {
+    if (!event.ctrlKey || event.deltaY === 0) return;
+
+    event.preventDefault();
+    ipcRenderer.send("app:zoom-wheel", event.deltaY < 0 ? "in" : "out");
+  },
+  { passive: false }
+);
+
 contextBridge.exposeInMainWorld("electronAPI", {
   getAppVersion: () => ipcRenderer.invoke("app:get-version"),
   saveCurrentPagePDF: (fileName) =>

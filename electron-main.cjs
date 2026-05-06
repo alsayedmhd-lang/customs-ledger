@@ -8,6 +8,80 @@ let backendProcess;
 let mainWindow;
 let updateInfo;
 let updateDownloaded = false;
+const MIN_ZOOM_FACTOR = 0.5;
+const MAX_ZOOM_FACTOR = 3;
+const ZOOM_STEP = 0.1;
+
+function clampZoomFactor(value) {
+  const zoomFactor = Number(value);
+  if (!Number.isFinite(zoomFactor)) return 1;
+  return Math.min(MAX_ZOOM_FACTOR, Math.max(MIN_ZOOM_FACTOR, zoomFactor));
+}
+
+function getUserPreferencesPath() {
+  return path.join(app.getPath("userData"), "user-preferences.json");
+}
+
+function readUserPreferences() {
+  const preferencesPath = getUserPreferencesPath();
+
+  try {
+    if (!fs.existsSync(preferencesPath)) {
+      return { zoomFactor: 1 };
+    }
+
+    const preferences = JSON.parse(fs.readFileSync(preferencesPath, "utf8"));
+    return {
+      ...preferences,
+      zoomFactor: clampZoomFactor(preferences?.zoomFactor),
+    };
+  } catch (error) {
+    console.error("Failed to read user preferences:", error);
+    return { zoomFactor: 1 };
+  }
+}
+
+function saveUserPreferences(nextPreferences) {
+  const preferencesPath = getUserPreferencesPath();
+
+  try {
+    fs.mkdirSync(path.dirname(preferencesPath), { recursive: true });
+    fs.writeFileSync(
+      preferencesPath,
+      JSON.stringify(
+        {
+          ...readUserPreferences(),
+          ...nextPreferences,
+          zoomFactor: clampZoomFactor(nextPreferences.zoomFactor),
+        },
+        null,
+        2
+      )
+    );
+  } catch (error) {
+    console.error("Failed to save user preferences:", error);
+  }
+}
+
+function setAppZoomFactor(zoomFactor, options = {}) {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+
+  const nextZoomFactor = Number(clampZoomFactor(zoomFactor).toFixed(2));
+  mainWindow.webContents.setZoomFactor(nextZoomFactor);
+
+  if (options.save !== false) {
+    saveUserPreferences({ zoomFactor: nextZoomFactor });
+  }
+}
+
+function adjustAppZoom(direction) {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  if (direction !== "in" && direction !== "out") return;
+
+  const currentZoomFactor = mainWindow.webContents.getZoomFactor();
+  const delta = direction === "in" ? ZOOM_STEP : -ZOOM_STEP;
+  setAppZoomFactor(currentZoomFactor + delta);
+}
 
 function safeFileName(name) {
   return String(name || "document")
@@ -86,6 +160,14 @@ function createWindow() {
     },
   });
 
+  const userPreferences = readUserPreferences();
+  saveUserPreferences({ zoomFactor: userPreferences.zoomFactor });
+  setAppZoomFactor(userPreferences.zoomFactor, { save: false });
+
+  mainWindow.webContents.on("did-finish-load", () => {
+    setAppZoomFactor(readUserPreferences().zoomFactor, { save: false });
+  });
+
   mainWindow.webContents.on("context-menu", (event, params) => {
     const template = [];
 
@@ -152,9 +234,21 @@ function setupApplicationMenu() {
       label: "View",
       submenu: [
         { role: "toggleDevTools", label: "Developer Tools" },
-        { role: "resetZoom", label: "Reset Zoom" },
-        { role: "zoomIn", label: "Zoom In" },
-        { role: "zoomOut", label: "Zoom Out" },
+        {
+          label: "Reset Zoom",
+          accelerator: "CommandOrControl+0",
+          click: () => setAppZoomFactor(1),
+        },
+        {
+          label: "Zoom In",
+          accelerator: "CommandOrControl+=",
+          click: () => adjustAppZoom("in"),
+        },
+        {
+          label: "Zoom Out",
+          accelerator: "CommandOrControl+-",
+          click: () => adjustAppZoom("out"),
+        },
         { type: "separator" },
         { role: "togglefullscreen", label: "Full Screen" },
       ],
@@ -206,6 +300,13 @@ autoUpdater.on("error", (error) => {
 });
 
 ipcMain.handle("app:get-version", () => app.getVersion());
+
+ipcMain.on("app:zoom-wheel", (event, direction) => {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  if (event.sender !== mainWindow.webContents) return;
+
+  adjustAppZoom(direction);
+});
 
 ipcMain.handle("save-current-page-pdf", async (event, fileName) => {
   try {
