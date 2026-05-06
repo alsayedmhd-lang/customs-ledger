@@ -49,19 +49,17 @@ export default function CustomerLedgerPage() {
   const isClient = user?.role === "client";
   const effectiveClientId = clientId;
 
-  const token =
-    localStorage.getItem("token") ||
-    sessionStorage.getItem("auth_token") ||
-    localStorage.getItem("auth_token");
+  const apiBase = (import.meta.env.VITE_API_BASE_URL || "http://localhost:10000").replace(/\/$/, "");
+  const token = sessionStorage.getItem("auth_token");
 
   useEffect(() => {
-    fetch("http://127.0.0.1:3000/api/clients", {
+    fetch(`${apiBase}/api/clients`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => res.json())
       .then((res) => setClients(Array.isArray(res) ? res : []))
       .catch(console.error);
-  }, [token]);
+  }, [apiBase, token]);
 
   const handleClientSelected = useCallback((nextClientId: number | "") => {
     const nextClient =
@@ -87,6 +85,13 @@ export default function CustomerLedgerPage() {
     [clients, isClient, linkedClientId]
   );
 
+  useEffect(() => {
+    if (!isClient || linkedClientId <= 0) return;
+    if (clientId !== linkedClientId || !hasSelectedClient) {
+      handleClientSelected(linkedClientId);
+    }
+  }, [isClient, linkedClientId, clientId, hasSelectedClient, handleClientSelected]);
+
   const filteredData = useMemo(() => {
     const q = referenceSearch.trim().toLowerCase();
     if (!q) return data;
@@ -111,6 +116,7 @@ export default function CustomerLedgerPage() {
     () => openingBalance + totalDebit - totalCredit,
     [openingBalance, totalDebit, totalCredit]
   );
+  const isSearchDisabled = !hasSelectedClient || !effectiveClientId || isLoading;
 
   const loadLedger = async () => {
     if (!effectiveClientId) return;
@@ -123,15 +129,14 @@ export default function CustomerLedgerPage() {
         to: toDate,
         q: referenceSearch.trim(),
       });
-      const res = await fetch(
-        `http://127.0.0.1:3000/api/customer-ledger/${effectiveClientId}?${params.toString()}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      const requestUrl = `${apiBase}/api/customer-ledger/${effectiveClientId}?${params.toString()}`;
+
+      const res = await fetch(requestUrl, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = await res.json();
 
       if (!res.ok) throw new Error(`Failed to load customer ledger: ${res.status}`);
-      const json = await res.json();
 
       setData(Array.isArray(json) ? json : json.rows ?? []);
       setOpeningBalance(Number(json.openingBalance ?? 0));
@@ -197,6 +202,13 @@ export default function CustomerLedgerPage() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-5 items-end">
           <div>
             <label className="text-sm font-medium text-gray-700">العميل</label>
+            {isClient ? (
+              <div className="w-full border rounded-xl px-3 py-2 mt-1 bg-gray-50 text-gray-900 min-h-[42px]">
+                {selectedClient
+                  ? selectedClient.nameAr || selectedClient.nameEn || selectedClient.name
+                  : "â€”"}
+              </div>
+            ) : (
             <select
               className="w-full border rounded-xl px-3 py-2 mt-1 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500"
               value={clientId}
@@ -212,6 +224,7 @@ export default function CustomerLedgerPage() {
                 </option>
               ))}
             </select>
+            )}
           </div>
 
           <div>
@@ -253,7 +266,7 @@ export default function CustomerLedgerPage() {
           <button
             type="button"
             onClick={loadLedger}
-            disabled={!hasSelectedClient || !effectiveClientId || isLoading}
+            disabled={isSearchDisabled}
             className="h-[42px] rounded-xl bg-primary text-white shadow hover:bg-primary/90 transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isLoading ? "جاري البحث..." : "بحث"}

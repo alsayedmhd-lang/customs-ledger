@@ -36,31 +36,105 @@
     createdBy: number | null;
   };
 
+  function ledgerEntryPriority(row: LedgerRow) {
+    if (row.entryType === "invoice") return 1;
+    if (row.entryType === "advance_payment") return 2;
+    if (row.entryType === "receipt") return 3;
+    return 9;
+  }
+
   async function getClientScope(req: any) {
     if (req.user?.role !== "client") return null;
+    const tokenClientId = Number(req.user?.clientId || 0);
     const { usersTable } = await import("@workspace/db");
+    const userId = Number(req.user?.userId || req.user?.id || 0);
+    if (!Number.isInteger(userId) || userId <= 0) {
+      return {
+        clientId: Number.isInteger(tokenClientId) && tokenClientId > 0 ? tokenClientId : null,
+        permissions: (req.user as any).clientViewPermissions ?? null,
+        tokenClientId: Number.isInteger(tokenClientId) && tokenClientId > 0 ? tokenClientId : null,
+        userTableClientId: null,
+        resolvedFrom: Number.isInteger(tokenClientId) && tokenClientId > 0 ? "token" : null,
+      };
+    }
+
     const [user] = await db
       .select({ clientId: usersTable.clientId, clientViewPermissions: usersTable.clientViewPermissions })
       .from(usersTable)
-      .where(eq(usersTable.id, req.user.userId))
+      .where(eq(usersTable.id, userId))
       .limit(1);
-    return user?.clientId ? { clientId: Number(user.clientId), permissions: user.clientViewPermissions as any } : { clientId: null, permissions: null };
+
+    const userTableClientId = user?.clientId ? Number(user.clientId) : null;
+    const resolvedClientId =
+      Number.isInteger(tokenClientId) && tokenClientId > 0
+        ? tokenClientId
+        : userTableClientId;
+
+    return {
+      clientId: resolvedClientId,
+      permissions: (req.user as any).clientViewPermissions ?? user?.clientViewPermissions ?? null,
+      tokenClientId: Number.isInteger(tokenClientId) && tokenClientId > 0 ? tokenClientId : null,
+      userTableClientId,
+      resolvedFrom: Number.isInteger(tokenClientId) && tokenClientId > 0 ? "token" : userTableClientId ? "users.clientId" : null,
+    };
   }
 
   router.get("/customer-ledger/:clientId", requireAuth, async (req, res) => {
     try {
+      console.log("[customer-ledger route entered]", {
+        reqUser: req.user,
+        params: req.params,
+        query: req.query,
+      });
+
+      const requestedClientId = Number(req.params.clientId);
       const clientScope = await getClientScope(req);
+      const log403 = (reason: string, resolvedClientId: number | null) => {
+        console.log(`[customer-ledger 403] reason=${reason}`, {
+          paramClientId: requestedClientId,
+          reqUser: req.user,
+          role: req.user?.role,
+          tokenClientId: clientScope?.tokenClientId ?? (req.user as any)?.clientId ?? null,
+          userTableClientId: clientScope?.userTableClientId ?? null,
+          resolvedClientId,
+          resolvedFrom: clientScope?.resolvedFrom ?? null,
+        });
+      };
+
+      res.on("finish", () => {
+        if (res.statusCode === 403) {
+          console.log("[customer-ledger 403] reason=unknown_finish", {
+            paramClientId: requestedClientId,
+            reqUser: req.user,
+            role: req.user?.role,
+            tokenClientId: clientScope?.tokenClientId ?? (req.user as any)?.clientId ?? null,
+            userTableClientId: clientScope?.userTableClientId ?? null,
+            resolvedClientId: clientScope?.clientId ?? null,
+            resolvedFrom: clientScope?.resolvedFrom ?? null,
+          });
+        }
+      });
+
       if (clientScope && !clientScope.clientId) {
+        log403("missing_client_link", null);
         return res.status(403).json({ error: "Client is not linked" });
       }
-      const clientId = clientScope ? Number(clientScope.clientId) : Number(req.params.clientId);
+      const clientId = clientScope ? Number(clientScope.clientId) : requestedClientId;
+
+      if (!Number.isInteger(clientId) || clientId <= 0) {
+        console.log("[customer-ledger backend]", {
+          routeName: "GET /customer-ledger/:clientId",
+          reqUser: req.user,
+          paramClientId: requestedClientId,
+          resolvedClientId: clientId,
+          responseStatus: 400,
+          reason: "invalid resolved clientId",
+        });
+        return res.status(400).json({ error: "Invalid clientId" });
+      }
       const from = req.query.from ? String(req.query.from) : "";
       const to = req.query.to ? String(req.query.to) : "";
       const q = req.query.q ? String(req.query.q).trim().toLowerCase() : "";
-
-      if (!Number.isInteger(clientId) || clientId <= 0) {
-        return res.status(400).json({ error: "Invalid clientId" });
-      }
 
       const [client] = await db
         .select()
@@ -72,16 +146,21 @@
         return res.status(404).json({ error: "Client not found" });
       }
 
-      const invoiceRows = await db
-        .select()
-        .from(invoicesTable)
-        .where(
-          and(
-            clientId > 0 ? eq(invoicesTable.clientId, clientId) : undefined,
-            isNull(invoicesTable.deletedAt),
-            inArray(invoicesTable.status, ["issued", "paid"])
-          )
-        );
+      const invoiceRows = clientScope
+        ? await db
+            .select()
+            .from(invoicesTable)
+            .where(eq(invoicesTable.clientId, clientId))
+        : await db
+            .select()
+            .from(invoicesTable)
+            .where(
+              and(
+                clientId > 0 ? eq(invoicesTable.clientId, clientId) : undefined,
+                isNull(invoicesTable.deletedAt),
+                inArray(invoicesTable.status, ["issued", "paid"])
+              )
+            );
 
       const receiptRows = await db
         .select()
@@ -167,12 +246,31 @@
           return true;
         })
         .sort((a, b) => {
-          if (a.entryDate === b.entryDate) return a.id.localeCompare(b.id);
-          return a.entryDate.localeCompare(b.entryDate);
+          const dateOrder = a.entryDate.localeCompare(b.entryDate);
+          if (dateOrder !== 0) return dateOrder;
+
+          const invoiceOrder = Number(a.invoiceId || 0) - Number(b.invoiceId || 0);
+          if (invoiceOrder !== 0) return invoiceOrder;
+
+          const priorityOrder = ledgerEntryPriority(a) - ledgerEntryPriority(b);
+          if (priorityOrder !== 0) return priorityOrder;
+
+          return a.id.localeCompare(b.id);
         });
 
       const previousRows = allRows.filter((row) => from && row.entryDate < from);
       const openingBalance = previousRows.reduce((sum, row) => sum + row.balanceImpact, 0);
+
+      if (clientScope) {
+        console.log("[customer-ledger backend]", {
+          routeName: "GET /customer-ledger/:clientId",
+          reqUser: req.user,
+          paramClientId: requestedClientId,
+          effectiveClientId: clientId,
+          responseStatus: 200,
+          rowsCount: sortedRows.length,
+        });
+      }
 
       res.json({
         client: {

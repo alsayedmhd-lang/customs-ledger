@@ -14,7 +14,25 @@ import { Router } from "express";
 const router = Router();
 
 router.use((req, res, next) => {
+  if (!req.path.startsWith("/trash")) {
+    if (req.originalUrl.includes("customer-ledger")) {
+      console.log("[customer-ledger trace] after requireAuth guard name=trashRouter allowed=skip_non_trash", {
+        role: (req as any).user?.role,
+        path: req.path,
+        originalUrl: req.originalUrl,
+      });
+    }
+    return next();
+  }
+
   if ((req as any).user?.role === "client") {
+    if (req.originalUrl.includes("customer-ledger")) {
+      console.log("[customer-ledger 403] reason=trash_router_client_guard", {
+        role: (req as any).user?.role,
+        path: req.path,
+        originalUrl: req.originalUrl,
+      });
+    }
     return res.status(403).json({ error: "Trash is not allowed for client users" });
   }
   next();

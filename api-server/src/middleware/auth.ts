@@ -22,15 +22,42 @@ export function signToken(payload: AuthPayload): string {
 }
 
 export function requireAuth(req: Request, res: Response, next: NextFunction) {
+  const isCustomerLedger = req.originalUrl.includes("customer-ledger");
   const header = req.headers.authorization;
+  if (isCustomerLedger) {
+    console.log("[customer-ledger trace] requireAuth entered", {
+      method: req.method,
+      originalUrl: req.originalUrl,
+      path: req.path,
+      hasToken: Boolean(header?.startsWith("Bearer ")),
+    });
+  }
   if (!header?.startsWith("Bearer ")) {
+    if (isCustomerLedger) {
+      console.log("[customer-ledger trace] requireAuth denied", {
+        reason: "missing_bearer_token",
+        status: 401,
+      });
+    }
     return res.status(401).json({ message: "غير مصرح — الرجاء تسجيل الدخول" });
   }
   try {
     const token = header.slice(7);
     req.user = jwt.verify(token, JWT_SECRET) as AuthPayload;
+    if (isCustomerLedger) {
+      console.log("[customer-ledger trace] requireAuth success", {
+        user: req.user,
+      });
+    }
     next();
-  } catch {
+  } catch (err) {
+    if (isCustomerLedger) {
+      console.log("[customer-ledger trace] requireAuth denied", {
+        reason: "token_verify_failed",
+        status: 401,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
     return res.status(401).json({ message: "انتهت صلاحية الجلسة — الرجاء تسجيل الدخول مجدداً" });
   }
 }
