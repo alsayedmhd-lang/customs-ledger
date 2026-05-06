@@ -20,6 +20,7 @@ import { useAuth } from "@/lib/auth-context";
 import { useLanguage } from "@/lib/language-context";
 import { useCompanySettings } from "@/lib/company-settings-context";
 import { useDisplaySettings } from "@/lib/display-settings-context";
+import { getRoleLabel } from "@/lib/role-labels";
 import SettingsPanel from "./SettingsPanel";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -111,6 +112,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const resolvedName = (isAR ? user?.displayNameAr : user?.displayNameEn) || user?.displayName || "";
+  const roleLabel = getRoleLabel(user?.role, isAR);
   const initial = resolvedName?.charAt(0) ?? "م";
   const todayStr = new Date().toLocaleDateString(lang === "ar" ? "ar-EG" : "en-US", {
     weekday: "long", year: "numeric", month: "long", day: "numeric",
@@ -204,7 +206,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
           </div>
           <div className="min-w-0 flex-1">
             <p className="text-sm font-bold truncate" style={{ color: "var(--sb-foreground, #ffffff)" }}>{isAR ? resolvedName : user?.displayNameEn || resolvedName}</p>
-            <p className="text-xs font-medium" style={{ color: "var(--sb-muted-foreground, rgba(255,255,255,0.4))" }}>{user?.role === "admin" ? t("admin") : t("user")}</p>
+            <p className="text-xs font-medium" style={{ color: "var(--sb-muted-foreground, rgba(255,255,255,0.4))" }}>{roleLabel}</p>
           </div>
         </div>
         <button
@@ -369,7 +371,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                     {isAR ? resolvedName : user?.displayNameEn || resolvedName}
                   </p>
                   <p className="text-xs text-slate-500 mb-2">
-                    {user?.role === "admin" ? t("admin") : t("user")}
+                    {roleLabel}
                   </p>
 
                   <button

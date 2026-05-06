@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useAuth, type UserPermissions } from "@/lib/auth-context";
 import { useLanguage } from "@/lib/language-context";
+import { getRoleLabel } from "@/lib/role-labels";
 import {
   Users, Plus, Trash2, Pencil, Key, ShieldCheck, User, X, Check,
   FileText, ReceiptText, UserCog, PackageSearch, Shield, Mail, Phone, UserCheck, Clock, KeyRound
@@ -378,22 +379,22 @@ export default function UsersPage() {
                     {u.role === "admin" ? (
                       <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300">
                         <ShieldCheck className="w-3 h-3" />
-                        {isAR ? "مدير" : "Admin"}
+                        {getRoleLabel(u.role, isAR)}
                       </span>
                     ) : u.role === "supervisor" ? (
                       <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full font-medium bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300">
                         <Shield className="w-3 h-3" />
-                        {isAR ? "مشرف" : "Supervisor"}
+                        {getRoleLabel(u.role, isAR)}
                       </span>
                     ) : u.role === "client" ? (
                       <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
                         <UserCheck className="w-3 h-3" />
-                        {isAR ? "عميل" : "Client"}
+                        {getRoleLabel(u.role, isAR)}
                       </span>
                     ) : (
                       <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
                         <User className="w-3 h-3" />
-                        {isAR ? "مستخدم" : "User"}
+                        {getRoleLabel(u.role, isAR)}
                       </span>
                     )}
                   </td>
@@ -501,9 +502,9 @@ export default function UsersPage() {
             <Field label={isAR ? "كلمة السر" : "Password"}><input type="password" value={form.password} onChange={e => setForm(p => ({ ...p, password: e.target.value }))} className={inputCls} required /></Field>
             <Field label={isAR ? "الدور" : "Role"}>
               <select value={form.role} onChange={e => setForm(p => ({ ...p, role: e.target.value, clientId: e.target.value === "client" ? p.clientId : "" }))} className={inputCls}>
-                <option value="user">{isAR ? "مستخدم" : "User"}</option>
-                <option value="supervisor">{isAR ? "مشرف" : "Supervisor"}</option>
-                <option value="client">{isAR ? "عميل" : "Client"}</option>
+                <option value="user">{getRoleLabel("user", isAR)}</option>
+                <option value="supervisor">{getRoleLabel("supervisor", isAR)}</option>
+                <option value="client">{getRoleLabel("client", isAR)}</option>
               </select>
             </Field>
             {form.role === "client" && (
@@ -539,9 +540,9 @@ export default function UsersPage() {
             <Field label={isAR ? "الاسم الكامل (احتياطي)" : "Full Name (fallback)"}><input value={editForm.displayName} onChange={e => setEditForm(p => ({ ...p, displayName: e.target.value }))} className={inputCls} required /></Field>
             <Field label={isAR ? "الدور" : "Role"}>
               <select value={editForm.role} onChange={e => setEditForm(p => ({ ...p, role: e.target.value, clientId: e.target.value === "client" ? p.clientId : "" }))} className={inputCls}>
-                <option value="user">{isAR ? "مستخدم" : "User"}</option>
-                <option value="supervisor">{isAR ? "مشرف" : "Supervisor"}</option>
-                <option value="client">{isAR ? "عميل" : "Client"}</option>
+                <option value="user">{getRoleLabel("user", isAR)}</option>
+                <option value="supervisor">{getRoleLabel("supervisor", isAR)}</option>
+                <option value="client">{getRoleLabel("client", isAR)}</option>
               </select>
             </Field>
             {editForm.role === "client" && (
