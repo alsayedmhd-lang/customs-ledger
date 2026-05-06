@@ -44,6 +44,15 @@ async function fetchClientStatement(id: number) {
   return res.json();
 }
 
+function formatDateYMD(value: string | null) {
+  if (!value) return "";
+  const normalized = value.trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(normalized)) return normalized.slice(0, 10);
+
+  const parsed = new Date(normalized);
+  return Number.isNaN(parsed.getTime()) ? normalized : parsed.toISOString().slice(0, 10);
+}
+
 export default function ClientStatement() {
   const { id } = useParams<{ id: string }>();
   const clientId = parseInt(id || "0", 10);
@@ -84,6 +93,10 @@ export default function ClientStatement() {
   const { client, invoices, totalDue, totalPaid, balance } = statement;
   const today = new Date().toISOString();
   const statementRef = `ST-${client.id}-${new Date().getFullYear()}`;
+  const params = new URLSearchParams(window.location.search);
+  const fromDateText = formatDateYMD(params.get("from"));
+  const toDateText = formatDateYMD(params.get("to"));
+  const hasDateRange = !!fromDateText && !!toDateText;
 
   // Running balance table
   let runningBalance = 0;
@@ -231,6 +244,26 @@ export default function ClientStatement() {
               {client.address && <p className="text-sm text-gray-600 mt-0.5">{client.address}</p>}
               {client.taxId && <p className="text-sm text-gray-600">الرقم الضريبي: {client.taxId}</p>}
               {client.email && <p className="text-sm text-gray-500">{client.email}</p>}
+              {hasDateRange && (
+                <div className="mt-3 grid grid-cols-2 gap-3 text-xs" dir={isAR ? "rtl" : "ltr"}>
+                  <div className="rounded border border-gray-200 bg-gray-50 px-3 py-2 text-center">
+                    <div className="font-bold text-gray-600">
+                      {isAR ? "من تاريخ" : "From Date"}
+                    </div>
+                    <div className="mt-1 font-mono text-gray-900" dir="ltr">
+                      {fromDateText}
+                    </div>
+                  </div>
+                  <div className="rounded border border-gray-200 bg-gray-50 px-3 py-2 text-center">
+                    <div className="font-bold text-gray-600">
+                      {isAR ? "إلى تاريخ" : "To Date"}
+                    </div>
+                    <div className="mt-1 font-mono text-gray-900" dir="ltr">
+                      {toDateText}
+                    </div>
+                  </div>
+                </div>
+              )}
               {client.phone && <p className="text-sm text-gray-500">☎ {client.phone}</p>}
             </div>
 

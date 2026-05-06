@@ -272,7 +272,13 @@ export default function StatementsIndex() {
                           </Link>
                         )}
                           <button
-                            onClick={() => setLocation(`/clients/${client.id}/statement`)}
+                            onClick={() => {
+                              const query = new URLSearchParams();
+                              if (fromDate) query.set("from", fromDate);
+                              if (toDate) query.set("to", toDate);
+                              const suffix = query.toString() ? `?${query.toString()}` : "";
+                              setLocation(`/clients/${client.id}/statement${suffix}`);
+                            }}
                             className="flex items-center gap-1.5 px-3 py-1.5 bg-muted/10 text-muted-foreground hover:bg-muted/20 rounded-lg font-semibold text-xs transition-all"
                           >
                             <Printer className="w-3.5 h-3.5" />
