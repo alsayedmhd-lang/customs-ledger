@@ -5,11 +5,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || "http://localhost:3000").replace(/\/$/, "") + "/api";
 const UNLOCK_KEY = "developer_unlocked";
 const NA = "غير متاح";
+const DEFAULT_LOGIN_FOOTER_TEXT = "Internal Accounting System For Companes - alsayed.mhd@gmail.com - Phone - 00201009697521 - 0097460020446";
 
 type DeveloperSettings = {
   lockCompanyIdentity: boolean;
@@ -18,6 +20,7 @@ type DeveloperSettings = {
   lockStamp: boolean;
   lockLegalInfo: boolean;
   lockFooterBranding: boolean;
+  loginFooterText: string;
   preventRebrandToAnotherCompany: boolean;
   licenseStatus: string;
   licensedCompanyName: string;
@@ -57,6 +60,7 @@ const defaultSettings: DeveloperSettings = {
   lockStamp: false,
   lockLegalInfo: false,
   lockFooterBranding: false,
+  loginFooterText: "",
   preventRebrandToAnotherCompany: false,
   licenseStatus: "not_configured",
   licensedCompanyName: "",
@@ -377,6 +381,14 @@ export default function DeveloperSettingsPage() {
           <Card className="rounded-lg">
             <CardHeader><CardTitle className="text-lg">بيانات الترخيص</CardTitle></CardHeader>
             <CardContent className="grid gap-3">
+              <div className="space-y-1">
+                <Label>نص أسفل صفحة الدخول / Login footer text</Label>
+                <Textarea
+                  value={settings.loginFooterText || DEFAULT_LOGIN_FOOTER_TEXT}
+                  onChange={(event) => setText("loginFooterText", event.target.value)}
+                  className="min-h-20"
+                />
+              </div>
               {licenseFields.map(([key, label]) => (
                 <div key={key} className="space-y-1">
                   <Label>{label}</Label>

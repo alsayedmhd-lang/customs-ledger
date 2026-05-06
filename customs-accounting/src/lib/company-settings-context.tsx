@@ -28,6 +28,7 @@ export interface CompanySettings {
   showStampOnReceipts: boolean;
   showStampOnStatements: boolean;
   footerText: string;
+  loginFooterText: string;
   invoiceCashTitleAr: string;
   invoiceCashTitleEn: string;
   invoiceCreditTitleAr: string;
@@ -86,6 +87,7 @@ export const DEFAULT_SETTINGS: CompanySettings = {
   showStampOnReceipts: true,
   showStampOnStatements: true,
   footerText: "",
+  loginFooterText: "",
   invoiceCashTitleAr: "فاتورة نقداً",
   invoiceCashTitleEn: "Cash Invoice",
   invoiceCreditTitleAr: "فاتورة نقداً / على الحساب",

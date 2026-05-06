@@ -9,6 +9,8 @@ import { motion, AnimatePresence } from "framer-motion";
 
 const LOGO = `${import.meta.env.BASE_URL}logo_nobg.png`;
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
+const LOGIN_FOOTER_TEXT_AR = "نظام المحاسبة الداخلي للشركات - alsayed.mhd@gmail.com - تلفون  - 00201009697521 - 0097460020446 ";
+const LOGIN_FOOTER_TEXT_EN = "Internal Accounting System For Companes - alsayed.mhd@gmail.com - Phone - 00201009697521 - 0097460020446";
 
 function OtpInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const inputs = useRef<(HTMLInputElement | null)[]>([]);
@@ -73,6 +75,7 @@ export default function LoginPage() {
   const primaryColor = "hsl(var(--primary))";
   const primaryShadow = "0 6px 20px hsl(var(--primary) / 0.35)";
   const logoShadow = `drop-shadow(0 0 24px ${displayPrimary.hex}66)`;
+  const loginFooterText = settings.loginFooterText?.trim() || (isAR ? LOGIN_FOOTER_TEXT_AR : LOGIN_FOOTER_TEXT_EN);
 
   const loginTheme = isDark
     ? {
@@ -838,7 +841,7 @@ export default function LoginPage() {
         </AnimatePresence>
 
         <p className="text-center text-white/25 text-xs mt-6 font-medium">
-          {isAR ? "نظام المحاسبة الداخلي للشركات - alsayed.mhd@gmail.com - تلفون  - 00201009697521 - 0097460020446 " : "Internal Accounting System For Companes - alsayed.mhd@gmail.com - Phone - 00201009697521 - 0097460020446"}
+          {loginFooterText}
                   </p>
         <p className="text-center text-white/25 text-xs mt-2 font-medium">
           Version {appVersion}
