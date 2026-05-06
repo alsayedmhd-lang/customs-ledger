@@ -1808,11 +1808,17 @@ const decryptBackupData = async (backupFile: any, password: string) => {
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      dir={isRTL ? "rtl" : "ltr"}
-      className="flex w-full gap-5 pb-10 items-start"
+      dir="ltr"
+      className={cn(
+        "relative left-1/2 grid w-[calc(100vw-2rem)] max-w-none -translate-x-1/2 grid-cols-1 gap-6 pb-10 items-start sm:w-[calc(100vw-3rem)] md:w-[calc(100vw-16rem-3rem)] lg:w-[calc(100vw-16rem-4rem)]",
+        isRTL ? "md:grid-cols-[minmax(0,1fr)_12rem]" : "md:grid-cols-[12rem_minmax(0,1fr)]"
+      )}
     >
       {/* ── Sticky Sidebar ─────────────────────────────────────── */}
-      <div className="sticky top-4 self-start w-48 shrink-0 space-y-3">
+      <div
+        className={cn("sticky top-4 self-start w-full space-y-3", isRTL ? "md:order-2" : "md:order-1")}
+        dir={isRTL ? "rtl" : "ltr"}
+      >
 
         {/* User card */}
         <div className="bg-card rounded-2xl border border-border/50 shadow-sm p-3">
@@ -1878,7 +1884,10 @@ const decryptBackupData = async (backupFile: any, password: string) => {
       </div>
 
       {/* ── Content Area ───────────────────────────────────────── */}
-      <div className="flex-1 min-w-0 w-full space-y-5">
+      <div
+        className={cn("min-w-0 w-full space-y-5", isRTL ? "md:order-1" : "md:order-2")}
+        dir={isRTL ? "rtl" : "ltr"}
+      >
 
         {/* Section title */}
         <div className="flex items-center justify-between">

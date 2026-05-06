@@ -37,6 +37,19 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [pageZoom, setPageZoom] = useState(1);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem("sidebar_collapsed") === "true";
+    } catch {
+      return false;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("sidebar_collapsed", String(sidebarCollapsed));
+    } catch {}
+  }, [sidebarCollapsed]);
 
     useEffect(() => {
       const handleWheel = (e: WheelEvent) => {
@@ -117,22 +130,50 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const todayStr = new Date().toLocaleDateString(lang === "ar" ? "ar-EG" : "en-US", {
     weekday: "long", year: "numeric", month: "long", day: "numeric",
   });
+  const isPrintRoute = location.includes("/print");
 
-  const SidebarContent = () => (
+  const SidebarContent = ({
+    collapsed = false,
+    showCollapseButton = false,
+  }: {
+    collapsed?: boolean;
+    showCollapseButton?: boolean;
+  }) => (
     <div className="flex flex-col h-full">
       {/* Logo */}
-      <div className="p-5 flex items-center gap-3 border-b" style={{ borderColor: "var(--sb-border, rgba(255,255,255,0.1))" }}>
+      <div
+        className={cn(
+          "border-b transition-all duration-200",
+          collapsed ? "p-3 flex flex-col items-center gap-3" : "p-5 flex items-center gap-3"
+        )}
+        style={{ borderColor: "var(--sb-border, rgba(255,255,255,0.1))" }}
+      >
+        {showCollapseButton && (
+          <button
+            type="button"
+            onClick={() => setSidebarCollapsed((value) => !value)}
+            className={cn(
+              "flex h-9 w-9 items-center justify-center rounded-xl font-bold transition-colors hover:bg-white/10",
+              !collapsed && (isRTL ? "me-auto" : "ms-auto")
+            )}
+            style={{ color: "var(--sb-foreground, #ffffff)" }}
+            title={collapsed ? (isAR ? "توسيع القائمة" : "Expand sidebar") : (isAR ? "طي القائمة" : "Collapse sidebar")}
+            aria-label={collapsed ? (isAR ? "توسيع القائمة" : "Expand sidebar") : (isAR ? "طي القائمة" : "Collapse sidebar")}
+          >
+            ☰
+          </button>
+        )}
         <img
           src={logoSrc}
           alt="شعار الشركة"
-          className="w-12 h-12 flex-shrink-0 object-contain"
+          className={cn("flex-shrink-0 object-contain transition-all duration-200", collapsed ? "w-10 h-10" : "w-12 h-12")}
           style={{ filter: "drop-shadow(0 2px 8px rgba(59,130,246,0.5))" }}
           onError={(e) => {
             const el = e.currentTarget;
             el.style.display = "none";
           }}
         />
-        <div className="min-w-0">
+        {!collapsed && <div className="min-w-0">
           <h1 className="font-black text-sm leading-tight truncate" style={{ color: "var(--sb-foreground, #ffffff)" }}>
             {isAR
               ? (settings.nameAr || "").split(" ").slice(0, 2).join(" ")
@@ -141,22 +182,25 @@ export default function AppLayout({ children }: AppLayoutProps) {
           <p className="text-[11px] font-medium mt-0.5 truncate" style={{ color: "var(--sb-muted-foreground, rgba(255,255,255,0.5))" }}>
             {isAR ? settings.subtitleAr : settings.subtitleEn}
           </p>
-        </div>
+        </div>}
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 p-3 space-y-0.5 overflow-y-auto">
+      <nav className={cn("flex-1 space-y-0.5 overflow-y-auto transition-all duration-200", collapsed ? "p-2" : "p-3")}>
         {navItems.map((item) => {
           const isActive =
             location === item.href ||
             (item.href !== "/" && location.startsWith(item.href));
+          const label = t(item.name as any) || item.name;
           return (
             <Link key={item.href} href={item.href} onClick={() => setMobileOpen(false)}>
               <div
                 className={cn(
-                  "flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium transition-all duration-200 cursor-pointer group",
+                  "flex items-center rounded-xl font-medium transition-all duration-200 cursor-pointer group",
+                  collapsed ? "justify-center px-2 py-2.5" : "gap-3 px-3 py-2.5",
                   isActive && "shadow-lg nav-active-glow"
                 )}
+                title={collapsed ? label : undefined}
                 style={{
                   background: isActive ? "var(--sb-active-bg, #ffffff)" : undefined,
                   color: isActive ? "var(--sb-active-fg, #0f172a)" : "var(--sb-muted-foreground, rgba(255,255,255,0.6))",
@@ -185,8 +229,8 @@ export default function AppLayout({ children }: AppLayoutProps) {
                     isActive ? "text-primary" : item.color
                   )} />
                 </div>
-                <span className="text-sm font-semibold">{t(item.name as any) || item.name}</span>
-                {isActive && (
+                {!collapsed && <span className="text-sm font-semibold">{label}</span>}
+                {isActive && !collapsed && (
                   <motion.div
                     layoutId="activeIndicator"
                     className={`ms-auto w-1.5 h-1.5 rounded-full bg-primary`}
@@ -199,25 +243,33 @@ export default function AppLayout({ children }: AppLayoutProps) {
       </nav>
 
       {/* User + Logout */}
-      <div className="p-3 border-t" style={{ borderColor: "var(--sb-border, rgba(255,255,255,0.1))" }}>
-        <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl mb-1" style={{ background: "var(--sb-hover-bg, rgba(255,255,255,0.05))" }}>
+      <div className={cn("border-t transition-all duration-200", collapsed ? "p-2" : "p-3")} style={{ borderColor: "var(--sb-border, rgba(255,255,255,0.1))" }}>
+        <div
+          className={cn("flex items-center rounded-xl mb-1", collapsed ? "justify-center px-2 py-2.5" : "gap-3 px-3 py-2.5")}
+          style={{ background: "var(--sb-hover-bg, rgba(255,255,255,0.05))" }}
+          title={collapsed ? (isAR ? resolvedName : user?.displayNameEn || resolvedName) : undefined}
+        >
           <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-black text-sm flex-shrink-0 shadow-md">
             {initial}
           </div>
-          <div className="min-w-0 flex-1">
+          {!collapsed && <div className="min-w-0 flex-1">
             <p className="text-sm font-bold truncate" style={{ color: "var(--sb-foreground, #ffffff)" }}>{isAR ? resolvedName : user?.displayNameEn || resolvedName}</p>
             <p className="text-xs font-medium" style={{ color: "var(--sb-muted-foreground, rgba(255,255,255,0.4))" }}>{roleLabel}</p>
-          </div>
+          </div>}
         </div>
         <button
           onClick={logout}
-          className="flex w-full items-center gap-3 px-3 py-2.5 rounded-xl font-medium hover:bg-red-500/15 hover:text-red-500 transition-all duration-200 group"
+          className={cn(
+            "flex w-full items-center rounded-xl font-medium hover:bg-red-500/15 hover:text-red-500 transition-all duration-200 group",
+            collapsed ? "justify-center px-2 py-2.5" : "gap-3 px-3 py-2.5"
+          )}
           style={{ color: "var(--sb-muted-foreground, rgba(255,255,255,0.5))" }}
+          title={collapsed ? t("logout") : undefined}
         >
           <div className="w-8 h-8 rounded-lg group-hover:bg-red-500/15 flex items-center justify-center flex-shrink-0 transition-colors" style={{ background: "var(--sb-hover-bg, rgba(255,255,255,0.05))" }}>
             <LogOut className="w-4 h-4" />
           </div>
-          <span className="text-sm font-semibold">{t("logout")}</span>
+          {!collapsed && <span className="text-sm font-semibold">{t("logout")}</span>}
         </button>
       </div>
     </div>
@@ -231,7 +283,8 @@ export default function AppLayout({ children }: AppLayoutProps) {
       {/* Desktop Sidebar */}
       <aside
         className={cn(
-          "app-sidebar hidden md:flex w-64 flex-shrink-0 flex-col print-hidden relative",
+          "app-sidebar hidden md:flex flex-shrink-0 flex-col print-hidden relative transition-all duration-200",
+          sidebarCollapsed ? "w-20" : "w-64",
           isRTL ? "border-l" : "border-r"
         )}
         style={{
@@ -239,7 +292,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
           borderColor: "var(--sb-border, rgba(255,255,255,0.07))",
         }}
       >
-        <SidebarContent />
+        <SidebarContent collapsed={sidebarCollapsed} showCollapseButton />
       </aside>
 
       {/* Mobile Sidebar */}
@@ -393,7 +446,14 @@ export default function AppLayout({ children }: AppLayoutProps) {
             style={{ zoom: pageZoom }}
           >
           <div className="min-h-full">
-            <div className="mx-auto max-w-7xl p-4 sm:p-6 lg:p-8">
+            <div
+              className={cn(
+                "min-h-full",
+                isPrintRoute
+                  ? "mx-auto max-w-7xl p-4 sm:p-6 lg:p-8"
+                  : "w-full max-w-none px-4 py-4 sm:px-6 sm:py-6 lg:px-6"
+              )}
+            >
               {children}
             </div>
           </div>
