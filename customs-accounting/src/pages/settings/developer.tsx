@@ -182,11 +182,20 @@ function formatDisplayValue(value: string | number | boolean | null | undefined,
   return labels[normalized.toLowerCase()]?.[isAR ? 0 : 1] ?? normalized;
 }
 
-function formatSyncQueueDate(value: string | null | undefined, isAR: boolean) {
+function formatSyncQueueDate(value: string | number | null | undefined, isAR: boolean) {
   if (!value) return isAR ? "لا يوجد" : "Never";
-  const date = new Date(value);
+  const date = new Date(typeof value === "number" ? value : String(value));
   if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString();
+  return date.toLocaleString(isAR ? "ar" : "en");
+}
+
+function syncQueueStatusBadgeClass(status: string) {
+  const normalized = status.toLowerCase();
+  if (normalized === "pending") return "border-amber-200 bg-amber-50 text-amber-700";
+  if (normalized === "processing") return "border-blue-200 bg-blue-50 text-blue-700";
+  if (normalized === "done") return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  if (normalized === "failed") return "border-red-200 bg-red-50 text-red-700";
+  return "border-border bg-background text-muted-foreground";
 }
 
 function InfoRow({ label, value, isAR }: { label: string; value?: string | number | boolean | null; isAR: boolean }) {
@@ -231,6 +240,7 @@ export default function DeveloperSettingsPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isTestingConnection, setIsTestingConnection] = useState(false);
   const [isConnectingOnline, setIsConnectingOnline] = useState(false);
+  const [isSyncQueueLoading, setIsSyncQueueLoading] = useState(false);
   const [onlineDatabaseConnected, setOnlineDatabaseConnected] = useState(false);
   const [savedMessage, setSavedMessage] = useState("");
   const [databaseMessage, setDatabaseMessage] = useState("");
@@ -359,6 +369,7 @@ export default function DeveloperSettingsPage() {
   }
 
   async function loadSyncQueueStatus() {
+    setIsSyncQueueLoading(true);
     try {
       const res = await fetch(`${API_BASE}/developer/sync-queue/status`, { headers: authHeaders() });
       if (!res.ok) return;
@@ -371,6 +382,8 @@ export default function DeveloperSettingsPage() {
       });
     } catch {
       setSyncQueueStatus({ pending: 0, failed: 0, lastSync: null, recent: [] });
+    } finally {
+      setIsSyncQueueLoading(false);
     }
   }
 
@@ -590,14 +603,21 @@ export default function DeveloperSettingsPage() {
               <InfoRow isAR={isAR} label={tr("آخر نسخة احتياطية", "Last backup")} value={settings.lastBackupAt} />
             </div>
             <div className="rounded-2xl border border-border bg-background/70 p-4 shadow-sm">
-              <div className="mb-3 flex items-center gap-2 text-sm font-bold text-foreground">
-                <RefreshCw className="h-4 w-4 text-primary" />
-                <span>{tr("حالة قائمة المزامنة", "Sync queue status")}</span>
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 text-sm font-bold text-foreground">
+                  <RefreshCw className={cn("h-4 w-4 text-primary", isSyncQueueLoading && "animate-spin")} />
+                  <span>{tr("حالة قائمة المزامنة", "Sync queue status")}</span>
+                  {isSyncQueueLoading && <span className="text-xs font-medium text-muted-foreground">{tr("جارٍ التحميل...", "Loading...")}</span>}
+                </div>
+                <Button type="button" variant="outline" size="sm" onClick={loadSyncQueueStatus} disabled={isSyncQueueLoading} className="gap-2">
+                  <RefreshCw className={cn("h-3.5 w-3.5", isSyncQueueLoading && "animate-spin")} />
+                  {tr("تحديث", "Refresh")}
+                </Button>
               </div>
               <div className="grid gap-3 md:grid-cols-3">
                 <InfoRow isAR={isAR} label={tr("المزامنة المنتظرة", "Pending sync")} value={syncQueueStatus.pending} />
                 <InfoRow isAR={isAR} label={tr("المزامنة الفاشلة", "Failed sync")} value={syncQueueStatus.failed} />
-                <InfoRow isAR={isAR} label={tr("آخر مزامنة", "Last sync")} value={syncQueueStatus.lastSync || tr("لا يوجد", "Never")} />
+                <InfoRow isAR={isAR} label={tr("آخر مزامنة", "Last sync")} value={formatSyncQueueDate(syncQueueStatus.lastSync, isAR)} />
               </div>
               <div className="mt-4">
                 <div className="mb-2 text-xs font-semibold text-muted-foreground">{tr("آخر عناصر القائمة", "Recent Queue Items")}</div>
@@ -626,9 +646,15 @@ export default function DeveloperSettingsPage() {
                               <div className="text-muted-foreground">{item.entityId || "-"}</div>
                             </td>
                             <td className="px-3 py-2">{item.operation || "-"}</td>
-                            <td className="px-3 py-2">{item.status || "-"}</td>
+                            <td className="px-3 py-2">
+                              <span className={cn("inline-flex rounded-full border px-2 py-0.5 text-[11px] font-semibold", syncQueueStatusBadgeClass(item.status || ""))}>
+                                {item.status || "-"}
+                              </span>
+                            </td>
                             <td className="px-3 py-2">{item.attempts}</td>
-                            <td className="max-w-[220px] truncate px-3 py-2" title={item.lastError || ""}>{item.lastError || "-"}</td>
+                            <td className="px-3 py-2">
+                              <div className="max-w-[220px] truncate" title={item.lastError || ""}>{item.lastError || "-"}</div>
+                            </td>
                             <td className="px-3 py-2">{formatSyncQueueDate(item.createdAt, isAR)}</td>
                           </tr>
                         ))}
