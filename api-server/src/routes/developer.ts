@@ -218,7 +218,7 @@ router.get("/developer/database/sql", (_req, res) => {
 router.get("/developer/sync-queue/status", (_req, res) => {
   try {
     if (!sqlite) {
-      return res.json({ pending: 0, failed: 0, lastSync: null });
+      return res.json({ pending: 0, failed: 0, lastSync: null, recent: [] });
     }
 
     const table = sqlite
@@ -226,7 +226,7 @@ router.get("/developer/sync-queue/status", (_req, res) => {
       .get();
 
     if (!table) {
-      return res.json({ pending: 0, failed: 0, lastSync: null });
+      return res.json({ pending: 0, failed: 0, lastSync: null, recent: [] });
     }
 
     const pending = sqlite
@@ -238,11 +238,44 @@ router.get("/developer/sync-queue/status", (_req, res) => {
     const lastSync = sqlite
       .prepare("SELECT MAX(COALESCE(updated_at, created_at)) AS value FROM sync_queue WHERE status = 'success'")
       .get() as { value: number | null };
+    const recent = sqlite
+      .prepare(`
+        SELECT
+          id,
+          entity_type AS entityType,
+          entity_id AS entityId,
+          operation,
+          status,
+          retry_count AS attempts,
+          last_error AS lastError,
+          created_at AS createdAt,
+          updated_at AS updatedAt
+        FROM sync_queue
+        ORDER BY created_at DESC
+        LIMIT 10
+      `)
+      .all() as Array<{
+        id: number;
+        entityType: string;
+        entityId: string;
+        operation: string;
+        status: string;
+        attempts: number;
+        lastError: string | null;
+        createdAt: number | null;
+        updatedAt: number | null;
+      }>;
 
     return res.json({
       pending: Number(pending?.count || 0),
       failed: Number(failed?.count || 0),
       lastSync: lastSync?.value ? new Date(Number(lastSync.value)).toISOString() : null,
+      recent: recent.map((item) => ({
+        ...item,
+        attempts: Number(item.attempts || 0),
+        createdAt: item.createdAt ? new Date(Number(item.createdAt)).toISOString() : null,
+        updatedAt: item.updatedAt ? new Date(Number(item.updatedAt)).toISOString() : null,
+      })),
     });
   } catch (err) {
     console.error(err);

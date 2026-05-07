@@ -95,10 +95,22 @@ type DatabaseMode = "local" | "online";
 type SyncMode = "local-to-online" | "online-to-local" | "bidirectional";
 type AutoSyncTiming = "startup" | "interval";
 type SyncStatus = "idle" | "success" | "failed" | "in-progress";
+type SyncQueueItem = {
+  id: number;
+  entityType: string;
+  entityId: string;
+  operation: string;
+  status: string;
+  attempts: number;
+  lastError: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+};
 type SyncQueueStatus = {
   pending: number;
   failed: number;
   lastSync: string | null;
+  recent: SyncQueueItem[];
 };
 type BoolKey = {
   [K in keyof DeveloperSettings]: DeveloperSettings[K] extends boolean ? K : never;
@@ -170,6 +182,13 @@ function formatDisplayValue(value: string | number | boolean | null | undefined,
   return labels[normalized.toLowerCase()]?.[isAR ? 0 : 1] ?? normalized;
 }
 
+function formatSyncQueueDate(value: string | null | undefined, isAR: boolean) {
+  if (!value) return isAR ? "لا يوجد" : "Never";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString();
+}
+
 function InfoRow({ label, value, isAR }: { label: string; value?: string | number | boolean | null; isAR: boolean }) {
   return (
     <div className="rounded-lg border border-border bg-background px-3 py-2">
@@ -220,6 +239,7 @@ export default function DeveloperSettingsPage() {
     pending: 0,
     failed: 0,
     lastSync: null,
+    recent: [],
   });
   const [databaseMode, setDatabaseMode] = useState<DatabaseMode>("local");
   const [databaseConfig, setDatabaseConfig] = useState({
@@ -347,9 +367,10 @@ export default function DeveloperSettingsPage() {
         pending: Number(data?.pending || 0),
         failed: Number(data?.failed || 0),
         lastSync: data?.lastSync || null,
+        recent: Array.isArray(data?.recent) ? data.recent : [],
       });
     } catch {
-      setSyncQueueStatus({ pending: 0, failed: 0, lastSync: null });
+      setSyncQueueStatus({ pending: 0, failed: 0, lastSync: null, recent: [] });
     }
   }
 
@@ -577,6 +598,44 @@ export default function DeveloperSettingsPage() {
                 <InfoRow isAR={isAR} label={tr("المزامنة المنتظرة", "Pending sync")} value={syncQueueStatus.pending} />
                 <InfoRow isAR={isAR} label={tr("المزامنة الفاشلة", "Failed sync")} value={syncQueueStatus.failed} />
                 <InfoRow isAR={isAR} label={tr("آخر مزامنة", "Last sync")} value={syncQueueStatus.lastSync || tr("لا يوجد", "Never")} />
+              </div>
+              <div className="mt-4">
+                <div className="mb-2 text-xs font-semibold text-muted-foreground">{tr("آخر عناصر القائمة", "Recent Queue Items")}</div>
+                {syncQueueStatus.recent.length === 0 ? (
+                  <div className="rounded-md border border-border bg-background px-3 py-2 text-sm text-muted-foreground">
+                    {tr("لا توجد عناصر في القائمة بعد", "No queue items yet")}
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto rounded-md border border-border">
+                    <table className="w-full min-w-[760px] text-left text-xs">
+                      <thead className="bg-muted/50 text-muted-foreground">
+                        <tr>
+                          <th className="px-3 py-2 font-semibold">{tr("الكيان", "Entity")}</th>
+                          <th className="px-3 py-2 font-semibold">{tr("العملية", "Operation")}</th>
+                          <th className="px-3 py-2 font-semibold">{tr("الحالة", "Status")}</th>
+                          <th className="px-3 py-2 font-semibold">{tr("المحاولات", "Attempts")}</th>
+                          <th className="px-3 py-2 font-semibold">{tr("آخر خطأ", "Last Error")}</th>
+                          <th className="px-3 py-2 font-semibold">{tr("تاريخ الإنشاء", "Created")}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {syncQueueStatus.recent.map((item) => (
+                          <tr key={item.id} className="border-t border-border">
+                            <td className="px-3 py-2">
+                              <div className="font-medium">{item.entityType || "-"}</div>
+                              <div className="text-muted-foreground">{item.entityId || "-"}</div>
+                            </td>
+                            <td className="px-3 py-2">{item.operation || "-"}</td>
+                            <td className="px-3 py-2">{item.status || "-"}</td>
+                            <td className="px-3 py-2">{item.attempts}</td>
+                            <td className="max-w-[220px] truncate px-3 py-2" title={item.lastError || ""}>{item.lastError || "-"}</td>
+                            <td className="px-3 py-2">{formatSyncQueueDate(item.createdAt, isAR)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
