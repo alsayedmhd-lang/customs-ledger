@@ -215,6 +215,41 @@ router.get("/developer/database/sql", (_req, res) => {
   }
 });
 
+router.get("/developer/sync-queue/status", (_req, res) => {
+  try {
+    if (!sqlite) {
+      return res.json({ pending: 0, failed: 0, lastSync: null });
+    }
+
+    const table = sqlite
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'sync_queue'")
+      .get();
+
+    if (!table) {
+      return res.json({ pending: 0, failed: 0, lastSync: null });
+    }
+
+    const pending = sqlite
+      .prepare("SELECT COUNT(*) AS count FROM sync_queue WHERE status = 'pending'")
+      .get() as { count: number };
+    const failed = sqlite
+      .prepare("SELECT COUNT(*) AS count FROM sync_queue WHERE status = 'failed'")
+      .get() as { count: number };
+    const lastSync = sqlite
+      .prepare("SELECT MAX(COALESCE(updated_at, created_at)) AS value FROM sync_queue WHERE status = 'success'")
+      .get() as { value: number | null };
+
+    return res.json({
+      pending: Number(pending?.count || 0),
+      failed: Number(failed?.count || 0),
+      lastSync: lastSync?.value ? new Date(Number(lastSync.value)).toISOString() : null,
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Failed to read sync queue status" });
+  }
+});
+
 router.post("/developer/database/test-online", async (req, res) => {
   const connectionString = String(req.body?.connectionString || "").trim();
 

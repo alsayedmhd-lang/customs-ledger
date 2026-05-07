@@ -95,6 +95,11 @@ type DatabaseMode = "local" | "online";
 type SyncMode = "local-to-online" | "online-to-local" | "bidirectional";
 type AutoSyncTiming = "startup" | "interval";
 type SyncStatus = "idle" | "success" | "failed" | "in-progress";
+type SyncQueueStatus = {
+  pending: number;
+  failed: number;
+  lastSync: string | null;
+};
 type BoolKey = {
   [K in keyof DeveloperSettings]: DeveloperSettings[K] extends boolean ? K : never;
 }[keyof DeveloperSettings];
@@ -211,6 +216,11 @@ export default function DeveloperSettingsPage() {
   const [savedMessage, setSavedMessage] = useState("");
   const [databaseMessage, setDatabaseMessage] = useState("");
   const [settings, setSettings] = useState<DeveloperSettings>(defaultSettings);
+  const [syncQueueStatus, setSyncQueueStatus] = useState<SyncQueueStatus>({
+    pending: 0,
+    failed: 0,
+    lastSync: null,
+  });
   const [databaseMode, setDatabaseMode] = useState<DatabaseMode>("local");
   const [databaseConfig, setDatabaseConfig] = useState({
     localPath: "lib/db/local.db",
@@ -250,7 +260,10 @@ export default function DeveloperSettingsPage() {
   }, []);
 
   useEffect(() => {
-    if (unlocked) void loadSettings();
+    if (unlocked) {
+      void loadSettings();
+      void loadSyncQueueStatus();
+    }
   }, [unlocked]);
 
   async function loadSettings() {
@@ -323,6 +336,21 @@ export default function DeveloperSettingsPage() {
       }));
     }
     setDatabaseMessage(data.databaseStatus === "connected" ? tr("الاتصال سليم", "Connection OK") : tr("قاعدة البيانات غير متاحة", "Database unavailable"));
+  }
+
+  async function loadSyncQueueStatus() {
+    try {
+      const res = await fetch(`${API_BASE}/developer/sync-queue/status`, { headers: authHeaders() });
+      if (!res.ok) return;
+      const data = await res.json();
+      setSyncQueueStatus({
+        pending: Number(data?.pending || 0),
+        failed: Number(data?.failed || 0),
+        lastSync: data?.lastSync || null,
+      });
+    } catch {
+      setSyncQueueStatus({ pending: 0, failed: 0, lastSync: null });
+    }
   }
 
   async function copyDatabasePath() {
@@ -539,6 +567,17 @@ export default function DeveloperSettingsPage() {
               <InfoRow isAR={isAR} label={tr("حالة قاعدة البيانات", "Database status")} value={settings.databaseStatus} />
               <InfoRow isAR={isAR} label={tr("حجم قاعدة البيانات", "Database size")} value={formatBytes(settings.databaseSize, isAR)} />
               <InfoRow isAR={isAR} label={tr("آخر نسخة احتياطية", "Last backup")} value={settings.lastBackupAt} />
+            </div>
+            <div className="rounded-2xl border border-border bg-background/70 p-4 shadow-sm">
+              <div className="mb-3 flex items-center gap-2 text-sm font-bold text-foreground">
+                <RefreshCw className="h-4 w-4 text-primary" />
+                <span>{tr("حالة قائمة المزامنة", "Sync queue status")}</span>
+              </div>
+              <div className="grid gap-3 md:grid-cols-3">
+                <InfoRow isAR={isAR} label={tr("المزامنة المنتظرة", "Pending sync")} value={syncQueueStatus.pending} />
+                <InfoRow isAR={isAR} label={tr("المزامنة الفاشلة", "Failed sync")} value={syncQueueStatus.failed} />
+                <InfoRow isAR={isAR} label={tr("آخر مزامنة", "Last sync")} value={syncQueueStatus.lastSync || tr("لا يوجد", "Never")} />
+              </div>
             </div>
             <div className="flex flex-wrap gap-2">
               <Button type="button" variant="outline" onClick={checkDatabase} className="gap-2"><RefreshCw className="h-4 w-4" />{tr("فحص الاتصال", "Check connection")}</Button>
