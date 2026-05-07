@@ -23,3 +23,7 @@ export {
 export {
   receiptsTableSqlite as receiptsTable,
 } from "./schema/receipts-sqlite";
+
+export {
+  syncQueueTableSqlite as syncQueueTable,
+} from "./schema/sync-queue-sqlite";

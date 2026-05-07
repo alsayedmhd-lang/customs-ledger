@@ -168,3 +168,16 @@ CREATE TABLE IF NOT EXISTS otp_codes (
   used_at INTEGER,
   created_at INTEGER
 );
+
+CREATE TABLE IF NOT EXISTS sync_queue (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  entity_type TEXT NOT NULL,
+  entity_id TEXT NOT NULL,
+  operation TEXT NOT NULL,
+  payload_json TEXT,
+  status TEXT NOT NULL DEFAULT 'pending',
+  retry_count INTEGER NOT NULL DEFAULT 0,
+  last_error TEXT,
+  created_at INTEGER,
+  updated_at INTEGER
+);

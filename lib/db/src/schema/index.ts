@@ -24,6 +24,12 @@ export {
   companySettingsTableSqlite as companySettingsTable,
 } from "./company-settings-sqlite";
 
+export {
+  syncQueueTableSqlite as syncQueueTable,
+} from "./sync-queue-sqlite";
+
 export * from "./invoices-sqlite";
 
 export * from "./customer-ledger-sqlite";
+
+export * from "./sync-queue-sqlite";
