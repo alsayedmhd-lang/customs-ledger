@@ -362,6 +362,20 @@ export default function InvoiceForm() {
     portOfEntry: "",
   });
 
+  const fetchAuditLogs = async () => {
+    if (!isEdit) return;
+
+    const token = sessionStorage.getItem("auth_token");
+
+    const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/invoices/${invoiceId}/audit-logs`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    const data = await response.json();
+    setAuditLogs(Array.isArray(data) ? data : []);
+  };
+
   useEffect(() => {
   const token = sessionStorage.getItem("auth_token");
 
@@ -418,6 +432,7 @@ export default function InvoiceForm() {
         );
         await queryClient.invalidateQueries({ queryKey: getListInvoicesQueryKey() });
         await queryClient.invalidateQueries({ queryKey: ["/api/invoices", invoiceId] });
+        await fetchAuditLogs();
 
         toast({ title: isAR ? "تم تحديث الفاتورة" : "Invoice updated" });
       },
@@ -605,17 +620,7 @@ export default function InvoiceForm() {
 }, [isEdit, user?.id, users.length, setValue]);
 
   useEffect(() => {
-    if (!isEdit) return;
-
-    const token = sessionStorage.getItem("auth_token");
-
-    fetch(`${import.meta.env.VITE_API_BASE_URL}/api/invoices/${invoiceId}/audit-logs`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    })
-      .then((r) => r.json())
-      .then((data) => setAuditLogs(Array.isArray(data) ? data : []));
+    fetchAuditLogs();
   }, [invoiceId, isEdit]);
   
 
@@ -806,6 +811,20 @@ export default function InvoiceForm() {
             result.push(changeText("بوليصة الشحن", "Bill of lading", before.billOfLading, after.billOfLading));
           }
 
+          const addChange = (key: string, labelAr: string, labelEn: string) => {
+            if (String(before[key] ?? "") !== String(after[key] ?? "")) {
+              result.push(changeText(labelAr, labelEn, before[key], after[key]));
+            }
+          };
+
+          addChange("portOfEntry", "ميناء الدخول", "Port of entry");
+          addChange("issueDate", "تاريخ الإصدار", "Issue date");
+          addChange("dueDate", "تاريخ الاستحقاق", "Due date");
+          addChange("status", "الحالة", "Status");
+          addChange("subtotal", "المجموع الفرعي", "Subtotal");
+          addChange("taxAmount", "قيمة الضريبة", "Tax amount");
+          addChange("shipmentWeight", "وزن الشحنة", "Shipment weight");
+
       if (before.packageCount !== after.packageCount) {
         result.push(changeText("عدد الطرود", "Package count", before.packageCount, after.packageCount));
       }
@@ -826,17 +845,6 @@ export default function InvoiceForm() {
         result.push(changeText("المندوب", "Agent", before.createdBy, after.createdBy));
       }
 
-      const beforeItems = changes.before?.items || [];
-      const afterItems = changes.after?.items || [];
-
-      if (JSON.stringify(beforeItems) !== JSON.stringify(afterItems)) {
-        result.push(
-          isAR
-            ? "تم تعديل أصناف الفاتورة (إضافة / حذف / تعديل)"
-            : "Invoice items modified (add / remove / edit)"
-        );
-      }
-
       return result.length > 0
         ? result
         : [isAR ? "تم تعديل بيانات الفاتورة" : "Invoice details updated"];
@@ -846,6 +854,20 @@ export default function InvoiceForm() {
       } catch {
         return [isAR ? "تعذر قراءة تفاصيل التغيير" : "Could not read change details"];
       }
+  };
+
+  const getAuditUsername = (log: any) => {
+    const auditUser = users.find((u) => String(u.id) === String(log.userId));
+    if (!auditUser) return log.username || "-";
+
+    return (
+      (isAR
+        ? auditUser.displayNameAr || auditUser.displayName || auditUser.displayNameEn
+        : auditUser.displayNameEn || auditUser.displayName || auditUser.displayNameAr) ||
+      auditUser.username ||
+      log.username ||
+      "-"
+    );
   };
 
  return (
@@ -1438,7 +1460,7 @@ export default function InvoiceForm() {
                       {actionLabel}
                     </div>
                     <div className="text-xs text-muted-foreground mt-2 leading-5">
-                      {isAR ? "بواسطة" : "By"}: {log.username || "-"}
+                      {isAR ? "بواسطة" : "By"}: {getAuditUsername(log)}
                     </div>
                   </div>
 
