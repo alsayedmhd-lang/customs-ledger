@@ -1827,6 +1827,15 @@ const decryptBackupData = async (backupFile: any, password: string) => {
         onTabChange={setActiveTab}
         actions={
           <>
+            <a
+              href="/docs/project-guide.pdf"
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-background px-3 py-2.5 text-sm font-semibold text-muted-foreground shadow-sm transition hover:bg-muted hover:text-foreground"
+            >
+              <Info className="h-4 w-4" />
+              {isAR ? "دليل المشروع" : "Project Guide"}
+            </a>
             {canSeeDeveloperLink && (
               <button
                 type="button"
