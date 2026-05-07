@@ -3,6 +3,7 @@ import { db, sqlite, companySettingsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { requireAdmin } from "../middleware/auth";
 import { hashPassword } from "../utils/password";
+import { ensureMasterPasswordHashColumn } from "../utils/ensure-company-settings-columns";
 
 const router = Router();
 
@@ -46,9 +47,12 @@ function ensureCompanySettingsPrintTitleColumns() {
 }
 
 ensureCompanySettingsPrintTitleColumns();
+ensureMasterPasswordHashColumn();
 
 router.get("/company-settings", async (_req, res) => {
   try {
+    ensureMasterPasswordHashColumn();
+
     let [settings] = await db.select().from(companySettingsTable).limit(1);
 
     if (!settings) {
@@ -102,6 +106,8 @@ router.get("/company-settings", async (_req, res) => {
 
 router.put("/company-settings", requireAdmin, async (req, res) => {
   try {
+    ensureMasterPasswordHashColumn();
+
     const body = req.body as any;
 
     let masterPasswordHash: string | undefined;

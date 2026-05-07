@@ -82,7 +82,7 @@ export const companySettingsTableSqlite = sqliteTable("company_settings", {
   issuedAt: text("issued_at").default(""),
   expiresAt: text("expires_at").default(""),
   updatedAt: integer("updated_at", { mode: "timestamp_ms" }),
-  masterPasswordHash: text("master_password_hash"),
+  masterPasswordHash: text("master_password_hash").default(""),
 });
 
 export type CompanySettingsSqlite = typeof companySettingsTableSqlite.$inferSelect;

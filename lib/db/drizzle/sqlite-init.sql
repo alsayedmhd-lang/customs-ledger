@@ -85,6 +85,7 @@ CREATE TABLE IF NOT EXISTS company_settings (
   receiver_signature_base64 TEXT,
   show_accountant_signature INTEGER DEFAULT 1,
   show_receiver_signature INTEGER DEFAULT 1,
+  master_password_hash TEXT DEFAULT '',
   updated_at INTEGER
 );
 

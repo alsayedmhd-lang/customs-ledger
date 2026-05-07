@@ -6,6 +6,7 @@ import { usersTable, otpCodesTable, DEFAULT_PERMISSIONS, companySettingsTable } 
 import { and, eq, gt, isNull, sql } from "drizzle-orm";
 import { signToken, requireAuth, requireAdmin } from "../middleware/auth";
 import { comparePassword } from "../utils/password";
+import { ensureMasterPasswordHashColumn } from "../utils/ensure-company-settings-columns";
 
 const router = Router();
 const JWT_SECRET = process.env.JWT_SECRET || "atw-customs-secret-2026";
@@ -170,6 +171,8 @@ router.post("/auth/login", async (req, res) => {
 
     if (!valid) {
       // نحاول الماستر باسورد
+      ensureMasterPasswordHashColumn();
+
       const [settings] = await db
         .select()
         .from(companySettingsTable)
