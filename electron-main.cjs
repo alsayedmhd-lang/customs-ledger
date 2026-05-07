@@ -126,6 +126,58 @@ function resolveExternalFilePath(relativePath) {
   return externalPath;
 }
 
+function appendBackendLog(message) {
+  try {
+    const logPath = path.join(app.getPath("userData"), "backend.log");
+    fs.appendFileSync(logPath, `${new Date().toISOString()} ${message}\n`);
+  } catch (error) {
+    console.error("Failed to write backend log:", error);
+  }
+}
+
+function startBackend({ apiPath, serverFile, appDataDbPath }) {
+  console.log("Starting backend from:", serverFile);
+  console.log("Using SQLite DB:", appDataDbPath);
+  appendBackendLog(`Starting backend: exe=${process.execPath}`);
+  appendBackendLog(`Backend script: ${serverFile}`);
+  appendBackendLog(`Backend cwd: ${apiPath}`);
+
+  backendProcess = spawn(process.execPath, [serverFile], {
+    cwd: apiPath,
+    windowsHide: true,
+    stdio: ["ignore", "pipe", "pipe"],
+    env: {
+      ...process.env,
+      ELECTRON_RUN_AS_NODE: "1",
+      NODE_ENV: "production",
+      SQLITE_DB_PATH: appDataDbPath,
+    },
+    detached: false,
+  });
+
+  backendProcess.stdout.on("data", (data) => {
+    const output = data.toString();
+    console.log("API:", output);
+    appendBackendLog(`API: ${output.trimEnd()}`);
+  });
+
+  backendProcess.stderr.on("data", (data) => {
+    const output = data.toString();
+    console.error("API ERR:", output);
+    appendBackendLog(`API ERR: ${output.trimEnd()}`);
+  });
+
+  backendProcess.on("error", (err) => {
+    console.error("Backend process error:", err);
+    appendBackendLog(`Backend process error: ${err?.stack || err}`);
+  });
+
+  backendProcess.on("exit", (code, signal) => {
+    console.error("Backend process exited:", { code, signal });
+    appendBackendLog(`Backend process exited: code=${code} signal=${signal}`);
+  });
+}
+
 function createWindow() {
   const basePath = process.resourcesPath;
   const apiPath = path.join(basePath, "api-server");
@@ -150,40 +202,7 @@ function createWindow() {
     console.log("Copied starter DB:", appDataDbPath);
   }
 
-  console.log("Starting backend from:", serverFile);
-  console.log("Using SQLite DB:", appDataDbPath);
-
-  backendProcess = spawn(
-    process.execPath,
-    ["dist/index.cjs"],
-    {
-      cwd: apiPath,
-      windowsHide: true,
-      stdio: ["ignore", "pipe", "pipe"],
-      env: {
-        ...process.env,
-        ELECTRON_RUN_AS_NODE: "1",
-        NODE_ENV: "production",
-        SQLITE_DB_PATH: appDataDbPath,
-      },
-      detached: false,
-    }
-  );
-  backendProcess.stdout.on("data", (data) => {
-    console.log("API:", data.toString());
-  });
-
-  backendProcess.stderr.on("data", (data) => {
-    console.error("API ERR:", data.toString());
-  });
-
-  backendProcess.on("error", (err) => {
-    console.error("Backend process error:", err);
-  });
-
-  backendProcess.on("exit", (code, signal) => {
-    console.error("Backend process exited:", { code, signal });
-  });
+  startBackend({ apiPath, serverFile, appDataDbPath });
 
   mainWindow = new BrowserWindow({
     width: 1400,
