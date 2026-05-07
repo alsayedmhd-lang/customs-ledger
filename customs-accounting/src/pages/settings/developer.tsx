@@ -6,6 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import SettingsShell from "@/components/layout/SettingsShell";
+import { useLanguage } from "@/lib/language-context";
 import { cn } from "@/lib/utils";
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || "http://localhost:3000").replace(/\/$/, "") + "/api";
@@ -173,6 +175,8 @@ function DevField({ label, children }: { label: string; children: React.ReactNod
 }
 
 export default function DeveloperSettingsPage() {
+  const { lang, isRTL } = useLanguage();
+  const isAR = lang === "ar";
   const [password, setPassword] = useState("");
   const [unlocked, setUnlocked] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>("security");
@@ -209,6 +213,19 @@ export default function DeveloperSettingsPage() {
     lastSyncTime: "غير متاح",
     status: "idle",
   });
+
+  const developerTabs = tabs.map((tab) => ({
+    ...tab,
+    label: isAR
+      ? tab.label
+      : ({
+          security: "Security & License",
+          manager: "Manager Access",
+          database: "Database",
+          diagnostics: "Diagnostics",
+          updates: "Updates",
+        } as Record<TabId, string>)[tab.id],
+  }));
 
   useEffect(() => {
     if (sessionStorage.getItem(UNLOCK_KEY) === "true") setUnlocked(true);
@@ -333,37 +350,21 @@ export default function DeveloperSettingsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl space-y-5 px-4 py-6" dir="rtl">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold tracking-normal">إعدادات المطوّر</h1>
-          <p className="mt-1 text-sm text-muted-foreground">إعدادات حماية وتشخيص لا تعرض أسرار النظام أو كلمات المرور.</p>
-        </div>
+    <SettingsShell
+      dir={isRTL ? "rtl" : "ltr"}
+      width="default"
+      title={isAR ? "إعدادات المطوّر" : "Developer Settings"}
+      description={isAR ? "إعدادات حماية وتشخيص لا تعرض أسرار النظام أو كلمات المرور." : "System protection, diagnostics, database, and release controls."}
+      tabs={developerTabs}
+      activeTab={activeTab}
+      onTabChange={setActiveTab}
+      actions={
         <Button type="button" onClick={saveSettings} disabled={isSaving} className="gap-2">
           <Save className="h-4 w-4" />
-          {isSaving ? "جار الحفظ..." : "حفظ"}
+          {isSaving ? (isAR ? "جارٍ الحفظ..." : "Saving...") : (isAR ? "حفظ" : "Save")}
         </Button>
-      </div>
-
-      <div className="flex flex-wrap gap-2 rounded-xl border border-border bg-card p-2">
-        {tabs.map((tab) => {
-          const Icon = tab.icon;
-          return (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setActiveTab(tab.id)}
-              className={cn(
-                "flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition",
-                activeTab === tab.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground"
-              )}
-            >
-              <Icon className="h-4 w-4" />
-              {tab.label}
-            </button>
-          );
-        })}
-      </div>
+      }
+    >
 
       {error && <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</div>}
       {savedMessage && <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{savedMessage}</div>}
@@ -634,6 +635,6 @@ export default function DeveloperSettingsPage() {
           </CardContent>
         </Card>
       )}
-    </div>
+    </SettingsShell>
   );
 }

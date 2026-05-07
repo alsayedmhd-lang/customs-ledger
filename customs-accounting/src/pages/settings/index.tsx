@@ -9,6 +9,7 @@ import {
 } from "@/components/print-document-parts";
 import { useState, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
+import SettingsShell from "@/components/layout/SettingsShell";
 import { useAuth } from "@/lib/auth-context";
 import { useLanguage } from "@/lib/language-context";
 import { useCompanySettings, DEFAULT_SETTINGS, type CompanySettings } from "@/lib/company-settings-context";
@@ -1809,14 +1810,50 @@ const decryptBackupData = async (backupFile: any, password: string) => {
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       dir="ltr"
-      className={cn(
-        "relative left-1/2 grid w-[calc(100vw-2rem)] max-w-none -translate-x-1/2 grid-cols-1 gap-6 pb-10 items-start sm:w-[calc(100vw-3rem)] md:w-[calc(100vw-16rem-3rem)] lg:w-[calc(100vw-16rem-4rem)]",
-        isRTL ? "md:grid-cols-[minmax(0,1fr)_12rem]" : "md:grid-cols-[12rem_minmax(0,1fr)]"
-      )}
+      className="pb-10"
     >
+      <SettingsShell
+        dir={isRTL ? "rtl" : "ltr"}
+        width={activeTab === "preview" ? "wide" : "default"}
+        title={isAR ? "إعدادات البرنامج" : "Settings"}
+        description={isAR ? "إدارة إعدادات الشركة والطباعة والنسخ الاحتياطي ومظهر التطبيق" : "Manage company, print, backup, and appearance settings"}
+        tabs={visibleTabs.map((tab) => ({
+          id: tab.id,
+          icon: tab.icon,
+          label: isAR ? tab.labelAr : tab.labelEn,
+          color: tab.color,
+        }))}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        actions={
+          <>
+            {canSeeDeveloperLink && (
+              <button
+                type="button"
+                onClick={() => {
+                  window.location.hash = "/settings/developer";
+                }}
+                className="inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-background px-3 py-2.5 text-sm font-semibold text-muted-foreground shadow-sm transition hover:bg-muted hover:text-foreground"
+              >
+                <Shield className="h-4 w-4" />
+                {isAR ? "المطور" : "Developer"}
+              </button>
+            )}
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition hover:bg-primary/90 disabled:opacity-60"
+            >
+              {saving ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+              {saving ? (isAR ? "جارٍ الحفظ..." : "Saving...") : (isAR ? "حفظ التغييرات" : "Save Changes")}
+            </button>
+          </>
+        }
+      >
       {/* ── Sticky Sidebar ─────────────────────────────────────── */}
+      {false && (
       <div
-        className={cn("sticky top-4 self-start w-full space-y-3", isRTL ? "md:order-2" : "md:order-1")}
+        className="hidden legacy-settings-sidebar"
         dir={isRTL ? "rtl" : "ltr"}
       >
 
@@ -1882,6 +1919,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
           {saving ? (isAR ? "جارٍ الحفظ..." : "Saving...") : (isAR ? "حفظ التغييرات" : "Save Changes")}
         </button>
       </div>
+      )}
 
       {/* ── Content Area ───────────────────────────────────────── */}
       <div
@@ -3353,6 +3391,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
           )}
 
           </div>
+        </SettingsShell>
         </motion.div>
       );
     }
