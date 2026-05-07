@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/lib/auth-context";
-import { LanguageProvider } from "@/lib/language-context";
+import { LanguageProvider, useLanguage } from "@/lib/language-context";
 import { CompanySettingsProvider } from "@/lib/company-settings-context";
 import { DisplaySettingsProvider } from "@/lib/display-settings-context";
 import { useEffect } from "react";
@@ -42,11 +42,13 @@ function RouteWrapper({ children }: { children: React.ReactNode }) {
 
 function ProtectedRouter() {
   const { user, isLoading } = useAuth();
+  const { lang } = useLanguage();
+  const isAR = lang === "ar";
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background" dir="rtl">
-        <div className="text-muted-foreground text-lg">جارٍ التحميل...</div>
+      <div className="min-h-screen flex items-center justify-center bg-background" dir={isAR ? "rtl" : "ltr"}>
+        <div className="text-muted-foreground text-lg">{isAR ? "جارٍ التحميل..." : "Loading..."}</div>
       </div>
     );
   }

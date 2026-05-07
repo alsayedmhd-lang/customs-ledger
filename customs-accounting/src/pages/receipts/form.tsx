@@ -34,7 +34,7 @@ const formSchema = z.object({
   clientName: z.string().optional().nullable(),
   invoiceId: z.coerce.number().optional().nullable(),
   invoiceNumber: z.string().optional().nullable(),
-  amount: z.coerce.number().min(0.01, "المبلغ مطلوب"),
+  amount: z.coerce.number().min(0.01, "Amount is required"),
   paymentMethod: z.enum(["cash", "transfer", "check"]),
   notes: z.string().optional(),
   receiptDate: z.string(),
@@ -42,10 +42,10 @@ const formSchema = z.object({
 
 type ReceiptFormValues = z.infer<typeof formSchema>;
 
-const PAYMENT_METHOD_LABELS: Record<string, string> = {
-  cash: "cash - نقداً",
-  transfer: "transfer - تحويل بنكي",
-  check: "check - شيك",
+const PAYMENT_METHOD_LABELS: Record<string, { ar: string; en: string }> = {
+  cash: { ar: "نقداً", en: "Cash" },
+  transfer: { ar: "تحويل بنكي", en: "Bank transfer" },
+  check: { ar: "شيك", en: "Cheque" },
 };
 
 export default function ReceiptForm() {
@@ -66,6 +66,7 @@ export default function ReceiptForm() {
   const { toast } = useToast();
   const { lang } = useLanguage();
   const isAR = lang === "ar";
+  const tr = (ar: string, en: string) => (isAR ? ar : en);
 
   const createMutation = useCreateReceipt();
   const updateMutation = useUpdateReceipt();
@@ -191,7 +192,10 @@ export default function ReceiptForm() {
       }
 
       queryClient.invalidateQueries({ queryKey: getListReceiptsQueryKey() });
-      toast({ title: "تم الحفظ", description: `تم ${isEdit ? "تحديث" : "إنشاء"} سند القبض بنجاح` });
+      toast({
+        title: tr("تم الحفظ", "Saved"),
+        description: isEdit ? tr("تم تحديث سند القبض بنجاح", "Receipt updated successfully") : tr("تم إنشاء سند القبض بنجاح", "Receipt created successfully"),
+      });
       setLocation(`/receipts/${saved.id}/print`);
 
     } catch (err) {
@@ -200,15 +204,15 @@ export default function ReceiptForm() {
 
       if ((err as any)?.status === 409 && conflictReceiptId > 0) {
         toast({
-          title: "سند موجود",
-          description: "يوجد سند قبض مرتبط مسبقاً بهذه الفاتورة",
+          title: tr("سند موجود", "Receipt already exists"),
+          description: tr("يوجد سند قبض مرتبط مسبقاً بهذه الفاتورة", "A receipt is already linked to this invoice"),
         });
         setLocation(`/receipts/${conflictReceiptId}/edit`);
         return;
       }
       toast({
-        title: "خطأ",
-        description: "فشل حفظ سند القبض",
+        title: tr("خطأ", "Error"),
+        description: tr("فشل حفظ سند القبض", "Failed to save receipt"),
         variant: "destructive",
       });
     }
@@ -241,9 +245,9 @@ export default function ReceiptForm() {
           </Button>
         </Link>
         <div>
-          <h1 className="text-2xl font-bold">{isEdit ? "تعديل سند القبض" : "سند قبض جديد"}</h1>
+          <h1 className="text-2xl font-bold">{isEdit ? tr("تعديل سند القبض", "Edit Receipt") : tr("سند قبض جديد", "New Receipt")}</h1>
           <p className="text-sm text-muted-foreground">
-            {isEdit ? "تعديل بيانات السند" : "إنشاء سند قبض جديد"}
+            {isEdit ? tr("تعديل بيانات السند", "Edit receipt details") : tr("إنشاء سند قبض جديد", "Create a new receipt")}
           </p>
         </div>
       </div>
@@ -254,8 +258,8 @@ export default function ReceiptForm() {
             (errors) => {
               console.log("receipt validation errors:", errors);
               toast({
-                title: "بيانات ناقصة",
-                description: "راجع الحقول المطلوبة قبل الحفظ",
+                title: tr("بيانات ناقصة", "Missing information"),
+                description: tr("راجع الحقول المطلوبة قبل الحفظ", "Review required fields before saving"),
                 variant: "destructive",
               });
             }
@@ -265,7 +269,7 @@ export default function ReceiptForm() {
         <div className="bg-card rounded-2xl border border-border p-6 space-y-5">
           {/* Client */}
           <div className="space-y-2">
-            <Label>العميل <span className="text-destructive">*</span></Label>
+            <Label>{tr("العميل", "Client")} <span className="text-destructive">*</span></Label>
             <Select
               key={watch("clientId") || linkedInvoice?.clientId || "empty-client"}
               value={String(watch("clientId") || linkedInvoice?.clientId || "")}
@@ -285,7 +289,7 @@ export default function ReceiptForm() {
               }}
             >
               <SelectTrigger>
-                <SelectValue placeholder={selectedClientName || "اختر العميل"} />
+                <SelectValue placeholder={selectedClientName || tr("اختر العميل", "Select client")} />
               </SelectTrigger>
               <SelectContent
                   position="popper"
@@ -303,7 +307,7 @@ export default function ReceiptForm() {
 
           {/* Invoice (optional) */}
           <div className="space-y-2">
-            <Label>الفاتورة <span className="text-muted-foreground text-xs">(اختياري — اتركه فارغاً للدفعة المستقلة)</span></Label>
+            <Label>{tr("الفاتورة", "Invoice")} <span className="text-muted-foreground text-xs">{tr("(اختياري - اتركه فارغاً للدفعة المستقلة)", "(optional - leave empty for an independent payment)")}</span></Label>
             <Select
               key={watch("invoiceId") || linkedInvoice?.id || "none"}
               value={String(watch("invoiceId") || linkedInvoice?.id || "none")}
@@ -334,7 +338,7 @@ export default function ReceiptForm() {
                 <SelectValue
                   placeholder={
                     selectedInvoiceNumber ||
-                    (effectiveClientId ? "اختر فاتورة (اختياري)" : "اختر العميل أولاً")
+                    (effectiveClientId ? tr("اختر فاتورة (اختياري)", "Select invoice (optional)") : tr("اختر العميل أولاً", "Select client first"))
                   }
                 />
               </SelectTrigger>
@@ -342,10 +346,10 @@ export default function ReceiptForm() {
                   position="popper"
                   className="z-[9999] bg-white dark:bg-slate-900 opacity-100 backdrop-blur-none border border-slate-300 shadow-2xl"
                 >
-                <SelectItem value="none">بدون فاتورة (دفعة مستقلة)</SelectItem>
+                <SelectItem value="none">{tr("بدون فاتورة (دفعة مستقلة)", "No invoice (independent payment)")}</SelectItem>
                 {clientInvoices.map((inv) => (
                   <SelectItem key={inv.id} value={String(inv.id)}>
-                    {inv.invoiceNumber} — {formatCurrency(inv.total)} ({inv.status === "paid" ? "مدفوعة" : inv.status === "issued" ? "صادرة" : "مسودة"})
+                    {inv.invoiceNumber} - {formatCurrency(inv.total)} ({inv.status === "paid" ? tr("مدفوعة", "Paid") : inv.status === "issued" ? tr("صادرة", "Issued") : tr("مسودة", "Draft")})
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -355,7 +359,7 @@ export default function ReceiptForm() {
           {/* Amount + Date */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div className="space-y-2">
-              <Label>المبلغ (ر.ق) <span className="text-destructive">*</span></Label>
+              <Label>{tr("المبلغ (ر.ق)", "Amount (QR)")} <span className="text-destructive">*</span></Label>
               <Input
                 type="number"
                 step="0.01"
@@ -367,7 +371,7 @@ export default function ReceiptForm() {
             </div>
 
             <div className="space-y-2">
-              <Label>تاريخ السند <span className="text-destructive">*</span></Label>
+              <Label>{tr("تاريخ السند", "Receipt date")} <span className="text-destructive">*</span></Label>
               <Input type="date" {...register("receiptDate")} />
               {errors.receiptDate && <p className="text-destructive text-xs">{errors.receiptDate.message}</p>}
             </div>
@@ -375,7 +379,7 @@ export default function ReceiptForm() {
 
           {/* Payment Method */}
           <div className="space-y-2">
-            <Label>طريقة الدفع <span className="text-destructive">*</span></Label>
+            <Label>{tr("طريقة الدفع", "Payment method")} <span className="text-destructive">*</span></Label>
             <Select
               value={watch("paymentMethod")}
               onValueChange={(v) => setValue("paymentMethod", v as "cash" | "transfer" | "check", { shouldValidate: true })}
@@ -388,7 +392,7 @@ export default function ReceiptForm() {
                   className="z-[9999] bg-white dark:bg-slate-900 opacity-100 backdrop-blur-none border border-slate-300 shadow-2xl"
                 >
                 {Object.entries(PAYMENT_METHOD_LABELS).map(([value, label]) => (
-                  <SelectItem key={value} value={value}>{label}</SelectItem>
+                  <SelectItem key={value} value={value}>{isAR ? label.ar : label.en}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -396,8 +400,8 @@ export default function ReceiptForm() {
 
           {/* Notes */}
           <div className="space-y-2">
-            <Label>ملاحظات</Label>
-            <Textarea placeholder="أي ملاحظات إضافية..." rows={3} {...register("notes")} />
+            <Label>{tr("ملاحظات", "Notes")}</Label>
+            <Textarea placeholder={tr("أي ملاحظات إضافية...", "Any additional notes...")} rows={3} {...register("notes")} />
           </div>
         </div>
 
@@ -405,7 +409,7 @@ export default function ReceiptForm() {
         <div className="fixed bottom-6 right-6 left-6 md:right-[18rem] flex gap-3 justify-end z-10">
           <Link href="/receipts">
             <Button type="button" variant="outline" className="bg-background shadow-lg">
-              إلغاء
+              {tr("إلغاء", "Cancel")}
             </Button>
           </Link>
           <Button
@@ -414,7 +418,7 @@ export default function ReceiptForm() {
             className="gap-2 shadow-lg shadow-primary/20"
           >
             <Save className="w-4 h-4" />
-            {isSubmitting ? "جارٍ الحفظ..." : isEdit ? "تحديث السند" : "حفظ وطباعة"}
+            {isSubmitting ? tr("جارٍ الحفظ...", "Saving...") : isEdit ? tr("تحديث السند", "Update receipt") : tr("حفظ وطباعة", "Save and print")}
           </Button>
         </div>
         {/* Spacer for fixed bar */}

@@ -50,6 +50,7 @@ export default function ReceiptsList() {
   const isClient = user?.role === "client";
   const { t, lang } = useLanguage();
   const isAR = lang === "ar";
+  const tr = (ar: string, en: string) => (isAR ? ar : en);
   const [search, setSearch] = useState("");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
@@ -73,7 +74,7 @@ const getClientName = (receipt: { clientName?: string | null; clientId?: number 
   if (receipt.clientName && receipt.clientName.trim()) return receipt.clientName;
 
   const client = (clients ?? []).find((c) => c.id === receipt.clientId);
-  return client?.name || "لا يوجد";
+  return client?.name || tr("لا يوجد", "None");
 };
 
   const filtered = (receipts ?? []).filter((r) => {
@@ -101,8 +102,8 @@ const getClientName = (receipt: { clientName?: string | null; clientId?: number 
       toast({ title: t("delete"), description: t("receipts") });
     } catch {
       toast({
-        title: "خطأ",
-        description: "فشل حذف سند القبض",
+        title: tr("خطأ", "Error"),
+        description: tr("فشل حذف سند القبض", "Failed to delete receipt"),
         variant: "destructive",
       });
     } finally {
@@ -128,7 +129,7 @@ const getClientName = (receipt: { clientName?: string | null; clientId?: number 
             }`}
           >
             {showAmounts ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-            {showAmounts ? (isAR ? "إخفاء الأرقام" : "Hide") : (isAR ? "إظهار الأرقام" : "Show")}
+            {showAmounts ? tr("إخفاء الأرقام", "Hide") : tr("إظهار الأرقام", "Show")}
           </button>
 
           {!isClient && <Link href="/receipts/new">
@@ -205,28 +206,28 @@ const getClientName = (receipt: { clientName?: string | null; clientId?: number 
               <thead className="sticky top-0 z-10">
                 <tr className="border-b border-border bg-muted/40">
                   <th className="text-start px-4 py-3 font-semibold text-muted-foreground">
-                    {isAR ? "رقم السند" : "Receipt No"}
+                    {tr("رقم السند", "Receipt No")}
                   </th>
                   <th className="text-start px-4 py-3 font-semibold text-muted-foreground">
-                    {isAR ? "العميل" : "Client"}
+                    {tr("العميل", "Client")}
                   </th>
                   <th className="text-start px-4 py-3 font-semibold text-muted-foreground">
-                    {isAR ? "الفاتورة" : "Invoice"}
+                    {tr("الفاتورة", "Invoice")}
                   </th>
                   <th className="text-start px-4 py-3 font-semibold text-muted-foreground">
-                    {isAR ? "المبلغ" : "Amount"}
+                    {tr("المبلغ", "Amount")}
                   </th>
                   <th className="text-start px-4 py-3 font-semibold text-muted-foreground">
-                    {isAR ? "طريقة الدفع" : "Payment Method"}
+                    {tr("طريقة الدفع", "Payment Method")}
                   </th>
                   <th className="text-start px-4 py-3 font-semibold text-muted-foreground">
-                    {isAR ? "المستلم" : "Received By"}
+                    {tr("المستلم", "Received By")}
                   </th>
                   <th className="text-start px-4 py-3 font-semibold text-muted-foreground">
-                    {isAR ? "التاريخ" : "Date"}
+                    {tr("التاريخ", "Date")}
                   </th>
                   <th className="text-end px-4 py-3 font-semibold text-muted-foreground">
-                    {isAR ? "الإجراءات" : "Actions"}
+                    {tr("الإجراءات", "Actions")}
                   </th>
                 </tr>
               </thead>

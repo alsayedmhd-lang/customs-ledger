@@ -23,7 +23,9 @@ import {
 export default function InvoicesList() {
   const { user, can } = useAuth();
   const isClient = user?.role === "client";
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
+  const isAR = lang === "ar";
+  const tr = (ar: string, en: string) => (isAR ? ar : en);
   const { data: invoices = [], isLoading } = useListInvoices();
   const [search, setSearch] = useState("");
   const [fromDate, setFromDate] = useState("");
@@ -141,7 +143,7 @@ export default function InvoicesList() {
             <span className="text-xs text-muted-foreground shrink-0">
               {search
                 ? <>{filtered.length} <span className="opacity-60">/ {invoices?.length ?? 0}</span></>
-                : <>{invoices?.length ?? 0} فاتورة</>
+                : <>{invoices?.length ?? 0} {tr("فاتورة", "invoices")}</>
               }
             </span>
           )}
@@ -235,7 +237,9 @@ export default function InvoicesList() {
         {!isLoading && filtered.length > 0 && (
           <div className="px-4 py-2.5 border-t border-border/40 bg-muted/20 text-center">
             <span className="text-xs text-muted-foreground">
-              {search ? `${filtered.length} من ${invoices?.length ?? 0} فاتورة` : `إجمالي ${filtered.length} فاتورة`}
+              {search
+                ? tr(`${filtered.length} من ${invoices?.length ?? 0} فاتورة`, `${filtered.length} of ${invoices?.length ?? 0} invoices`)
+                : tr(`إجمالي ${filtered.length} فاتورة`, `Total ${filtered.length} invoices`)}
             </span>
           </div>
         )}

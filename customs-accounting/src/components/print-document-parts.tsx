@@ -1,5 +1,6 @@
 import Barcode from "react-barcode";
 import { useCompanySettings, type CompanySettings } from "@/lib/company-settings-context";
+import { useLanguage } from "@/lib/language-context";
 
 type DocumentKind = "invoice" | "receipt" | "statement";
 
@@ -272,6 +273,8 @@ export function PrintSignaturesStamp({
   override?: SettingsOverride;
 }) {
   const { settings, stampSrc } = usePrintSettings(override);
+  const { lang } = useLanguage();
+  const isAR = lang === "ar";
   const stampEnabled = kind === "invoice" ? settings.showStampOnInvoices : settings.showStampOnReceipts;
   const stampHeight = kind === "invoice" ? "130px" : "110px";
   const sigHeight = kind === "invoice" ? "h-20" : "h-14";
@@ -282,16 +285,14 @@ export function PrintSignaturesStamp({
         <div className="h-12 flex items-end justify-center">
           <div className="w-full border-b-2 border-gray-400" />
         </div>
-        <p className="text-xs text-gray-500 mt-1 font-bold">توقيع المستلم</p>
-        <p className="text-xs text-gray-400">{kind === "invoice" ? "Received By" : "Receiver Signature"}</p>
+        <p className="text-xs text-gray-500 mt-1 font-bold">{isAR ? "توقيع المستلم" : kind === "invoice" ? "Received By" : "Receiver Signature"}</p>
       </div>
 
       <div className="text-center">
         <div className="h-12 flex items-end justify-center">
           <div className="w-full border-b-2 border-gray-400" />
         </div>
-        <p className="text-xs text-gray-500 mt-1 font-bold">توقيع المحاسب</p>
-        <p className="text-xs text-gray-400">{kind === "invoice" ? "Accountant" : "Accountant Signature"}</p>
+        <p className="text-xs text-gray-500 mt-1 font-bold">{isAR ? "توقيع المحاسب" : kind === "invoice" ? "Accountant" : "Accountant Signature"}</p>
       </div>
 
       {showSignatures && settings.showReceiverSignature && receiverSignature && (
@@ -357,13 +358,19 @@ export function PrintDocumentFooter({
   override?: SettingsOverride;
 }) {
   const { settings } = usePrintSettings(override);
-  const dateText = new Date().toLocaleDateString("ar-EG-u-nu-latn", {
+  const { lang } = useLanguage();
+  const isAR = lang === "ar";
+  const dateText = new Date().toLocaleDateString(isAR ? "ar-EG-u-nu-latn" : "en-US", {
     year: "numeric",
     month: "long",
     day: "numeric",
   });
 
-  const refLabel = kind === "invoice" ? "رقم الفاتورة" : kind === "receipt" ? "رقم السند" : "المرجع";
+  const refLabel = kind === "invoice"
+    ? (isAR ? "رقم الفاتورة" : "Invoice No")
+    : kind === "receipt"
+    ? (isAR ? "رقم السند" : "Receipt No")
+    : (isAR ? "المرجع" : "Reference");
 
   return (
     <div className="border-t-4 border-double border-gray-700 px-6 py-3 bg-gray-50 relative z-10">
@@ -380,9 +387,9 @@ export function PrintDocumentFooter({
       {settings.footerText && <div className="text-center text-xs text-gray-500 mt-1">{settings.footerText}</div>}
 
       <div className="text-center text-xs text-gray-400 mt-1">
-        طبعت في: {dateText}
-        {" — "}{refLabel}: {reference}
-        {kind === "statement" && typeof count === "number" ? ` — عدد الحركات: ${count}` : ""}
+        {isAR ? "طبعت في" : "Printed at"}: {dateText}
+        {" - "}{refLabel}: {reference}
+        {kind === "statement" && typeof count === "number" ? ` - ${isAR ? "عدد الحركات" : "Entries"}: ${count}` : ""}
       </div>
     </div>
   );

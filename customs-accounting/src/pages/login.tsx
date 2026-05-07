@@ -166,7 +166,7 @@ export default function LoginPage() {
         setLocation("/");
       }
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "خطأ في تسجيل الدخول ");
+      setError(err instanceof Error ? err.message : (isAR ? "خطأ في تسجيل الدخول" : "Sign in failed"));
     } finally {
       setLoading(false);
     }
@@ -181,7 +181,7 @@ export default function LoginPage() {
       await verifyOtp(otpPending.otpToken, otpCode);
       setLocation("/");
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "رمز التحقق غير صحيح");
+      setError(err instanceof Error ? err.message : (isAR ? "رمز التحقق غير صحيح" : "Invalid verification code"));
       setOtpCode("");
     } finally {
       setLoading(false);
@@ -213,10 +213,10 @@ export default function LoginPage() {
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "فشل التسجيل");
+      if (!res.ok) throw new Error(data.message || (isAR ? "فشل التسجيل" : "Registration failed"));
       setMode("registered");
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "فشل التسجيل");
+      setError(err instanceof Error ? err.message : (isAR ? "فشل التسجيل" : "Registration failed"));
     } finally {
       setLoading(false);
     }
@@ -242,7 +242,7 @@ export default function LoginPage() {
       setOtpCode("");
       startResendCooldown();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "فشل إعادة الإرسال");
+      setError(err instanceof Error ? err.message : (isAR ? "فشل إعادة الإرسال" : "Resend failed"));
     } finally {
       setLoading(false);
     }
@@ -259,7 +259,7 @@ export default function LoginPage() {
         body: JSON.stringify({ username: forgotUsername.trim().toLowerCase() }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "فشل الطلب");
+      if (!res.ok) throw new Error(data.message || (isAR ? "فشل الطلب" : "Request failed"));
       if (data.resetToken) {
         setResetToken(data.resetToken);
         setResetMaskedEmail(data.maskedEmail ?? null);
@@ -270,7 +270,7 @@ export default function LoginPage() {
         setError(isAR ? "لم يتم إرسال الرمز — تأكد من صحة اسم المستخدم" : "Code not sent — check your username");
       }
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "فشل الطلب");
+      setError(err instanceof Error ? err.message : (isAR ? "فشل الطلب" : "Request failed"));
     } finally {
       setLoading(false);
     }
@@ -288,13 +288,13 @@ export default function LoginPage() {
         body: JSON.stringify({ resetToken, code: resetOtpCode }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "رمز غير صحيح");
+      if (!res.ok) throw new Error(data.message || (isAR ? "رمز غير صحيح" : "Invalid code"));
       setPasswordChangeToken(data.passwordChangeToken);
       setNewPassword("");
       setConfirmPassword("");
       setMode("new-password");
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "رمز غير صحيح");
+      setError(err instanceof Error ? err.message : (isAR ? "رمز غير صحيح" : "Invalid code"));
       setResetOtpCode("");
     } finally {
       setLoading(false);
@@ -320,13 +320,13 @@ export default function LoginPage() {
         body: JSON.stringify({ passwordChangeToken, newPassword }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "فشل تغيير كلمة السر");
+      if (!res.ok) throw new Error(data.message || (isAR ? "فشل تغيير كلمة السر" : "Failed to change password"));
       setMode("login");
       setUsername(forgotUsername);
       setPassword("");
       setError("");
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "فشل تغيير كلمة السر");
+      setError(err instanceof Error ? err.message : (isAR ? "فشل تغيير كلمة السر" : "Failed to change password"));
     } finally {
       setLoading(false);
     }

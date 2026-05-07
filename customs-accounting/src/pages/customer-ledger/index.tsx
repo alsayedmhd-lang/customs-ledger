@@ -48,6 +48,7 @@ export default function CustomerLedgerPage() {
   const { user } = useAuth();
   const { lang } = useLanguage();
   const isAR = lang === "ar";
+  const tr = (ar: string, en: string) => (isAR ? ar : en);
   const [data, setData] = useState<LedgerRow[]>([]);
   const [openingBalance, setOpeningBalance] = useState(0);
   const [clients, setClients] = useState<Client[]>([]);
@@ -177,15 +178,15 @@ export default function CustomerLedgerPage() {
   };
 
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto" dir="rtl">
+    <div className="p-6 space-y-6 max-w-7xl mx-auto" dir={isAR ? "rtl" : "ltr"}>
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
-        <div className="text-right">
+        <div className={isAR ? "text-right" : "text-left"}>
           <h1 className="text-3xl font-bold text-gray-900">
-            ملخص العميل المالي
+            {tr("ملخص العميل المالي", "Customer Financial Summary")}
           </h1>
           <p className="text-sm text-gray-500 mt-1">
-            كشف مختصر لحركات العميل والرصيد
+            {tr("كشف مختصر لحركات العميل والرصيد", "A brief statement of customer transactions and balance")}
           </p>
         </div>
 
@@ -195,7 +196,7 @@ export default function CustomerLedgerPage() {
           disabled={!effectiveClientId}
           className="px-5 py-2 rounded-xl bg-primary text-primary-foreground shadow hover:bg-primary/90 transition disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          الطباعة
+          {tr("الطباعة", "Print")}
         </button>
       </div>
 
@@ -203,20 +204,20 @@ export default function CustomerLedgerPage() {
       <div className="bg-white border rounded-2xl shadow-sm overflow-hidden">
         <div className="px-5 py-4 border-b bg-gray-50 flex items-center justify-between">
           <div>
-            <div className="font-semibold text-gray-900">البحث والتصفية</div>
+            <div className="font-semibold text-gray-900">{tr("البحث والتصفية", "Search and filters")}</div>
             <div className="text-xs text-gray-500 mt-1">
-              اختر العميل والفترة ثم اضغط بحث
+              {tr("اختر العميل والفترة ثم اضغط بحث", "Select the client and period, then search")}
             </div>
           </div>
 
           <div className="text-sm text-gray-500">
-            {data.length} حركة
+            {data.length} {tr("حركة", "entries")}
           </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-5 items-end">
           <div>
-            <label className="text-sm font-medium text-gray-700">العميل</label>
+            <label className="text-sm font-medium text-gray-700">{tr("العميل", "Client")}</label>
             {isClient ? (
               <div className="w-full border rounded-xl px-3 py-2 mt-1 bg-gray-50 text-gray-900 min-h-[42px]">
                 {selectedClient
@@ -231,8 +232,8 @@ export default function CustomerLedgerPage() {
                 handleClientSelected(e.target.value ? Number(e.target.value) : "");
               }}
             >
-              {!isClient && <option value="">اختر العميل</option>}
-              {isClient && <option value="">&#1575;&#1582;&#1578;&#1585; &#1575;&#1604;&#1593;&#1605;&#1610;&#1604;</option>}
+              {!isClient && <option value="">{tr("اختر العميل", "Select client")}</option>}
+              {isClient && <option value="">{tr("اختر العميل", "Select client")}</option>}
               {visibleClients.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.nameAr || c.nameEn || c.name}
@@ -244,7 +245,7 @@ export default function CustomerLedgerPage() {
 
           <div>
             <label className="text-sm font-medium text-gray-700">
-              من تاريخ
+              {tr("من تاريخ", "From date")}
             </label>
             <input
               type="date"
@@ -256,7 +257,7 @@ export default function CustomerLedgerPage() {
 
           <div>
             <label className="text-sm font-medium text-gray-700">
-              إلى تاريخ
+              {tr("إلى تاريخ", "To date")}
             </label>
             <input
               type="date"
@@ -268,12 +269,12 @@ export default function CustomerLedgerPage() {
 
           <div>
             <label className="text-sm font-medium text-gray-700">
-              {isAR ? "رقم الفاتورة أو سند القبض" : "Invoice or receipt number"}
+              {tr("رقم الفاتورة أو سند القبض", "Invoice or receipt number")}
             </label>
             <input
               value={referenceSearch}
               onChange={(e) => setReferenceSearch(e.target.value)}
-              placeholder={isAR ? "رقم الفاتورة أو سند القبض" : "Invoice or receipt number"}
+              placeholder={tr("رقم الفاتورة أو سند القبض", "Invoice or receipt number")}
               className="w-full border rounded-xl px-3 py-2 mt-1 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500"
             />
           </div>
@@ -284,7 +285,7 @@ export default function CustomerLedgerPage() {
             disabled={isSearchDisabled}
             className="h-[42px] rounded-xl bg-primary text-primary-foreground shadow hover:bg-primary/90 transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isLoading ? "جاري البحث..." : "بحث"}
+            {isLoading ? tr("جاري البحث...", "Searching...") : tr("بحث", "Search")}
           </button>
         </div>
       </div>
@@ -292,7 +293,7 @@ export default function CustomerLedgerPage() {
       {/* Summary */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-white border rounded-2xl p-4 shadow-sm">
-          <div className="text-sm text-gray-500">العميل</div>
+          <div className="text-sm text-gray-500">{tr("العميل", "Client")}</div>
           <div className="font-bold text-gray-900 mt-1">
             {selectedClient
               ? selectedClient.nameAr || selectedClient.nameEn || selectedClient.name
@@ -301,21 +302,21 @@ export default function CustomerLedgerPage() {
         </div>
 
         <div className="bg-white border rounded-2xl p-4 shadow-sm">
-          <div className="text-sm text-gray-500">إجمالي المدين</div>
+          <div className="text-sm text-gray-500">{tr("إجمالي المدين", "Total debit")}</div>
           <div className="font-bold text-gray-900 mt-1">
             QR {formatMoney(totalDebit)}
           </div>
         </div>
 
         <div className="bg-white border rounded-2xl p-4 shadow-sm">
-          <div className="text-sm text-gray-500">إجمالي الدائن</div>
+          <div className="text-sm text-gray-500">{tr("إجمالي الدائن", "Total credit")}</div>
           <div className="font-bold text-green-700 mt-1">
             QR {formatMoney(totalCredit)}
           </div>
         </div>
 
         <div className="bg-white border rounded-2xl p-4 shadow-sm">
-          <div className="text-sm text-gray-500">الرصيد</div>
+          <div className="text-sm text-gray-500">{tr("الرصيد", "Balance")}</div>
           <div
             className={`font-bold mt-1 ${
               finalBalance > 0
@@ -335,11 +336,11 @@ export default function CustomerLedgerPage() {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50 border-b text-gray-600">
-              <th className="p-3 text-right">التاريخ</th>
-              <th className="p-3 text-right">النوع</th>
-              <th className="p-3 text-right">مدين</th>
-              <th className="p-3 text-right">دائن</th>
-              <th className="p-3 text-right">الرصيد</th>
+              <th className="p-3 text-right">{tr("التاريخ", "Date")}</th>
+              <th className="p-3 text-right">{tr("النوع", "Type")}</th>
+              <th className="p-3 text-right">{tr("مدين", "Debit")}</th>
+              <th className="p-3 text-right">{tr("دائن", "Credit")}</th>
+              <th className="p-3 text-right">{tr("الرصيد", "Balance")}</th>
             </tr>
           </thead>
 
@@ -351,7 +352,7 @@ export default function CustomerLedgerPage() {
                 <>
                   <tr className="border-b bg-gray-50">
                     <td className="p-3 text-gray-400">—</td>
-                    <td className="p-3 font-semibold">رصيد سابق</td>
+                    <td className="p-3 font-semibold">{tr("رصيد سابق", "Opening balance")}</td>
                     <td className="p-3">QR 0.00</td>
                     <td className="p-3">QR 0.00</td>
                     <td className="p-3 font-bold text-blue-700">
@@ -368,11 +369,11 @@ export default function CustomerLedgerPage() {
 
                         <td className="p-3">
                           {row.entryType === "invoice"
-                            ? "فاتورة"
+                            ? tr("فاتورة", "Invoice")
                             : row.entryType === "receipt"
-                            ? "سند قبض"
+                            ? tr("سند قبض", "Receipt")
                             : row.entryType === "advance"
-                            ? "دفعة مقدمة"
+                            ? tr("دفعة مقدمة", "Advance payment")
                             : row.entryType}
                         </td>
 
@@ -394,7 +395,7 @@ export default function CustomerLedgerPage() {
                   {filteredData.length === 0 && (
                     <tr>
                       <td colSpan={5} className="p-8 text-center text-gray-500">
-                        اختر العميل ثم اضغط بحث لعرض الحركات
+                        {tr("اختر العميل ثم اضغط بحث لعرض الحركات", "Select a client, then search to view transactions")}
                       </td>
                     </tr>
                   )}
