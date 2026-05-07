@@ -632,7 +632,7 @@ export default function LoginPage() {
                 )}
 
                 <button type="submit" disabled={loading || otpCode.length < 6}
-                  className="w-full bg-gradient-to-l from-blue-500 to-blue-600 hover:from-blue-400 hover:to-blue-500 disabled:opacity-50 text-white font-bold py-3 rounded-xl transition-all shadow-lg shadow-blue-900/40"
+                  className="w-full bg-primary text-primary-foreground font-bold py-3 rounded-xl transition-all shadow-lg shadow-primary/20 hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent disabled:pointer-events-none disabled:opacity-50"
                 >
                   {loading ? (isAR ? "جارٍ التحقق..." : "Verifying...") : (isAR ? "تأكيد الرمز" : "Confirm Code")}
                 </button>
@@ -761,7 +761,7 @@ export default function LoginPage() {
                 )}
 
                 <button type="submit" disabled={loading || resetOtpCode.length < 6}
-                  className="w-full bg-gradient-to-l from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 disabled:opacity-50 text-white font-bold py-3 rounded-xl transition-all shadow-lg"
+                  className="w-full bg-primary text-primary-foreground font-bold py-3 rounded-xl transition-all shadow-lg shadow-primary/20 hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent disabled:pointer-events-none disabled:opacity-50"
                 >
                   {loading ? (isAR ? "جارٍ التحقق..." : "Verifying...") : (isAR ? "تأكيد الرمز" : "Confirm Code")}
                 </button>
