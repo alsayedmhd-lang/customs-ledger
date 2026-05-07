@@ -5,10 +5,19 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import crypto from "crypto";
+import { createRequire } from "module";
 import packageJson from "../../../package.json";
 import { requireAdmin } from "../middleware/auth";
 
 const router = Router();
+const require = createRequire(path.join(process.cwd(), "package.json"));
+const { Client: PgClient } = require("pg") as {
+  Client: new (config: { connectionString: string; connectionTimeoutMillis?: number; query_timeout?: number }) => {
+    connect: () => Promise<void>;
+    query: (sql: string) => Promise<unknown>;
+    end: () => Promise<void>;
+  };
+};
 
 const developerPermissionColumns = [
   [
@@ -71,6 +80,31 @@ function ensureDeveloperSettingsColumns() {
 
 function toBool(value: unknown) {
   return value === true || value === 1 || value === "1";
+}
+
+function sanitizeDatabaseError(error: unknown) {
+  const code = typeof error === "object" && error !== null && "code" in error ? String((error as { code?: unknown }).code) : "";
+  const message = error instanceof Error ? error.message : "Connection failed";
+
+  if (code === "ENOTFOUND") return "Host not found";
+  if (code === "ECONNREFUSED") return "Connection refused";
+  if (code === "ETIMEDOUT" || code === "ETIMEOUT") return "Connection timed out";
+  if (code === "ECONNRESET") return "Connection was reset";
+  if (/password authentication failed/i.test(message)) return "Authentication failed";
+  if (/database .* does not exist/i.test(message)) return "Database does not exist";
+  if (/no pg_hba.conf entry/i.test(message)) return "Access rejected by PostgreSQL host rules";
+  if (/self-signed certificate/i.test(message)) return "TLS certificate is not trusted";
+
+  return message.replace(/postgres(?:ql)?:\/\/\S+/gi, "[redacted]").slice(0, 180);
+}
+
+function isPostgresConnectionString(value: string) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "postgres:" || url.protocol === "postgresql:";
+  } catch {
+    return false;
+  }
 }
 
 function mapDeveloperPermissions(settings: any) {
@@ -178,6 +212,38 @@ router.get("/developer/database/sql", (_req, res) => {
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: "Failed to create SQL file" });
+  }
+});
+
+router.post("/developer/database/test-online", async (req, res) => {
+  const connectionString = String(req.body?.connectionString || "").trim();
+
+  if (!connectionString) {
+    return res.status(400).json({ success: false, error: "Connection string is required" });
+  }
+
+  if (!isPostgresConnectionString(connectionString)) {
+    return res.status(400).json({ success: false, error: "Only PostgreSQL connection strings are supported" });
+  }
+
+  const client = new PgClient({
+    connectionString,
+    connectionTimeoutMillis: 5000,
+    query_timeout: 5000,
+  });
+
+  try {
+    await client.connect();
+    await client.query("select 1");
+    return res.json({ success: true });
+  } catch (err) {
+    return res.status(400).json({ success: false, error: sanitizeDatabaseError(err) });
+  } finally {
+    try {
+      await client.end();
+    } catch {
+      // Ignore close errors; this endpoint only reports the connection test result.
+    }
   }
 });
 

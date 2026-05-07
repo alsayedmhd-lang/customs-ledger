@@ -202,6 +202,7 @@ export default function DeveloperSettingsPage() {
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isTestingConnection, setIsTestingConnection] = useState(false);
   const [savedMessage, setSavedMessage] = useState("");
   const [databaseMessage, setDatabaseMessage] = useState("");
   const [settings, setSettings] = useState<DeveloperSettings>(defaultSettings);
@@ -327,12 +328,58 @@ export default function DeveloperSettingsPage() {
     window.open(`${API_BASE}/developer/database/sql`, "_blank");
   }
 
-  function testPreparedConnection() {
-    setDatabaseMessage(databaseMode === "local" ? tr("تم فحص إعدادات SQLite المحلية", "Local SQLite settings checked") : tr("تم فحص نموذج إعدادات الاتصال بدون إرسال أسرار", "Connection form checked without sending secrets"));
+  async function testPreparedConnection() {
+    setDatabaseMessage("");
+
+    if (databaseMode !== "online") {
+      setDatabaseMessage(tr("اختر قاعدة أونلاين لاختبار Connection String", "Select Online database to test the connection string"));
+      return;
+    }
+
+    if (!databaseConfig.useConnectionString) {
+      setDatabaseMessage(tr("فعّل خيار Connection String الكامل ثم أدخل الرابط", "Enable full connection string and enter the URL"));
+      return;
+    }
+
+    const connectionString = databaseConfig.connectionString.trim();
+    if (!connectionString) {
+      setDatabaseMessage(tr("Connection String مطلوب لاختبار الاتصال", "Connection string is required to test the connection"));
+      return;
+    }
+
+    if (!/^postgres(?:ql)?:\/\//i.test(connectionString)) {
+      setDatabaseMessage(tr("يدعم الاختبار PostgreSQL connection string فقط حالياً", "Only PostgreSQL connection strings are supported for now"));
+      return;
+    }
+
+    setIsTestingConnection(true);
+    try {
+      const res = await fetch(`${API_BASE}/developer/database/test-online`, {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify({ connectionString }),
+      });
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok || !data?.success) {
+        setDatabaseMessage(data?.error ? tr(`فشل الاتصال: ${data.error}`, `Connection failed: ${data.error}`) : tr("فشل الاتصال", "Connection failed"));
+        return;
+      }
+
+      setDatabaseMessage(tr("تم الاتصال بنجاح", "Connected successfully"));
+    } catch {
+      setDatabaseMessage(tr("تعذر اختبار الاتصال بالخادم", "Could not test the connection through the server"));
+    } finally {
+      setIsTestingConnection(false);
+    }
   }
 
   function savePreparedConnection() {
     setDatabaseMessage(tr("تم حفظ إعدادات العرض محليًا داخل الجلسة الحالية", "Display settings saved locally in this session"));
+  }
+
+  function showLocalDatabasePreviewMessage() {
+    setDatabaseMessage(tr("هذا الزر لا ينشئ قاعدة فعلية حالياً", "This button does not create an actual database right now"));
   }
 
   const setBool = (key: BoolKey, checked: boolean) => setSettings((current) => ({ ...current, [key]: checked }));
@@ -490,7 +537,7 @@ export default function DeveloperSettingsPage() {
                   </DevField>
                 </div>
                 <div className="mt-4 flex flex-wrap gap-2">
-                  <Button type="button" onClick={testPreparedConnection} size="sm">{tr("إنشاء قاعدة جديدة", "Create new database")}</Button>
+                  <Button type="button" onClick={showLocalDatabasePreviewMessage} size="sm">{tr("إنشاء قاعدة جديدة", "Create new database")}</Button>
                   <Button type="button" variant="outline" onClick={createSqlFile} size="sm">{tr("تحميل ملف SQL لإنشاء قاعدة جديدة", "Download SQL file to create a new database")}</Button>
                 </div>
               </div>
@@ -546,7 +593,9 @@ export default function DeveloperSettingsPage() {
 
             <div className="rounded-2xl border border-border bg-background/70 p-4 shadow-sm">
               <div className="mb-4 flex flex-wrap gap-2">
-                <Button type="button" variant="outline" onClick={testPreparedConnection} size="sm">{tr("اختبار الاتصال", "Test connection")}</Button>
+                <Button type="button" variant="outline" onClick={testPreparedConnection} size="sm" disabled={isTestingConnection}>
+                  {isTestingConnection ? tr("جارٍ الاختبار...", "Testing...") : tr("اختبار الاتصال", "Test connection")}
+                </Button>
                 <Button type="button" variant="outline" onClick={savePreparedConnection} size="sm">{tr("حفظ الإعدادات", "Save settings")}</Button>
                 <Button type="button" onClick={checkDatabase} size="sm">{tr("اتصال", "Connect")}</Button>
               </div>
