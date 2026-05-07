@@ -5,14 +5,15 @@ type PageContainerProps = {
   children: ReactNode;
   className?: string;
   contentClassName?: string;
-  width?: "default" | "wide" | "full";
+  width?: "normal" | "default" | "wide" | "full";
   dir?: "ltr" | "rtl";
 };
 
 const widthClass = {
-  default: "max-w-6xl lg:w-[86%] xl:w-[82%] 2xl:w-[80%]",
-  wide: "max-w-7xl",
-  full: "max-w-none",
+  normal: "max-w-[72rem] lg:w-[88%] xl:w-[84%] 2xl:w-[80%]",
+  default: "max-w-[72rem] lg:w-[88%] xl:w-[84%] 2xl:w-[80%]",
+  wide: "max-w-[88rem] lg:w-[94%] xl:w-[92%] 2xl:w-[90%]",
+  full: "w-full max-w-none",
 };
 
 export default function PageContainer({
@@ -30,7 +31,7 @@ export default function PageContainer({
       dir={resolvedDir}
       data-dir={resolvedDir}
     >
-      <div className={cn("mx-auto w-full min-w-0", widthClass[width], contentClassName)}>
+      <div className={cn("mx-auto w-full min-w-0 transition-[width,max-width] duration-200 ease-out", widthClass[width], contentClassName)}>
         {children}
       </div>
     </div>

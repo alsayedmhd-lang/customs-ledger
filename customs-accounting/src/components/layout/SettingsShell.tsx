@@ -22,7 +22,7 @@ type SettingsShellProps<T extends string> = {
   className?: string;
   contentClassName?: string;
   dir?: "ltr" | "rtl";
-  width?: "default" | "wide" | "full";
+  width?: "normal" | "default" | "wide" | "full";
   tabsSticky?: boolean;
 };
 
