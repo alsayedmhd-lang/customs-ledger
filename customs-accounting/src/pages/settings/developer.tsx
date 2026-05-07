@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || "http://localhost:3000").replace(/\/$/, "") + "/api";
 const UNLOCK_KEY = "developer_unlocked";
+const ONLINE_DATABASE_CONNECTED_KEY = "developer_online_database_connected";
 const DEFAULT_LOGIN_FOOTER_TEXT = "Internal Accounting System For Companes - alsayed.mhd@gmail.com - Phone - 00201009697521 - 0097460020446";
 
 type DeveloperSettings = {
@@ -149,6 +150,8 @@ function formatDisplayValue(value: string | number | boolean | null | undefined,
   const normalized = String(value);
   const labels: Record<string, [string, string]> = {
     connected: ["متصل", "Connected"],
+    online_connected: ["متصل بالأونلاين", "Connected"],
+    online_disconnected: ["غير متصل بالأونلاين", "Disconnected"],
     "not connected": ["غير متصل", "Not connected"],
     not_connected: ["غير متصل", "Not connected"],
     unavailable: ["غير متاح", "Unavailable"],
@@ -203,6 +206,8 @@ export default function DeveloperSettingsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isTestingConnection, setIsTestingConnection] = useState(false);
+  const [isConnectingOnline, setIsConnectingOnline] = useState(false);
+  const [onlineDatabaseConnected, setOnlineDatabaseConnected] = useState(false);
   const [savedMessage, setSavedMessage] = useState("");
   const [databaseMessage, setDatabaseMessage] = useState("");
   const [settings, setSettings] = useState<DeveloperSettings>(defaultSettings);
@@ -241,6 +246,7 @@ export default function DeveloperSettingsPage() {
 
   useEffect(() => {
     if (sessionStorage.getItem(UNLOCK_KEY) === "true") setUnlocked(true);
+    setOnlineDatabaseConnected(sessionStorage.getItem(ONLINE_DATABASE_CONNECTED_KEY) === "true");
   }, []);
 
   useEffect(() => {
@@ -374,8 +380,62 @@ export default function DeveloperSettingsPage() {
     }
   }
 
+  async function connectOnlineDatabase() {
+    setDatabaseMessage("");
+
+    if (databaseMode !== "online") {
+      setDatabaseMessage(tr("اختر قاعدة أونلاين للاتصال", "Select Online database to connect"));
+      return;
+    }
+
+    if (!databaseConfig.useConnectionString) {
+      setDatabaseMessage(tr("فعّل خيار Connection String الكامل ثم أدخل الرابط", "Enable full connection string and enter the URL"));
+      return;
+    }
+
+    const connectionString = databaseConfig.connectionString.trim();
+    if (!connectionString) {
+      setDatabaseMessage(tr("Connection String مطلوب للاتصال", "Connection string is required to connect"));
+      return;
+    }
+
+    if (!/^postgres(?:ql)?:\/\//i.test(connectionString)) {
+      setDatabaseMessage(tr("يدعم الاتصال PostgreSQL connection string فقط حالياً", "Only PostgreSQL connection strings are supported for now"));
+      return;
+    }
+
+    setIsConnectingOnline(true);
+    try {
+      const res = await fetch(`${API_BASE}/developer/database/test-online`, {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify({ connectionString }),
+      });
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok || !data?.success) {
+        setDatabaseMessage(data?.error ? tr(`فشل الاتصال: ${data.error}`, `Connection failed: ${data.error}`) : tr("فشل الاتصال", "Connection failed"));
+        return;
+      }
+
+      sessionStorage.setItem(ONLINE_DATABASE_CONNECTED_KEY, "true");
+      setOnlineDatabaseConnected(true);
+      setDatabaseMessage(tr("Online: متصل بالأونلاين", "Online: Connected"));
+    } catch {
+      setDatabaseMessage(tr("تعذر الاتصال بقاعدة الأونلاين عبر الخادم", "Could not connect to the online database through the server"));
+    } finally {
+      setIsConnectingOnline(false);
+    }
+  }
+
+  function disconnectOnlineDatabase() {
+    sessionStorage.removeItem(ONLINE_DATABASE_CONNECTED_KEY);
+    setOnlineDatabaseConnected(false);
+    setDatabaseMessage(tr("Online: غير متصل بالأونلاين", "Online: Disconnected"));
+  }
+
   function savePreparedConnection() {
-    setDatabaseMessage(tr("تم حفظ إعدادات العرض محليًا داخل الجلسة الحالية", "Display settings saved locally in this session"));
+    setDatabaseMessage(tr("لم يتم حفظ Connection String أو تغيير مصدر البيانات", "Connection string was not saved and the data source was not changed"));
   }
 
   function showLocalDatabasePreviewMessage() {
@@ -549,6 +609,12 @@ export default function DeveloperSettingsPage() {
                   <Cloud className="h-4 w-4 text-blue-600" />
                   <span>{tr("إعدادات قاعدة البيانات الأونلاين", "Online database settings")}</span>
                 </div>
+                <div className="mb-4 flex h-10 items-center justify-between rounded-md border border-border bg-background px-3 text-sm">
+                  <span className="text-muted-foreground">{tr("Online", "Online")}</span>
+                  <span className={cn("font-semibold", onlineDatabaseConnected ? "text-emerald-600" : "text-red-600")}>
+                    {onlineDatabaseConnected ? tr("متصل بالأونلاين", "Connected") : tr("غير متصل بالأونلاين", "Disconnected")}
+                  </span>
+                </div>
                 <label className="mb-4 flex items-center gap-2 text-sm font-semibold text-foreground">
                   <input
                     type="checkbox"
@@ -597,7 +663,13 @@ export default function DeveloperSettingsPage() {
                   {isTestingConnection ? tr("جارٍ الاختبار...", "Testing...") : tr("اختبار الاتصال", "Test connection")}
                 </Button>
                 <Button type="button" variant="outline" onClick={savePreparedConnection} size="sm">{tr("حفظ الإعدادات", "Save settings")}</Button>
-                <Button type="button" onClick={checkDatabase} size="sm">{tr("اتصال", "Connect")}</Button>
+                {onlineDatabaseConnected ? (
+                  <Button type="button" variant="outline" onClick={disconnectOnlineDatabase} size="sm">{tr("فصل الاتصال", "Disconnect")}</Button>
+                ) : (
+                  <Button type="button" onClick={connectOnlineDatabase} size="sm" disabled={isConnectingOnline}>
+                    {isConnectingOnline ? tr("جارٍ الاتصال...", "Connecting...") : tr("اتصال", "Connect")}
+                  </Button>
+                )}
               </div>
 
               <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
