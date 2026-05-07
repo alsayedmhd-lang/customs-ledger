@@ -8,6 +8,7 @@ import {
 import { formatCurrency, formatDate, arabicNums } from "@/lib/utils";
 import {
   FileText, Users, DollarSign, AlertCircle, ArrowLeft, ArrowRight, TrendingUp, Eye, EyeOff,
+  BookOpen,
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
@@ -105,6 +106,15 @@ export default function Dashboard() {
     hidden: { opacity: 0, y: 16 },
     show: { opacity: 1, y: 0, transition: { duration: 0.35 } },
   };
+  const handleOpenProjectGuide = async () => {
+    const api = (window as any).electronAPI;
+    if (!api?.openExternalFile) return;
+
+    const result = await api.openExternalFile("docs/project-guide.pdf");
+    if (!result?.success) {
+      console.error("Failed to open project guide:", result?.error || result);
+    }
+  };
 
   return (
     <motion.div
@@ -194,6 +204,29 @@ export default function Dashboard() {
           ))}
         </div>
       </div>
+
+      <motion.button
+        type="button"
+        variants={item}
+        onClick={handleOpenProjectGuide}
+        className="w-full bg-card border border-border/50 rounded-2xl p-5 shadow-sm text-start transition-colors hover:bg-muted/30"
+      >
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 rounded-xl bg-primary/10 flex-shrink-0">
+            <BookOpen className="w-5 h-5 text-primary" />
+          </div>
+          <div className="min-w-0">
+            <h2 className="text-sm font-bold text-foreground">
+              {isAR ? "دليل المشروع" : "Project Guide"}
+            </h2>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              {isAR
+                ? "افتح دليل استخدام النظام وميزات البرنامج"
+                : "Open the system user guide and application features"}
+            </p>
+          </div>
+        </div>
+      </motion.button>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         {/* Revenue Chart */}

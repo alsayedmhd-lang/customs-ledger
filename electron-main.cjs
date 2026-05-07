@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, Menu } = require("electron");
+const { app, BrowserWindow, ipcMain, dialog, Menu, shell } = require("electron");
 const { autoUpdater } = require("electron-updater");
 const { spawn } = require("child_process");
 const path = require("path");
@@ -88,6 +88,42 @@ function safeFileName(name) {
     .replace(/[<>:"/\\|?*]+/g, "-")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function safeRelativePath(relativePath) {
+  if (typeof relativePath !== "string") return null;
+
+  const normalized = path.normalize(relativePath).replace(/^([\\/])+/, "");
+  if (!normalized || path.isAbsolute(normalized) || normalized.startsWith("..") || normalized.includes(`..${path.sep}`)) {
+    return null;
+  }
+
+  return normalized;
+}
+
+function resolveExternalFilePath(relativePath) {
+  const safePath = safeRelativePath(relativePath);
+  if (!safePath) return null;
+
+  const candidates = app.isPackaged
+    ? [
+        path.join(process.resourcesPath, "customs-accounting", "dist", "public", safePath),
+        path.join(process.resourcesPath, "app.asar", "customs-accounting", "dist", "public", safePath),
+      ]
+    : [
+        path.join(__dirname, "customs-accounting", "dist", "public", safePath),
+        path.join(__dirname, "customs-accounting", "public", safePath),
+      ];
+
+  const sourcePath = candidates.find((candidate) => fs.existsSync(candidate));
+  if (!sourcePath) return null;
+
+  if (!sourcePath.includes(".asar")) return sourcePath;
+
+  const externalPath = path.join(app.getPath("userData"), "external-files", safePath);
+  fs.mkdirSync(path.dirname(externalPath), { recursive: true });
+  fs.copyFileSync(sourcePath, externalPath);
+  return externalPath;
 }
 
 function createWindow() {
@@ -300,6 +336,25 @@ autoUpdater.on("error", (error) => {
 });
 
 ipcMain.handle("app:get-version", () => app.getVersion());
+
+ipcMain.handle("open-external-file", async (_event, relativePath) => {
+  try {
+    const filePath = resolveExternalFilePath(relativePath);
+    if (!filePath) {
+      return { success: false, error: "File not found" };
+    }
+
+    const errorMessage = await shell.openPath(filePath);
+    if (errorMessage) {
+      return { success: false, error: errorMessage };
+    }
+
+    return { success: true, filePath };
+  } catch (error) {
+    console.error("External file open error:", error);
+    return { success: false, error: error.message };
+  }
+});
 
 ipcMain.on("app:zoom-wheel", (event, direction) => {
   if (!mainWindow || mainWindow.isDestroyed()) return;

@@ -13,6 +13,8 @@ window.addEventListener(
 
 contextBridge.exposeInMainWorld("electronAPI", {
   getAppVersion: () => ipcRenderer.invoke("app:get-version"),
+  openExternalFile: (relativePath) =>
+    ipcRenderer.invoke("open-external-file", relativePath),
   saveCurrentPagePDF: (fileName) =>
     ipcRenderer.invoke("save-current-page-pdf", fileName),
   checkForUpdates: () => ipcRenderer.invoke("check-for-updates"),
