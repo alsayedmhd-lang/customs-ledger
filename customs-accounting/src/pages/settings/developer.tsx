@@ -112,6 +112,10 @@ type SyncQueueStatus = {
   lastSync: string | null;
   recent: SyncQueueItem[];
 };
+type ReadinessStatus = {
+  apiStatus: "connected" | "error";
+  onlineStatus: "online" | "offline";
+};
 type BoolKey = {
   [K in keyof DeveloperSettings]: DeveloperSettings[K] extends boolean ? K : never;
 }[keyof DeveloperSettings];
@@ -241,6 +245,7 @@ export default function DeveloperSettingsPage() {
   const [isTestingConnection, setIsTestingConnection] = useState(false);
   const [isConnectingOnline, setIsConnectingOnline] = useState(false);
   const [isSyncQueueLoading, setIsSyncQueueLoading] = useState(false);
+  const [isReadinessLoading, setIsReadinessLoading] = useState(false);
   const [onlineDatabaseConnected, setOnlineDatabaseConnected] = useState(false);
   const [savedMessage, setSavedMessage] = useState("");
   const [databaseMessage, setDatabaseMessage] = useState("");
@@ -250,6 +255,10 @@ export default function DeveloperSettingsPage() {
     failed: 0,
     lastSync: null,
     recent: [],
+  });
+  const [readinessStatus, setReadinessStatus] = useState<ReadinessStatus>({
+    apiStatus: "error",
+    onlineStatus: typeof navigator !== "undefined" && navigator.onLine ? "online" : "offline",
   });
   const [databaseMode, setDatabaseMode] = useState<DatabaseMode>("local");
   const [databaseConfig, setDatabaseConfig] = useState({
@@ -293,6 +302,7 @@ export default function DeveloperSettingsPage() {
     if (unlocked) {
       void loadSettings();
       void loadSyncQueueStatus();
+      void loadReadinessStatus();
     }
   }, [unlocked]);
 
@@ -384,6 +394,26 @@ export default function DeveloperSettingsPage() {
       setSyncQueueStatus({ pending: 0, failed: 0, lastSync: null, recent: [] });
     } finally {
       setIsSyncQueueLoading(false);
+    }
+  }
+
+  async function loadReadinessStatus() {
+    setIsReadinessLoading(true);
+    const onlineStatus = typeof navigator !== "undefined" && navigator.onLine ? "online" : "offline";
+
+    try {
+      const res = await fetch(`${API_BASE}/healthz`, { headers: authHeaders() });
+      setReadinessStatus({
+        apiStatus: res.ok ? "connected" : "error",
+        onlineStatus,
+      });
+    } catch {
+      setReadinessStatus({
+        apiStatus: "error",
+        onlineStatus,
+      });
+    } finally {
+      setIsReadinessLoading(false);
     }
   }
 
@@ -662,6 +692,26 @@ export default function DeveloperSettingsPage() {
                     </table>
                   </div>
                 )}
+              </div>
+            </div>
+            <div className="rounded-2xl border border-border bg-background/70 p-4 shadow-sm">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 text-sm font-bold text-foreground">
+                  <Activity className={cn("h-4 w-4 text-primary", isReadinessLoading && "animate-pulse")} />
+                  <span>{tr("حالة الشبكة وجاهزية المزامنة", "Network / Sync Readiness Status")}</span>
+                  {isReadinessLoading && <span className="text-xs font-medium text-muted-foreground">{tr("جارٍ الفحص...", "Checking...")}</span>}
+                </div>
+                <Button type="button" variant="outline" size="sm" onClick={loadReadinessStatus} disabled={isReadinessLoading} className="gap-2">
+                  <RefreshCw className={cn("h-3.5 w-3.5", isReadinessLoading && "animate-spin")} />
+                  {tr("تحديث", "Refresh")}
+                </Button>
+              </div>
+              <div className="grid gap-3 md:grid-cols-5">
+                <InfoRow isAR={isAR} label={tr("وضع التطبيق", "App Mode")} value="SQLite Local" />
+                <InfoRow isAR={isAR} label={tr("حالة API", "API Status")} value={readinessStatus.apiStatus === "connected" ? tr("متصل", "Connected") : tr("خطأ", "Error")} />
+                <InfoRow isAR={isAR} label={tr("محرك المزامنة", "Sync Engine")} value={tr("غير مفعّل بعد", "Not enabled yet")} />
+                <InfoRow isAR={isAR} label={tr("آخر مزامنة", "Last Sync")} value={tr("غير متاح", "Not available")} />
+                <InfoRow isAR={isAR} label={tr("حالة الاتصال", "Online Status")} value={readinessStatus.onlineStatus === "online" ? tr("متصل بالإنترنت", "Online") : tr("غير متصل", "Offline")} />
               </div>
             </div>
             <div className="flex flex-wrap gap-2">
