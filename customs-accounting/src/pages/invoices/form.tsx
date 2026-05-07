@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation, useParams, Link } from "wouter";
 import { motion } from "framer-motion";
 import { useForm, useFieldArray } from "react-hook-form";
@@ -106,6 +106,123 @@ const inputCls =
   "w-full px-3 h-10 text-sm bg-background border border-border rounded-lg outline-none focus:ring-2 focus:ring-primary/20 transition-colors";
 const labelCls =
   "block text-xs font-semibold text-muted-foreground mb-1 uppercase tracking-wide";
+
+const IMPORTER_EXPORTER_SUGGESTIONS_KEY = "invoice_importer_exporter_suggestions";
+const ENTRY_PORT_SUGGESTIONS_KEY = "invoice_entry_port_suggestions";
+
+function readSuggestions(storageKey: string) {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(storageKey) || "[]");
+    return Array.isArray(parsed)
+      ? parsed.filter((item): item is string => typeof item === "string" && item.trim()).slice(0, 10)
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeSuggestions(storageKey: string, suggestions: string[]) {
+  localStorage.setItem(storageKey, JSON.stringify(suggestions.slice(0, 10)));
+}
+
+function rememberSuggestion(storageKey: string, value: string | null | undefined) {
+  const normalized = String(value ?? "").trim();
+  if (!normalized) return;
+
+  writeSuggestions(storageKey, [
+    normalized,
+    ...readSuggestions(storageKey).filter((item) => item !== normalized),
+  ]);
+}
+
+function removeSuggestion(storageKey: string, value: string) {
+  writeSuggestions(
+    storageKey,
+    readSuggestions(storageKey).filter((item) => item !== value)
+  );
+}
+
+function SuggestionInput({
+  storageKey,
+  value,
+  onChange,
+  placeholder,
+  className,
+  dir,
+}: {
+  storageKey: string;
+  value?: string | null;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  className?: string;
+  dir?: "rtl" | "ltr";
+}) {
+  const [open, setOpen] = useState(false);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+
+  const refreshSuggestions = () => setSuggestions(readSuggestions(storageKey));
+  const visibleSuggestions = suggestions.slice(0, 5);
+
+  return (
+    <div className="relative">
+      <input
+        value={value ?? ""}
+        onFocus={() => {
+          refreshSuggestions();
+          setOpen(true);
+        }}
+        onChange={(event) => {
+          onChange(event.target.value);
+          refreshSuggestions();
+          setOpen(true);
+        }}
+        onBlur={() => setTimeout(() => setOpen(false), 100)}
+        placeholder={placeholder}
+        className={className}
+        dir={dir}
+      />
+
+      {open && visibleSuggestions.length > 0 && (
+        <div
+          className="absolute left-0 right-0 top-full z-[9999] mt-1 max-h-56 overflow-auto rounded-lg border border-border bg-popover text-popover-foreground shadow-xl"
+          dir={dir}
+        >
+          {visibleSuggestions.map((suggestion) => (
+            <div
+              key={suggestion}
+              className="flex items-center gap-2 border-b border-border/50 last:border-b-0"
+            >
+              <button
+                type="button"
+                onMouseDown={(event) => {
+                  event.preventDefault();
+                  onChange(suggestion);
+                  setOpen(false);
+                }}
+                className="min-w-0 flex-1 truncate px-3 py-2 text-start text-sm hover:bg-muted"
+              >
+                {suggestion}
+              </button>
+              <button
+                type="button"
+                aria-label="Remove suggestion"
+                onMouseDown={(event) => {
+                  event.preventDefault();
+                  removeSuggestion(storageKey, suggestion);
+                  refreshSuggestions();
+                  setOpen(true);
+                }}
+                className="shrink-0 px-3 py-2 text-sm font-semibold text-muted-foreground hover:bg-muted hover:text-destructive"
+              >
+                ×
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 interface SortableRowProps {
   id: string;
@@ -240,6 +357,10 @@ export default function InvoiceForm() {
   });
 
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const pendingSuggestionsRef = useRef({
+    importerExporterName: "",
+    portOfEntry: "",
+  });
 
   useEffect(() => {
   const token = sessionStorage.getItem("auth_token");
@@ -258,6 +379,14 @@ export default function InvoiceForm() {
   const createMut = useCreateInvoice({
     mutation: {
       onSuccess: (data) => {
+        rememberSuggestion(
+          IMPORTER_EXPORTER_SUGGESTIONS_KEY,
+          pendingSuggestionsRef.current.importerExporterName
+        );
+        rememberSuggestion(
+          ENTRY_PORT_SUGGESTIONS_KEY,
+          pendingSuggestionsRef.current.portOfEntry
+        );
         queryClient.invalidateQueries({ queryKey: getListInvoicesQueryKey() });
         toast({ title: isAR ? "تم إنشاء الفاتورة بنجاح" : "Invoice created" });
         setLocation("/invoices");
@@ -279,6 +408,14 @@ export default function InvoiceForm() {
   const updateMut = useUpdateInvoice({
     mutation: {
       onSuccess: async () => {
+        rememberSuggestion(
+          IMPORTER_EXPORTER_SUGGESTIONS_KEY,
+          pendingSuggestionsRef.current.importerExporterName
+        );
+        rememberSuggestion(
+          ENTRY_PORT_SUGGESTIONS_KEY,
+          pendingSuggestionsRef.current.portOfEntry
+        );
         await queryClient.invalidateQueries({ queryKey: getListInvoicesQueryKey() });
         await queryClient.invalidateQueries({ queryKey: ["/api/invoices", invoiceId] });
 
@@ -334,6 +471,11 @@ export default function InvoiceForm() {
     control,
     name: "items",
   });
+
+  useEffect(() => {
+    register("importerExporterName");
+    register("portOfEntry");
+  }, [register]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
@@ -525,6 +667,11 @@ export default function InvoiceForm() {
         return;
       }
     }
+
+    pendingSuggestionsRef.current = {
+      importerExporterName: data.importerExporterName ?? "",
+      portOfEntry: data.portOfEntry ?? "",
+    };
 
     if (isEdit) {
         updateMut.mutate({
@@ -810,7 +957,7 @@ export default function InvoiceForm() {
         ) : null}
         </div>
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-        <div className="bg-card rounded-2xl border border-border/50 shadow-sm overflow-hidden">
+        <div className="bg-card rounded-2xl border border-border/50 shadow-sm overflow-visible">
           <div className="flex items-center gap-2 px-4 py-3 border-b border-border/40 bg-primary/5">
             <FileText className="w-4 h-4 text-primary" />
             <h2 className="text-sm font-bold text-foreground">
@@ -869,10 +1016,18 @@ export default function InvoiceForm() {
             <label className={labelCls}>
               {isAR ? "اسم المستورد / المصدر" : "Importer / Exporter Name"}
             </label>
-            <input
-              {...register("importerExporterName")}
+            <SuggestionInput
+              storageKey={IMPORTER_EXPORTER_SUGGESTIONS_KEY}
+              value={watch("importerExporterName") ?? ""}
+              onChange={(value) =>
+                setValue("importerExporterName", value, {
+                  shouldDirty: true,
+                  shouldValidate: true,
+                })
+              }
               placeholder={isAR ? "ادخل الاسم" : "Enter the name"}
               className={inputCls}
+              dir={isRTL ? "rtl" : "ltr"}
             />
           </div>
 
@@ -920,7 +1075,7 @@ export default function InvoiceForm() {
           </div>
         </div>
 
-        <div className="bg-card rounded-2xl border border-border/50 shadow-sm overflow-hidden">
+        <div className="bg-card rounded-2xl border border-border/50 shadow-sm overflow-visible">
           <div className="flex items-center gap-2 px-4 py-3 border-b border-border/40 bg-blue-500/5">
             <Ship className="w-4 h-4 text-blue-500" />
             <h2 className="text-sm font-bold text-foreground">
@@ -980,10 +1135,18 @@ export default function InvoiceForm() {
               <label className={labelCls}>
                 {isAR ? "ميناء الدخول" : "Port of Entry"}
               </label>
-              <input
-                {...register("portOfEntry")}
+              <SuggestionInput
+                storageKey={ENTRY_PORT_SUGGESTIONS_KEY}
+                value={watch("portOfEntry") ?? ""}
+                onChange={(value) =>
+                  setValue("portOfEntry", value, {
+                    shouldDirty: true,
+                    shouldValidate: true,
+                  })
+                }
                 placeholder={isAR ? "مثال: ميناء حمد" : "e.g. Hamad Port"}
                 className={inputCls}
+                dir={isRTL ? "rtl" : "ltr"}
               />
             </div>
 
