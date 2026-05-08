@@ -241,6 +241,12 @@ function getSyncQueueDisplayStatus(status: SyncQueueStatus, isAR: boolean) {
   return isAR ? "خامل" : "Idle";
 }
 
+function getSyncEngineStatus(autoSync: boolean, onlineConnected: boolean, isAR: boolean) {
+  if (autoSync) return isAR ? "تلقائي / نشط" : "Automatic / Active";
+  if (onlineConnected) return isAR ? "وضع المزامنة: يدوي" : "Manual Sync Mode";
+  return isAR ? "يدوي / غير متصل بالأونلاين" : "Manual / Online disconnected";
+}
+
 function InfoRow({ label, value, isAR }: { label: string; value?: string | number | boolean | null; isAR: boolean }) {
   return (
     <div className="rounded-lg border border-border bg-background px-3 py-2">
@@ -503,6 +509,13 @@ export default function DeveloperSettingsPage() {
       }
 
       const count = Number(data.pendingCount ?? data.processedCount ?? 0);
+      if (data.onlineConnected) {
+        sessionStorage.setItem(ONLINE_DATABASE_CONNECTED_KEY, "true");
+        setOnlineDatabaseConnected(true);
+      } else {
+        sessionStorage.removeItem(ONLINE_DATABASE_CONNECTED_KEY);
+        setOnlineDatabaseConnected(false);
+      }
       setSyncWorkerMessage(
         tr(
           `قرأ العامل ${count} عنصرًا في الانتظار. ${data.message || ""}`,
@@ -858,7 +871,7 @@ export default function DeveloperSettingsPage() {
               <div className="grid gap-3 md:grid-cols-5">
                 <InfoRow isAR={isAR} label={tr("وضع التطبيق", "App Mode")} value="SQLite Local" />
                 <InfoRow isAR={isAR} label={tr("حالة API", "API Status")} value={readinessStatus.apiStatus === "connected" ? tr("متصل", "Connected") : tr("خطأ", "Error")} />
-                <InfoRow isAR={isAR} label={tr("محرك المزامنة", "Sync Engine")} value={tr("غير مفعّل بعد", "Not enabled yet")} />
+                <InfoRow isAR={isAR} label={tr("محرك المزامنة", "Sync Engine")} value={getSyncEngineStatus(syncConfig.autoSync, onlineDatabaseConnected, isAR)} />
                 <InfoRow isAR={isAR} label={tr("آخر مزامنة", "Last Sync")} value={tr("غير متاح", "Not available")} />
                 <InfoRow isAR={isAR} label={tr("حالة الاتصال", "Online Status")} value={readinessStatus.onlineStatus === "online" ? tr("متصل بالإنترنت", "Online") : tr("غير متصل", "Offline")} />
               </div>

@@ -803,6 +803,22 @@ for (let i = 0; i < maxItemsLength; i++) {
       createdAt: new Date(),
     });
 
+    await enqueueSyncChange({
+      entityType: "invoice",
+      entityId: invoice.id,
+      action: "update",
+      payload: {
+        invoiceId: invoice.id,
+        invoiceNumber: invoice.invoiceNumber,
+        shipmentRef: invoice.shipmentRef,
+        clientId: invoice.clientId,
+        total: invoice.total,
+        status: invoice.status,
+        updatedAt: invoice.updatedAt,
+      },
+      userId: req.user?.userId,
+    });
+
     res.json({
       ...formatInvoice(invoice, client.name),
       items: insertedItems,
