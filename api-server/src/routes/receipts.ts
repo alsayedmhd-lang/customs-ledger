@@ -1,7 +1,8 @@
 import { Router, type IRouter } from "express";
-import { db, sqlite, receiptsTable, clientsTable, invoicesTable, customerLedgerTableSqlite, usersTable } from "@workspace/db";
+import { db, sqlite, receiptsTable, clientsTable, invoicesTable, customerLedgerTableSqlite, usersTable, syncQueueTable } from "@workspace/db";
 import { eq, desc, isNull, and, ne } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth";
+import { enqueueSyncChange } from "../utils/sync-queue";
 
 const router: IRouter = Router();
 
@@ -158,6 +159,48 @@ async function refreshInvoicePaidStatus(invoiceId: number | null | undefined) {
       .set({ status: nextStatus, updatedAt: new Date() })
       .where(eq(invoicesTable.id, invoice.id));
   }
+}
+
+async function enqueueReceiptSyncChangeIfNeeded(input: {
+  operation: "create" | "update";
+  receipt: typeof receiptsTable.$inferSelect;
+  userId?: number | string | null;
+}) {
+  const existing = await db
+    .select({ id: syncQueueTable.id })
+    .from(syncQueueTable)
+    .where(
+      and(
+        eq(syncQueueTable.entityType, "receipt"),
+        eq(syncQueueTable.entityId, String(input.receipt.id)),
+        eq(syncQueueTable.operation, input.operation),
+        eq(syncQueueTable.status, "pending"),
+      ),
+    )
+    .limit(1);
+
+  if (existing.length > 0) return;
+
+  console.log("[SYNC][QUEUE][RECEIPT]", {
+    operation: input.operation,
+    receiptId: input.receipt.id,
+  });
+
+  await enqueueSyncChange({
+    entityType: "receipt",
+    entityId: input.receipt.id,
+    action: input.operation,
+    payload: {
+      receiptId: input.receipt.id,
+      receiptNumber: input.receipt.receiptNumber,
+      invoiceId: input.receipt.invoiceId ?? null,
+      clientId: input.receipt.clientId,
+      amount: input.receipt.amount,
+      paymentMethod: input.receipt.paymentMethod,
+      receiptDate: input.receipt.receiptDate,
+    },
+    userId: input.userId ?? null,
+  });
 }
 
 async function generateReceiptNumber(): Promise<string> {
@@ -388,6 +431,11 @@ router.post("/receipts", requireAuth, async (req, res) => {
       });
 
     await refreshInvoicePaidStatus(receipt.invoiceId);
+    await enqueueReceiptSyncChangeIfNeeded({
+      operation: "create",
+      receipt,
+      userId: req.user?.userId ?? (req as any).user?.id ?? null,
+    });
 
     const [client] = receipt.clientId
       ? await db
@@ -528,6 +576,20 @@ router.put("/receipts/:id", requireAuth, async (req, res) => {
 
     await refreshInvoicePaidStatus(oldReceipt?.invoiceId);
     await refreshInvoicePaidStatus(invoiceId);
+
+    const [updatedReceipt] = await db
+      .select()
+      .from(receiptsTable)
+      .where(eq(receiptsTable.id, id))
+      .limit(1);
+
+    if (updatedReceipt) {
+      await enqueueReceiptSyncChangeIfNeeded({
+        operation: "update",
+        receipt: updatedReceipt,
+        userId: req.user?.userId ?? (req as any).user?.id ?? null,
+      });
+    }
 
     res.json({
       success: true,
