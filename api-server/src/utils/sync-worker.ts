@@ -45,6 +45,14 @@ type LocalInvoiceRow = {
   updatedAt: number | null;
 };
 
+type LocalClientRow = {
+  id: number;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  taxId: string | null;
+};
+
 function getOnlineConnectionString() {
   if (!sqlite) return "";
 
@@ -58,6 +66,10 @@ function getOnlineConnectionString() {
     .get() as { connectionString?: string | null } | undefined;
 
   return String(row?.connectionString || "").trim();
+}
+
+function normalizeText(value: string | null | undefined) {
+  return String(value || "").trim().replace(/\s+/g, " ").toLowerCase();
 }
 
 function getLocalInvoice(entityId: string) {
@@ -93,6 +105,22 @@ function getLocalInvoice(entityId: string) {
     .get(Number(entityId)) as LocalInvoiceRow | undefined;
 }
 
+function getLocalClient(clientId: number) {
+  return sqlite
+    ?.prepare(`
+      SELECT
+        id,
+        name,
+        email,
+        phone,
+        tax_id AS taxId
+      FROM clients
+      WHERE id = ?
+      LIMIT 1
+    `)
+    .get(Number(clientId)) as LocalClientRow | undefined;
+}
+
 function toPgTimestamp(value: number | null | undefined) {
   return value ? new Date(Number(value)) : null;
 }
@@ -107,6 +135,14 @@ function getInvoiceIssueDate(invoice: LocalInvoiceRow) {
 
 function errorMessage(err: unknown) {
   return err instanceof Error ? err.message.slice(0, 500) : String(err).slice(0, 500);
+}
+
+function logInvoiceSync(operation: string, invoice: LocalInvoiceRow) {
+  console.log("[SYNC][INVOICE]", {
+    operation,
+    invoiceId: invoice.id,
+    invoiceNumber: invoice.invoiceNumber,
+  });
 }
 
 function markSynced(id: number) {
@@ -161,12 +197,126 @@ async function createOnlineClient(connectionString: string) {
   return client;
 }
 
-async function pushInvoiceCreate(client: any, invoice: LocalInvoiceRow) {
+async function getOnlineClientColumns(client: any) {
+  const result = await client.query(`
+    SELECT column_name
+    FROM information_schema.columns
+    WHERE table_name = 'clients'
+  `) as { rows?: Array<{ column_name: string }> };
+
+  return new Set((result.rows || []).map((row) => row.column_name));
+}
+
+async function findOnlineClientId(client: any, localClient: LocalClientRow) {
+  const columns = await getOnlineClientColumns(client);
+  const attempts: Array<{ column: string; value: string; normalized?: boolean }> = [];
+  const taxValue = String(localClient.taxId || "").trim();
+  const emailValue = String(localClient.email || "").trim();
+  const phoneValue = String(localClient.phone || "").trim();
+  const nameValue = normalizeText(localClient.name);
+
+  for (const column of ["tax_number", "tax_id"]) {
+    if (taxValue && columns.has(column)) attempts.push({ column, value: taxValue });
+  }
+
+  for (const column of ["cr_number"]) {
+    if (taxValue && columns.has(column)) attempts.push({ column, value: taxValue });
+  }
+
+  if (emailValue && columns.has("email")) attempts.push({ column: "email", value: emailValue });
+  if (phoneValue && columns.has("phone")) attempts.push({ column: "phone", value: phoneValue });
+
+  for (const column of ["name_ar", "name_en", "name"]) {
+    if (nameValue && columns.has(column)) attempts.push({ column, value: nameValue, normalized: true });
+  }
+
+  for (const attempt of attempts) {
+    const result = await client.query(
+      attempt.normalized
+        ? `SELECT id FROM clients WHERE lower(trim(${attempt.column})) = $1 LIMIT 1`
+        : `SELECT id FROM clients WHERE ${attempt.column} = $1 LIMIT 1`,
+      [attempt.value]
+    ) as { rows?: Array<{ id: number }> };
+
+    const id = result.rows?.[0]?.id;
+    if (id) {
+      console.log("[SYNC][CLIENT_MAPPING]", {
+        localClientId: localClient.id,
+        onlineClientId: id,
+        matchedBy: attempt.column,
+      });
+      return Number(id);
+    }
+  }
+
+  return null;
+}
+
+async function resolveOnlineClientId(client: any, invoice: LocalInvoiceRow) {
+  const localClient = getLocalClient(invoice.clientId);
+  if (!localClient) {
+    throw new Error(`Local client not found for local clientId: ${invoice.clientId}`);
+  }
+
+  const onlineClientId = await findOnlineClientId(client, localClient);
+  if (!onlineClientId) {
+    throw new Error(`Online client mapping not found for local clientId: ${invoice.clientId}`);
+  }
+
+  return onlineClientId;
+}
+
+async function pushInvoiceCreate(client: any, invoice: LocalInvoiceRow, onlineClientId: number) {
   const issueDate = getInvoiceIssueDate(invoice);
-  console.log("Sync worker pushing invoice", {
-    invoiceId: invoice.id,
-    issueDate,
+  logInvoiceSync("create", invoice);
+  console.log("Sync worker pushing invoice", { invoiceId: invoice.id, invoiceNumber: invoice.invoiceNumber, issueDate });
+  console.log("[SYNC][INVOICE][PAYLOAD]", {
+    operation: "create",
+    localInvoiceId: invoice.id,
+    invoiceNumber: invoice.invoiceNumber,
+    onlineClientId,
   });
+
+  const existing = await client.query(
+    `
+      SELECT id, invoice_number
+      FROM invoices
+      WHERE invoice_number = $1 OR id = $2
+      ORDER BY CASE WHEN invoice_number = $1 THEN 0 ELSE 1 END
+      LIMIT 1
+    `,
+    [String(invoice.invoiceNumber || ""), Number(invoice.id)]
+  ) as { rowCount?: number; rows?: Array<{ id: number; invoice_number: string }> };
+  console.log("[SYNC][INVOICE][FOUND]", existing.rows?.[0] || null);
+
+  if (existing.rowCount && existing.rows?.[0]) {
+    await client.query(
+      `
+        UPDATE invoices
+        SET invoice_number = $1,
+            issue_date = $2,
+            due_date = $3,
+            client_id = $4,
+            shipment_ref = $5,
+            status = $6,
+            total = $7,
+            updated_at = $8
+        WHERE id = $9
+      `,
+      [
+        String(invoice.invoiceNumber || ""),
+        issueDate,
+        invoice.dueDate ?? null,
+        onlineClientId,
+        invoice.shipmentRef ?? null,
+        String(invoice.status || "draft"),
+        Number(invoice.total ?? 0),
+        toPgTimestamp(invoice.updatedAt) ?? new Date(),
+        Number(existing.rows[0].id),
+      ]
+    );
+    return;
+  }
 
   await client.query(
     `
@@ -199,12 +349,11 @@ async function pushInvoiceCreate(client: any, invoice: LocalInvoiceRow) {
           $11, $12, $13, $14, $15, $16, $17, $18, $19,
           $20, $21, $22
         )
-        ON CONFLICT (invoice_number) DO NOTHING
       `,
     [
       Number(invoice.id),
       String(invoice.invoiceNumber || ""),
-      Number(invoice.clientId),
+      onlineClientId,
       issueDate,
       invoice.dueDate ?? null,
       String(invoice.status || "draft"),
@@ -228,13 +377,27 @@ async function pushInvoiceCreate(client: any, invoice: LocalInvoiceRow) {
   );
 }
 
-async function pushInvoiceUpdate(client: any, invoice: LocalInvoiceRow) {
+async function pushInvoiceUpdate(client: any, invoice: LocalInvoiceRow, onlineClientId: number) {
   const issueDate = getInvoiceIssueDate(invoice);
-  console.log("Sync worker updating invoice", {
-    invoiceId: invoice.id,
+  logInvoiceSync("update", invoice);
+  console.log("Sync worker updating invoice", { invoiceId: invoice.id, invoiceNumber: invoice.invoiceNumber, issueDate });
+  console.log("[SYNC][INVOICE][PAYLOAD]", {
+    operation: "update",
+    localInvoiceId: invoice.id,
     invoiceNumber: invoice.invoiceNumber,
-    issueDate,
+    onlineClientId,
   });
+
+  const existing = await client.query(
+    `
+      SELECT id, invoice_number
+      FROM invoices
+      WHERE invoice_number = $1
+      LIMIT 1
+    `,
+    [String(invoice.invoiceNumber || "")]
+  ) as { rowCount?: number; rows?: Array<{ id: number; invoice_number: string }> };
+  console.log("[SYNC][INVOICE][FOUND]", existing.rows?.[0] || null);
 
   const result = await client.query(
     `
@@ -251,7 +414,7 @@ async function pushInvoiceUpdate(client: any, invoice: LocalInvoiceRow) {
     [
       issueDate,
       invoice.dueDate ?? null,
-      Number(invoice.clientId),
+      onlineClientId,
       invoice.shipmentRef ?? null,
       String(invoice.status || "draft"),
       Number(invoice.total ?? 0),
@@ -348,14 +511,17 @@ export async function runSyncWorkerOnce(): Promise<{
             issueDate: getInvoiceIssueDate(invoice),
           });
 
+          const onlineClientId = await resolveOnlineClientId(client, invoice);
+
           if (row.operation === "create") {
-            await pushInvoiceCreate(client, invoice);
+            await pushInvoiceCreate(client, invoice, onlineClientId);
           } else {
-            await pushInvoiceUpdate(client, invoice);
+            await pushInvoiceUpdate(client, invoice, onlineClientId);
           }
           markSynced(row.id);
           processedCount += 1;
         } catch (err) {
+          console.error("[SYNC][INVOICE][ERROR]", err);
           lastError = errorMessage(err);
           markFailed(row, lastError);
         }

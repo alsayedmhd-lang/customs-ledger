@@ -291,6 +291,7 @@ export default function DeveloperSettingsPage() {
   const [isConnectingOnline, setIsConnectingOnline] = useState(false);
   const [isSyncQueueLoading, setIsSyncQueueLoading] = useState(false);
   const [isSyncWorkerRunning, setIsSyncWorkerRunning] = useState(false);
+  const [isRetryingFailedSync, setIsRetryingFailedSync] = useState(false);
   const [isReadinessLoading, setIsReadinessLoading] = useState(false);
   const [onlineDatabaseConnected, setOnlineDatabaseConnected] = useState(false);
   const [savedMessage, setSavedMessage] = useState("");
@@ -527,6 +528,35 @@ export default function DeveloperSettingsPage() {
       setSyncWorkerMessage(err instanceof Error ? err.message : tr("تعذر تشغيل المزامنة", "Failed to run sync"));
     } finally {
       setIsSyncWorkerRunning(false);
+    }
+  }
+
+  async function retryFailedSyncItems() {
+    setSyncWorkerMessage("");
+    setIsRetryingFailedSync(true);
+    try {
+      const res = await fetch(`${API_BASE}/developer/sync-queue/retry-failed`, {
+        method: "POST",
+        headers: authHeaders(),
+      });
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok || !data?.ok) {
+        throw new Error(data?.error || tr("تعذر إعادة محاولة العناصر الفاشلة", "Failed to retry failed items"));
+      }
+
+      const count = Number(data.retriedCount || 0);
+      setSyncWorkerMessage(
+        tr(
+          `تمت إعادة ${count} عنصر فاشل إلى الانتظار.`,
+          `${count} failed item(s) reset to pending.`
+        )
+      );
+      await loadSyncQueueStatus();
+    } catch (err) {
+      setSyncWorkerMessage(err instanceof Error ? err.message : tr("تعذر إعادة محاولة العناصر الفاشلة", "Failed to retry failed items"));
+    } finally {
+      setIsRetryingFailedSync(false);
     }
   }
 
@@ -797,6 +827,17 @@ export default function DeveloperSettingsPage() {
                 <Button type="button" size="sm" onClick={runSyncWorkerNow} disabled={isSyncWorkerRunning} className="gap-2">
                   <RefreshCw className={cn("h-3.5 w-3.5", isSyncWorkerRunning && "animate-spin")} />
                   {isSyncWorkerRunning ? tr("جارٍ التشغيل...", "Running...") : tr("تشغيل المزامنة الآن", "Run sync now")}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={retryFailedSyncItems}
+                  disabled={isRetryingFailedSync || syncQueueStatus.failed === 0}
+                  className="gap-2"
+                >
+                  <RefreshCw className={cn("h-3.5 w-3.5", isRetryingFailedSync && "animate-spin")} />
+                  {isRetryingFailedSync ? tr("جارٍ الإعادة...", "Retrying...") : tr("إعادة محاولة الفاشلة", "Retry Failed")}
                 </Button>
               </div>
               {syncWorkerMessage && (

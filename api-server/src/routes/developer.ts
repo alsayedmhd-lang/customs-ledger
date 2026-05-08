@@ -332,6 +332,36 @@ router.get("/developer/sync-queue/status", (_req, res) => {
   }
 });
 
+router.post("/developer/sync-queue/retry-failed", (_req, res) => {
+  try {
+    ensureSyncQueueTable();
+
+    if (!sqlite) {
+      return res.status(503).json({ ok: false, error: "SQLite database is unavailable" });
+    }
+
+    const result = sqlite
+      .prepare(`
+        UPDATE sync_queue
+        SET status = 'pending',
+            retry_count = 0,
+            last_error = NULL,
+            updated_at = ?
+        WHERE status = 'failed'
+      `)
+      .run(Date.now()) as { changes?: number };
+
+    return res.json({
+      ok: true,
+      retriedCount: Number(result.changes || 0),
+      message: "Failed sync queue items were reset to pending.",
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ ok: false, error: "Failed to reset failed sync queue items" });
+  }
+});
+
 router.post("/developer/sync/run-once", async (_req, res) => {
   const result = await runSyncWorkerOnce();
 
