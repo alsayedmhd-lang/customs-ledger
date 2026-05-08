@@ -8,6 +8,7 @@ import crypto from "crypto";
 import { createRequire } from "module";
 import packageJson from "../../../package.json";
 import { requireAdmin } from "../middleware/auth";
+import { ensureSyncQueueTable } from "../utils/ensure-sync-queue-table";
 
 const router = Router();
 const require = createRequire(path.join(process.cwd(), "package.json"));
@@ -197,6 +198,7 @@ async function getSettingsRow() {
 }
 
 ensureDeveloperSettingsColumns();
+ensureSyncQueueTable();
 
 router.use("/developer", requireAdmin);
 
@@ -247,8 +249,10 @@ router.get("/developer/database/sql", (_req, res) => {
 
 router.get("/developer/sync-queue/status", (_req, res) => {
   try {
+    ensureSyncQueueTable();
+
     if (!sqlite) {
-      return res.json({ pending: 0, failed: 0, lastSync: null, recent: [] });
+      return res.json({ pending: 0, synced: 0, failed: 0, lastSync: null, lastError: null, recent: [] });
     }
 
     const table = sqlite
@@ -256,7 +260,7 @@ router.get("/developer/sync-queue/status", (_req, res) => {
       .get();
 
     if (!table) {
-      return res.json({ pending: 0, failed: 0, lastSync: null, recent: [] });
+      return res.json({ pending: 0, synced: 0, failed: 0, lastSync: null, lastError: null, recent: [] });
     }
 
     const pending = sqlite
@@ -265,9 +269,21 @@ router.get("/developer/sync-queue/status", (_req, res) => {
     const failed = sqlite
       .prepare("SELECT COUNT(*) AS count FROM sync_queue WHERE status = 'failed'")
       .get() as { count: number };
+    const synced = sqlite
+      .prepare("SELECT COUNT(*) AS count FROM sync_queue WHERE status IN ('success', 'synced', 'done')")
+      .get() as { count: number };
     const lastSync = sqlite
-      .prepare("SELECT MAX(COALESCE(updated_at, created_at)) AS value FROM sync_queue WHERE status = 'success'")
+      .prepare("SELECT MAX(COALESCE(updated_at, created_at)) AS value FROM sync_queue WHERE status IN ('success', 'synced', 'done')")
       .get() as { value: number | null };
+    const lastError = sqlite
+      .prepare(`
+        SELECT last_error AS value
+        FROM sync_queue
+        WHERE status = 'failed' AND last_error IS NOT NULL AND last_error <> ''
+        ORDER BY COALESCE(updated_at, created_at) DESC
+        LIMIT 1
+      `)
+      .get() as { value: string | null } | undefined;
     const recent = sqlite
       .prepare(`
         SELECT
@@ -298,8 +314,10 @@ router.get("/developer/sync-queue/status", (_req, res) => {
 
     return res.json({
       pending: Number(pending?.count || 0),
+      synced: Number(synced?.count || 0),
       failed: Number(failed?.count || 0),
       lastSync: lastSync?.value ? new Date(Number(lastSync.value)).toISOString() : null,
+      lastError: lastError?.value || null,
       recent: recent.map((item) => ({
         ...item,
         attempts: Number(item.attempts || 0),
