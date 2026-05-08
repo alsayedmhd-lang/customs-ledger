@@ -68,6 +68,33 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | null>(null);
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || "http://localhost:10000").replace(/\/$/, "") + "/api";
+const ONLINE_DATABASE_CONNECTED_KEY = "developer_online_database_connected";
+
+async function checkSyncConnection(token: string) {
+  try {
+    const res = await fetch(`${API_BASE}/developer/sync/check-connection`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    const data = await res.json().catch(() => ({}));
+
+    if (res.ok && data?.onlineConnected) {
+      sessionStorage.setItem(ONLINE_DATABASE_CONNECTED_KEY, "true");
+      console.log("[SYNC][LOGIN_CHECK] Online: Connected");
+      return;
+    }
+
+    sessionStorage.removeItem(ONLINE_DATABASE_CONNECTED_KEY);
+    console.log("[SYNC][LOGIN_CHECK] Online: Disconnected", data?.message || data?.lastError || res.status);
+  } catch (err) {
+    sessionStorage.removeItem(ONLINE_DATABASE_CONNECTED_KEY);
+    console.warn("[SYNC][LOGIN_CHECK] Online connection check failed", err);
+  }
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [token, setToken] = useState<string | null>(null);
@@ -115,6 +142,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .then((u: AuthUser) => {
           setUser({ ...u, permissions: u.permissions ?? ALL_PERMISSIONS });
           setToken(stored);
+          void checkSyncConnection(stored);
         })
         .catch(() => {
           sessionStorage.removeItem("auth_token");
@@ -146,6 +174,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     setToken(newToken);
     setUser({ ...newUser, permissions: newUser.permissions ?? ALL_PERMISSIONS });
+    void checkSyncConnection(newToken);
     return undefined;
   }, []);
 
@@ -163,6 +192,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     sessionStorage.setItem("auth_token", newToken);
     setToken(newToken);
     setUser({ ...newUser, permissions: newUser.permissions ?? ALL_PERMISSIONS });
+    void checkSyncConnection(newToken);
   }, [setToken, setUser]);
 
   const resendOtp = useCallback(async (otpToken: string): Promise<OtpPending> => {

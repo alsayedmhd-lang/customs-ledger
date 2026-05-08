@@ -377,6 +377,57 @@ router.post("/developer/sync/run-once", async (_req, res) => {
   });
 });
 
+router.post("/developer/sync/check-connection", async (_req, res) => {
+  const settings = await getSettingsRow();
+  const connectionString = String((settings as any)?.databaseConnectionString || "").trim();
+
+  console.log("[SYNC][CHECK_CONNECTION]", { hasConnectionString: Boolean(connectionString) });
+
+  if (!connectionString) {
+    return res.json({
+      ok: true,
+      onlineConnected: false,
+      message: "Online: Disconnected - connection string is not configured",
+    });
+  }
+
+  if (!isPostgresConnectionString(connectionString)) {
+    return res.json({
+      ok: true,
+      onlineConnected: false,
+      message: "Online: Disconnected - only PostgreSQL connection strings are supported",
+    });
+  }
+
+  const client = new PgClient({
+    connectionString,
+    connectionTimeoutMillis: 5000,
+    query_timeout: 5000,
+  });
+
+  try {
+    await client.connect();
+    await client.query("select 1");
+    console.log("[SYNC][CHECK_CONNECTION] Online: Connected");
+    return res.json({ ok: true, onlineConnected: true, message: "Online: Connected" });
+  } catch (err) {
+    const error = sanitizeDatabaseError(err);
+    console.warn("[SYNC][CHECK_CONNECTION] Online: Disconnected", error);
+    return res.json({
+      ok: true,
+      onlineConnected: false,
+      lastError: error,
+      message: `Online: Disconnected - ${error}`,
+    });
+  } finally {
+    try {
+      await client.end();
+    } catch {
+      // Ignore close errors; this endpoint only warms up/checks the online connection.
+    }
+  }
+});
+
 router.post("/developer/database/test-online", async (req, res) => {
   const connectionString = String(req.body?.connectionString || "").trim();
 

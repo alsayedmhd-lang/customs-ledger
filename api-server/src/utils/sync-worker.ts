@@ -45,6 +45,15 @@ type LocalInvoiceRow = {
   updatedAt: number | null;
 };
 
+type LocalInvoiceItemRow = {
+  id: number;
+  invoiceId: number;
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  total: number;
+};
+
 type LocalClientRow = {
   id: number;
   name: string;
@@ -103,6 +112,23 @@ function getLocalInvoice(entityId: string) {
       LIMIT 1
     `)
     .get(Number(entityId)) as LocalInvoiceRow | undefined;
+}
+
+function getLocalInvoiceItems(localInvoiceId: number) {
+  return sqlite
+    ?.prepare(`
+      SELECT
+        id,
+        invoice_id AS invoiceId,
+        description,
+        quantity,
+        unit_price AS unitPrice,
+        total
+      FROM invoice_items
+      WHERE invoice_id = ?
+      ORDER BY id ASC
+    `)
+    .all(Number(localInvoiceId)) as LocalInvoiceItemRow[] | undefined;
 }
 
 function getLocalClient(clientId: number) {
@@ -428,6 +454,68 @@ async function pushInvoiceUpdate(client: any, invoice: LocalInvoiceRow, onlineCl
   }
 }
 
+async function getOnlineInvoiceId(client: any, invoiceNumber: string) {
+  const result = await client.query(
+    `
+      SELECT id
+      FROM invoices
+      WHERE invoice_number = $1
+      LIMIT 1
+    `,
+    [String(invoiceNumber || "")]
+  ) as { rows?: Array<{ id: number }> };
+
+  const onlineInvoiceId = result.rows?.[0]?.id;
+  if (!onlineInvoiceId) {
+    throw new Error(`Online invoice not found for item sync: ${invoiceNumber}`);
+  }
+
+  return Number(onlineInvoiceId);
+}
+
+async function syncInvoiceItems(client: any, invoice: LocalInvoiceRow) {
+  const onlineInvoiceId = await getOnlineInvoiceId(client, invoice.invoiceNumber);
+  const items = getLocalInvoiceItems(invoice.id) || [];
+
+  console.log("[SYNC][INVOICE_ITEMS]", {
+    localInvoiceId: invoice.id,
+    onlineInvoiceId,
+    count: items.length,
+  });
+
+  await client.query("BEGIN");
+  try {
+    await client.query("DELETE FROM invoice_items WHERE invoice_id = $1", [onlineInvoiceId]);
+
+    for (const item of items) {
+      await client.query(
+        `
+          INSERT INTO invoice_items (
+            invoice_id,
+            description,
+            quantity,
+            unit_price,
+            total
+          )
+          VALUES ($1, $2, $3, $4, $5)
+        `,
+        [
+          onlineInvoiceId,
+          String(item.description || ""),
+          Number(item.quantity ?? 0),
+          Number(item.unitPrice ?? 0),
+          Number(item.total ?? 0),
+        ]
+      );
+    }
+
+    await client.query("COMMIT");
+  } catch (err) {
+    await client.query("ROLLBACK").catch(() => undefined);
+    throw err;
+  }
+}
+
 export async function runSyncWorkerOnce(): Promise<{
   pendingCount: number;
   processedCount: number;
@@ -518,6 +606,9 @@ export async function runSyncWorkerOnce(): Promise<{
           } else {
             await pushInvoiceUpdate(client, invoice, onlineClientId);
           }
+
+          await syncInvoiceItems(client, invoice);
+
           markSynced(row.id);
           processedCount += 1;
         } catch (err) {
