@@ -12,7 +12,9 @@ import { cn } from "@/lib/utils";
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || "http://localhost:3000").replace(/\/$/, "") + "/api";
 const UNLOCK_KEY = "developer_unlocked";
+const UNLOCKED_AT_KEY = "developer_unlocked_at";
 const ONLINE_DATABASE_CONNECTED_KEY = "developer_online_database_connected";
+const DEVELOPER_IDLE_TIMEOUT_MS = 5 * 60 * 1000;
 const DEFAULT_LOGIN_FOOTER_TEXT = "Internal Accounting System For Companes - alsayed.mhd@gmail.com - Phone - 00201009697521 - 0097460020446";
 
 type DeveloperSettings = {
@@ -190,6 +192,18 @@ function authHeaders() {
   };
 }
 
+function clearDeveloperUnlockSession() {
+  sessionStorage.removeItem(UNLOCK_KEY);
+  sessionStorage.removeItem(UNLOCKED_AT_KEY);
+}
+
+function isDeveloperUnlockValid() {
+  const unlocked = sessionStorage.getItem(UNLOCK_KEY) === "true";
+  const unlockedAt = Number(sessionStorage.getItem(UNLOCKED_AT_KEY) || 0);
+
+  return unlocked && unlockedAt > 0 && Date.now() - unlockedAt < DEVELOPER_IDLE_TIMEOUT_MS;
+}
+
 function formatBytes(value: number | null | undefined, isAR: boolean) {
   if (!value) return isAR ? "غير متاح" : "Unavailable";
   if (value < 1024) return `${value} B`;
@@ -344,9 +358,47 @@ export default function DeveloperSettingsPage() {
   }));
 
   useEffect(() => {
-    if (sessionStorage.getItem(UNLOCK_KEY) === "true") setUnlocked(true);
+    if (isDeveloperUnlockValid()) {
+      setUnlocked(true);
+    } else {
+      clearDeveloperUnlockSession();
+    }
+
     setOnlineDatabaseConnected(sessionStorage.getItem(ONLINE_DATABASE_CONNECTED_KEY) === "true");
   }, []);
+
+  useEffect(() => {
+    return () => {
+      clearDeveloperUnlockSession();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!unlocked) return;
+
+    let idleTimer: ReturnType<typeof setTimeout>;
+    const lockDeveloper = () => {
+      clearDeveloperUnlockSession();
+      setUnlocked(false);
+      setPassword("");
+      setError(isAR ? "انتهت جلسة المطور بسبب عدم النشاط" : "Developer session expired due to inactivity");
+    };
+
+    const resetIdleTimer = () => {
+      sessionStorage.setItem(UNLOCKED_AT_KEY, Date.now().toString());
+      clearTimeout(idleTimer);
+      idleTimer = setTimeout(lockDeveloper, DEVELOPER_IDLE_TIMEOUT_MS);
+    };
+
+    const events = ["mousemove", "keydown", "click", "scroll"];
+    events.forEach((eventName) => window.addEventListener(eventName, resetIdleTimer, { passive: true }));
+    resetIdleTimer();
+
+    return () => {
+      clearTimeout(idleTimer);
+      events.forEach((eventName) => window.removeEventListener(eventName, resetIdleTimer));
+    };
+  }, [unlocked, isAR]);
 
   useEffect(() => {
     if (unlocked) {
@@ -428,6 +480,7 @@ export default function DeveloperSettingsPage() {
       });
       if (!res.ok) throw new Error(tr("كلمة المرور غير صحيحة", "Incorrect password"));
       sessionStorage.setItem(UNLOCK_KEY, "true");
+      sessionStorage.setItem(UNLOCKED_AT_KEY, Date.now().toString());
       setUnlocked(true);
       setPassword("");
     } catch (err) {

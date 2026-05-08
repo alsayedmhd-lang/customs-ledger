@@ -68,6 +68,8 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | null>(null);
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || "http://localhost:10000").replace(/\/$/, "") + "/api";
+const DEVELOPER_UNLOCK_KEY = "developer_unlocked";
+const DEVELOPER_UNLOCKED_AT_KEY = "developer_unlocked_at";
 const ONLINE_DATABASE_CONNECTED_KEY = "developer_online_database_connected";
 
 async function checkSyncConnection(token: string) {
@@ -102,6 +104,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(() => {
     sessionStorage.removeItem("auth_token");
+    sessionStorage.removeItem(DEVELOPER_UNLOCK_KEY);
+    sessionStorage.removeItem(DEVELOPER_UNLOCKED_AT_KEY);
+    sessionStorage.removeItem(ONLINE_DATABASE_CONNECTED_KEY);
     setToken(null);
     setUser(null);
   }, []);
