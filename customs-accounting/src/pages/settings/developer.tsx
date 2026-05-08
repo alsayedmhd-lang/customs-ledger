@@ -284,10 +284,12 @@ export default function DeveloperSettingsPage() {
   const [isTestingConnection, setIsTestingConnection] = useState(false);
   const [isConnectingOnline, setIsConnectingOnline] = useState(false);
   const [isSyncQueueLoading, setIsSyncQueueLoading] = useState(false);
+  const [isSyncWorkerRunning, setIsSyncWorkerRunning] = useState(false);
   const [isReadinessLoading, setIsReadinessLoading] = useState(false);
   const [onlineDatabaseConnected, setOnlineDatabaseConnected] = useState(false);
   const [savedMessage, setSavedMessage] = useState("");
   const [databaseMessage, setDatabaseMessage] = useState("");
+  const [syncWorkerMessage, setSyncWorkerMessage] = useState("");
   const [settings, setSettings] = useState<DeveloperSettings>(defaultSettings);
   const [syncQueueStatus, setSyncQueueStatus] = useState<SyncQueueStatus>({
     pending: 0,
@@ -483,6 +485,35 @@ export default function DeveloperSettingsPage() {
       setSyncQueueStatus({ pending: 0, synced: 0, failed: 0, lastSync: null, lastError: null, recent: [] });
     } finally {
       setIsSyncQueueLoading(false);
+    }
+  }
+
+  async function runSyncWorkerNow() {
+    setSyncWorkerMessage("");
+    setIsSyncWorkerRunning(true);
+    try {
+      const res = await fetch(`${API_BASE}/developer/sync/run-once`, {
+        method: "POST",
+        headers: authHeaders(),
+      });
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok || !data?.ok) {
+        throw new Error(data?.message || tr("تعذر تشغيل المزامنة", "Failed to run sync"));
+      }
+
+      const count = Number(data.pendingCount ?? data.processedCount ?? 0);
+      setSyncWorkerMessage(
+        tr(
+          `قرأ العامل ${count} عنصرًا في الانتظار. ${data.message || ""}`,
+          `Worker read ${count} pending item(s). ${data.message || ""}`
+        )
+      );
+      await loadSyncQueueStatus();
+    } catch (err) {
+      setSyncWorkerMessage(err instanceof Error ? err.message : tr("تعذر تشغيل المزامنة", "Failed to run sync"));
+    } finally {
+      setIsSyncWorkerRunning(false);
     }
   }
 
@@ -750,7 +781,16 @@ export default function DeveloperSettingsPage() {
                   <RefreshCw className={cn("h-3.5 w-3.5", isSyncQueueLoading && "animate-spin")} />
                   {tr("تحديث", "Refresh")}
                 </Button>
+                <Button type="button" size="sm" onClick={runSyncWorkerNow} disabled={isSyncWorkerRunning} className="gap-2">
+                  <RefreshCw className={cn("h-3.5 w-3.5", isSyncWorkerRunning && "animate-spin")} />
+                  {isSyncWorkerRunning ? tr("جارٍ التشغيل...", "Running...") : tr("تشغيل المزامنة الآن", "Run sync now")}
+                </Button>
               </div>
+              {syncWorkerMessage && (
+                <div className="mb-3 rounded-md border border-border bg-background px-3 py-2 text-sm text-muted-foreground">
+                  {syncWorkerMessage}
+                </div>
+              )}
               <div className="grid gap-3 md:grid-cols-5">
                 <InfoRow isAR={isAR} label={tr("المزامنة المنتظرة", "Pending sync")} value={syncQueueStatus.pending} />
                 <InfoRow isAR={isAR} label={tr("المزامنة الناجحة", "Synced")} value={syncQueueStatus.synced} />
