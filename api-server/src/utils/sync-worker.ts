@@ -54,6 +54,20 @@ type LocalInvoiceItemRow = {
   total: number;
 };
 
+type LocalReceiptRow = {
+  id: number;
+  receiptNumber: string;
+  clientId: number;
+  invoiceId: number | null;
+  amount: number;
+  paymentMethod: string | null;
+  notes: string | null;
+  receiptDate: string;
+  createdBy: number | null;
+  deletedAt: number | null;
+  createdAt: number | null;
+};
+
 type LocalClientRow = {
   id: number;
   name: string;
@@ -131,6 +145,28 @@ function getLocalInvoiceItems(localInvoiceId: number) {
     .all(Number(localInvoiceId)) as LocalInvoiceItemRow[] | undefined;
 }
 
+function getLocalReceipt(entityId: string) {
+  return sqlite
+    ?.prepare(`
+      SELECT
+        id,
+        receipt_number AS receiptNumber,
+        client_id AS clientId,
+        invoice_id AS invoiceId,
+        amount,
+        payment_method AS paymentMethod,
+        notes,
+        receipt_date AS receiptDate,
+        created_by AS createdBy,
+        deleted_at AS deletedAt,
+        created_at AS createdAt
+      FROM receipts
+      WHERE id = ?
+      LIMIT 1
+    `)
+    .get(Number(entityId)) as LocalReceiptRow | undefined;
+}
+
 function getLocalClient(clientId: number) {
   return sqlite
     ?.prepare(`
@@ -169,6 +205,13 @@ function logInvoiceSync(operation: string, invoice: LocalInvoiceRow) {
     invoiceId: invoice.id,
     invoiceNumber: invoice.invoiceNumber,
   });
+}
+
+function isSupportedSyncRow(row: SyncQueueRow) {
+  return (
+    (row.entityType === "invoice" || row.entityType === "receipt") &&
+    (row.operation === "create" || row.operation === "update")
+  );
 }
 
 function markSynced(id: number) {
@@ -279,14 +322,18 @@ async function findOnlineClientId(client: any, localClient: LocalClientRow) {
 }
 
 async function resolveOnlineClientId(client: any, invoice: LocalInvoiceRow) {
-  const localClient = getLocalClient(invoice.clientId);
+  return resolveOnlineClientIdForLocalClientId(client, invoice.clientId);
+}
+
+async function resolveOnlineClientIdForLocalClientId(client: any, localClientId: number) {
+  const localClient = getLocalClient(localClientId);
   if (!localClient) {
-    throw new Error(`Local client not found for local clientId: ${invoice.clientId}`);
+    throw new Error(`Local client not found for local clientId: ${localClientId}`);
   }
 
   const onlineClientId = await findOnlineClientId(client, localClient);
   if (!onlineClientId) {
-    throw new Error(`Online client mapping not found for local clientId: ${invoice.clientId}`);
+    throw new Error(`Online client mapping not found for local clientId: ${localClientId}`);
   }
 
   return onlineClientId;
@@ -473,6 +520,26 @@ async function getOnlineInvoiceId(client: any, invoiceNumber: string) {
   return Number(onlineInvoiceId);
 }
 
+async function getOnlineInvoiceMapping(client: any, invoiceNumber: string) {
+  const result = await client.query(
+    `
+      SELECT id, client_id
+      FROM invoices
+      WHERE invoice_number = $1
+      LIMIT 1
+    `,
+    [String(invoiceNumber || "")]
+  ) as { rows?: Array<{ id: number; client_id: number }> };
+
+  const row = result.rows?.[0];
+  if (!row) return null;
+
+  return {
+    onlineInvoiceId: Number(row.id),
+    onlineClientId: Number(row.client_id),
+  };
+}
+
 async function syncInvoiceItems(client: any, invoice: LocalInvoiceRow) {
   const onlineInvoiceId = await getOnlineInvoiceId(client, invoice.invoiceNumber);
   const items = getLocalInvoiceItems(invoice.id) || [];
@@ -514,6 +581,113 @@ async function syncInvoiceItems(client: any, invoice: LocalInvoiceRow) {
     await client.query("ROLLBACK").catch(() => undefined);
     throw err;
   }
+}
+
+function logReceiptSync(operation: string, receipt: LocalReceiptRow) {
+  console.log("[SYNC][RECEIPT]", {
+    operation,
+    receiptId: receipt.id,
+    receiptNumber: receipt.receiptNumber,
+  });
+}
+
+async function resolveReceiptOnlineMapping(client: any, receipt: LocalReceiptRow) {
+  if (receipt.invoiceId) {
+    const localInvoice = getLocalInvoice(String(receipt.invoiceId));
+    if (!localInvoice) {
+      throw new Error(`Local invoice mapping not found for receiptId: ${receipt.id}`);
+    }
+
+    const onlineInvoice = await getOnlineInvoiceMapping(client, localInvoice.invoiceNumber);
+    if (!onlineInvoice) {
+      throw new Error(`Online invoice mapping not found for receiptId: ${receipt.id}`);
+    }
+
+    console.log("[SYNC][RECEIPT][MAPPING]", {
+      localInvoiceId: receipt.invoiceId,
+      onlineInvoiceId: onlineInvoice.onlineInvoiceId,
+      onlineClientId: onlineInvoice.onlineClientId,
+    });
+
+    return onlineInvoice;
+  }
+
+  const onlineClientId = await resolveOnlineClientIdForLocalClientId(client, receipt.clientId);
+  console.log("[SYNC][RECEIPT][MAPPING]", {
+    localInvoiceId: null,
+    onlineInvoiceId: null,
+    onlineClientId,
+  });
+
+  return {
+    onlineInvoiceId: null,
+    onlineClientId,
+  };
+}
+
+async function pushReceipt(client: any, receipt: LocalReceiptRow, operation: string) {
+  logReceiptSync(operation, receipt);
+  const mapping = await resolveReceiptOnlineMapping(client, receipt);
+  const existing = await client.query(
+    `
+      SELECT id, receipt_number
+      FROM receipts
+      WHERE receipt_number = $1
+      LIMIT 1
+    `,
+    [String(receipt.receiptNumber || "")]
+  ) as { rowCount?: number; rows?: Array<{ id: number; receipt_number: string }> };
+
+  if (existing.rowCount && existing.rows?.[0]) {
+    await client.query(
+      `
+        UPDATE receipts
+        SET client_id = $1,
+            invoice_id = $2,
+            amount = $3,
+            payment_method = $4,
+            notes = $5,
+            receipt_date = $6
+        WHERE id = $7
+      `,
+      [
+        mapping.onlineClientId,
+        mapping.onlineInvoiceId,
+        Number(receipt.amount ?? 0),
+        String(receipt.paymentMethod || "cash"),
+        receipt.notes ?? null,
+        String(receipt.receiptDate || todayIsoDate()),
+        Number(existing.rows[0].id),
+      ]
+    );
+    return;
+  }
+
+  await client.query(
+    `
+      INSERT INTO receipts (
+        receipt_number,
+        client_id,
+        invoice_id,
+        amount,
+        payment_method,
+        notes,
+        receipt_date,
+        created_at
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    `,
+    [
+      String(receipt.receiptNumber || ""),
+      mapping.onlineClientId,
+      mapping.onlineInvoiceId,
+      Number(receipt.amount ?? 0),
+      String(receipt.paymentMethod || "cash"),
+      receipt.notes ?? null,
+      String(receipt.receiptDate || todayIsoDate()),
+      toPgTimestamp(receipt.createdAt) ?? new Date(),
+    ]
+  );
 }
 
 export async function runSyncWorkerOnce(): Promise<{
@@ -566,7 +740,7 @@ export async function runSyncWorkerOnce(): Promise<{
         console.warn("Online database connection: Disconnected", lastError);
 
         for (const row of pending) {
-          if (row.entityType === "invoice" && (row.operation === "create" || row.operation === "update")) {
+          if (isSupportedSyncRow(row)) {
             markRetrying(row);
             markFailed(row, lastError);
           }
@@ -578,7 +752,7 @@ export async function runSyncWorkerOnce(): Promise<{
 
     try {
       for (const row of pending) {
-        if (row.entityType !== "invoice" || (row.operation !== "create" && row.operation !== "update")) {
+        if (!isSupportedSyncRow(row)) {
           continue;
         }
 
@@ -589,30 +763,39 @@ export async function runSyncWorkerOnce(): Promise<{
             throw new Error("Online database connection string is not configured");
           }
 
-          const invoice = getLocalInvoice(row.entityId);
-          if (!invoice) {
-            throw new Error(`Local invoice not found for sync entityId ${row.entityId}`);
-          }
+          if (row.entityType === "invoice") {
+            const invoice = getLocalInvoice(row.entityId);
+            if (!invoice) {
+              throw new Error(`Local invoice not found for sync entityId ${row.entityId}`);
+            }
 
-          console.log("Sync worker loaded local invoice", {
-            invoiceId: invoice.id,
-            issueDate: getInvoiceIssueDate(invoice),
-          });
+            console.log("Sync worker loaded local invoice", {
+              invoiceId: invoice.id,
+              issueDate: getInvoiceIssueDate(invoice),
+            });
 
-          const onlineClientId = await resolveOnlineClientId(client, invoice);
+            const onlineClientId = await resolveOnlineClientId(client, invoice);
 
-          if (row.operation === "create") {
-            await pushInvoiceCreate(client, invoice, onlineClientId);
+            if (row.operation === "create") {
+              await pushInvoiceCreate(client, invoice, onlineClientId);
+            } else {
+              await pushInvoiceUpdate(client, invoice, onlineClientId);
+            }
+
+            await syncInvoiceItems(client, invoice);
           } else {
-            await pushInvoiceUpdate(client, invoice, onlineClientId);
-          }
+            const receipt = getLocalReceipt(row.entityId);
+            if (!receipt) {
+              throw new Error(`Local receipt not found for sync entityId ${row.entityId}`);
+            }
 
-          await syncInvoiceItems(client, invoice);
+            await pushReceipt(client, receipt, row.operation);
+          }
 
           markSynced(row.id);
           processedCount += 1;
         } catch (err) {
-          console.error("[SYNC][INVOICE][ERROR]", err);
+          console.error(`[SYNC][${row.entityType.toUpperCase()}][ERROR]`, err);
           lastError = errorMessage(err);
           markFailed(row, lastError);
         }
