@@ -68,6 +68,24 @@ type LocalReceiptRow = {
   createdAt: number | null;
 };
 
+type LocalAccountingRow = {
+  id: number;
+  clientId: number;
+  invoiceId: number | null;
+  receiptId: number | null;
+  entryDate: string;
+  entryType: string;
+  descriptionAr: string;
+  descriptionEn: string;
+  referenceType: string;
+  referenceNumber: string | null;
+  debit: number;
+  credit: number;
+  balanceImpact: number;
+  createdBy: number | null;
+  createdAt: string | null;
+};
+
 type LocalClientRow = {
   id: number;
   name: string;
@@ -167,6 +185,32 @@ function getLocalReceipt(entityId: string) {
     .get(Number(entityId)) as LocalReceiptRow | undefined;
 }
 
+function getLocalAccountingEntry(entityId: string) {
+  return sqlite
+    ?.prepare(`
+      SELECT
+        id,
+        client_id AS clientId,
+        invoice_id AS invoiceId,
+        receipt_id AS receiptId,
+        entry_date AS entryDate,
+        entry_type AS entryType,
+        description_ar AS descriptionAr,
+        description_en AS descriptionEn,
+        reference_type AS referenceType,
+        reference_number AS referenceNumber,
+        debit,
+        credit,
+        balance_impact AS balanceImpact,
+        created_by AS createdBy,
+        created_at AS createdAt
+      FROM customer_ledger
+      WHERE id = ?
+      LIMIT 1
+    `)
+    .get(Number(entityId)) as LocalAccountingRow | undefined;
+}
+
 function getLocalClient(clientId: number) {
   return sqlite
     ?.prepare(`
@@ -209,7 +253,7 @@ function logInvoiceSync(operation: string, invoice: LocalInvoiceRow) {
 
 function isSupportedSyncRow(row: SyncQueueRow) {
   return (
-    (row.entityType === "invoice" || row.entityType === "receipt") &&
+    (row.entityType === "invoice" || row.entityType === "receipt" || row.entityType === "accounting" || row.entityType === "customer_ledger") &&
     (row.operation === "create" || row.operation === "update")
   );
 }
@@ -540,6 +584,25 @@ async function getOnlineInvoiceMapping(client: any, invoiceNumber: string) {
   };
 }
 
+async function hasOnlineInvoice(client: any, invoiceNumber: string) {
+  return Boolean(await getOnlineInvoiceMapping(client, invoiceNumber));
+}
+
+async function getOnlineReceiptId(client: any, receiptNumber: string) {
+  const result = await client.query(
+    `
+      SELECT id
+      FROM receipts
+      WHERE receipt_number = $1
+      LIMIT 1
+    `,
+    [String(receiptNumber || "")]
+  ) as { rows?: Array<{ id: number }> };
+
+  const onlineReceiptId = result.rows?.[0]?.id;
+  return onlineReceiptId ? Number(onlineReceiptId) : null;
+}
+
 async function syncInvoiceItems(client: any, invoice: LocalInvoiceRow) {
   const onlineInvoiceId = await getOnlineInvoiceId(client, invoice.invoiceNumber);
   const items = getLocalInvoiceItems(invoice.id) || [];
@@ -663,6 +726,13 @@ async function pushReceipt(client: any, receipt: LocalReceiptRow, operation: str
     return;
   }
 
+  if (operation === "update") {
+    console.log("[SYNC][RECEIPT][FALLBACK_CREATE]", {
+      receiptId: receipt.id,
+      receiptNumber: receipt.receiptNumber,
+    });
+  }
+
   await client.query(
     `
       INSERT INTO receipts (
@@ -686,6 +756,172 @@ async function pushReceipt(client: any, receipt: LocalReceiptRow, operation: str
       receipt.notes ?? null,
       String(receipt.receiptDate || todayIsoDate()),
       toPgTimestamp(receipt.createdAt) ?? new Date(),
+    ]
+  );
+}
+
+async function hasOnlineTable(client: any, tableName: string) {
+  const result = await client.query(
+    `
+      SELECT 1
+      FROM information_schema.tables
+      WHERE table_schema = 'public' AND table_name = $1
+      LIMIT 1
+    `,
+    [tableName]
+  ) as { rowCount?: number };
+
+  return Number(result.rowCount || 0) > 0;
+}
+
+async function resolveAccountingOnlineMapping(client: any, entry: LocalAccountingRow) {
+  let onlineInvoiceId: number | null = null;
+  let onlineReceiptId: number | null = null;
+  let onlineClientId: number | null = null;
+
+  if (entry.referenceType === "invoice" || entry.invoiceId) {
+    const localInvoice = entry.invoiceId ? getLocalInvoice(String(entry.invoiceId)) : null;
+    const invoiceNumber = localInvoice?.invoiceNumber || entry.referenceNumber || "";
+    const onlineInvoice = await getOnlineInvoiceMapping(client, invoiceNumber);
+
+    if (!onlineInvoice) {
+      throw new Error(`Online invoice mapping not found for accountingId: ${entry.id}`);
+    }
+
+    onlineInvoiceId = onlineInvoice.onlineInvoiceId;
+    onlineClientId = onlineInvoice.onlineClientId;
+  }
+
+  if (entry.referenceType === "receipt" || entry.receiptId) {
+    const localReceipt = entry.receiptId ? getLocalReceipt(String(entry.receiptId)) : null;
+    const receiptNumber = localReceipt?.receiptNumber || entry.referenceNumber || "";
+    onlineReceiptId = await getOnlineReceiptId(client, receiptNumber);
+
+    if (!onlineReceiptId) {
+      throw new Error(`Online receipt mapping not found for accountingId: ${entry.id}`);
+    }
+
+    if (localReceipt?.invoiceId) {
+      const localInvoice = getLocalInvoice(String(localReceipt.invoiceId));
+      const onlineInvoice = localInvoice ? await getOnlineInvoiceMapping(client, localInvoice.invoiceNumber) : null;
+      if (!onlineInvoice) {
+        throw new Error(`Online invoice mapping not found for accountingId: ${entry.id}`);
+      }
+      onlineInvoiceId = onlineInvoice.onlineInvoiceId;
+      onlineClientId = onlineInvoice.onlineClientId;
+    } else if (!onlineClientId) {
+      onlineClientId = await resolveOnlineClientIdForLocalClientId(client, entry.clientId);
+    }
+  }
+
+  if (!onlineClientId) {
+    onlineClientId = await resolveOnlineClientIdForLocalClientId(client, entry.clientId);
+  }
+
+  return { onlineClientId, onlineInvoiceId, onlineReceiptId };
+}
+
+async function pushAccountingEntry(client: any, entry: LocalAccountingRow, operation: string) {
+  console.log("[SYNC][ACCOUNTING]", {
+    operation,
+    referenceType: entry.referenceType,
+    referenceNumber: entry.referenceNumber,
+  });
+
+  if (!(await hasOnlineTable(client, "customer_ledger"))) {
+    console.log("[SYNC][ACCOUNTING][SKIPPED_NO_TABLE]", {
+      referenceType: entry.referenceType,
+      referenceNumber: entry.referenceNumber,
+      entryType: entry.entryType,
+    });
+    return;
+  }
+
+  const mapping = await resolveAccountingOnlineMapping(client, entry);
+  const existing = await client.query(
+    `
+      SELECT id
+      FROM customer_ledger
+      WHERE reference_type = $1
+        AND reference_number = $2
+        AND entry_type = $3
+      LIMIT 1
+    `,
+    [String(entry.referenceType || ""), String(entry.referenceNumber || ""), String(entry.entryType || "")]
+  ) as { rowCount?: number; rows?: Array<{ id: number }> };
+
+  if (existing.rowCount && existing.rows?.[0]) {
+    console.log("[SYNC][ACCOUNTING][SKIPPED_ALREADY_EXISTS]", {
+      referenceType: entry.referenceType,
+      referenceNumber: entry.referenceNumber,
+      entryType: entry.entryType,
+    });
+
+    await client.query(
+      `
+        UPDATE customer_ledger
+        SET client_id = $1,
+            invoice_id = $2,
+            receipt_id = $3,
+            entry_date = $4,
+            description_ar = $5,
+            description_en = $6,
+            debit = $7,
+            credit = $8,
+            balance_impact = $9
+        WHERE id = $10
+      `,
+      [
+        mapping.onlineClientId,
+        mapping.onlineInvoiceId,
+        mapping.onlineReceiptId,
+        String(entry.entryDate || todayIsoDate()),
+        String(entry.descriptionAr || ""),
+        String(entry.descriptionEn || ""),
+        Number(entry.debit ?? 0),
+        Number(entry.credit ?? 0),
+        Number(entry.balanceImpact ?? 0),
+        Number(existing.rows[0].id),
+      ]
+    );
+    return;
+  }
+
+  await client.query(
+    `
+      INSERT INTO customer_ledger (
+        client_id,
+        invoice_id,
+        receipt_id,
+        entry_date,
+        entry_type,
+        description_ar,
+        description_en,
+        reference_type,
+        reference_number,
+        debit,
+        credit,
+        balance_impact,
+        created_by,
+        created_at
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+    `,
+    [
+      mapping.onlineClientId,
+      mapping.onlineInvoiceId,
+      mapping.onlineReceiptId,
+      String(entry.entryDate || todayIsoDate()),
+      String(entry.entryType || ""),
+      String(entry.descriptionAr || ""),
+      String(entry.descriptionEn || ""),
+      String(entry.referenceType || ""),
+      String(entry.referenceNumber || ""),
+      Number(entry.debit ?? 0),
+      Number(entry.credit ?? 0),
+      Number(entry.balanceImpact ?? 0),
+      entry.createdBy ?? null,
+      entry.createdAt ? new Date(entry.createdAt) : new Date(),
     ]
   );
 }
@@ -778,18 +1014,31 @@ export async function runSyncWorkerOnce(): Promise<{
 
             if (row.operation === "create") {
               await pushInvoiceCreate(client, invoice, onlineClientId);
-            } else {
+            } else if (await hasOnlineInvoice(client, invoice.invoiceNumber)) {
               await pushInvoiceUpdate(client, invoice, onlineClientId);
+            } else {
+              console.log("[SYNC][INVOICE][FALLBACK_CREATE]", {
+                invoiceId: invoice.id,
+                invoiceNumber: invoice.invoiceNumber,
+              });
+              await pushInvoiceCreate(client, invoice, onlineClientId);
             }
 
             await syncInvoiceItems(client, invoice);
-          } else {
+          } else if (row.entityType === "receipt") {
             const receipt = getLocalReceipt(row.entityId);
             if (!receipt) {
               throw new Error(`Local receipt not found for sync entityId ${row.entityId}`);
             }
 
             await pushReceipt(client, receipt, row.operation);
+          } else {
+            const accountingEntry = getLocalAccountingEntry(row.entityId);
+            if (!accountingEntry) {
+              throw new Error(`Local accounting entry not found for sync entityId ${row.entityId}`);
+            }
+
+            await pushAccountingEntry(client, accountingEntry, row.operation);
           }
 
           markSynced(row.id);
