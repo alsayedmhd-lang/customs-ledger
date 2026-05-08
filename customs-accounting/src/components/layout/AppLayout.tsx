@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import {
   LayoutDashboard,
@@ -24,8 +25,22 @@ import { getRoleLabel } from "@/lib/role-labels";
 import SettingsPanel from "./SettingsPanel";
 import { motion, AnimatePresence } from "framer-motion";
 
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
+
 interface AppLayoutProps {
   children: React.ReactNode;
+}
+
+function authFetch(url: string, options: RequestInit = {}) {
+  const token = sessionStorage.getItem("auth_token");
+  return fetch(url, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(options.headers ?? {}),
+    },
+  });
 }
 
 export default function AppLayout({ children }: AppLayoutProps) {
@@ -98,6 +113,29 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const isClient = user?.role === "client";
   const clientCanViewStatement = isClient && user?.clientViewPermissions?.canViewStatement !== false;
   const clientCanViewSummary = isClient && user?.clientViewPermissions?.canViewSummary !== false;
+  const { data: trashedInvoiceCount = 0 } = useQuery<unknown[], Error, number>({
+    queryKey: ["trash-invoices"],
+    queryFn: async () => {
+      const res = await authFetch(`${API_BASE}/api/trash/invoices`);
+      if (!res.ok) throw new Error("Failed to load trash invoice count");
+      return res.json();
+    },
+    select: (items) => items.length,
+    enabled: Boolean(user && !isClient),
+    staleTime: 30_000,
+  });
+  const { data: trashedReceiptCount = 0 } = useQuery<unknown[], Error, number>({
+    queryKey: ["trash-receipts"],
+    queryFn: async () => {
+      const res = await authFetch(`${API_BASE}/api/trash/receipts`);
+      if (!res.ok) throw new Error("Failed to load trash receipt count");
+      return res.json();
+    },
+    select: (items) => items.length,
+    enabled: Boolean(user && !isClient),
+    staleTime: 30_000,
+  });
+  const hasTrashCounts = trashedInvoiceCount > 0 || trashedReceiptCount > 0;
   const clientAllowedHrefs = new Set(["/", "/invoices", "/receipts", "/statements", "/customer-ledger"]);
   const navItems = [
     { name: t("dashboard"), href: "/", icon: LayoutDashboard, color: "text-blue-400" },
@@ -196,8 +234,8 @@ export default function AppLayout({ children }: AppLayoutProps) {
             <Link key={item.href} href={item.href} onClick={() => setMobileOpen(false)}>
               <div
                 className={cn(
-                  "flex items-center rounded-xl font-medium transition-all duration-200 cursor-pointer group",
-                  collapsed ? "justify-center px-2 py-2.5" : "gap-3 px-3 py-2.5",
+                  "rounded-xl font-medium transition-all duration-200 cursor-pointer group",
+                  collapsed ? "flex items-center justify-center px-2 py-2.5" : "px-3 py-2.5",
                   isActive && "shadow-lg nav-active-glow"
                 )}
                 title={collapsed ? label : undefined}
@@ -218,24 +256,46 @@ export default function AppLayout({ children }: AppLayoutProps) {
                   }
                 }}
               >
-                <div className={cn(
-                  "w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors",
-                  isActive && "bg-primary/15"
-                )}
-                  style={{ background: isActive ? undefined : "var(--sb-hover-bg, rgba(255,255,255,0.05))" }}
-                >
-                  <item.icon className={cn(
-                    "w-4 h-4",
-                    isActive ? "text-primary" : item.color
-                  )} />
+                <div className={cn("flex items-center", collapsed ? "justify-center" : "gap-3")}>
+                  <div className={cn(
+                    "w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors",
+                    isActive && "bg-primary/15"
+                  )}
+                    style={{ background: isActive ? undefined : "var(--sb-hover-bg, rgba(255,255,255,0.05))" }}
+                  >
+                    <item.icon className={cn(
+                      "w-4 h-4",
+                      isActive ? "text-primary" : item.color
+                    )} />
+                  </div>
+                  {!collapsed && <span className="text-sm font-semibold">{label}</span>}
+                  {!collapsed && item.href === "/trash" && hasTrashCounts && (
+                    <div className="ms-auto flex items-center gap-1">
+                      {trashedInvoiceCount > 0 && (
+                        <span
+                          className="flex h-4 min-w-4 items-center justify-center rounded-full bg-sky-500 px-1 text-[10px] font-black leading-none text-white"
+                          title={isAR ? "فواتير محذوفة" : "Deleted invoices"}
+                        >
+                          {trashedInvoiceCount}
+                        </span>
+                      )}
+                      {trashedReceiptCount > 0 && (
+                        <span
+                          className="flex h-4 min-w-4 items-center justify-center rounded-full bg-emerald-500 px-1 text-[10px] font-black leading-none text-white"
+                          title={isAR ? "سندات قبض محذوفة" : "Deleted receipts"}
+                        >
+                          {trashedReceiptCount}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  {isActive && !collapsed && (
+                    <motion.div
+                      layoutId="activeIndicator"
+                      className={`w-1.5 h-1.5 rounded-full bg-primary`}
+                    />
+                  )}
                 </div>
-                {!collapsed && <span className="text-sm font-semibold">{label}</span>}
-                {isActive && !collapsed && (
-                  <motion.div
-                    layoutId="activeIndicator"
-                    className={`ms-auto w-1.5 h-1.5 rounded-full bg-primary`}
-                  />
-                )}
               </div>
             </Link>
           );
