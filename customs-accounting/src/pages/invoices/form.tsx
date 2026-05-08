@@ -968,7 +968,7 @@ export default function InvoiceForm() {
               </button>
             </Link>
 
-            <Link href={`/invoices/${invoiceId}/print`}>
+            <Link href={`/invoices/${invoiceId}/receipt`}>
               <button className="flex items-center gap-1.5 px-3 py-2 bg-slate-700 text-white text-sm font-medium rounded-xl hover:bg-slate-600">
                 <Printer className="w-3.5 h-3.5" />
                 {isAR ? "طباعة" : "Print"}
