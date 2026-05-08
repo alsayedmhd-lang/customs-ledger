@@ -9,6 +9,7 @@ import { createRequire } from "module";
 import packageJson from "../../../package.json";
 import { requireAdmin } from "../middleware/auth";
 import { ensureSyncQueueTable } from "../utils/ensure-sync-queue-table";
+import { runSyncWorkerOnce } from "../utils/sync-worker";
 
 const router = Router();
 const require = createRequire(path.join(process.cwd(), "package.json"));
@@ -329,6 +330,17 @@ router.get("/developer/sync-queue/status", (_req, res) => {
     console.error(err);
     return res.status(500).json({ error: "Failed to read sync queue status" });
   }
+});
+
+router.post("/developer/sync/run-once", async (_req, res) => {
+  const result = await runSyncWorkerOnce();
+
+  return res.json({
+    ok: true,
+    pendingCount: result.pendingCount,
+    processedCount: result.pendingCount,
+    message: "Sync worker read pending queue items only. No online sync was executed.",
+  });
 });
 
 router.post("/developer/database/test-online", async (req, res) => {
