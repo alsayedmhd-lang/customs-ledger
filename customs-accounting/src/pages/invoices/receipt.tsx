@@ -600,19 +600,15 @@ const impExpValue =
 
         {/* ══ SIGNATURES / STAMP ══════════════════════════════════════════ */}
         <div className="print-footer relative">
-        <div className="grid grid-cols-2 gap-4 px-6 pb-2 pt-3 mt-2">
-          <div className="text-center">
-            <div className="h-12 flex items-end justify-center">
-              <div className="w-full border-b border-slate-300 opacity-45" />
-            </div>
+        <div className="relative grid grid-cols-[1fr_0.8fr_1fr] items-end gap-8 px-12 pb-5 pt-8" style={{ zIndex: 30, direction: "ltr" }}>
+          <div className="order-3 relative z-10 text-center">
+            <div className="h-24 border-b-2 border-gray-400" />
             <p className="text-xs text-gray-500 mt-1 font-bold">توقيع المستلم</p>
             <p className="text-xs text-gray-400">Received By</p>
           </div>
 
-          <div className="text-center">
-            <div className="h-12 flex items-end justify-center">
-              <div className="w-full border-b border-slate-300 opacity-45" />
-            </div>
+          <div className="order-1 relative z-10 text-center">
+            <div className="h-24 border-b-2 border-gray-400" />
             <p className="text-xs text-gray-500 mt-1 font-bold">توقيع المحاسب</p>
             <p className="text-xs text-gray-400">Accountant</p>
           </div>
@@ -621,7 +617,7 @@ const impExpValue =
             <img
               src={(user as any)?.signatureBase64 || (user as any)?.receiverSignatureBase64}
               alt="Receiver Signature"
-              className="absolute bottom-10 right-[12%] h-20 w-auto object-contain pointer-events-none"
+              className="absolute bottom-12 right-[10%] h-24 max-w-[220px] object-contain pointer-events-none"
               style={{ zIndex: 3, opacity: 0.9, mixBlendMode: "multiply" }}
             />
           )}
@@ -630,7 +626,7 @@ const impExpValue =
             <img
               src={company.accountantSignatureBase64}
               alt="Accountant Signature"
-              className="absolute bottom-10 left-[10%] h-20 w-auto object-contain pointer-events-none"
+              className="absolute bottom-12 left-[10%] h-24 max-w-[220px] object-contain pointer-events-none"
               style={{
                 zIndex: 3,
                 opacity: 0.9,
@@ -640,29 +636,29 @@ const impExpValue =
             />
           )}
 
-          {company.showStampOnInvoices && showStamp && (
-            <div className="contents">
+          <div
+            className="order-2 relative flex min-h-32 items-center justify-center pointer-events-none"
+            style={{ zIndex: 50 }}
+          >
+            {company.showStampOnInvoices && showStamp && (
               <img
                 src={stampSrc}
                 alt="الختم الرسمي"
-                className="w-auto object-contain"
+                className="absolute left-1/2 top-full w-auto -translate-x-1/2 -translate-y-[58%] object-contain"
                 style={{
-                  position: "absolute",
-                  left: "50%",
-                  transform: "translateX(-50%)",
-                  bottom: "8mm",
-                  zIndex: 20,
-                  pointerEvents: "none",
-                  height: "130px",
-                  maxWidth: "200px",
-                  opacity: 0.92,
+                  height: "150px",
+                  maxWidth: "230px",
+                  opacity: 0.56,
+                  zIndex: 50,
                 }}
               />
-            </div>
-          )}
+            )}
+          </div>
         </div>
         {/* ══ FOOTER ══════════════════════════════════════════════════════ */}
-        <PrintDocumentFooter kind="invoice" reference={invNum} />
+        <div className="relative z-10">
+          <PrintDocumentFooter kind="invoice" reference={invNum} />
+        </div>
         <div className="hidden">
           <div className="flex items-center justify-between text-xs text-gray-600">
             <span>✉ {printEmail}</span>
