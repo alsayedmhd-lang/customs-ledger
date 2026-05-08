@@ -15,10 +15,18 @@ export function ensureSyncQueueTable() {
       status TEXT NOT NULL DEFAULT 'pending',
       retry_count INTEGER NOT NULL DEFAULT 0,
       last_error TEXT,
+      synced_at INTEGER,
       created_at INTEGER,
       updated_at INTEGER
     );
   `);
+
+  const columns = sqlite.prepare("PRAGMA table_info(sync_queue)").all() as Array<{ name: string }>;
+  const existing = new Set(columns.map((column) => column.name));
+
+  if (!existing.has("synced_at")) {
+    sqlite.exec("ALTER TABLE sync_queue ADD COLUMN synced_at INTEGER");
+  }
 
   ensured = true;
   console.log("Ensured sync_queue table");

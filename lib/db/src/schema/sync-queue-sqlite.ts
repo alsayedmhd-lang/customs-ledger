@@ -9,6 +9,7 @@ export const syncQueueTableSqlite = sqliteTable("sync_queue", {
   status: text("status").notNull().default("pending"),
   retryCount: integer("retry_count").notNull().default(0),
   lastError: text("last_error"),
+  syncedAt: integer("synced_at", { mode: "timestamp_ms" }),
   createdAt: integer("created_at", { mode: "timestamp_ms" }),
   updatedAt: integer("updated_at", { mode: "timestamp_ms" }),
 });

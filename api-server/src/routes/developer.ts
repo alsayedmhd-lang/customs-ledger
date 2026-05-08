@@ -338,8 +338,12 @@ router.post("/developer/sync/run-once", async (_req, res) => {
   return res.json({
     ok: true,
     pendingCount: result.pendingCount,
-    processedCount: result.pendingCount,
-    message: "Sync worker read pending queue items only. No online sync was executed.",
+    processedCount: result.processedCount,
+    onlineConnected: result.onlineConnected,
+    lastError: result.lastError,
+    message: result.onlineConnected
+      ? "Online: Connected. Sync worker completed."
+      : `Online: Disconnected${result.lastError ? ` - ${result.lastError}` : ""}`,
   });
 });
 
