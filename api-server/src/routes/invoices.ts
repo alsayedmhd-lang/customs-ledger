@@ -13,6 +13,7 @@ import {
 import { invoiceAuditLogsTableSqlite } from "../../../lib/db/src/schema/invoices-sqlite";
 import { eq, desc, isNull, and, like, isNotNull } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth";
+import { enqueueSyncChange } from "../utils/sync-queue";
 
 const router: IRouter = Router();
 
@@ -433,6 +434,21 @@ router.post("/invoices", requireAuth, async (req, res) => {
         return formatItem(inserted);
       })
     );
+
+    await enqueueSyncChange({
+      entityType: "invoice",
+      entityId: invoice.id,
+      action: "create",
+      payload: {
+        invoiceId: invoice.id,
+        invoiceNumber: invoice.invoiceNumber,
+        shipmentRef: invoice.shipmentRef,
+        clientId: invoice.clientId,
+        total: invoice.total,
+        status: invoice.status,
+      },
+      userId: req.user?.userId,
+    });
     
 
     res.status(201).json({
