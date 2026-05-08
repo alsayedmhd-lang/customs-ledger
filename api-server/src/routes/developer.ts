@@ -371,6 +371,7 @@ router.post("/developer/sync/run-once", async (_req, res) => {
     processedCount: result.processedCount,
     onlineConnected: result.onlineConnected,
     lastError: result.lastError,
+    autoRestoredCount: result.autoRestoredCount,
     message: result.onlineConnected
       ? "Online: Connected. Sync worker completed."
       : `Online: Disconnected${result.lastError ? ` - ${result.lastError}` : ""}`,

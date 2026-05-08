@@ -570,10 +570,15 @@ export default function DeveloperSettingsPage() {
         sessionStorage.removeItem(ONLINE_DATABASE_CONNECTED_KEY);
         setOnlineDatabaseConnected(false);
       }
+      const autoRestoredCount = Number(data.autoRestoredCount || 0);
+      const autoRestoreNotice =
+        autoRestoredCount > 0
+          ? tr(" تمت استعادة سجلات محذوفة تلقائيًا أثناء المزامنة", " Deleted records were restored automatically during sync.")
+          : "";
       setSyncWorkerMessage(
         tr(
-          `قرأ العامل ${count} عنصرًا في الانتظار. ${data.message || ""}`,
-          `Worker read ${count} pending item(s). ${data.message || ""}`
+          `قرأ العامل ${count} عنصرًا في الانتظار. ${data.message || ""}${autoRestoreNotice}`,
+          `Worker read ${count} pending item(s). ${data.message || ""}${autoRestoreNotice}`
         )
       );
       await loadSyncQueueStatus();

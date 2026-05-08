@@ -20,6 +20,10 @@ type SyncQueueRow = {
   retryCount: number;
 };
 
+type SyncRunStats = {
+  autoRestoredCount: number;
+};
+
 type LocalInvoiceRow = {
   id: number;
   invoiceNumber: string;
@@ -251,6 +255,44 @@ function logInvoiceSync(operation: string, invoice: LocalInvoiceRow) {
   });
 }
 
+function hasDeletedAt(row: { deleted_at?: unknown } | null | undefined) {
+  return row?.deleted_at !== null && row?.deleted_at !== undefined;
+}
+
+async function autoRestoreOnlineInvoiceIfNeeded(
+  client: any,
+  row: { id: number; invoice_number?: string; deleted_at?: unknown } | null | undefined,
+  invoice: LocalInvoiceRow,
+  stats: SyncRunStats
+) {
+  if (!row || !hasDeletedAt(row)) return;
+
+  await client.query("UPDATE invoices SET deleted_at = NULL WHERE id = $1", [Number(row.id)]);
+  stats.autoRestoredCount += 1;
+  console.log("[SYNC][AUTO_RESTORE][INVOICE]", {
+    onlineInvoiceId: Number(row.id),
+    invoiceId: invoice.id,
+    invoiceNumber: invoice.invoiceNumber || row.invoice_number || null,
+  });
+}
+
+async function autoRestoreOnlineReceiptIfNeeded(
+  client: any,
+  row: { id: number; receipt_number?: string; deleted_at?: unknown } | null | undefined,
+  receipt: LocalReceiptRow,
+  stats: SyncRunStats
+) {
+  if (!row || !hasDeletedAt(row)) return;
+
+  await client.query("UPDATE receipts SET deleted_at = NULL WHERE id = $1", [Number(row.id)]);
+  stats.autoRestoredCount += 1;
+  console.log("[SYNC][AUTO_RESTORE][RECEIPT]", {
+    onlineReceiptId: Number(row.id),
+    receiptId: receipt.id,
+    receiptNumber: receipt.receiptNumber || row.receipt_number || null,
+  });
+}
+
 function isSupportedSyncRow(row: SyncQueueRow) {
   return (
     (row.entityType === "invoice" || row.entityType === "receipt" || row.entityType === "accounting" || row.entityType === "customer_ledger") &&
@@ -383,7 +425,7 @@ async function resolveOnlineClientIdForLocalClientId(client: any, localClientId:
   return onlineClientId;
 }
 
-async function pushInvoiceCreate(client: any, invoice: LocalInvoiceRow, onlineClientId: number) {
+async function pushInvoiceCreate(client: any, invoice: LocalInvoiceRow, onlineClientId: number, stats: SyncRunStats) {
   const issueDate = getInvoiceIssueDate(invoice);
   logInvoiceSync("create", invoice);
   console.log("Sync worker pushing invoice", { invoiceId: invoice.id, invoiceNumber: invoice.invoiceNumber, issueDate });
@@ -396,17 +438,18 @@ async function pushInvoiceCreate(client: any, invoice: LocalInvoiceRow, onlineCl
 
   const existing = await client.query(
     `
-      SELECT id, invoice_number
+      SELECT id, invoice_number, deleted_at
       FROM invoices
       WHERE invoice_number = $1 OR id = $2
       ORDER BY CASE WHEN invoice_number = $1 THEN 0 ELSE 1 END
       LIMIT 1
     `,
     [String(invoice.invoiceNumber || ""), Number(invoice.id)]
-  ) as { rowCount?: number; rows?: Array<{ id: number; invoice_number: string }> };
+  ) as { rowCount?: number; rows?: Array<{ id: number; invoice_number: string; deleted_at: unknown }> };
   console.log("[SYNC][INVOICE][FOUND]", existing.rows?.[0] || null);
 
   if (existing.rowCount && existing.rows?.[0]) {
+    await autoRestoreOnlineInvoiceIfNeeded(client, existing.rows[0], invoice, stats);
     await client.query(
       `
         UPDATE invoices
@@ -494,7 +537,7 @@ async function pushInvoiceCreate(client: any, invoice: LocalInvoiceRow, onlineCl
   );
 }
 
-async function pushInvoiceUpdate(client: any, invoice: LocalInvoiceRow, onlineClientId: number) {
+async function pushInvoiceUpdate(client: any, invoice: LocalInvoiceRow, onlineClientId: number, stats: SyncRunStats) {
   const issueDate = getInvoiceIssueDate(invoice);
   logInvoiceSync("update", invoice);
   console.log("Sync worker updating invoice", { invoiceId: invoice.id, invoiceNumber: invoice.invoiceNumber, issueDate });
@@ -507,14 +550,15 @@ async function pushInvoiceUpdate(client: any, invoice: LocalInvoiceRow, onlineCl
 
   const existing = await client.query(
     `
-      SELECT id, invoice_number
+      SELECT id, invoice_number, deleted_at
       FROM invoices
       WHERE invoice_number = $1
       LIMIT 1
     `,
     [String(invoice.invoiceNumber || "")]
-  ) as { rowCount?: number; rows?: Array<{ id: number; invoice_number: string }> };
+  ) as { rowCount?: number; rows?: Array<{ id: number; invoice_number: string; deleted_at: unknown }> };
   console.log("[SYNC][INVOICE][FOUND]", existing.rows?.[0] || null);
+  await autoRestoreOnlineInvoiceIfNeeded(client, existing.rows?.[0], invoice, stats);
 
   const result = await client.query(
     `
@@ -688,20 +732,21 @@ async function resolveReceiptOnlineMapping(client: any, receipt: LocalReceiptRow
   };
 }
 
-async function pushReceipt(client: any, receipt: LocalReceiptRow, operation: string) {
+async function pushReceipt(client: any, receipt: LocalReceiptRow, operation: string, stats: SyncRunStats) {
   logReceiptSync(operation, receipt);
   const mapping = await resolveReceiptOnlineMapping(client, receipt);
   const existing = await client.query(
     `
-      SELECT id, receipt_number
+      SELECT id, receipt_number, deleted_at
       FROM receipts
       WHERE receipt_number = $1
       LIMIT 1
     `,
     [String(receipt.receiptNumber || "")]
-  ) as { rowCount?: number; rows?: Array<{ id: number; receipt_number: string }> };
+  ) as { rowCount?: number; rows?: Array<{ id: number; receipt_number: string; deleted_at: unknown }> };
 
   if (existing.rowCount && existing.rows?.[0]) {
+    await autoRestoreOnlineReceiptIfNeeded(client, existing.rows[0], receipt, stats);
     await client.query(
       `
         UPDATE receipts
@@ -931,13 +976,14 @@ export async function runSyncWorkerOnce(): Promise<{
   processedCount: number;
   onlineConnected: boolean;
   lastError: string | null;
+  autoRestoredCount: number;
 }> {
   try {
     ensureSyncQueueTable();
 
     if (!sqlite) {
       console.log("Sync worker pending items: 0");
-      return { pendingCount: 0, processedCount: 0, onlineConnected: false, lastError: "SQLite database is unavailable" };
+      return { pendingCount: 0, processedCount: 0, onlineConnected: false, lastError: "SQLite database is unavailable", autoRestoredCount: 0 };
     }
 
     const pending = sqlite
@@ -965,6 +1011,7 @@ export async function runSyncWorkerOnce(): Promise<{
     let onlineConnected = false;
     let lastError: string | null = null;
     let client: any = null;
+    const stats: SyncRunStats = { autoRestoredCount: 0 };
 
     if (connectionString) {
       try {
@@ -982,7 +1029,7 @@ export async function runSyncWorkerOnce(): Promise<{
           }
         }
 
-        return { pendingCount: pending.length, processedCount: 0, onlineConnected: false, lastError };
+        return { pendingCount: pending.length, processedCount: 0, onlineConnected: false, lastError, autoRestoredCount: stats.autoRestoredCount };
       }
     }
 
@@ -1013,15 +1060,15 @@ export async function runSyncWorkerOnce(): Promise<{
             const onlineClientId = await resolveOnlineClientId(client, invoice);
 
             if (row.operation === "create") {
-              await pushInvoiceCreate(client, invoice, onlineClientId);
+              await pushInvoiceCreate(client, invoice, onlineClientId, stats);
             } else if (await hasOnlineInvoice(client, invoice.invoiceNumber)) {
-              await pushInvoiceUpdate(client, invoice, onlineClientId);
+              await pushInvoiceUpdate(client, invoice, onlineClientId, stats);
             } else {
               console.log("[SYNC][INVOICE][FALLBACK_CREATE]", {
                 invoiceId: invoice.id,
                 invoiceNumber: invoice.invoiceNumber,
               });
-              await pushInvoiceCreate(client, invoice, onlineClientId);
+              await pushInvoiceCreate(client, invoice, onlineClientId, stats);
             }
 
             await syncInvoiceItems(client, invoice);
@@ -1031,7 +1078,7 @@ export async function runSyncWorkerOnce(): Promise<{
               throw new Error(`Local receipt not found for sync entityId ${row.entityId}`);
             }
 
-            await pushReceipt(client, receipt, row.operation);
+            await pushReceipt(client, receipt, row.operation, stats);
           } else {
             const accountingEntry = getLocalAccountingEntry(row.entityId);
             if (!accountingEntry) {
@@ -1059,9 +1106,9 @@ export async function runSyncWorkerOnce(): Promise<{
       }
     }
 
-    return { pendingCount: pending.length, processedCount, onlineConnected, lastError };
+    return { pendingCount: pending.length, processedCount, onlineConnected, lastError, autoRestoredCount: stats.autoRestoredCount };
   } catch (err) {
     console.warn("Sync worker failed", err);
-    return { pendingCount: 0, processedCount: 0, onlineConnected: false, lastError: errorMessage(err) };
+    return { pendingCount: 0, processedCount: 0, onlineConnected: false, lastError: errorMessage(err), autoRestoredCount: 0 };
   }
 }

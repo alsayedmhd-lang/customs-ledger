@@ -181,6 +181,14 @@ export default function TrashPage() {
   });
 
   const totalItems = trashedInvoices.length + trashedReceipts.length;
+  const invoiceCountLabel =
+    lang === "ar"
+      ? `${trashedInvoices.length} فواتير محذوفة`
+      : `${trashedInvoices.length} deleted invoice${trashedInvoices.length === 1 ? "" : "s"}`;
+  const receiptCountLabel =
+    lang === "ar"
+      ? `${trashedReceipts.length} سندات قبض محذوفة`
+      : `${trashedReceipts.length} deleted receipt${trashedReceipts.length === 1 ? "" : "s"}`;
 
   const thCls = "px-4 py-3 font-semibold text-muted-foreground text-xs uppercase tracking-wider";
   const tdCls = "px-4 py-3";
@@ -202,6 +210,20 @@ export default function TrashPage() {
                   : `${totalItems} deleted item${totalItems > 1 ? "s" : ""}`
                 : t("trashEmpty")}
             </p>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <TrashCounterBadge
+                icon={<FileText className="h-3.5 w-3.5" />}
+                label={invoiceCountLabel}
+                count={trashedInvoices.length}
+                className="border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-900/60 dark:bg-sky-950/30 dark:text-sky-300"
+              />
+              <TrashCounterBadge
+                icon={<ReceiptText className="h-3.5 w-3.5" />}
+                label={receiptCountLabel}
+                count={trashedReceipts.length}
+                className="border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-300"
+              />
+            </div>
           </div>
         </div>
         {totalItems > 0 && (
@@ -230,11 +252,16 @@ export default function TrashPage() {
             >
               <Icon className="w-4 h-4" />
               {t(tab)}
-              {count > 0 && (
-                <span className="bg-destructive text-destructive-foreground text-xs font-bold rounded-full px-1.5 py-0.5 min-w-[20px] text-center">
-                  {count}
-                </span>
-              )}
+              <span
+                className={cn(
+                  "rounded-full border px-1.5 py-0.5 text-center text-xs font-bold min-w-[20px]",
+                  count > 0 && tab === "invoices" && "border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-900/60 dark:bg-sky-950/30 dark:text-sky-300",
+                  count > 0 && tab === "receipts" && "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-300",
+                  count === 0 && "border-border bg-muted/30 text-muted-foreground/70"
+                )}
+              >
+                {count}
+              </span>
             </button>
           );
         })}
@@ -422,6 +449,30 @@ export default function TrashPage() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+  );
+}
+
+function TrashCounterBadge({
+  icon,
+  label,
+  count,
+  className,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  count: number;
+  className: string;
+}) {
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold",
+        count > 0 ? className : "border-border bg-muted/20 text-muted-foreground/70"
+      )}
+    >
+      {icon}
+      {label}
+    </span>
   );
 }
 
