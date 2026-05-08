@@ -138,8 +138,10 @@ type SyncQueueItem = {
 };
 type SyncQueueStatus = {
   pending: number;
+  synced: number;
   failed: number;
   lastSync: string | null;
+  lastError: string | null;
   recent: SyncQueueItem[];
 };
 type ReadinessStatus = {
@@ -227,9 +229,16 @@ function syncQueueStatusBadgeClass(status: string) {
   const normalized = status.toLowerCase();
   if (normalized === "pending") return "border-amber-200 bg-amber-50 text-amber-700";
   if (normalized === "processing") return "border-blue-200 bg-blue-50 text-blue-700";
-  if (normalized === "done") return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  if (normalized === "done" || normalized === "success" || normalized === "synced") return "border-emerald-200 bg-emerald-50 text-emerald-700";
   if (normalized === "failed") return "border-red-200 bg-red-50 text-red-700";
   return "border-border bg-background text-muted-foreground";
+}
+
+function getSyncQueueDisplayStatus(status: SyncQueueStatus, isAR: boolean) {
+  if (status.failed > 0) return isAR ? "فشلت" : "Failed";
+  if (status.pending > 0) return isAR ? "قيد الانتظار" : "Pending";
+  if (status.synced > 0) return isAR ? "نجحت" : "Synced";
+  return isAR ? "خامل" : "Idle";
 }
 
 function InfoRow({ label, value, isAR }: { label: string; value?: string | number | boolean | null; isAR: boolean }) {
@@ -282,8 +291,10 @@ export default function DeveloperSettingsPage() {
   const [settings, setSettings] = useState<DeveloperSettings>(defaultSettings);
   const [syncQueueStatus, setSyncQueueStatus] = useState<SyncQueueStatus>({
     pending: 0,
+    synced: 0,
     failed: 0,
     lastSync: null,
+    lastError: null,
     recent: [],
   });
   const [readinessStatus, setReadinessStatus] = useState<ReadinessStatus>({
@@ -462,12 +473,14 @@ export default function DeveloperSettingsPage() {
       const data = await res.json();
       setSyncQueueStatus({
         pending: Number(data?.pending || 0),
+        synced: Number(data?.synced || 0),
         failed: Number(data?.failed || 0),
         lastSync: data?.lastSync || null,
+        lastError: data?.lastError || null,
         recent: Array.isArray(data?.recent) ? data.recent : [],
       });
     } catch {
-      setSyncQueueStatus({ pending: 0, failed: 0, lastSync: null, recent: [] });
+      setSyncQueueStatus({ pending: 0, synced: 0, failed: 0, lastSync: null, lastError: null, recent: [] });
     } finally {
       setIsSyncQueueLoading(false);
     }
@@ -738,10 +751,12 @@ export default function DeveloperSettingsPage() {
                   {tr("تحديث", "Refresh")}
                 </Button>
               </div>
-              <div className="grid gap-3 md:grid-cols-3">
+              <div className="grid gap-3 md:grid-cols-5">
                 <InfoRow isAR={isAR} label={tr("المزامنة المنتظرة", "Pending sync")} value={syncQueueStatus.pending} />
+                <InfoRow isAR={isAR} label={tr("المزامنة الناجحة", "Synced")} value={syncQueueStatus.synced} />
                 <InfoRow isAR={isAR} label={tr("المزامنة الفاشلة", "Failed sync")} value={syncQueueStatus.failed} />
                 <InfoRow isAR={isAR} label={tr("آخر مزامنة", "Last sync")} value={formatSyncQueueDate(syncQueueStatus.lastSync, isAR)} />
+                <InfoRow isAR={isAR} label={tr("آخر خطأ", "Last error")} value={syncQueueStatus.lastError || "-"} />
               </div>
               <div className="mt-4">
                 <div className="mb-2 text-xs font-semibold text-muted-foreground">{tr("آخر عناصر القائمة", "Recent Queue Items")}</div>
@@ -1000,8 +1015,8 @@ export default function DeveloperSettingsPage() {
                     </DevField>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
-                    <InfoRow isAR={isAR} label={tr("آخر مزامنة", "Last sync")} value={syncConfig.lastSyncTime} />
-                    <InfoRow isAR={isAR} label={tr("الحالة", "Status")} value={syncConfig.status} />
+                    <InfoRow isAR={isAR} label={tr("آخر مزامنة", "Last sync")} value={formatSyncQueueDate(syncQueueStatus.lastSync, isAR)} />
+                    <InfoRow isAR={isAR} label={tr("الحالة", "Status")} value={getSyncQueueDisplayStatus(syncQueueStatus, isAR)} />
                   </div>
                 </div>
               </div>
