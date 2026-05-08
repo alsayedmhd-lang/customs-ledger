@@ -40,6 +40,21 @@ type DeveloperSettings = {
   allowManagerEditBranding: boolean;
   allowManagerEditRegistrationSettings: boolean;
   allowManagerEditSensitiveUsers: boolean;
+  databaseProvider?: string | null;
+  databaseMode?: DatabaseMode | null;
+  databaseUseConnectionString?: boolean | null;
+  databaseConnectionString?: string | null;
+  databaseHost?: string | null;
+  databasePort?: string | null;
+  databaseName?: string | null;
+  databaseUsername?: string | null;
+  databasePassword?: string | null;
+  syncMode?: SyncMode | null;
+  syncAutoSync?: boolean | null;
+  syncTiming?: AutoSyncTiming | null;
+  syncIntervalMinutes?: number | null;
+  syncLastSyncTime?: string | null;
+  syncStatus?: SyncStatus | null;
   sqlitePath?: string | null;
   databaseStatus?: string | null;
   databaseSize?: number | null;
@@ -80,6 +95,21 @@ const defaultSettings: DeveloperSettings = {
   allowManagerEditBranding: false,
   allowManagerEditRegistrationSettings: false,
   allowManagerEditSensitiveUsers: false,
+  databaseProvider: "sqlite",
+  databaseMode: "local",
+  databaseUseConnectionString: false,
+  databaseConnectionString: "",
+  databaseHost: "",
+  databasePort: "5432",
+  databaseName: "",
+  databaseUsername: "",
+  databasePassword: "",
+  syncMode: "local-to-online",
+  syncAutoSync: false,
+  syncTiming: "startup",
+  syncIntervalMinutes: 30,
+  syncLastSyncTime: "",
+  syncStatus: "idle",
 };
 
 const tabs = [
@@ -306,14 +336,61 @@ export default function DeveloperSettingsPage() {
     }
   }, [unlocked]);
 
+  function applyDeveloperSettingsState(data: DeveloperSettings) {
+    const nextSettings = { ...defaultSettings, ...data };
+    setSettings(nextSettings);
+    setDatabaseMode(nextSettings.databaseMode === "online" ? "online" : "local");
+    setDatabaseConfig((current) => ({
+      ...current,
+      localPath: nextSettings.sqlitePath || current.localPath,
+      host: nextSettings.databaseHost || "",
+      port: nextSettings.databasePort || "5432",
+      databaseName: nextSettings.databaseName || "",
+      username: nextSettings.databaseUsername || "",
+      password: nextSettings.databasePassword || "",
+      useConnectionString: Boolean(nextSettings.databaseUseConnectionString),
+      connectionString: nextSettings.databaseConnectionString || "",
+    }));
+    setSyncConfig((current) => ({
+      ...current,
+      mode: nextSettings.syncMode || "local-to-online",
+      autoSync: Boolean(nextSettings.syncAutoSync),
+      timing: nextSettings.syncTiming || "startup",
+      intervalMinutes: Number(nextSettings.syncIntervalMinutes || 30),
+      lastSyncTime: nextSettings.syncLastSyncTime || current.lastSyncTime,
+      status: nextSettings.syncStatus || "idle",
+    }));
+    sessionStorage.setItem("developer_settings", JSON.stringify(nextSettings));
+  }
+
+  function buildDeveloperSettingsPayload() {
+    return {
+      ...settings,
+      databaseProvider: databaseMode === "online" ? "postgresql" : "sqlite",
+      databaseMode,
+      databaseUseConnectionString: databaseConfig.useConnectionString,
+      databaseConnectionString: databaseConfig.useConnectionString ? databaseConfig.connectionString : "",
+      databaseHost: databaseConfig.host,
+      databasePort: databaseConfig.port,
+      databaseName: databaseConfig.databaseName,
+      databaseUsername: databaseConfig.username,
+      databasePassword: databaseConfig.password,
+      syncMode: syncConfig.mode,
+      syncAutoSync: syncConfig.autoSync,
+      syncTiming: syncConfig.timing,
+      syncIntervalMinutes: syncConfig.intervalMinutes,
+      syncLastSyncTime: syncConfig.lastSyncTime,
+      syncStatus: syncConfig.status,
+    };
+  }
+
   async function loadSettings() {
     setError("");
     try {
       const res = await fetch(`${API_BASE}/developer/settings`, { headers: authHeaders() });
       if (!res.ok) throw new Error(tr("تعذر تحميل إعدادات المطوّر", "Failed to load developer settings"));
       const data = await res.json();
-      setSettings({ ...defaultSettings, ...data });
-      sessionStorage.setItem("developer_settings", JSON.stringify({ ...defaultSettings, ...data }));
+      applyDeveloperSettingsState(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : tr("تعذر تحميل إعدادات المطوّر", "Failed to load developer settings"));
     }
@@ -348,12 +425,11 @@ export default function DeveloperSettingsPage() {
       const res = await fetch(`${API_BASE}/developer/settings`, {
         method: "PUT",
         headers: authHeaders(),
-        body: JSON.stringify(settings),
+        body: JSON.stringify(buildDeveloperSettingsPayload()),
       });
       if (!res.ok) throw new Error(tr("تعذر حفظ إعدادات المطوّر", "Failed to save developer settings"));
       const data = await res.json();
-      setSettings({ ...defaultSettings, ...data });
-      sessionStorage.setItem("developer_settings", JSON.stringify({ ...defaultSettings, ...data }));
+      applyDeveloperSettingsState(data);
       window.dispatchEvent(new CustomEvent("developer-settings-updated", { detail: data }));
       setSavedMessage(tr("تم الحفظ", "Saved"));
     } catch (err) {
@@ -526,8 +602,26 @@ export default function DeveloperSettingsPage() {
     setDatabaseMessage(tr("Online: غير متصل بالأونلاين", "Online: Disconnected"));
   }
 
-  function savePreparedConnection() {
-    setDatabaseMessage(tr("لم يتم حفظ Connection String أو تغيير مصدر البيانات", "Connection string was not saved and the data source was not changed"));
+  async function savePreparedConnection() {
+    setError("");
+    setDatabaseMessage("");
+    setIsSaving(true);
+    try {
+      const res = await fetch(`${API_BASE}/developer/settings`, {
+        method: "PUT",
+        headers: authHeaders(),
+        body: JSON.stringify(buildDeveloperSettingsPayload()),
+      });
+      if (!res.ok) throw new Error(tr("تعذر حفظ إعدادات قاعدة البيانات", "Failed to save database settings"));
+      const data = await res.json();
+      applyDeveloperSettingsState(data);
+      window.dispatchEvent(new CustomEvent("developer-settings-updated", { detail: data }));
+      setDatabaseMessage(tr("تم حفظ إعدادات قاعدة البيانات", "Database settings saved"));
+    } catch (err) {
+      setDatabaseMessage(err instanceof Error ? err.message : tr("تعذر حفظ إعدادات قاعدة البيانات", "Failed to save database settings"));
+    } finally {
+      setIsSaving(false);
+    }
   }
 
   function showLocalDatabasePreviewMessage() {
