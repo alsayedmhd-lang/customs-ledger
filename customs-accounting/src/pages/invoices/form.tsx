@@ -38,6 +38,8 @@ import {
   ArrowLeft,
   Plus,
   Trash2,
+  ExternalLink,
+  Upload,
   Save,
   FileText,
   Ship,
@@ -111,6 +113,17 @@ const IMPORTER_EXPORTER_SUGGESTIONS_KEY = "invoice_importer_exporter_suggestions
 const ENTRY_PORT_SUGGESTIONS_KEY = "invoice_entry_port_suggestions";
 const ATTACHMENT_MAX_SIZE_BYTES = 5 * 1024 * 1024;
 const ALLOWED_ATTACHMENT_EXTENSIONS = new Set(["pdf", "jpg", "jpeg", "png", "doc", "docx", "xls", "xlsx"]);
+const PRESET_ATTACHMENT_CATEGORIES = [
+  { key: "customs_declaration", ar: "البيان الجمركي", en: "Customs Declaration" },
+  { key: "bill_of_lading", ar: "بوليصة الشحن", en: "Bill of Lading" },
+  { key: "commercial_invoice", ar: "الفاتورة التجارية", en: "Commercial Invoice" },
+  { key: "packing_list", ar: "قائمة التعبئة", en: "Packing List" },
+  { key: "certificate_of_origin", ar: "شهادة المنشأ", en: "Certificate of Origin" },
+  { key: "payment_receipt", ar: "إيصال الدفع", en: "Payment Receipt" },
+  { key: "delivery_order", ar: "إذن التسليم", en: "Delivery Order" },
+  { key: "arrival_notice", ar: "إشعار الوصول", en: "Arrival Notice" },
+] as const;
+const PRESET_ATTACHMENT_CATEGORY_KEYS = new Set(PRESET_ATTACHMENT_CATEGORIES.map((category) => category.key));
 
 type InvoiceAttachment = {
   id: number;
@@ -409,6 +422,7 @@ export default function InvoiceForm() {
   const [attachments, setAttachments] = useState<InvoiceAttachment[]>([]);
   const [attachmentsLoading, setAttachmentsLoading] = useState(false);
   const [attachmentBusy, setAttachmentBusy] = useState(false);
+  const [selectedAttachmentIds, setSelectedAttachmentIds] = useState<Record<string, number>>({});
   const { data: clients } = useListClients();
   const { data: invoices } = useListInvoices();
   const { data: templates } = useListInvoiceItemTemplates();
@@ -690,6 +704,30 @@ export default function InvoiceForm() {
   const shipmentRefWatch = watch("shipmentRef");
   const declarationBaseNumber = getDeclarationBaseNumber(shipmentRefWatch);
   const attachmentsEnabled = Boolean(isEdit && invoiceId && declarationBaseNumber);
+  const attachmentsByCategory = new Map<string, InvoiceAttachment[]>();
+  for (const attachment of attachments) {
+    const category = String(attachment.category || "other");
+    const normalizedCategory = PRESET_ATTACHMENT_CATEGORY_KEYS.has(category as any) ? category : "other";
+    attachmentsByCategory.set(normalizedCategory, [
+      ...(attachmentsByCategory.get(normalizedCategory) || []),
+      attachment,
+    ]);
+  }
+  const otherAttachments = attachmentsByCategory.get("other") || [];
+  const attachmentCountLabel = (count: number) =>
+    isAR ? `${count} ${count === 1 ? "ملف" : "ملفات"}` : `${count} ${count === 1 ? "file" : "files"}`;
+  const canViewInvoiceAuditLog =
+    user?.role === "admin" || Boolean((user as any)?.permissions?.canViewInvoiceAuditLog);
+  const showInvoiceAuditLog = Boolean(isEdit && canViewInvoiceAuditLog && auditLogs.length > 0);
+  const getSelectedAttachment = (category: string) => {
+    const categoryAttachments = attachmentsByCategory.get(category) || [];
+    const selectedId = selectedAttachmentIds[category];
+    return categoryAttachments.find((attachment) => attachment.id === selectedId) || null;
+  };
+  const attachmentButtonCls =
+    "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-60";
+  const attachmentDeleteButtonCls =
+    "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-destructive/30 text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-60";
 
   const subtotal = itemsWatch.reduce(
     (acc, item) =>
@@ -803,7 +841,23 @@ export default function InvoiceForm() {
     void fetchAttachments(declarationBaseNumber);
   }, [declarationBaseNumber, invoiceId, isEdit]);
 
-  const handleAddAttachmentClick = async () => {
+  useEffect(() => {
+    setSelectedAttachmentIds((current) => {
+      const next: Record<string, number> = {};
+
+      for (const [category, categoryAttachments] of attachmentsByCategory.entries()) {
+        if (categoryAttachments.length === 0) continue;
+        const currentSelectedId = current[category];
+        next[category] = categoryAttachments.some((attachment) => attachment.id === currentSelectedId)
+          ? currentSelectedId
+          : categoryAttachments[0].id;
+      }
+
+      return next;
+    });
+  }, [attachments]);
+
+  const handleAddAttachmentClick = async (category = "other") => {
     if (!attachmentsEnabled) {
       toast({
         title: isAR ? "احفظ الفاتورة أولًا لتفعيل المرفقات" : "Save invoice first to enable attachments",
@@ -874,7 +928,7 @@ export default function InvoiceForm() {
           relativePath: saveResult.relativePath,
           mimeType: extension || null,
           fileSize: selected.size ?? null,
-          category: "other",
+          category,
         }),
       });
 
@@ -1611,7 +1665,8 @@ export default function InvoiceForm() {
           </div>
         </div>
 
-        <div className="bg-card rounded-2xl border border-border/50 shadow-sm overflow-hidden">
+        <div className={showInvoiceAuditLog ? "grid grid-cols-1 lg:grid-cols-2 gap-4 items-start" : ""}>
+        <div className="bg-card rounded-2xl border border-border/50 shadow-sm overflow-hidden min-w-0">
           <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-border/40 bg-slate-500/5">
             <div className="flex items-center gap-2">
               <FileText className="w-4 h-4 text-slate-600" />
@@ -1621,15 +1676,9 @@ export default function InvoiceForm() {
             </div>
 
             {attachmentsEnabled && (
-              <button
-                type="button"
-                onClick={handleAddAttachmentClick}
-                disabled={attachmentBusy}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:opacity-60"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                {isAR ? "إضافة مرفق" : "Add Attachment"}
-              </button>
+              <span className="rounded-full border border-border bg-background px-2.5 py-1 text-xs font-semibold text-muted-foreground">
+                {attachments.length}
+              </span>
             )}
           </div>
 
@@ -1641,61 +1690,285 @@ export default function InvoiceForm() {
                   : "Save invoice first to enable attachments"}
               </p>
             ) : (
-              <>
+              <div className="space-y-5">
                 {attachmentsLoading ? (
                   <p className="text-sm text-muted-foreground">
                     {isAR ? "جاري تحميل المرفقات..." : "Loading attachments..."}
                   </p>
-                ) : attachments.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">
-                    {isAR ? "لا توجد مرفقات حتى الآن" : "No attachments yet"}
-                  </p>
                 ) : (
-                  <div className="divide-y divide-border/50 rounded-lg border border-border/60">
-                    {attachments.map((attachment) => (
-                      <div
-                        key={attachment.id}
-                        className="flex flex-col gap-3 px-3 py-3 sm:flex-row sm:items-center sm:justify-between"
-                      >
-                        <div className="min-w-0">
-                          <div className="truncate text-sm font-semibold text-foreground">
-                            {attachment.fileName}
-                          </div>
-                          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                            <span>{attachment.category || "other"}</span>
-                            <span>•</span>
-                            <span>
-                              {attachment.createdAt
-                                ? new Date(attachment.createdAt).toLocaleString(isAR ? "ar" : "en-US")
-                                : "-"}
-                            </span>
-                          </div>
-                        </div>
-
-                        <div className="flex shrink-0 items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => void handleOpenAttachment(attachment)}
-                            className="rounded-lg border border-border px-3 py-1.5 text-xs font-semibold hover:bg-muted"
-                          >
-                            {isAR ? "فتح" : "Open"}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => void handleDeleteAttachment(attachment.id)}
-                            disabled={attachmentBusy}
-                            className="rounded-lg border border-destructive/30 px-3 py-1.5 text-xs font-semibold text-destructive hover:bg-destructive/10 disabled:opacity-60"
-                          >
-                            {isAR ? "حذف" : "Delete"}
-                          </button>
-                        </div>
+                  <>
+                    <section className="space-y-2">
+                      <div className="flex flex-nowrap items-center justify-between gap-3">
+                        <h4 className="text-sm font-bold text-foreground">
+                          {isAR ? "مرفقات أساسية" : "Preset Attachment Slots"}
+                        </h4>
+                        <span className="text-xs text-muted-foreground">
+                          {PRESET_ATTACHMENT_CATEGORIES.filter((category) => attachmentsByCategory.has(category.key)).length}
+                          /{PRESET_ATTACHMENT_CATEGORIES.length}
+                        </span>
                       </div>
-                    ))}
-                  </div>
+
+                      <div className="divide-y divide-border/50 rounded-lg border border-border/60">
+                        {PRESET_ATTACHMENT_CATEGORIES.map((category) => {
+                          const categoryAttachments = attachmentsByCategory.get(category.key) || [];
+                          const uploaded = categoryAttachments.length > 0;
+                          const selectedAttachment = getSelectedAttachment(category.key);
+
+                          return (
+                            <div key={category.key} className="space-y-3 px-3 py-3">
+                              <div className="flex flex-nowrap items-center justify-between gap-3">
+                              <div className="min-w-0 flex-1">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <span className="text-sm font-semibold text-foreground">
+                                    {isAR ? category.ar : category.en}
+                                  </span>
+                                  <span
+                                    className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${
+                                      uploaded
+                                        ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                                        : "border-border bg-muted/40 text-muted-foreground"
+                                    }`}
+                                  >
+                                    {uploaded
+                                      ? attachmentCountLabel(categoryAttachments.length)
+                                      : isAR ? "غير مرفوع" : "Missing"}
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div className="flex shrink-0 flex-nowrap items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => void handleAddAttachmentClick(category.key)}
+                                  disabled={attachmentBusy}
+                                  title={isAR ? "رفع" : "Upload"}
+                                  aria-label={isAR ? "رفع" : "Upload"}
+                                  className={attachmentButtonCls}
+                                >
+                                  <Upload className="w-4 h-4" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => selectedAttachment && void handleOpenAttachment(selectedAttachment)}
+                                  disabled={!selectedAttachment}
+                                  title={isAR ? "فتح" : "Open"}
+                                  aria-label={isAR ? "فتح" : "Open"}
+                                  className={attachmentButtonCls}
+                                >
+                                  <ExternalLink className="w-4 h-4" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => selectedAttachment && void handleDeleteAttachment(selectedAttachment.id)}
+                                  disabled={attachmentBusy || !selectedAttachment}
+                                  title={isAR ? "حذف" : "Delete"}
+                                  aria-label={isAR ? "حذف" : "Delete"}
+                                  className={attachmentDeleteButtonCls}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                              </div>
+
+                              {categoryAttachments.length > 0 && (
+                                <div className="space-y-2">
+                                  {categoryAttachments.map((attachment) => (
+                                    <div
+                                      key={attachment.id}
+                                      className="flex flex-nowrap items-center justify-between gap-3 rounded-lg bg-muted/20 px-3 py-2"
+                                    >
+                                      <input
+                                        type="radio"
+                                        name={`attachment-${category.key}`}
+                                        checked={selectedAttachmentIds[category.key] === attachment.id}
+                                        onChange={() =>
+                                          setSelectedAttachmentIds((current) => ({
+                                            ...current,
+                                            [category.key]: attachment.id,
+                                          }))
+                                        }
+                                        className="h-4 w-4 shrink-0 accent-primary"
+                                      />
+                                      <div className="min-w-0 flex-1 truncate text-sm text-foreground">
+                                        {attachment.fileName}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </section>
+
+                    <section className="space-y-2">
+                      {(() => {
+                        const selectedOtherAttachment = getSelectedAttachment("other");
+                        return (
+                          <>
+                      <div className="flex flex-nowrap items-center justify-between gap-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h4 className="text-sm font-bold text-foreground">
+                            {isAR ? "أخرى" : "Other"}
+                          </h4>
+                          <span
+                            className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${
+                              otherAttachments.length > 0
+                                ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                                : "border-border bg-muted/40 text-muted-foreground"
+                            }`}
+                          >
+                            {otherAttachments.length > 0
+                              ? attachmentCountLabel(otherAttachments.length)
+                              : isAR ? "غير مرفوع" : "Missing"}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => void handleAddAttachmentClick("other")}
+                          disabled={attachmentBusy}
+                          title={isAR ? "رفع" : "Upload"}
+                          aria-label={isAR ? "رفع" : "Upload"}
+                          className={attachmentButtonCls}
+                        >
+                          <Upload className="w-4 h-4" />
+                        </button>
+                        {otherAttachments[0] && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => selectedOtherAttachment && void handleOpenAttachment(selectedOtherAttachment)}
+                              disabled={!selectedOtherAttachment}
+                              title={isAR ? "فتح" : "Open"}
+                              aria-label={isAR ? "فتح" : "Open"}
+                              className={attachmentButtonCls}
+                            >
+                              <ExternalLink className="w-4 h-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => selectedOtherAttachment && void handleDeleteAttachment(selectedOtherAttachment.id)}
+                              disabled={attachmentBusy || !selectedOtherAttachment}
+                              title={isAR ? "حذف" : "Delete"}
+                              aria-label={isAR ? "حذف" : "Delete"}
+                              className={attachmentDeleteButtonCls}
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </>
+                        )}
+                      </div>
+
+                      {otherAttachments.length === 0 ? (
+                        <p className="rounded-lg border border-dashed border-border px-3 py-3 text-sm text-muted-foreground">
+                          {isAR ? "لا توجد مرفقات أخرى حتى الآن" : "No other attachments yet"}
+                        </p>
+                      ) : (
+                        <div className="divide-y divide-border/50 rounded-lg border border-border/60">
+                          {otherAttachments.map((attachment) => (
+                            <div
+                              key={attachment.id}
+                              className="flex flex-nowrap items-center justify-between gap-3 px-3 py-3"
+                            >
+                              <input
+                                type="radio"
+                                name="attachment-other"
+                                checked={selectedAttachmentIds.other === attachment.id}
+                                onChange={() =>
+                                  setSelectedAttachmentIds((current) => ({
+                                    ...current,
+                                    other: attachment.id,
+                                  }))
+                                }
+                                className="h-4 w-4 shrink-0 accent-primary"
+                              />
+                              <div className="min-w-0 flex-1">
+                                <div className="truncate text-sm font-semibold text-foreground">
+                                  {attachment.fileName}
+                                </div>
+                                <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                                  <span>{attachment.category || "other"}</span>
+                                  <span>•</span>
+                                  <span>
+                                    {attachment.createdAt
+                                      ? new Date(attachment.createdAt).toLocaleString(isAR ? "ar" : "en-US")
+                                      : "-"}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                          </>
+                        );
+                      })()}
+                    </section>
+                  </>
                 )}
-              </>
+              </div>
             )}
           </div>
+        </div>
+
+        {showInvoiceAuditLog && (
+          <div className="rounded-2xl border border-border/50 bg-card shadow-sm overflow-hidden min-w-0">
+            <div className="px-5 py-3 border-b border-border/40 flex items-center justify-between gap-3">
+              <h3 className="text-sm font-bold">
+                {isAR ? "سجل تغييرات الفاتورة" : "Invoice Audit Log"}
+              </h3>
+              <span className="text-xs text-muted-foreground">
+                {auditLogs.length} {isAR ? "عملية" : "events"}
+              </span>
+            </div>
+
+            <div className="divide-y divide-border/40 max-h-[520px] overflow-y-auto">
+              {auditLogs.map((log, i) => {
+                const rawDate =
+                  log.createdAt ??
+                  log.created_at ??
+                  JSON.parse(log.changesJson || "{}")?.after?.invoice?.updatedAt ??
+                  JSON.parse(log.changesJson || "{}")?.before?.invoice?.updatedAt;
+                const dateText = rawDate ? new Date(rawDate).toLocaleString("en-US") : "-";
+                const actionLabel =
+                  log.action === "created"
+                    ? isAR ? "إنشاء الفاتورة" : "Invoice Created"
+                    : log.action === "updated"
+                      ? isAR ? "تعديل الفاتورة" : "Invoice Updated"
+                      : log.action === "deleted"
+                        ? isAR ? "حذف الفاتورة" : "Invoice Deleted"
+                        : log.action === "restored"
+                          ? isAR ? "استعادة الفاتورة" : "Invoice Restored"
+                          : log.action;
+                const summary = getAuditSummary(log);
+
+                return (
+                  <div key={i} className="px-4 py-3 space-y-2">
+                    <div className="flex flex-nowrap items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="inline-flex rounded-full border border-border bg-muted/40 px-2.5 py-1 text-xs font-bold">
+                          {actionLabel}
+                        </div>
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          {isAR ? "بواسطة" : "By"}: {getAuditUsername(log)}
+                        </div>
+                      </div>
+                      <div className="shrink-0 text-xs text-muted-foreground">
+                        {dateText}
+                      </div>
+                    </div>
+                    <div className="text-xs text-muted-foreground leading-6 break-words">
+                      {(Array.isArray(summary) ? summary : [String(summary ?? "")]).map((s: string, idx: number) => (
+                        <div key={idx}>• {s}</div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
         </div>
 
         <div className="fixed bottom-4 left-1/2 -translate-x-1/2 w-[calc(100%-2rem)] max-w-md bg-card/90 backdrop-blur-md border border-border/60 px-4 py-3 rounded-2xl shadow-2xl flex items-center justify-between gap-3 z-40">
@@ -1732,7 +2005,7 @@ export default function InvoiceForm() {
         </div>
       </form>
 
-     {isEdit && user?.role === "admin" && auditLogs.length > 0 && (
+     {false && isEdit && user?.role === "admin" && auditLogs.length > 0 && (
         <div className="rounded-2xl border border-border/50 bg-card shadow-sm overflow-hidden">
           <div className="px-5 py-3 border-b border-border/40 flex items-center justify-between">
             <h3 className="text-sm font-bold">
