@@ -211,11 +211,11 @@ export default function ReceiptPrint() {
   const receiptNum = receipt.receiptNumber;
 
   return (
-    <div className="min-h-screen bg-gray-100 print:bg-white" dir="rtl">
+    <div className="bg-gray-100 print:bg-white" dir="rtl">
       <style>{`
         @media print {
           @page { size: A4 portrait; margin: 10mm 10mm 10mm 15mm; }
-          body { margin: 0; }
+          body { margin: 0; background: white !important; }
         }
       `}</style>
 
@@ -263,9 +263,10 @@ export default function ReceiptPrint() {
       </div>
 
       <div
-        className="max-w-2xl mx-auto print:max-w-none print:w-full print:mx-0 bg-white shadow-lg print:shadow-none border border-gray-200 print:border-none relative overflow-hidden"
+        className="print-page max-w-2xl mx-auto print:max-w-none print:w-full print:mx-0 bg-white shadow-lg print:shadow-none border border-gray-200 print:border-none relative overflow-hidden"
         style={{ fontFamily: "'Cairo', 'Arial', sans-serif" }}
       >
+        <main className="print-content">
         {settings.showWatermark && (
           <div
             className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none select-none"
@@ -437,7 +438,10 @@ export default function ReceiptPrint() {
           </div>
         </div>
 
-          <div className="relative grid grid-cols-2 gap-8 px-10 pb-3 pt-4 border-t border-gray-300" style={{ zIndex: 3 }}>
+        </main>
+
+        <div className="print-footer">
+          <div className="print-signature-stamp-area relative grid grid-cols-2 gap-8 px-10 pb-3 pt-4 border-t border-gray-300" style={{ zIndex: 3 }}>
             <div className="text-center">
               <div className="h-12 border-b-2 border-gray-400" />
               <p className="text-xs text-gray-500 mt-1 font-bold">توقيع المستلم</p>
@@ -510,6 +514,7 @@ export default function ReceiptPrint() {
             })}
             {" — "} رقم السند: {receipt.receiptNumber}
           </div>
+        </div>
       </div>
     </div>
   );

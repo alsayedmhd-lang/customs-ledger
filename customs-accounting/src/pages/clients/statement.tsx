@@ -106,16 +106,16 @@ export default function ClientStatement() {
   });
 
   return (
-    <div className="min-h-screen bg-gray-100 print:bg-white" dir="rtl">
+    <div className="bg-gray-100 print:bg-white" dir="rtl">
       {/* Print CSS */}
       <style>{`
         @media print {
           @page { size: A4 portrait; margin: 10mm 10mm 10mm 15mm; }
           body { margin: 0; }
           .print\\:hidden { display: none !important; }
-          .print-page { min-height: 297mm; display: flex; flex-direction: column; }
-          .print-content { flex: 1; }
-          .print-footer { margin-top: auto; }
+          .print-page { min-height: 297mm; height: auto; display: flex; flex-direction: column; overflow: visible !important; }
+          .print-content { flex: 1 1 auto; min-height: 0; }
+          .print-footer { flex: 0 0 auto; margin-top: auto; page-break-inside: avoid; break-inside: avoid; }
         }
       `}</style>
 
@@ -387,26 +387,23 @@ export default function ClientStatement() {
             يُرجى سداد المبالغ المستحقة في أقرب وقت ممكن — Please settle outstanding balances promptly.
           </div>
 
-          {/* Stamp — absolute overlay, does not affect layout */}
-          {settings.showStampOnStatements && showStamp && (
-            <div
-              className="absolute inset-0 flex items-center justify-center pointer-events-none"
-              style={{ zIndex: 2 }}
-            >
-              <img
-                src={stampSrc}
-                alt="الختم الرسمي"
-                className="w-auto object-contain"
-                style={{ height: "130px", maxWidth: "200px", opacity: 0.92 }}
-              />
-            </div>
-          )}
         </div>
 
         </main>
 
         {/* ══ FOOTER ══════════════════════════════════════════════════════ */}
-        <footer className="print-footer border-t-4 border-double border-gray-700 px-6 py-3 bg-gray-50" style={{ position: "relative", zIndex: 1 }}>
+        <footer className="print-footer" style={{ position: "relative", zIndex: 1 }}>
+          {settings.showStampOnStatements && showStamp && (
+            <div className="print-signature-stamp-area flex justify-center px-6 py-3 pointer-events-none">
+              <img
+                src={stampSrc}
+                alt="الختم الرسمي"
+                className="w-auto object-contain"
+                style={{ height: "105px", maxWidth: "180px", opacity: 0.92 }}
+              />
+            </div>
+          )}
+          <div className="border-t-4 border-double border-gray-700 px-6 py-3 bg-gray-50">
           <div className="flex items-center justify-between text-xs text-gray-600">
             <span>✉ {printEmail}</span>
             <span className="font-bold text-gray-800">{settings.nameAr} · {settings.nameEn.split(" ").slice(0, 3).join(" ")} C.C</span>
@@ -419,6 +416,7 @@ export default function ClientStatement() {
             طُبعت في: {new Date().toLocaleDateString("ar-EG-u-nu-latn", { year: "numeric", month: "long", day: "numeric" })}
             {" — "}المرجع: {statementRef}
             {" — "}عدد الفواتير: {arabicNums(invoices.length)}
+          </div>
           </div>
         </footer>
       </div>

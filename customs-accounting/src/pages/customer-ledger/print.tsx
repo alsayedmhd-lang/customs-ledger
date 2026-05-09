@@ -182,15 +182,15 @@ export default function CustomerLedgerPrintPage() {
   let runningBalance = openingBalance;
 
   return (
-    <div className="min-h-screen bg-gray-100 print:bg-white" dir="rtl">
+    <div className="bg-gray-100 print:bg-white" dir="rtl">
       <style>{`
         @media print {
           @page { size: A4 portrait; margin: 10mm; }
           body { margin: 0; background: white !important; }
           .print\\:hidden { display: none !important; }
-          .print-page { min-height: 297mm; display: flex; flex-direction: column; }
-          .print-content { flex: 1; }
-          .print-footer { margin-top: auto; }
+          .print-page { min-height: 297mm; height: auto; display: flex; flex-direction: column; overflow: visible !important; }
+          .print-content { flex: 1 1 auto; min-height: 0; }
+          .print-footer { flex: 0 0 auto; margin-top: auto; page-break-inside: avoid; break-inside: avoid; }
         }
       `}</style>
 
@@ -537,25 +537,22 @@ export default function CustomerLedgerPrintPage() {
             يُرجى مراجعة الحركات والرصيد — Please review the transactions and balance.
           </div>
 
-          {settings.showStampOnStatements && showStamp && (
-            <div
-              className="absolute inset-0 flex items-end justify-center pointer-events-none"
-              style={{ zIndex: 2, paddingBottom: 30 }}
-            >
-              <img
-                src={stampSrc}
-                alt="stamp"
-                className="w-auto object-contain"
-                style={{ height: 125, maxWidth: 210, opacity: 0.92 }}
-              />
-            </div>
-          )}
         </div>
 
         </main>
 
         {/* FOOTER */}
         <footer className="print-footer">
+        {settings.showStampOnStatements && showStamp && (
+          <div className="print-signature-stamp-area flex justify-center px-6 py-3 pointer-events-none">
+            <img
+              src={stampSrc}
+              alt="stamp"
+              className="w-auto object-contain"
+              style={{ height: 105, maxWidth: 180, opacity: 0.92 }}
+            />
+          </div>
+        )}
         <PrintDocumentFooter kind="statement" reference={statementRef} count={rows.length} />
         <div className="hidden">
           <div className="flex items-center justify-between text-xs text-gray-600">

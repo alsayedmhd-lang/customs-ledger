@@ -280,7 +280,7 @@ export function PrintSignaturesStamp({
   const sigHeight = kind === "invoice" ? "h-20" : "h-14";
 
   return (
-    <div className={`relative grid grid-cols-2 ${kind === "invoice" ? "gap-4 px-6 pb-2 pt-3" : "gap-8 px-10 pb-3 pt-4"} border-t border-gray-300 mt-2`} style={{ zIndex: 3 }}>
+    <div className={`print-signature-stamp-area relative grid grid-cols-2 ${kind === "invoice" ? "gap-4 px-6 pb-2 pt-3" : "gap-8 px-10 pb-3 pt-4"} border-t border-gray-300 mt-2`} style={{ zIndex: 3 }}>
       <div className="text-center">
         <div className="h-12 flex items-end justify-center">
           <div className="w-full border-b-2 border-gray-400" />
@@ -373,7 +373,7 @@ export function PrintDocumentFooter({
     : (isAR ? "المرجع" : "Reference");
 
   return (
-    <div className="border-t-4 border-double border-gray-700 px-6 py-3 bg-gray-50 relative z-10">
+    <div className="border-t-4 border-double border-gray-700 px-6 py-3 bg-gray-50 relative z-10 print-break-inside-avoid">
       <div className="flex items-center justify-between text-xs text-gray-600">
         <span>✉ {settings.email}</span>
         <span className="font-bold text-gray-800">
