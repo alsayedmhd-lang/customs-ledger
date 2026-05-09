@@ -101,6 +101,43 @@ function safeRelativePath(relativePath) {
   return normalized;
 }
 
+function getAttachmentsRoot() {
+  return path.join(app.getPath("userData"), "attachments");
+}
+
+function isPathInside(parentPath, childPath) {
+  const relative = path.relative(parentPath, childPath);
+  return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
+}
+
+function safeDeclarationBaseNumber(value) {
+  const cleaned = String(value || "")
+    .replace(/[^a-zA-Z0-9]/g, "")
+    .trim();
+
+  return cleaned || null;
+}
+
+function safeStoredAttachmentName(value) {
+  const name = String(value || "").trim();
+
+  if (
+    !name ||
+    name.includes("..") ||
+    name.includes("/") ||
+    name.includes("\\") ||
+    path.basename(name) !== name
+  ) {
+    return null;
+  }
+
+  return name;
+}
+
+function getAttachmentRelativePath(...segments) {
+  return path.join("attachments", ...segments);
+}
+
 function resolveExternalFilePath(relativePath) {
   const safePath = safeRelativePath(relativePath);
   if (!safePath) return null;
@@ -372,6 +409,81 @@ ipcMain.handle("open-external-file", async (_event, relativePath) => {
   } catch (error) {
     console.error("External file open error:", error);
     return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle("attachment:save-file", async (_event, payload = {}) => {
+  try {
+    const sourcePath = String(payload.sourcePath || "");
+    const declarationBaseNumber = safeDeclarationBaseNumber(payload.declarationBaseNumber);
+    const storedName = safeStoredAttachmentName(payload.storedName);
+
+    if (!sourcePath || !path.isAbsolute(sourcePath)) {
+      return { ok: false, error: "sourcePath must be an absolute path" };
+    }
+
+    if (!declarationBaseNumber) {
+      return { ok: false, error: "Invalid declarationBaseNumber" };
+    }
+
+    if (!storedName) {
+      return { ok: false, error: "Invalid storedName" };
+    }
+
+    const sourceStats = fs.existsSync(sourcePath) ? fs.statSync(sourcePath) : null;
+    if (!sourceStats?.isFile()) {
+      return { ok: false, error: "Source file not found" };
+    }
+
+    const attachmentsRoot = getAttachmentsRoot();
+    const targetDir = path.resolve(attachmentsRoot, "declarations", declarationBaseNumber);
+    const targetPath = path.resolve(targetDir, storedName);
+
+    if (!isPathInside(attachmentsRoot, targetPath)) {
+      return { ok: false, error: "Invalid attachment path" };
+    }
+
+    fs.mkdirSync(targetDir, { recursive: true });
+    fs.copyFileSync(sourcePath, targetPath);
+
+    return {
+      ok: true,
+      relativePath: getAttachmentRelativePath("declarations", declarationBaseNumber, storedName),
+      fullPath: targetPath,
+    };
+  } catch (error) {
+    console.error("Attachment save error:", error);
+    return { ok: false, error: error.message };
+  }
+});
+
+ipcMain.handle("attachment:open-file", async (_event, relativePath) => {
+  try {
+    const safePath = safeRelativePath(relativePath);
+    if (!safePath) {
+      return { ok: false, error: "Invalid attachment path" };
+    }
+
+    const attachmentsRoot = getAttachmentsRoot();
+    const targetPath = path.resolve(app.getPath("userData"), safePath);
+
+    if (!isPathInside(attachmentsRoot, targetPath)) {
+      return { ok: false, error: "Attachment path is outside storage root" };
+    }
+
+    if (!fs.existsSync(targetPath) || !fs.statSync(targetPath).isFile()) {
+      return { ok: false, error: "Attachment file not found" };
+    }
+
+    const errorMessage = await shell.openPath(targetPath);
+    if (errorMessage) {
+      return { ok: false, error: errorMessage };
+    }
+
+    return { ok: true, fullPath: targetPath };
+  } catch (error) {
+    console.error("Attachment open error:", error);
+    return { ok: false, error: error.message };
   }
 });
 
