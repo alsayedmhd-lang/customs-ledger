@@ -138,6 +138,18 @@ function getAttachmentRelativePath(...segments) {
   return path.join("attachments", ...segments);
 }
 
+function getAttachmentFileMetadata(filePath) {
+  const stats = fs.statSync(filePath);
+  const ext = path.extname(filePath).replace(/^\./, "").toLowerCase();
+
+  return {
+    filePath,
+    fileName: path.basename(filePath),
+    size: stats.size,
+    ext,
+  };
+}
+
 function resolveExternalFilePath(relativePath) {
   const safePath = safeRelativePath(relativePath);
   if (!safePath) return null;
@@ -409,6 +421,36 @@ ipcMain.handle("open-external-file", async (_event, relativePath) => {
   } catch (error) {
     console.error("External file open error:", error);
     return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle("attachments:select-file", async () => {
+  try {
+    if (!mainWindow || mainWindow.isDestroyed()) {
+      return { canceled: true, error: "Main window not found" };
+    }
+
+    const result = await dialog.showOpenDialog(mainWindow, {
+      properties: ["openFile"],
+      filters: [
+        {
+          name: "Supported Attachments",
+          extensions: ["pdf", "jpg", "jpeg", "png", "doc", "docx", "xls", "xlsx"],
+        },
+      ],
+    });
+
+    if (result.canceled || !result.filePaths?.[0]) {
+      return { canceled: true };
+    }
+
+    return {
+      canceled: false,
+      ...getAttachmentFileMetadata(result.filePaths[0]),
+    };
+  } catch (error) {
+    console.error("Attachment select error:", error);
+    return { canceled: true, error: error.message };
   }
 });
 

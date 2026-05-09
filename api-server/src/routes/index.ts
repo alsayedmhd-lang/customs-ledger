@@ -10,6 +10,7 @@ import usersManagementRouter from "./users-management";
 import accountingRouter from "./accounting";
 import companySettingsRouter from "./company-settings";
 import developerRouter from "./developer";
+import invoiceAttachmentsRouter from "./invoice-attachments";
 import { requireAuth } from "../middleware/auth";
 
 const router: IRouter = Router();
@@ -29,5 +30,6 @@ router.use(usersManagementRouter);
 router.use(accountingRouter);
 router.use(companySettingsRouter);
 router.use(developerRouter);
+router.use(invoiceAttachmentsRouter);
 
 export default router;

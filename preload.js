@@ -15,6 +15,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   getAppVersion: () => ipcRenderer.invoke("app:get-version"),
   openExternalFile: (relativePath) =>
     ipcRenderer.invoke("open-external-file", relativePath),
+  selectAttachmentFile: () => ipcRenderer.invoke("attachments:select-file"),
   saveAttachmentFile: ({ sourcePath, declarationBaseNumber, storedName }) =>
     ipcRenderer.invoke("attachment:save-file", {
       sourcePath,

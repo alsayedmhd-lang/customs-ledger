@@ -109,6 +109,63 @@ const labelCls =
 
 const IMPORTER_EXPORTER_SUGGESTIONS_KEY = "invoice_importer_exporter_suggestions";
 const ENTRY_PORT_SUGGESTIONS_KEY = "invoice_entry_port_suggestions";
+const ATTACHMENT_MAX_SIZE_BYTES = 5 * 1024 * 1024;
+const ALLOWED_ATTACHMENT_EXTENSIONS = new Set(["pdf", "jpg", "jpeg", "png", "doc", "docx", "xls", "xlsx"]);
+
+type InvoiceAttachment = {
+  id: number;
+  fileName: string;
+  mimeType?: string | null;
+  fileSize?: number | null;
+  category?: string | null;
+  storageProvider?: string | null;
+  createdAt?: string | null;
+  declarationNumber?: string | null;
+  declarationBaseNumber?: string | null;
+  relativePath?: string | null;
+};
+
+type AttachmentSaveResult = {
+  ok: boolean;
+  relativePath?: string;
+  fullPath?: string;
+  error?: string;
+};
+
+type AttachmentSelectResult = {
+  canceled?: boolean;
+  filePath?: string;
+  fileName?: string;
+  size?: number;
+  ext?: string;
+  error?: string;
+};
+
+function getDeclarationBaseNumber(value: string | null | undefined) {
+  return String(value ?? "")
+    .replace(/[^a-zA-Z0-9]/g, "")
+    .trim();
+}
+
+function sanitizeStoredFileName(fileName: string) {
+  const cleaned = String(fileName || "attachment")
+    .replace(/[<>:"/\\|?*]+/g, "-")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^\.+/, "")
+    .trim();
+
+  return cleaned || "attachment";
+}
+
+function getFileExtension(fileName: string) {
+  const parts = String(fileName || "").split(".");
+  return parts.length > 1 ? String(parts.pop() || "").toLowerCase() : "";
+}
+
+function getAttachmentApiBase() {
+  return `${import.meta.env.VITE_API_BASE_URL}/api/invoice-attachments`;
+}
 
 function readSuggestions(storageKey: string) {
   try {
@@ -349,6 +406,9 @@ export default function InvoiceForm() {
   const isAR = lang === "ar";
   const [users, setUsers] = useState<any[]>([]);
   const [receiptLookupPending, setReceiptLookupPending] = useState(false);
+  const [attachments, setAttachments] = useState<InvoiceAttachment[]>([]);
+  const [attachmentsLoading, setAttachmentsLoading] = useState(false);
+  const [attachmentBusy, setAttachmentBusy] = useState(false);
   const { data: clients } = useListClients();
   const { data: invoices } = useListInvoices();
   const { data: templates } = useListInvoiceItemTemplates();
@@ -627,6 +687,9 @@ export default function InvoiceForm() {
   const itemsWatch = watch("items") || [];
   const taxRateWatch = watch("taxRate") || 0;
   const advancePaymentWatch = watch("advancePayment") || 0;
+  const shipmentRefWatch = watch("shipmentRef");
+  const declarationBaseNumber = getDeclarationBaseNumber(shipmentRefWatch);
+  const attachmentsEnabled = Boolean(isEdit && invoiceId && declarationBaseNumber);
 
   const subtotal = itemsWatch.reduce(
     (acc, item) =>
@@ -702,6 +765,183 @@ export default function InvoiceForm() {
     if (template) {
       setValue(`items.${index}.description`, template.description);
       setValue(`items.${index}.unitPrice`, template.defaultUnitPrice);
+    }
+  };
+
+  const fetchAttachments = async (baseNumber = declarationBaseNumber) => {
+    if (!isEdit || !invoiceId || !baseNumber) {
+      setAttachments([]);
+      return;
+    }
+
+    try {
+      setAttachmentsLoading(true);
+      const token = sessionStorage.getItem("auth_token");
+      const response = await fetch(`${getAttachmentApiBase()}/${encodeURIComponent(baseNumber)}`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Attachments request failed with status ${response.status}`);
+      }
+
+      const data = await response.json();
+      setAttachments(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error("Failed to load attachments:", error);
+      toast({
+        title: isAR ? "خطأ" : "Error",
+        description: isAR ? "تعذر تحميل المرفقات" : "Failed to load attachments",
+        variant: "destructive",
+      });
+    } finally {
+      setAttachmentsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void fetchAttachments(declarationBaseNumber);
+  }, [declarationBaseNumber, invoiceId, isEdit]);
+
+  const handleAddAttachmentClick = async () => {
+    if (!attachmentsEnabled) {
+      toast({
+        title: isAR ? "احفظ الفاتورة أولًا لتفعيل المرفقات" : "Save invoice first to enable attachments",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const api = (window as any).electronAPI;
+    if (!api?.selectAttachmentFile || !api?.saveAttachmentFile) {
+      toast({
+        title: isAR ? "واجهة المرفقات غير متاحة" : "Attachment bridge is not available",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setAttachmentBusy(true);
+      const selected: AttachmentSelectResult = await api.selectAttachmentFile();
+
+      if (selected.canceled) return;
+      if (!selected.filePath || !selected.fileName) {
+        throw new Error(selected.error || "No file was selected");
+      }
+
+      const extension = selected.ext || getFileExtension(selected.fileName);
+      if (!ALLOWED_ATTACHMENT_EXTENSIONS.has(extension)) {
+        toast({
+          title: isAR ? "نوع الملف غير مسموح" : "Unsupported file type",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (Number(selected.size || 0) > ATTACHMENT_MAX_SIZE_BYTES) {
+        toast({
+          title: isAR ? "الملف أكبر من الحد المسموح 5MB" : "File exceeds 5MB limit",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const storedName = `${Date.now()}-${sanitizeStoredFileName(selected.fileName)}`;
+      const saveResult: AttachmentSaveResult = await api.saveAttachmentFile({
+        sourcePath: selected.filePath,
+        declarationBaseNumber,
+        storedName,
+      });
+
+      if (!saveResult.ok || !saveResult.relativePath) {
+        throw new Error(saveResult.error || "Failed to save attachment file");
+      }
+
+      const token = sessionStorage.getItem("auth_token");
+      const response = await fetch(getAttachmentApiBase(), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          invoiceId,
+          declarationNumber: shipmentRefWatch || declarationBaseNumber,
+          declarationBaseNumber,
+          fileName: selected.fileName,
+          storedName,
+          relativePath: saveResult.relativePath,
+          mimeType: extension || null,
+          fileSize: selected.size ?? null,
+          category: "other",
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        throw new Error(errorData?.error || `Metadata request failed with status ${response.status}`);
+      }
+
+      await fetchAttachments(declarationBaseNumber);
+      toast({ title: isAR ? "تمت إضافة المرفق" : "Attachment added" });
+    } catch (error) {
+      console.error("Failed to add attachment:", error);
+      toast({
+        title: isAR ? "خطأ" : "Error",
+        description: error instanceof Error ? error.message : String(error),
+        variant: "destructive",
+      });
+    } finally {
+      setAttachmentBusy(false);
+    }
+  };
+
+  const handleOpenAttachment = async (attachment: InvoiceAttachment) => {
+    if (!attachment.relativePath) return;
+
+    const api = (window as any).electronAPI;
+    if (!api?.openAttachmentFile) {
+      toast({
+        title: isAR ? "واجهة المرفقات غير متاحة" : "Attachment bridge is not available",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const result: AttachmentSaveResult = await api.openAttachmentFile(attachment.relativePath);
+    if (!result.ok) {
+      toast({
+        title: isAR ? "تعذر فتح الملف" : "Failed to open file",
+        description: result.error,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDeleteAttachment = async (attachmentId: number) => {
+    try {
+      setAttachmentBusy(true);
+      const token = sessionStorage.getItem("auth_token");
+      const response = await fetch(`${getAttachmentApiBase()}/${attachmentId}`, {
+        method: "DELETE",
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      });
+
+      if (!response.ok && response.status !== 204) {
+        throw new Error(`Delete request failed with status ${response.status}`);
+      }
+
+      await fetchAttachments(declarationBaseNumber);
+    } catch (error) {
+      console.error("Failed to delete attachment:", error);
+      toast({
+        title: isAR ? "تعذر حذف المرفق" : "Failed to delete attachment",
+        description: error instanceof Error ? error.message : String(error),
+        variant: "destructive",
+      });
+    } finally {
+      setAttachmentBusy(false);
     }
   };
 
@@ -1368,6 +1608,93 @@ export default function InvoiceForm() {
                 </span>
               </div>
             </div>
+          </div>
+        </div>
+
+        <div className="bg-card rounded-2xl border border-border/50 shadow-sm overflow-hidden">
+          <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-border/40 bg-slate-500/5">
+            <div className="flex items-center gap-2">
+              <FileText className="w-4 h-4 text-slate-600" />
+              <h3 className="text-sm font-bold">
+                {isAR ? "المرفقات" : "Attachments"}
+              </h3>
+            </div>
+
+            {attachmentsEnabled && (
+              <button
+                type="button"
+                onClick={handleAddAttachmentClick}
+                disabled={attachmentBusy}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:opacity-60"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                {isAR ? "إضافة مرفق" : "Add Attachment"}
+              </button>
+            )}
+          </div>
+
+          <div className="p-4">
+            {!attachmentsEnabled ? (
+              <p className="text-sm text-muted-foreground">
+                {isAR
+                  ? "احفظ الفاتورة أولًا لتفعيل المرفقات"
+                  : "Save invoice first to enable attachments"}
+              </p>
+            ) : (
+              <>
+                {attachmentsLoading ? (
+                  <p className="text-sm text-muted-foreground">
+                    {isAR ? "جاري تحميل المرفقات..." : "Loading attachments..."}
+                  </p>
+                ) : attachments.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    {isAR ? "لا توجد مرفقات حتى الآن" : "No attachments yet"}
+                  </p>
+                ) : (
+                  <div className="divide-y divide-border/50 rounded-lg border border-border/60">
+                    {attachments.map((attachment) => (
+                      <div
+                        key={attachment.id}
+                        className="flex flex-col gap-3 px-3 py-3 sm:flex-row sm:items-center sm:justify-between"
+                      >
+                        <div className="min-w-0">
+                          <div className="truncate text-sm font-semibold text-foreground">
+                            {attachment.fileName}
+                          </div>
+                          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                            <span>{attachment.category || "other"}</span>
+                            <span>•</span>
+                            <span>
+                              {attachment.createdAt
+                                ? new Date(attachment.createdAt).toLocaleString(isAR ? "ar" : "en-US")
+                                : "-"}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex shrink-0 items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => void handleOpenAttachment(attachment)}
+                            className="rounded-lg border border-border px-3 py-1.5 text-xs font-semibold hover:bg-muted"
+                          >
+                            {isAR ? "فتح" : "Open"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void handleDeleteAttachment(attachment.id)}
+                            disabled={attachmentBusy}
+                            className="rounded-lg border border-destructive/30 px-3 py-1.5 text-xs font-semibold text-destructive hover:bg-destructive/10 disabled:opacity-60"
+                          >
+                            {isAR ? "حذف" : "Delete"}
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
           </div>
         </div>
 
