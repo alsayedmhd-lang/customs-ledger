@@ -575,6 +575,25 @@ export default function DeveloperSettingsPage() {
         autoRestoredCount > 0
           ? tr(" تمت استعادة سجلات محذوفة تلقائيًا أثناء المزامنة", " Deleted records were restored automatically during sync.")
           : "";
+
+      if (data.onlineConnected === false) {
+        const lastError = String(data.lastError || "").trim();
+        const isNotConfigured = lastError === "Online database connection string is not configured";
+        const message = isNotConfigured
+          ? tr("قاعدة البيانات السحابية غير مضبوطة", "Online database connection is not configured")
+          : tr("تعذر الاتصال بقاعدة البيانات السحابية", "Unable to connect to online database");
+
+        setSyncWorkerMessage(lastError ? `${message}: ${lastError}` : message);
+        await loadSyncQueueStatus();
+        return;
+      }
+
+      if (data.onlineConnected === true && Number(data.processedCount || 0) === 0 && Number(data.pendingCount || 0) === 0) {
+        setSyncWorkerMessage(tr("لا توجد عناصر بانتظار المزامنة", "No pending sync items"));
+        await loadSyncQueueStatus();
+        return;
+      }
+
       setSyncWorkerMessage(
         tr(
           `قرأ العامل ${count} عنصرًا في الانتظار. ${data.message || ""}${autoRestoreNotice}`,
