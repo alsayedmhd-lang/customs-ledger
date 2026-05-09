@@ -977,7 +977,7 @@ export default function DeveloperSettingsPage() {
                     {tr("لا توجد عناصر في القائمة بعد", "No queue items yet")}
                   </div>
                 ) : (
-                  <div className="overflow-x-auto rounded-md border border-border">
+                  <div className="max-h-[250px] overflow-x-auto overflow-y-auto rounded-md border border-border">
                     <table className="w-full min-w-[760px] text-left text-xs">
                       <thead className="bg-muted/50 text-muted-foreground">
                         <tr>
