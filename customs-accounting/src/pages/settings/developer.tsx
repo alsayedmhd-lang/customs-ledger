@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Shield, Users, Database, Activity, PackageCheck, Copy, FileText, RefreshCw, Save, Cloud } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,6 +15,7 @@ const UNLOCK_KEY = "developer_unlocked";
 const UNLOCKED_AT_KEY = "developer_unlocked_at";
 const ONLINE_DATABASE_CONNECTED_KEY = "developer_online_database_connected";
 const DEVELOPER_IDLE_TIMEOUT_MS = 5 * 60 * 1000;
+const AUTO_SYNC_INTERVAL_MS = 2 * 60 * 1000;
 const DEFAULT_LOGIN_FOOTER_TEXT = "Internal Accounting System For Companes - alsayed.mhd@gmail.com - Phone - 00201009697521 - 0097460020446";
 
 type DeveloperSettings = {
@@ -351,6 +352,7 @@ export default function DeveloperSettingsPage() {
     lastSyncTime: tr("غير متاح", "Unavailable"),
     status: "idle",
   });
+  const syncWorkerRunningRef = useRef(false);
 
   const developerTabs = tabs.map((tab) => ({
     ...tab,
@@ -548,8 +550,14 @@ export default function DeveloperSettingsPage() {
     }
   }
 
-  async function runSyncWorkerNow() {
-    setSyncWorkerMessage("");
+  async function runSyncWorkerNow(options: { silent?: boolean } = {}) {
+    if (syncWorkerRunningRef.current) return;
+
+    const silent = Boolean(options.silent);
+    syncWorkerRunningRef.current = true;
+    if (!silent) {
+      setSyncWorkerMessage("");
+    }
     setIsSyncWorkerRunning(true);
     try {
       const res = await fetch(`${API_BASE}/developer/sync/run-once`, {
@@ -563,6 +571,7 @@ export default function DeveloperSettingsPage() {
       }
 
       const count = Number(data.pendingCount ?? data.processedCount ?? 0);
+      const processedCount = Number(data.processedCount || 0);
       if (data.onlineConnected) {
         sessionStorage.setItem(ONLINE_DATABASE_CONNECTED_KEY, "true");
         setOnlineDatabaseConnected(true);
@@ -583,13 +592,25 @@ export default function DeveloperSettingsPage() {
           ? tr("قاعدة البيانات السحابية غير مضبوطة", "Online database connection is not configured")
           : tr("تعذر الاتصال بقاعدة البيانات السحابية", "Unable to connect to online database");
 
-        setSyncWorkerMessage(lastError ? `${message}: ${lastError}` : message);
+        if (!silent) {
+          setSyncWorkerMessage(lastError ? `${message}: ${lastError}` : message);
+        }
         await loadSyncQueueStatus();
         return;
       }
 
-      if (data.onlineConnected === true && Number(data.processedCount || 0) === 0 && Number(data.pendingCount || 0) === 0) {
-        setSyncWorkerMessage(tr("لا توجد عناصر بانتظار المزامنة", "No pending sync items"));
+      if (data.onlineConnected === true && processedCount === 0 && Number(data.pendingCount || 0) === 0) {
+        if (!silent) {
+          setSyncWorkerMessage(tr("لا توجد عناصر بانتظار المزامنة", "No pending sync items"));
+        }
+        await loadSyncQueueStatus();
+        return;
+      }
+
+      if (silent) {
+        if (processedCount > 0) {
+          setSyncWorkerMessage(tr(`تمت مزامنة ${processedCount} عنصر.`, `${processedCount} sync item(s) processed.`));
+        }
         await loadSyncQueueStatus();
         return;
       }
@@ -602,11 +623,28 @@ export default function DeveloperSettingsPage() {
       );
       await loadSyncQueueStatus();
     } catch (err) {
-      setSyncWorkerMessage(err instanceof Error ? err.message : tr("تعذر تشغيل المزامنة", "Failed to run sync"));
+      if (!silent) {
+        setSyncWorkerMessage(err instanceof Error ? err.message : tr("تعذر تشغيل المزامنة", "Failed to run sync"));
+      }
     } finally {
+      syncWorkerRunningRef.current = false;
       setIsSyncWorkerRunning(false);
     }
   }
+
+  useEffect(() => {
+    if (!unlocked || !onlineDatabaseConnected) return;
+
+    const intervalId = window.setInterval(() => {
+      if (syncWorkerRunningRef.current) return;
+      if (typeof navigator !== "undefined" && navigator.onLine === false) return;
+      if (!onlineDatabaseConnected) return;
+
+      void runSyncWorkerNow({ silent: true });
+    }, AUTO_SYNC_INTERVAL_MS);
+
+    return () => window.clearInterval(intervalId);
+  }, [unlocked, onlineDatabaseConnected]);
 
   async function retryFailedSyncItems() {
     setSyncWorkerMessage("");
@@ -901,7 +939,7 @@ export default function DeveloperSettingsPage() {
                   <RefreshCw className={cn("h-3.5 w-3.5", isSyncQueueLoading && "animate-spin")} />
                   {tr("تحديث", "Refresh")}
                 </Button>
-                <Button type="button" size="sm" onClick={runSyncWorkerNow} disabled={isSyncWorkerRunning} className="gap-2">
+                <Button type="button" size="sm" onClick={() => void runSyncWorkerNow()} disabled={isSyncWorkerRunning} className="gap-2">
                   <RefreshCw className={cn("h-3.5 w-3.5", isSyncWorkerRunning && "animate-spin")} />
                   {isSyncWorkerRunning ? tr("جارٍ التشغيل...", "Running...") : tr("تشغيل المزامنة الآن", "Run sync now")}
                 </Button>
@@ -916,6 +954,9 @@ export default function DeveloperSettingsPage() {
                   <RefreshCw className={cn("h-3.5 w-3.5", isRetryingFailedSync && "animate-spin")} />
                   {isRetryingFailedSync ? tr("جارٍ الإعادة...", "Retrying...") : tr("إعادة محاولة الفاشلة", "Retry Failed")}
                 </Button>
+              </div>
+              <div className="mb-3 text-xs font-medium text-muted-foreground">
+                {tr("المزامنة التلقائية تعمل كل دقيقتين عند توفر الاتصال", "Auto sync runs every 2 minutes when connected")}
               </div>
               {syncWorkerMessage && (
                 <div className="mb-3 rounded-md border border-border bg-background px-3 py-2 text-sm text-muted-foreground">
