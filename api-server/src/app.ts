@@ -1,6 +1,8 @@
 import express, { type Express, type Request, type Response } from "express";
 import cors from "cors";
 import router from "./routes";
+import invoiceAttachmentsRouter from "./routes/invoice-attachments";
+import { requireAuth } from "./middleware/auth";
 import { ensureInvoiceAttachmentsTable } from "./utils/ensure-invoice-attachments-table";
 
 const app: Express = express();
@@ -56,6 +58,7 @@ app.get("/", (_req: Request, res: Response) => {
   res.status(200).send("🚀 Around The World Custom Clearance!");
 });
 
+app.use("/api", requireAuth, invoiceAttachmentsRouter);
 app.use("/api", router);
 
 export default app;
