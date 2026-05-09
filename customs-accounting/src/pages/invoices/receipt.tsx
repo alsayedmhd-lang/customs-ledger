@@ -235,7 +235,7 @@ const impExpValue =
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 print:bg-white" dir="rtl">
+    <div className="bg-gray-100 print:bg-white" dir="rtl">
       <style>{`
         @media print {
           @page {
@@ -247,26 +247,31 @@ const impExpValue =
             margin: 0 !important;
             padding: 0 !important;
             background: white !important;
-            height: 100%;
           }
 
           .print-page {
             width: 100% !important;
-            min-height: 100vh !important;
+            min-height: 287mm !important;
+            height: auto !important;
             background: white !important;
             margin: 0 !important;
             padding: 5mm !important;
             box-sizing: border-box;
             display: flex;
             flex-direction: column;
+            overflow: visible !important;
           }
 
           .print-content {
-            flex: 1;
+            flex: 1 1 auto;
+            min-height: 0;
           }
 
           .print-footer {
+            flex: 0 0 auto;
             margin-top: auto;
+            page-break-inside: avoid;
+            break-inside: avoid;
           }
         }
       `}</style>
