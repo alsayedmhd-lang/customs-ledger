@@ -1013,24 +1013,20 @@ export async function runSyncWorkerOnce(): Promise<{
     let client: any = null;
     const stats: SyncRunStats = { autoRestoredCount: 0 };
 
-    if (connectionString) {
-      try {
-        client = await createOnlineClient(connectionString);
-        onlineConnected = true;
-        console.log("Online database connection: Connected");
-      } catch (err) {
-        lastError = errorMessage(err);
-        console.warn("Online database connection: Disconnected", lastError);
+    if (!connectionString) {
+      lastError = "Online database connection string is not configured";
+      console.warn("Online database connection: Disconnected", lastError);
+      return { pendingCount: pending.length, processedCount: 0, onlineConnected: false, lastError, autoRestoredCount: stats.autoRestoredCount };
+    }
 
-        for (const row of pending) {
-          if (isSupportedSyncRow(row)) {
-            markRetrying(row);
-            markFailed(row, lastError);
-          }
-        }
-
-        return { pendingCount: pending.length, processedCount: 0, onlineConnected: false, lastError, autoRestoredCount: stats.autoRestoredCount };
-      }
+    try {
+      client = await createOnlineClient(connectionString);
+      onlineConnected = true;
+      console.log("Online database connection: Connected");
+    } catch (err) {
+      lastError = errorMessage(err);
+      console.warn("Online database connection: Disconnected", lastError);
+      return { pendingCount: pending.length, processedCount: 0, onlineConnected: false, lastError, autoRestoredCount: stats.autoRestoredCount };
     }
 
     try {
@@ -1041,10 +1037,6 @@ export async function runSyncWorkerOnce(): Promise<{
 
         try {
           markRetrying(row);
-
-          if (!client) {
-            throw new Error("Online database connection string is not configured");
-          }
 
           if (row.entityType === "invoice") {
             const invoice = getLocalInvoice(row.entityId);
