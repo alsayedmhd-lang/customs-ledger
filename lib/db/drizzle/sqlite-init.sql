@@ -123,6 +123,23 @@ CREATE TABLE IF NOT EXISTS invoice_items (
   total REAL NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS invoice_attachments (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  invoice_id INTEGER,
+  declaration_number TEXT NOT NULL,
+  declaration_base_number TEXT NOT NULL,
+  file_name TEXT NOT NULL,
+  stored_name TEXT NOT NULL,
+  relative_path TEXT NOT NULL,
+  mime_type TEXT,
+  file_size INTEGER,
+  category TEXT NOT NULL DEFAULT 'other',
+  storage_provider TEXT NOT NULL DEFAULT 'local',
+  created_by INTEGER,
+  created_at INTEGER NOT NULL,
+  deleted_at INTEGER
+);
+
 CREATE TABLE IF NOT EXISTS invoice_item_templates (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   description TEXT NOT NULL,

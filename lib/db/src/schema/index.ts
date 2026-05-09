@@ -10,6 +10,10 @@ export {
 } from "./invoices-sqlite";
 
 export {
+  invoiceAttachmentsTableSqlite as invoiceAttachmentsTable,
+} from "./invoice-attachments-sqlite";
+
+export {
   receiptsTableSqlite as receiptsTable,
 } from "./receipts-sqlite";
 
@@ -29,6 +33,8 @@ export {
 } from "./sync-queue-sqlite";
 
 export * from "./invoices-sqlite";
+
+export * from "./invoice-attachments-sqlite";
 
 export * from "./customer-ledger-sqlite";
 

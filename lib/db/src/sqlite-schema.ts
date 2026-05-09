@@ -21,6 +21,10 @@ export {
 } from "./schema/invoices-sqlite";
 
 export {
+  invoiceAttachmentsTableSqlite as invoiceAttachmentsTable,
+} from "./schema/invoice-attachments-sqlite";
+
+export {
   receiptsTableSqlite as receiptsTable,
 } from "./schema/receipts-sqlite";
 
