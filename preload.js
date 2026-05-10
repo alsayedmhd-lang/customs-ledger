@@ -13,6 +13,7 @@ window.addEventListener(
 
 contextBridge.exposeInMainWorld("electronAPI", {
   getAppVersion: () => ipcRenderer.invoke("app:get-version"),
+  analyzeDataRootMigration: () => ipcRenderer.invoke("data-root:analyze-migration"),
   openExternalFile: (relativePath) =>
     ipcRenderer.invoke("open-external-file", relativePath),
   selectAttachmentFile: () => ipcRenderer.invoke("attachments:select-file"),
