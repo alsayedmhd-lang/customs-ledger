@@ -226,6 +226,7 @@ function startBackend({ apiPath, serverFile, appDataDbPath }) {
 function resolveDataRoot() {
   const userDataPath = app.getPath("userData");
   const configPath = path.join(userDataPath, "storage-config.json");
+  const legacyDbPath = path.join(userDataPath, "local.db");
 
   let dataRoot = userDataPath;
 
@@ -236,6 +237,26 @@ function resolveDataRoot() {
 
       if (config && typeof config.dataRoot === "string" && config.dataRoot.trim()) {
         dataRoot = config.dataRoot.trim();
+      }
+    } else if (!fs.existsSync(legacyDbPath)) {
+      const bestDataRoot = detectBestDataDrive();
+
+      if (bestDataRoot) {
+        fs.mkdirSync(bestDataRoot, { recursive: true });
+
+        if (!fs.existsSync(userDataPath)) {
+          fs.mkdirSync(userDataPath, { recursive: true });
+        }
+
+        const storageConfig = {
+          dataRoot: bestDataRoot,
+          createdAt: new Date().toISOString(),
+          createdBy: "auto-first-run",
+          version: 1,
+        };
+
+        fs.writeFileSync(configPath, `${JSON.stringify(storageConfig, null, 2)}\n`, "utf8");
+        dataRoot = bestDataRoot;
       }
     }
   } catch (error) {
