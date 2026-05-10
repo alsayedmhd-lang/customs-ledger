@@ -263,6 +263,36 @@ function ensureDataRootFolders(dataRoot) {
   }
 }
 
+function detectBestDataDrive() {
+  const driveLetters = "DEFGHIJKLMNOPQRSTUVWXYZ";
+
+  for (const letter of driveLetters) {
+    const driveRoot = `${letter}:\\`;
+    const probePath = path.join(driveRoot, `.customs-ledger-write-test-${process.pid}-${Date.now()}`);
+
+    try {
+      if (!fs.existsSync(driveRoot)) {
+        continue;
+      }
+
+      fs.writeFileSync(probePath, "test");
+      fs.unlinkSync(probePath);
+
+      return path.join(driveRoot, "CustomsLedgerData");
+    } catch (error) {
+      try {
+        if (fs.existsSync(probePath)) {
+          fs.unlinkSync(probePath);
+        }
+      } catch (cleanupError) {
+        // Ignore cleanup errors while probing available data drives.
+      }
+    }
+  }
+
+  return null;
+}
+
 function getAttachmentsRoot() {
   return path.join(resolveDataRoot(), "attachments");
 }
