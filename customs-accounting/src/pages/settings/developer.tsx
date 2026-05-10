@@ -213,6 +213,21 @@ type BackupDirectoryResult =
       manifest: BackupManifest;
     }
   | { ok: false; error: string };
+type BackupVerificationResult =
+  | {
+      ok: true;
+      verified: true;
+      backupDir: string;
+      databaseSizeBytes: number;
+      manifest: BackupManifest;
+      warnings: string[];
+    }
+  | {
+      ok: false;
+      verified: false;
+      backupDir?: string;
+      error: string;
+    };
 type BoolKey = {
   [K in keyof DeveloperSettings]: DeveloperSettings[K] extends boolean ? K : never;
 }[keyof DeveloperSettings];
@@ -374,6 +389,7 @@ export default function DeveloperSettingsPage() {
   const [isBackupReadinessAnalyzing, setIsBackupReadinessAnalyzing] = useState(false);
   const [isBackupManifestGenerating, setIsBackupManifestGenerating] = useState(false);
   const [isBackupDirectoryCreating, setIsBackupDirectoryCreating] = useState(false);
+  const [isBackupVerifying, setIsBackupVerifying] = useState(false);
   const [onlineDatabaseConnected, setOnlineDatabaseConnected] = useState(false);
   const [savedMessage, setSavedMessage] = useState("");
   const [databaseMessage, setDatabaseMessage] = useState("");
@@ -382,6 +398,7 @@ export default function DeveloperSettingsPage() {
   const [backupReadinessAnalysis, setBackupReadinessAnalysis] = useState<BackupReadinessResult | null>(null);
   const [backupManifestResult, setBackupManifestResult] = useState<BackupManifestResult | null>(null);
   const [backupDirectoryResult, setBackupDirectoryResult] = useState<BackupDirectoryResult | null>(null);
+  const [backupVerificationResult, setBackupVerificationResult] = useState<BackupVerificationResult | null>(null);
   const [settings, setSettings] = useState<DeveloperSettings>(defaultSettings);
   const [syncQueueStatus, setSyncQueueStatus] = useState<SyncQueueStatus>({
     pending: 0,
@@ -1004,11 +1021,54 @@ export default function DeveloperSettingsPage() {
     }
   }
 
+  async function verifyLatestBackupDirectory() {
+    setIsBackupVerifying(true);
+    try {
+      if (!backupDirectoryResult?.ok) {
+        setBackupVerificationResult({
+          ok: false,
+          verified: false,
+          error: "No successful backup folder is available to verify",
+        });
+        return;
+      }
+
+      const api = (window as Window & {
+        electronAPI?: {
+          verifyBackupDirectory?: (backupDir: string) => Promise<BackupVerificationResult>;
+        };
+      }).electronAPI;
+
+      if (!api?.verifyBackupDirectory) {
+        setBackupVerificationResult({
+          ok: false,
+          verified: false,
+          backupDir: backupDirectoryResult.backupDir,
+          error: "Backup verification API is unavailable",
+        });
+        return;
+      }
+
+      const result = await api.verifyBackupDirectory(backupDirectoryResult.backupDir);
+      setBackupVerificationResult(result);
+    } catch (err) {
+      setBackupVerificationResult({
+        ok: false,
+        verified: false,
+        backupDir: backupDirectoryResult?.ok ? backupDirectoryResult.backupDir : undefined,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      setIsBackupVerifying(false);
+    }
+  }
+
   const setBool = (key: BoolKey, checked: boolean) => setSettings((current) => ({ ...current, [key]: checked }));
   const setText = (key: TextKey, value: string) => setSettings((current) => ({ ...current, [key]: value }));
   const dataStorageReport = dataStorageAnalysis?.ok ? dataStorageAnalysis.report : null;
   const backupReadinessReport = backupReadinessAnalysis?.ok ? backupReadinessAnalysis.report : null;
   const backupManifest = backupManifestResult?.ok ? backupManifestResult.manifest : null;
+  const backupVerificationWarningsCount = backupVerificationResult?.ok ? backupVerificationResult.warnings.length : null;
 
   if (!unlocked) {
     return (
@@ -1396,6 +1456,51 @@ export default function DeveloperSettingsPage() {
                   {backupManifestResult && !backupManifestResult.ok && (
                     <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
                       {backupManifestResult.error}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="rounded-2xl border border-border bg-background/70 p-4 shadow-sm">
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 text-sm font-bold text-foreground">
+                  <PackageCheck className="h-4 w-4 text-primary" />
+                  <span>Backup Verification</span>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={verifyLatestBackupDirectory}
+                  disabled={isBackupVerifying || !backupDirectoryResult?.ok}
+                  className="gap-2"
+                >
+                  <RefreshCw className={cn("h-3.5 w-3.5", isBackupVerifying && "animate-spin")} />
+                  {isBackupVerifying ? "Verifying..." : "Verify Latest Backup"}
+                </Button>
+              </div>
+
+              {backupVerificationResult && (
+                <div className="space-y-3">
+                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                    <InfoRow isAR={isAR} label="verified" value={backupVerificationResult.verified} />
+                    <InfoRow
+                      isAR={isAR}
+                      label="databaseSizeBytes"
+                      value={backupVerificationResult.ok ? backupVerificationResult.databaseSizeBytes : null}
+                    />
+                    <InfoRow isAR={isAR} label="backupDir" value={backupVerificationResult.backupDir} />
+                    <InfoRow isAR={isAR} label="warnings count" value={backupVerificationWarningsCount} />
+                  </div>
+
+                  {backupVerificationResult.ok && backupVerificationResult.verified ? (
+                    <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+                      Backup verified successfully.
+                    </div>
+                  ) : (
+                    <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                      {backupVerificationResult.error}
                     </div>
                   )}
                 </div>
