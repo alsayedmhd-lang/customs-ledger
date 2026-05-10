@@ -383,6 +383,79 @@ function analyzeDataRootMigration() {
   };
 }
 
+function analyzeBackupReadiness() {
+  const warnings = [];
+  const dataRoot = resolveDataRoot();
+  const databasePath = path.join(dataRoot, "local.db");
+  const backupsRoot = path.join(dataRoot, "backups");
+  const databaseExists = fs.existsSync(databasePath);
+  let databaseReadable = false;
+  let databaseSizeBytes = 0;
+  let backupsRootExists = false;
+  let backupsRootWritable = false;
+
+  if (databaseExists) {
+    try {
+      const databaseHandle = fs.openSync(databasePath, "r");
+      fs.closeSync(databaseHandle);
+      databaseReadable = true;
+    } catch (error) {
+      warnings.push(`Database is not readable: ${error?.message || error}`);
+    }
+
+    try {
+      databaseSizeBytes = fs.statSync(databasePath).size;
+    } catch (error) {
+      warnings.push(`Could not read database size: ${error?.message || error}`);
+    }
+  } else {
+    warnings.push("Database file does not exist");
+  }
+
+  try {
+    if (!fs.existsSync(backupsRoot)) {
+      fs.mkdirSync(backupsRoot, { recursive: true });
+    }
+
+    backupsRootExists = fs.existsSync(backupsRoot);
+  } catch (error) {
+    warnings.push(`Could not create backups root: ${error?.message || error}`);
+  }
+
+  const probePath = path.join(backupsRoot, `.customs-ledger-backup-test-${process.pid}-${Date.now()}`);
+
+  try {
+    if (backupsRootExists) {
+      fs.writeFileSync(probePath, "test");
+      fs.unlinkSync(probePath);
+      backupsRootWritable = true;
+    }
+  } catch (error) {
+    warnings.push(`Backups root is not writable: ${error?.message || error}`);
+
+    try {
+      if (fs.existsSync(probePath)) {
+        fs.unlinkSync(probePath);
+      }
+    } catch (cleanupError) {
+      warnings.push(`Failed to clean up backup write test: ${cleanupError?.message || cleanupError}`);
+    }
+  }
+
+  return {
+    ok: databaseExists && databaseReadable && backupsRootWritable,
+    dataRoot,
+    databasePath,
+    databaseExists,
+    databaseReadable,
+    databaseSizeBytes,
+    backupsRoot,
+    backupsRootExists,
+    backupsRootWritable,
+    warnings,
+  };
+}
+
 function getAttachmentsRoot() {
   return path.join(resolveDataRoot(), "attachments");
 }
@@ -570,6 +643,20 @@ ipcMain.handle("data-root:analyze-migration", async () => {
     return {
       ok: true,
       report: analyzeDataRootMigration(),
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error?.message || String(error),
+    };
+  }
+});
+
+ipcMain.handle("backup:analyze-readiness", async () => {
+  try {
+    return {
+      ok: true,
+      report: analyzeBackupReadiness(),
     };
   } catch (error) {
     return {
