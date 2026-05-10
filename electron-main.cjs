@@ -247,7 +247,20 @@ function resolveDataRoot() {
     fs.mkdirSync(dataRoot, { recursive: true });
   }
 
+  ensureDataRootFolders(dataRoot);
+
   return dataRoot;
+}
+
+function ensureDataRootFolders(dataRoot) {
+  const folders = ["database", "attachments", "backups", "license", "logs", "config"];
+
+  for (const folder of folders) {
+    const folderPath = path.join(dataRoot, folder);
+    if (!fs.existsSync(folderPath)) {
+      fs.mkdirSync(folderPath, { recursive: true });
+    }
+  }
 }
 
 function getAttachmentsRoot() {
