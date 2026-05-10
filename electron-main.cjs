@@ -314,6 +314,75 @@ function detectBestDataDrive() {
   return null;
 }
 
+function analyzeDataRootMigration() {
+  const sourceRoot = app.getPath("userData");
+  const targetRoot = detectBestDataDrive();
+  const warnings = [];
+  let targetWritable = false;
+
+  const items = [
+    { name: "local.db", type: "file" },
+    { name: "attachments", type: "folder" },
+    { name: "backups", type: "folder" },
+    { name: "license", type: "folder" },
+    { name: "logs", type: "folder" },
+    { name: "config", type: "folder" },
+  ].map((item) => {
+    const itemPath = path.join(sourceRoot, item.name);
+
+    return {
+      name: item.name,
+      path: itemPath,
+      exists: fs.existsSync(itemPath),
+      type: item.type,
+    };
+  });
+
+  if (!targetRoot) {
+    warnings.push("No suitable target drive detected");
+
+    return {
+      canAnalyze: true,
+      sourceRoot,
+      targetRoot: null,
+      targetWritable,
+      items,
+      warnings,
+    };
+  }
+
+  const probePath = path.join(targetRoot, `.customs-ledger-migration-test-${process.pid}-${Date.now()}`);
+
+  try {
+    if (!fs.existsSync(targetRoot)) {
+      fs.mkdirSync(targetRoot, { recursive: true });
+    }
+
+    fs.writeFileSync(probePath, "test");
+    fs.unlinkSync(probePath);
+    targetWritable = true;
+  } catch (error) {
+    warnings.push(`Target root is not writable: ${error?.message || error}`);
+
+    try {
+      if (fs.existsSync(probePath)) {
+        fs.unlinkSync(probePath);
+      }
+    } catch (cleanupError) {
+      warnings.push(`Failed to clean up target write test: ${cleanupError?.message || cleanupError}`);
+    }
+  }
+
+  return {
+    canAnalyze: true,
+    sourceRoot,
+    targetRoot,
+    targetWritable,
+    items,
+    warnings,
+  };
+}
+
 function getAttachmentsRoot() {
   return path.join(resolveDataRoot(), "attachments");
 }
