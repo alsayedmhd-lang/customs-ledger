@@ -225,12 +225,29 @@ function startBackend({ apiPath, serverFile, appDataDbPath }) {
 
 function resolveDataRoot() {
   const userDataPath = app.getPath("userData");
+  const configPath = path.join(userDataPath, "storage-config.json");
 
-  if (!fs.existsSync(userDataPath)) {
-    fs.mkdirSync(userDataPath, { recursive: true });
+  let dataRoot = userDataPath;
+
+  try {
+    if (fs.existsSync(configPath)) {
+      const raw = fs.readFileSync(configPath, "utf8");
+      const config = JSON.parse(raw);
+
+      if (config && typeof config.dataRoot === "string" && config.dataRoot.trim()) {
+        dataRoot = config.dataRoot.trim();
+      }
+    }
+  } catch (error) {
+    console.warn("[DATA_ROOT] Failed to read storage-config.json, falling back to userData", error);
+    dataRoot = userDataPath;
   }
 
-  return userDataPath;
+  if (!fs.existsSync(dataRoot)) {
+    fs.mkdirSync(dataRoot, { recursive: true });
+  }
+
+  return dataRoot;
 }
 
 function getAttachmentsRoot() {
