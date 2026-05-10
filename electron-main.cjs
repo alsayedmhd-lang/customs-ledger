@@ -526,10 +526,34 @@ function createBackupDirectory() {
   const manifestPath = path.join(backupDir, "manifest.json");
   fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
 
+  const sourceDbPath = manifest.database.path;
+  const targetDbPath = path.join(backupDir, "local.db");
+  let databasePath = null;
+  let databaseCopied = false;
+  let databaseSizeBytes = 0;
+
+  if (manifest.database.exists) {
+    fs.copyFileSync(sourceDbPath, targetDbPath);
+
+    const sourceSizeBytes = fs.statSync(sourceDbPath).size;
+    const targetSizeBytes = fs.statSync(targetDbPath).size;
+
+    if (sourceSizeBytes !== targetSizeBytes) {
+      throw new Error("Database backup verification failed: size mismatch");
+    }
+
+    databasePath = targetDbPath;
+    databaseCopied = true;
+    databaseSizeBytes = targetSizeBytes;
+  }
+
   return {
     ok: true,
     backupDir,
     manifestPath,
+    databasePath,
+    databaseCopied,
+    databaseSizeBytes,
     manifest,
   };
 }
