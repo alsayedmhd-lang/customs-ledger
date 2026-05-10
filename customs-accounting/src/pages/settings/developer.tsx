@@ -205,6 +205,14 @@ type BackupManifest = {
 type BackupManifestResult =
   | { ok: true; manifest: BackupManifest }
   | { ok: false; error: string };
+type BackupDirectoryResult =
+  | {
+      ok: true;
+      backupDir: string;
+      manifestPath: string;
+      manifest: BackupManifest;
+    }
+  | { ok: false; error: string };
 type BoolKey = {
   [K in keyof DeveloperSettings]: DeveloperSettings[K] extends boolean ? K : never;
 }[keyof DeveloperSettings];
@@ -365,6 +373,7 @@ export default function DeveloperSettingsPage() {
   const [isDataStorageAnalyzing, setIsDataStorageAnalyzing] = useState(false);
   const [isBackupReadinessAnalyzing, setIsBackupReadinessAnalyzing] = useState(false);
   const [isBackupManifestGenerating, setIsBackupManifestGenerating] = useState(false);
+  const [isBackupDirectoryCreating, setIsBackupDirectoryCreating] = useState(false);
   const [onlineDatabaseConnected, setOnlineDatabaseConnected] = useState(false);
   const [savedMessage, setSavedMessage] = useState("");
   const [databaseMessage, setDatabaseMessage] = useState("");
@@ -372,6 +381,7 @@ export default function DeveloperSettingsPage() {
   const [dataStorageAnalysis, setDataStorageAnalysis] = useState<DataStorageAnalysisResult | null>(null);
   const [backupReadinessAnalysis, setBackupReadinessAnalysis] = useState<BackupReadinessResult | null>(null);
   const [backupManifestResult, setBackupManifestResult] = useState<BackupManifestResult | null>(null);
+  const [backupDirectoryResult, setBackupDirectoryResult] = useState<BackupDirectoryResult | null>(null);
   const [settings, setSettings] = useState<DeveloperSettings>(defaultSettings);
   const [syncQueueStatus, setSyncQueueStatus] = useState<SyncQueueStatus>({
     pending: 0,
@@ -968,6 +978,32 @@ export default function DeveloperSettingsPage() {
     }
   }
 
+  async function createBackupDirectory() {
+    setIsBackupDirectoryCreating(true);
+    try {
+      const api = (window as Window & {
+        electronAPI?: {
+          createBackupDirectory?: () => Promise<BackupDirectoryResult>;
+        };
+      }).electronAPI;
+
+      if (!api?.createBackupDirectory) {
+        setBackupDirectoryResult({ ok: false, error: "Backup directory API is unavailable" });
+        return;
+      }
+
+      const result = await api.createBackupDirectory();
+      setBackupDirectoryResult(result);
+    } catch (err) {
+      setBackupDirectoryResult({
+        ok: false,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      setIsBackupDirectoryCreating(false);
+    }
+  }
+
   const setBool = (key: BoolKey, checked: boolean) => setSettings((current) => ({ ...current, [key]: checked }));
   const setText = (key: TextKey, value: string) => setSettings((current) => ({ ...current, [key]: value }));
   const dataStorageReport = dataStorageAnalysis?.ok ? dataStorageAnalysis.report : null;
@@ -1307,29 +1343,57 @@ export default function DeveloperSettingsPage() {
                   <FileText className="h-4 w-4 text-primary" />
                   <span>Backup Manifest</span>
                 </div>
-                <Button type="button" variant="outline" size="sm" onClick={generateBackupManifest} disabled={isBackupManifestGenerating} className="gap-2">
-                  <RefreshCw className={cn("h-3.5 w-3.5", isBackupManifestGenerating && "animate-spin")} />
-                  {isBackupManifestGenerating ? "Generating..." : "Generate Backup Manifest"}
-                </Button>
+                <div className="flex flex-wrap justify-end gap-2">
+                  <Button type="button" variant="outline" size="sm" onClick={generateBackupManifest} disabled={isBackupManifestGenerating} className="gap-2">
+                    <RefreshCw className={cn("h-3.5 w-3.5", isBackupManifestGenerating && "animate-spin")} />
+                    {isBackupManifestGenerating ? "Generating..." : "Generate Backup Manifest"}
+                  </Button>
+                  <Button type="button" variant="outline" size="sm" onClick={createBackupDirectory} disabled={isBackupDirectoryCreating} className="gap-2">
+                    <FileText className="h-3.5 w-3.5" />
+                    {isBackupDirectoryCreating ? "Creating..." : "Create Backup Folder"}
+                  </Button>
+                </div>
               </div>
 
-              {backupManifestResult && (
+              {(backupManifestResult || backupDirectoryResult) && (
                 <div className="space-y-3">
-                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                    <InfoRow isAR={isAR} label="backupId" value={backupManifest?.backupId} />
-                    <InfoRow isAR={isAR} label="createdAt" value={backupManifest?.createdAt} />
-                    <InfoRow isAR={isAR} label="appVersion" value={backupManifest?.appVersion} />
-                    <InfoRow isAR={isAR} label="platform" value={backupManifest?.platform} />
-                    <InfoRow isAR={isAR} label="dataRoot" value={backupManifest?.dataRoot} />
-                    <InfoRow isAR={isAR} label="database.path" value={backupManifest?.database.path} />
-                    <InfoRow isAR={isAR} label="database.exists" value={backupManifest?.database.exists} />
-                    <InfoRow isAR={isAR} label="database.sizeBytes" value={backupManifest?.database.sizeBytes} />
-                    <InfoRow isAR={isAR} label="attachments.exists" value={backupManifest?.attachments.exists} />
-                    <InfoRow isAR={isAR} label="backup.type" value={backupManifest?.backup.type} />
-                    <InfoRow isAR={isAR} label="backup.compression" value={backupManifest?.backup.compression} />
-                  </div>
+                  {backupManifestResult && (
+                    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                      <InfoRow isAR={isAR} label="backupId" value={backupManifest?.backupId} />
+                      <InfoRow isAR={isAR} label="createdAt" value={backupManifest?.createdAt} />
+                      <InfoRow isAR={isAR} label="appVersion" value={backupManifest?.appVersion} />
+                      <InfoRow isAR={isAR} label="platform" value={backupManifest?.platform} />
+                      <InfoRow isAR={isAR} label="dataRoot" value={backupManifest?.dataRoot} />
+                      <InfoRow isAR={isAR} label="database.path" value={backupManifest?.database.path} />
+                      <InfoRow isAR={isAR} label="database.exists" value={backupManifest?.database.exists} />
+                      <InfoRow isAR={isAR} label="database.sizeBytes" value={backupManifest?.database.sizeBytes} />
+                      <InfoRow isAR={isAR} label="attachments.exists" value={backupManifest?.attachments.exists} />
+                      <InfoRow isAR={isAR} label="backup.type" value={backupManifest?.backup.type} />
+                      <InfoRow isAR={isAR} label="backup.compression" value={backupManifest?.backup.compression} />
+                    </div>
+                  )}
 
-                  {!backupManifestResult.ok && (
+                  {backupDirectoryResult && (
+                    <div className="space-y-3">
+                      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                        <InfoRow isAR={isAR} label="ok" value={backupDirectoryResult.ok} />
+                        <InfoRow isAR={isAR} label="backupDir" value={backupDirectoryResult.ok ? backupDirectoryResult.backupDir : null} />
+                        <InfoRow isAR={isAR} label="manifestPath" value={backupDirectoryResult.ok ? backupDirectoryResult.manifestPath : null} />
+                      </div>
+
+                      {backupDirectoryResult.ok ? (
+                        <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+                          Backup folder created successfully.
+                        </div>
+                      ) : (
+                        <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                          {backupDirectoryResult.error}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {backupManifestResult && !backupManifestResult.ok && (
                     <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
                       {backupManifestResult.error}
                     </div>
