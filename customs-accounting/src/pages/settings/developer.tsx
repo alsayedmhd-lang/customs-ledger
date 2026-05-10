@@ -151,6 +151,23 @@ type ReadinessStatus = {
   apiStatus: "connected" | "error";
   onlineStatus: "online" | "offline";
 };
+type DataStorageAnalysisItem = {
+  name: string;
+  path: string;
+  exists: boolean;
+  type: "file" | "folder";
+};
+type DataStorageAnalysisReport = {
+  canAnalyze: boolean;
+  sourceRoot: string;
+  targetRoot: string | null;
+  targetWritable: boolean;
+  items: DataStorageAnalysisItem[];
+  warnings: string[];
+};
+type DataStorageAnalysisResult =
+  | { ok: true; report: DataStorageAnalysisReport }
+  | { ok: false; error: string };
 type BoolKey = {
   [K in keyof DeveloperSettings]: DeveloperSettings[K] extends boolean ? K : never;
 }[keyof DeveloperSettings];
@@ -308,10 +325,12 @@ export default function DeveloperSettingsPage() {
   const [isSyncWorkerRunning, setIsSyncWorkerRunning] = useState(false);
   const [isRetryingFailedSync, setIsRetryingFailedSync] = useState(false);
   const [isReadinessLoading, setIsReadinessLoading] = useState(false);
+  const [isDataStorageAnalyzing, setIsDataStorageAnalyzing] = useState(false);
   const [onlineDatabaseConnected, setOnlineDatabaseConnected] = useState(false);
   const [savedMessage, setSavedMessage] = useState("");
   const [databaseMessage, setDatabaseMessage] = useState("");
   const [syncWorkerMessage, setSyncWorkerMessage] = useState("");
+  const [dataStorageAnalysis, setDataStorageAnalysis] = useState<DataStorageAnalysisResult | null>(null);
   const [settings, setSettings] = useState<DeveloperSettings>(defaultSettings);
   const [syncQueueStatus, setSyncQueueStatus] = useState<SyncQueueStatus>({
     pending: 0,
@@ -830,8 +849,35 @@ export default function DeveloperSettingsPage() {
     setDatabaseMessage(tr("هذا الزر لا ينشئ قاعدة فعلية حالياً", "This button does not create an actual database right now"));
   }
 
+  async function analyzeDataStorage() {
+    setIsDataStorageAnalyzing(true);
+    try {
+      const api = (window as Window & {
+        electronAPI?: {
+          analyzeDataRootMigration?: () => Promise<DataStorageAnalysisResult>;
+        };
+      }).electronAPI;
+
+      if (!api?.analyzeDataRootMigration) {
+        setDataStorageAnalysis({ ok: false, error: "Data storage analysis API is unavailable" });
+        return;
+      }
+
+      const result = await api.analyzeDataRootMigration();
+      setDataStorageAnalysis(result);
+    } catch (err) {
+      setDataStorageAnalysis({
+        ok: false,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      setIsDataStorageAnalyzing(false);
+    }
+  }
+
   const setBool = (key: BoolKey, checked: boolean) => setSettings((current) => ({ ...current, [key]: checked }));
   const setText = (key: TextKey, value: string) => setSettings((current) => ({ ...current, [key]: value }));
+  const dataStorageReport = dataStorageAnalysis?.ok ? dataStorageAnalysis.report : null;
 
   if (!unlocked) {
     return (
@@ -1041,6 +1087,74 @@ export default function DeveloperSettingsPage() {
               <Button type="button" variant="outline" onClick={createSqlFile} className="gap-2"><FileText className="h-4 w-4" />{tr("إنشاء ملف SQL", "Create SQL file")}</Button>
             </div>
             {databaseMessage && <div className="text-sm text-muted-foreground">{databaseMessage}</div>}
+
+            <div className="rounded-2xl border border-border bg-background/70 p-4 shadow-sm">
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 text-sm font-bold text-foreground">
+                  <Database className="h-4 w-4 text-primary" />
+                  <span>Data Storage Analysis</span>
+                </div>
+                <Button type="button" variant="outline" size="sm" onClick={analyzeDataStorage} disabled={isDataStorageAnalyzing} className="gap-2">
+                  <RefreshCw className={cn("h-3.5 w-3.5", isDataStorageAnalyzing && "animate-spin")} />
+                  {isDataStorageAnalyzing ? "Analyzing..." : "Analyze Data Storage"}
+                </Button>
+              </div>
+
+              {dataStorageAnalysis && (
+                <div className="space-y-3">
+                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                    <InfoRow isAR={isAR} label="ok" value={dataStorageAnalysis.ok} />
+                    <InfoRow isAR={isAR} label="sourceRoot" value={dataStorageReport?.sourceRoot} />
+                    <InfoRow isAR={isAR} label="targetRoot" value={dataStorageReport?.targetRoot} />
+                    <InfoRow isAR={isAR} label="targetWritable" value={dataStorageReport?.targetWritable} />
+                  </div>
+
+                  {!dataStorageAnalysis.ok && (
+                    <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                      {dataStorageAnalysis.error}
+                    </div>
+                  )}
+
+                  {dataStorageReport && (
+                    <>
+                      <div className="rounded-md border border-border bg-background px-3 py-2 text-sm">
+                        <div className="mb-2 text-xs font-semibold text-muted-foreground">warnings</div>
+                        {dataStorageReport.warnings.length > 0 ? (
+                          <ul className="list-inside list-disc space-y-1">
+                            {dataStorageReport.warnings.map((warning) => (
+                              <li key={warning}>{warning}</li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <div className="text-muted-foreground">None</div>
+                        )}
+                      </div>
+
+                      <div className="overflow-x-auto rounded-md border border-border">
+                        <table className="w-full min-w-[520px] text-left text-xs">
+                          <thead className="bg-muted/50 text-muted-foreground">
+                            <tr>
+                              <th className="px-3 py-2 font-semibold">name</th>
+                              <th className="px-3 py-2 font-semibold">type</th>
+                              <th className="px-3 py-2 font-semibold">exists</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {dataStorageReport.items.map((item) => (
+                              <tr key={item.name} className="border-t border-border">
+                                <td className="px-3 py-2 font-medium">{item.name}</td>
+                                <td className="px-3 py-2">{item.type}</td>
+                                <td className="px-3 py-2">{item.exists ? "true" : "false"}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
 
             <div className="rounded-2xl border border-border bg-background/70 p-4 shadow-sm">
               <div className="mb-4 flex items-center gap-2 text-sm font-bold text-foreground">
