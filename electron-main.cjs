@@ -510,6 +510,30 @@ function createBackupManifest() {
   };
 }
 
+function createBackupDirectory() {
+  const manifest = createBackupManifest();
+  const dataRoot = manifest.dataRoot;
+  const backupsRoot = path.join(dataRoot, "backups");
+
+  if (!fs.existsSync(backupsRoot)) {
+    fs.mkdirSync(backupsRoot, { recursive: true });
+  }
+
+  const folderName = `backup-${manifest.createdAt.replace(/[:.]/g, "-")}-${manifest.backupId}`;
+  const backupDir = path.join(backupsRoot, folderName);
+  fs.mkdirSync(backupDir, { recursive: true });
+
+  const manifestPath = path.join(backupDir, "manifest.json");
+  fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
+
+  return {
+    ok: true,
+    backupDir,
+    manifestPath,
+    manifest,
+  };
+}
+
 function getAttachmentsRoot() {
   return path.join(resolveDataRoot(), "attachments");
 }
@@ -726,6 +750,17 @@ ipcMain.handle("backup:create-manifest", async () => {
       ok: true,
       manifest: createBackupManifest(),
     };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error?.message || String(error),
+    };
+  }
+});
+
+ipcMain.handle("backup:create-directory", async () => {
+  try {
+    return createBackupDirectory();
   } catch (error) {
     return {
       ok: false,
