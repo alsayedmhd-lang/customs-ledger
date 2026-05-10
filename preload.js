@@ -17,6 +17,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
   analyzeBackupReadiness: () => ipcRenderer.invoke("backup:analyze-readiness"),
   createBackupManifest: () => ipcRenderer.invoke("backup:create-manifest"),
   createBackupDirectory: () => ipcRenderer.invoke("backup:create-directory"),
+  verifyBackupDirectory: (backupDir) =>
+    ipcRenderer.invoke("backup:verify-directory", backupDir),
   openExternalFile: (relativePath) =>
     ipcRenderer.invoke("open-external-file", relativePath),
   selectAttachmentFile: () => ipcRenderer.invoke("attachments:select-file"),
