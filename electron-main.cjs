@@ -101,10 +101,6 @@ function safeRelativePath(relativePath) {
   return normalized;
 }
 
-function getAttachmentsRoot() {
-  return path.join(app.getPath("userData"), "attachments");
-}
-
 function isPathInside(parentPath, childPath) {
   const relative = path.relative(parentPath, childPath);
   return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
@@ -227,12 +223,26 @@ function startBackend({ apiPath, serverFile, appDataDbPath }) {
   });
 }
 
+function resolveDataRoot() {
+  const userDataPath = app.getPath("userData");
+
+  if (!fs.existsSync(userDataPath)) {
+    fs.mkdirSync(userDataPath, { recursive: true });
+  }
+
+  return userDataPath;
+}
+
+function getAttachmentsRoot() {
+  return path.join(resolveDataRoot(), "attachments");
+}
+
 function createWindow() {
   const basePath = process.resourcesPath;
   const apiPath = path.join(basePath, "api-server");
   const serverFile = path.join(apiPath, "dist", "index.cjs");
   const starterDbPath = path.join(apiPath, "lib", "db", "local.db");
-  const userDataPath = app.getPath("userData");
+  const userDataPath = resolveDataRoot();
   const appDataDbPath = path.join(userDataPath, "local.db");
 
   console.log("AppData DB path:", appDataDbPath);
