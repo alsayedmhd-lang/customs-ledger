@@ -558,6 +558,65 @@ function createBackupDirectory() {
   };
 }
 
+function verifyBackupDirectory(backupDir) {
+  try {
+    if (!backupDir) {
+      throw new Error("Backup directory is required");
+    }
+
+    if (!fs.existsSync(backupDir)) {
+      throw new Error("Backup directory not found");
+    }
+
+    const manifestPath = path.join(backupDir, "manifest.json");
+    const databasePath = path.join(backupDir, "local.db");
+
+    if (!fs.existsSync(manifestPath)) {
+      throw new Error("Backup manifest not found");
+    }
+
+    if (!fs.existsSync(databasePath)) {
+      throw new Error("Backup database not found");
+    }
+
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+
+    if (!manifest.backup) {
+      throw new Error("Backup manifest is missing backup metadata");
+    }
+
+    if (!manifest.createdAt) {
+      throw new Error("Backup manifest is missing createdAt");
+    }
+
+    if (manifest.backup.formatVersion !== 1) {
+      throw new Error("Unsupported backup manifest formatVersion");
+    }
+
+    const databaseSizeBytes = fs.statSync(databasePath).size;
+
+    if (databaseSizeBytes <= 0) {
+      throw new Error("Backup database is empty");
+    }
+
+    return {
+      ok: true,
+      verified: true,
+      backupDir,
+      databaseSizeBytes,
+      manifest,
+      warnings: [],
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      verified: false,
+      backupDir,
+      error: error?.message || String(error),
+    };
+  }
+}
+
 function getAttachmentsRoot() {
   return path.join(resolveDataRoot(), "attachments");
 }
@@ -788,6 +847,19 @@ ipcMain.handle("backup:create-directory", async () => {
   } catch (error) {
     return {
       ok: false,
+      error: error?.message || String(error),
+    };
+  }
+});
+
+ipcMain.handle("backup:verify-directory", async (_event, backupDir) => {
+  try {
+    return verifyBackupDirectory(backupDir);
+  } catch (error) {
+    return {
+      ok: false,
+      verified: false,
+      backupDir,
       error: error?.message || String(error),
     };
   }
