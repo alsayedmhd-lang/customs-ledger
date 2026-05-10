@@ -456,6 +456,60 @@ function analyzeBackupReadiness() {
   };
 }
 
+function createBackupManifest() {
+  const dataRoot = resolveDataRoot();
+  const timestamp = new Date().toISOString();
+  const backupId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const databasePath = path.join(dataRoot, "local.db");
+  const attachmentsPath = path.join(dataRoot, "attachments");
+  const backupsRoot = path.join(dataRoot, "backups");
+  let databaseExists = false;
+  let databaseSizeBytes = 0;
+  let attachmentsExists = false;
+
+  try {
+    databaseExists = fs.existsSync(databasePath);
+  } catch (error) {
+    databaseExists = false;
+  }
+
+  if (databaseExists) {
+    try {
+      databaseSizeBytes = fs.statSync(databasePath).size;
+    } catch (error) {
+      databaseSizeBytes = 0;
+    }
+  }
+
+  try {
+    attachmentsExists = fs.existsSync(attachmentsPath);
+  } catch (error) {
+    attachmentsExists = false;
+  }
+
+  return {
+    backupId,
+    createdAt: timestamp,
+    appVersion: app.getVersion(),
+    platform: process.platform,
+    dataRoot,
+    database: {
+      path: databasePath,
+      exists: databaseExists,
+      sizeBytes: databaseSizeBytes,
+    },
+    attachments: {
+      path: attachmentsPath,
+      exists: attachmentsExists,
+    },
+    backup: {
+      formatVersion: 1,
+      type: "full",
+      compression: "none",
+    },
+  };
+}
+
 function getAttachmentsRoot() {
   return path.join(resolveDataRoot(), "attachments");
 }
@@ -657,6 +711,20 @@ ipcMain.handle("backup:analyze-readiness", async () => {
     return {
       ok: true,
       report: analyzeBackupReadiness(),
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error?.message || String(error),
+    };
+  }
+});
+
+ipcMain.handle("backup:create-manifest", async () => {
+  try {
+    return {
+      ok: true,
+      manifest: createBackupManifest(),
     };
   } catch (error) {
     return {
