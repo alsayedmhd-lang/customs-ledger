@@ -168,6 +168,21 @@ type DataStorageAnalysisReport = {
 type DataStorageAnalysisResult =
   | { ok: true; report: DataStorageAnalysisReport }
   | { ok: false; error: string };
+type BackupReadinessReport = {
+  ok: boolean;
+  dataRoot: string;
+  databasePath: string;
+  databaseExists: boolean;
+  databaseReadable: boolean;
+  databaseSizeBytes: number;
+  backupsRoot: string;
+  backupsRootExists: boolean;
+  backupsRootWritable: boolean;
+  warnings: string[];
+};
+type BackupReadinessResult =
+  | { ok: true; report: BackupReadinessReport }
+  | { ok: false; error: string };
 type BoolKey = {
   [K in keyof DeveloperSettings]: DeveloperSettings[K] extends boolean ? K : never;
 }[keyof DeveloperSettings];
@@ -326,11 +341,13 @@ export default function DeveloperSettingsPage() {
   const [isRetryingFailedSync, setIsRetryingFailedSync] = useState(false);
   const [isReadinessLoading, setIsReadinessLoading] = useState(false);
   const [isDataStorageAnalyzing, setIsDataStorageAnalyzing] = useState(false);
+  const [isBackupReadinessAnalyzing, setIsBackupReadinessAnalyzing] = useState(false);
   const [onlineDatabaseConnected, setOnlineDatabaseConnected] = useState(false);
   const [savedMessage, setSavedMessage] = useState("");
   const [databaseMessage, setDatabaseMessage] = useState("");
   const [syncWorkerMessage, setSyncWorkerMessage] = useState("");
   const [dataStorageAnalysis, setDataStorageAnalysis] = useState<DataStorageAnalysisResult | null>(null);
+  const [backupReadinessAnalysis, setBackupReadinessAnalysis] = useState<BackupReadinessResult | null>(null);
   const [settings, setSettings] = useState<DeveloperSettings>(defaultSettings);
   const [syncQueueStatus, setSyncQueueStatus] = useState<SyncQueueStatus>({
     pending: 0,
@@ -875,9 +892,36 @@ export default function DeveloperSettingsPage() {
     }
   }
 
+  async function analyzeBackupReadiness() {
+    setIsBackupReadinessAnalyzing(true);
+    try {
+      const api = (window as Window & {
+        electronAPI?: {
+          analyzeBackupReadiness?: () => Promise<BackupReadinessResult>;
+        };
+      }).electronAPI;
+
+      if (!api?.analyzeBackupReadiness) {
+        setBackupReadinessAnalysis({ ok: false, error: "Backup readiness API is unavailable" });
+        return;
+      }
+
+      const result = await api.analyzeBackupReadiness();
+      setBackupReadinessAnalysis(result);
+    } catch (err) {
+      setBackupReadinessAnalysis({
+        ok: false,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      setIsBackupReadinessAnalyzing(false);
+    }
+  }
+
   const setBool = (key: BoolKey, checked: boolean) => setSettings((current) => ({ ...current, [key]: checked }));
   const setText = (key: TextKey, value: string) => setSettings((current) => ({ ...current, [key]: value }));
   const dataStorageReport = dataStorageAnalysis?.ok ? dataStorageAnalysis.report : null;
+  const backupReadinessReport = backupReadinessAnalysis?.ok ? backupReadinessAnalysis.report : null;
 
   if (!unlocked) {
     return (
@@ -1151,6 +1195,56 @@ export default function DeveloperSettingsPage() {
                         </table>
                       </div>
                     </>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="rounded-2xl border border-border bg-background/70 p-4 shadow-sm">
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 text-sm font-bold text-foreground">
+                  <Database className="h-4 w-4 text-primary" />
+                  <span>Backup Readiness</span>
+                </div>
+                <Button type="button" variant="outline" size="sm" onClick={analyzeBackupReadiness} disabled={isBackupReadinessAnalyzing} className="gap-2">
+                  <RefreshCw className={cn("h-3.5 w-3.5", isBackupReadinessAnalyzing && "animate-spin")} />
+                  {isBackupReadinessAnalyzing ? "Analyzing..." : "Analyze Backup Readiness"}
+                </Button>
+              </div>
+
+              {backupReadinessAnalysis && (
+                <div className="space-y-3">
+                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                    <InfoRow isAR={isAR} label="ok" value={backupReadinessAnalysis.ok} />
+                    <InfoRow isAR={isAR} label="dataRoot" value={backupReadinessReport?.dataRoot} />
+                    <InfoRow isAR={isAR} label="databasePath" value={backupReadinessReport?.databasePath} />
+                    <InfoRow isAR={isAR} label="databaseExists" value={backupReadinessReport?.databaseExists} />
+                    <InfoRow isAR={isAR} label="databaseReadable" value={backupReadinessReport?.databaseReadable} />
+                    <InfoRow isAR={isAR} label="databaseSizeBytes" value={backupReadinessReport?.databaseSizeBytes} />
+                    <InfoRow isAR={isAR} label="backupsRoot" value={backupReadinessReport?.backupsRoot} />
+                    <InfoRow isAR={isAR} label="backupsRootExists" value={backupReadinessReport?.backupsRootExists} />
+                    <InfoRow isAR={isAR} label="backupsRootWritable" value={backupReadinessReport?.backupsRootWritable} />
+                  </div>
+
+                  {!backupReadinessAnalysis.ok && (
+                    <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                      {backupReadinessAnalysis.error}
+                    </div>
+                  )}
+
+                  {backupReadinessReport && (
+                    <div className="rounded-md border border-border bg-background px-3 py-2 text-sm">
+                      <div className="mb-2 text-xs font-semibold text-muted-foreground">warnings</div>
+                      {backupReadinessReport.warnings.length > 0 ? (
+                        <ul className="list-inside list-disc space-y-1">
+                          {backupReadinessReport.warnings.map((warning) => (
+                            <li key={warning}>{warning}</li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <div className="text-muted-foreground">None</div>
+                      )}
+                    </div>
                   )}
                 </div>
               )}
