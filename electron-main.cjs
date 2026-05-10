@@ -565,6 +565,20 @@ autoUpdater.on("error", (error) => {
 
 ipcMain.handle("app:get-version", () => app.getVersion());
 
+ipcMain.handle("data-root:analyze-migration", async () => {
+  try {
+    return {
+      ok: true,
+      report: analyzeDataRootMigration(),
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error?.message || String(error),
+    };
+  }
+});
+
 ipcMain.handle("open-external-file", async (_event, relativePath) => {
   try {
     const filePath = resolveExternalFilePath(relativePath);
