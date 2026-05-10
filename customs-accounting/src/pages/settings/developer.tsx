@@ -927,7 +927,7 @@ export default function DeveloperSettingsPage() {
       }).electronAPI;
 
       if (!api?.analyzeDataRootMigration) {
-        setDataStorageAnalysis({ ok: false, error: "Data storage analysis API is unavailable" });
+        setDataStorageAnalysis({ ok: false, error: isAR ? "واجهة تحليل تخزين البيانات غير متاحة" : "Data storage analysis API is unavailable" });
         return;
       }
 
@@ -953,7 +953,7 @@ export default function DeveloperSettingsPage() {
       }).electronAPI;
 
       if (!api?.analyzeBackupReadiness) {
-        setBackupReadinessAnalysis({ ok: false, error: "Backup readiness API is unavailable" });
+        setBackupReadinessAnalysis({ ok: false, error: isAR ? "واجهة جاهزية النسخ الاحتياطي غير متاحة" : "Backup readiness API is unavailable" });
         return;
       }
 
@@ -979,7 +979,7 @@ export default function DeveloperSettingsPage() {
       }).electronAPI;
 
       if (!api?.createBackupManifest) {
-        setBackupManifestResult({ ok: false, error: "Backup manifest API is unavailable" });
+        setBackupManifestResult({ ok: false, error: isAR ? "واجهة ملف وصف النسخة الاحتياطية غير متاحة" : "Backup manifest API is unavailable" });
         return;
       }
 
@@ -1005,7 +1005,7 @@ export default function DeveloperSettingsPage() {
       }).electronAPI;
 
       if (!api?.createBackupDirectory) {
-        setBackupDirectoryResult({ ok: false, error: "Backup directory API is unavailable" });
+        setBackupDirectoryResult({ ok: false, error: isAR ? "واجهة مجلد النسخة الاحتياطية غير متاحة" : "Backup directory API is unavailable" });
         return;
       }
 
@@ -1028,7 +1028,7 @@ export default function DeveloperSettingsPage() {
         setBackupVerificationResult({
           ok: false,
           verified: false,
-          error: "No successful backup folder is available to verify",
+          error: isAR ? "لا يوجد مجلد نسخة احتياطية ناجح للتحقق منه" : "No successful backup folder is available to verify",
         });
         return;
       }
@@ -1044,7 +1044,7 @@ export default function DeveloperSettingsPage() {
           ok: false,
           verified: false,
           backupDir: backupDirectoryResult.backupDir,
-          error: "Backup verification API is unavailable",
+          error: isAR ? "واجهة التحقق من النسخة الاحتياطية غير متاحة" : "Backup verification API is unavailable",
         });
         return;
       }
@@ -1283,21 +1283,21 @@ export default function DeveloperSettingsPage() {
               <div className="mb-4 flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2 text-sm font-bold text-foreground">
                   <Database className="h-4 w-4 text-primary" />
-                  <span>Data Storage Analysis</span>
+                  <span>{isAR ? "تحليل تخزين البيانات" : "Data Storage Analysis"}</span>
                 </div>
                 <Button type="button" variant="outline" size="sm" onClick={analyzeDataStorage} disabled={isDataStorageAnalyzing} className="gap-2">
                   <RefreshCw className={cn("h-3.5 w-3.5", isDataStorageAnalyzing && "animate-spin")} />
-                  {isDataStorageAnalyzing ? "Analyzing..." : "Analyze Data Storage"}
+                  {isDataStorageAnalyzing ? (isAR ? "جار التحليل..." : "Analyzing...") : (isAR ? "تحليل تخزين البيانات" : "Analyze Data Storage")}
                 </Button>
               </div>
 
               {dataStorageAnalysis && (
                 <div className="space-y-3">
                   <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                    <InfoRow isAR={isAR} label="ok" value={dataStorageAnalysis.ok} />
-                    <InfoRow isAR={isAR} label="sourceRoot" value={dataStorageReport?.sourceRoot} />
-                    <InfoRow isAR={isAR} label="targetRoot" value={dataStorageReport?.targetRoot} />
-                    <InfoRow isAR={isAR} label="targetWritable" value={dataStorageReport?.targetWritable} />
+                    <InfoRow isAR={isAR} label={isAR ? "الحالة" : "ok"} value={dataStorageAnalysis.ok} />
+                    <InfoRow isAR={isAR} label={isAR ? "مسار المصدر" : "sourceRoot"} value={dataStorageReport?.sourceRoot} />
+                    <InfoRow isAR={isAR} label={isAR ? "مسار الهدف" : "targetRoot"} value={dataStorageReport?.targetRoot} />
+                    <InfoRow isAR={isAR} label={isAR ? "الهدف قابل للكتابة" : "targetWritable"} value={dataStorageReport?.targetWritable} />
                   </div>
 
                   {!dataStorageAnalysis.ok && (
@@ -1309,7 +1309,7 @@ export default function DeveloperSettingsPage() {
                   {dataStorageReport && (
                     <>
                       <div className="rounded-md border border-border bg-background px-3 py-2 text-sm">
-                        <div className="mb-2 text-xs font-semibold text-muted-foreground">warnings</div>
+                        <div className="mb-2 text-xs font-semibold text-muted-foreground">{isAR ? "التحذيرات" : "warnings"}</div>
                         {dataStorageReport.warnings.length > 0 ? (
                           <ul className="list-inside list-disc space-y-1">
                             {dataStorageReport.warnings.map((warning) => (
@@ -1317,7 +1317,7 @@ export default function DeveloperSettingsPage() {
                             ))}
                           </ul>
                         ) : (
-                          <div className="text-muted-foreground">None</div>
+                          <div className="text-muted-foreground">{isAR ? "لا يوجد" : "None"}</div>
                         )}
                       </div>
 
@@ -1325,9 +1325,9 @@ export default function DeveloperSettingsPage() {
                         <table className="w-full min-w-[520px] text-left text-xs">
                           <thead className="bg-muted/50 text-muted-foreground">
                             <tr>
-                              <th className="px-3 py-2 font-semibold">name</th>
-                              <th className="px-3 py-2 font-semibold">type</th>
-                              <th className="px-3 py-2 font-semibold">exists</th>
+                              <th className="px-3 py-2 font-semibold">{isAR ? "الاسم" : "name"}</th>
+                              <th className="px-3 py-2 font-semibold">{isAR ? "النوع" : "type"}</th>
+                              <th className="px-3 py-2 font-semibold">{isAR ? "موجود" : "exists"}</th>
                             </tr>
                           </thead>
                           <tbody>
@@ -1351,26 +1351,26 @@ export default function DeveloperSettingsPage() {
               <div className="mb-4 flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2 text-sm font-bold text-foreground">
                   <Database className="h-4 w-4 text-primary" />
-                  <span>Backup Readiness</span>
+                  <span>{isAR ? "جاهزية النسخ الاحتياطي" : "Backup Readiness"}</span>
                 </div>
                 <Button type="button" variant="outline" size="sm" onClick={analyzeBackupReadiness} disabled={isBackupReadinessAnalyzing} className="gap-2">
                   <RefreshCw className={cn("h-3.5 w-3.5", isBackupReadinessAnalyzing && "animate-spin")} />
-                  {isBackupReadinessAnalyzing ? "Analyzing..." : "Analyze Backup Readiness"}
+                  {isBackupReadinessAnalyzing ? (isAR ? "جار التحليل..." : "Analyzing...") : (isAR ? "تحليل جاهزية النسخ الاحتياطي" : "Analyze Backup Readiness")}
                 </Button>
               </div>
 
               {backupReadinessAnalysis && (
                 <div className="space-y-3">
                   <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                    <InfoRow isAR={isAR} label="ok" value={backupReadinessAnalysis.ok} />
-                    <InfoRow isAR={isAR} label="dataRoot" value={backupReadinessReport?.dataRoot} />
-                    <InfoRow isAR={isAR} label="databasePath" value={backupReadinessReport?.databasePath} />
-                    <InfoRow isAR={isAR} label="databaseExists" value={backupReadinessReport?.databaseExists} />
-                    <InfoRow isAR={isAR} label="databaseReadable" value={backupReadinessReport?.databaseReadable} />
-                    <InfoRow isAR={isAR} label="databaseSizeBytes" value={backupReadinessReport?.databaseSizeBytes} />
-                    <InfoRow isAR={isAR} label="backupsRoot" value={backupReadinessReport?.backupsRoot} />
-                    <InfoRow isAR={isAR} label="backupsRootExists" value={backupReadinessReport?.backupsRootExists} />
-                    <InfoRow isAR={isAR} label="backupsRootWritable" value={backupReadinessReport?.backupsRootWritable} />
+                    <InfoRow isAR={isAR} label={isAR ? "الحالة" : "ok"} value={backupReadinessAnalysis.ok} />
+                    <InfoRow isAR={isAR} label={isAR ? "مسار البيانات" : "dataRoot"} value={backupReadinessReport?.dataRoot} />
+                    <InfoRow isAR={isAR} label={isAR ? "مسار قاعدة البيانات" : "databasePath"} value={backupReadinessReport?.databasePath} />
+                    <InfoRow isAR={isAR} label={isAR ? "قاعدة البيانات موجودة" : "databaseExists"} value={backupReadinessReport?.databaseExists} />
+                    <InfoRow isAR={isAR} label={isAR ? "قاعدة البيانات قابلة للقراءة" : "databaseReadable"} value={backupReadinessReport?.databaseReadable} />
+                    <InfoRow isAR={isAR} label={isAR ? "حجم قاعدة البيانات بالبايت" : "databaseSizeBytes"} value={backupReadinessReport?.databaseSizeBytes} />
+                    <InfoRow isAR={isAR} label={isAR ? "مسار النسخ الاحتياطية" : "backupsRoot"} value={backupReadinessReport?.backupsRoot} />
+                    <InfoRow isAR={isAR} label={isAR ? "مسار النسخ موجود" : "backupsRootExists"} value={backupReadinessReport?.backupsRootExists} />
+                    <InfoRow isAR={isAR} label={isAR ? "مسار النسخ قابل للكتابة" : "backupsRootWritable"} value={backupReadinessReport?.backupsRootWritable} />
                   </div>
 
                   {!backupReadinessAnalysis.ok && (
@@ -1381,7 +1381,7 @@ export default function DeveloperSettingsPage() {
 
                   {backupReadinessReport && (
                     <div className="rounded-md border border-border bg-background px-3 py-2 text-sm">
-                      <div className="mb-2 text-xs font-semibold text-muted-foreground">warnings</div>
+                      <div className="mb-2 text-xs font-semibold text-muted-foreground">{isAR ? "التحذيرات" : "warnings"}</div>
                       {backupReadinessReport.warnings.length > 0 ? (
                         <ul className="list-inside list-disc space-y-1">
                           {backupReadinessReport.warnings.map((warning) => (
@@ -1389,7 +1389,7 @@ export default function DeveloperSettingsPage() {
                           ))}
                         </ul>
                       ) : (
-                        <div className="text-muted-foreground">None</div>
+                        <div className="text-muted-foreground">{isAR ? "لا يوجد" : "None"}</div>
                       )}
                     </div>
                   )}
@@ -1401,16 +1401,16 @@ export default function DeveloperSettingsPage() {
               <div className="mb-4 flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2 text-sm font-bold text-foreground">
                   <FileText className="h-4 w-4 text-primary" />
-                  <span>Backup Manifest</span>
+                  <span>{isAR ? "ملف وصف النسخة الاحتياطية" : "Backup Manifest"}</span>
                 </div>
                 <div className="flex flex-wrap justify-end gap-2">
                   <Button type="button" variant="outline" size="sm" onClick={generateBackupManifest} disabled={isBackupManifestGenerating} className="gap-2">
                     <RefreshCw className={cn("h-3.5 w-3.5", isBackupManifestGenerating && "animate-spin")} />
-                    {isBackupManifestGenerating ? "Generating..." : "Generate Backup Manifest"}
+                    {isBackupManifestGenerating ? (isAR ? "جار الإنشاء..." : "Generating...") : (isAR ? "إنشاء ملف وصف النسخة الاحتياطية" : "Generate Backup Manifest")}
                   </Button>
                   <Button type="button" variant="outline" size="sm" onClick={createBackupDirectory} disabled={isBackupDirectoryCreating} className="gap-2">
                     <FileText className="h-3.5 w-3.5" />
-                    {isBackupDirectoryCreating ? "Creating..." : "Create Backup Folder"}
+                    {isBackupDirectoryCreating ? (isAR ? "جار الإنشاء..." : "Creating...") : (isAR ? "إنشاء مجلد النسخة الاحتياطية" : "Create Backup Folder")}
                   </Button>
                 </div>
               </div>
@@ -1419,31 +1419,31 @@ export default function DeveloperSettingsPage() {
                 <div className="space-y-3">
                   {backupManifestResult && (
                     <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                      <InfoRow isAR={isAR} label="backupId" value={backupManifest?.backupId} />
-                      <InfoRow isAR={isAR} label="createdAt" value={backupManifest?.createdAt} />
-                      <InfoRow isAR={isAR} label="appVersion" value={backupManifest?.appVersion} />
-                      <InfoRow isAR={isAR} label="platform" value={backupManifest?.platform} />
-                      <InfoRow isAR={isAR} label="dataRoot" value={backupManifest?.dataRoot} />
-                      <InfoRow isAR={isAR} label="database.path" value={backupManifest?.database.path} />
-                      <InfoRow isAR={isAR} label="database.exists" value={backupManifest?.database.exists} />
-                      <InfoRow isAR={isAR} label="database.sizeBytes" value={backupManifest?.database.sizeBytes} />
-                      <InfoRow isAR={isAR} label="attachments.exists" value={backupManifest?.attachments.exists} />
-                      <InfoRow isAR={isAR} label="backup.type" value={backupManifest?.backup.type} />
-                      <InfoRow isAR={isAR} label="backup.compression" value={backupManifest?.backup.compression} />
+                      <InfoRow isAR={isAR} label={isAR ? "معرف النسخة" : "backupId"} value={backupManifest?.backupId} />
+                      <InfoRow isAR={isAR} label={isAR ? "تاريخ الإنشاء" : "createdAt"} value={backupManifest?.createdAt} />
+                      <InfoRow isAR={isAR} label={isAR ? "إصدار التطبيق" : "appVersion"} value={backupManifest?.appVersion} />
+                      <InfoRow isAR={isAR} label={isAR ? "النظام" : "platform"} value={backupManifest?.platform} />
+                      <InfoRow isAR={isAR} label={isAR ? "مسار البيانات" : "dataRoot"} value={backupManifest?.dataRoot} />
+                      <InfoRow isAR={isAR} label={isAR ? "مسار قاعدة البيانات" : "database.path"} value={backupManifest?.database.path} />
+                      <InfoRow isAR={isAR} label={isAR ? "قاعدة البيانات موجودة" : "database.exists"} value={backupManifest?.database.exists} />
+                      <InfoRow isAR={isAR} label={isAR ? "حجم قاعدة البيانات" : "database.sizeBytes"} value={backupManifest?.database.sizeBytes} />
+                      <InfoRow isAR={isAR} label={isAR ? "المرفقات موجودة" : "attachments.exists"} value={backupManifest?.attachments.exists} />
+                      <InfoRow isAR={isAR} label={isAR ? "نوع النسخة" : "backup.type"} value={backupManifest?.backup.type} />
+                      <InfoRow isAR={isAR} label={isAR ? "الضغط" : "backup.compression"} value={backupManifest?.backup.compression} />
                     </div>
                   )}
 
                   {backupDirectoryResult && (
                     <div className="space-y-3">
                       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                        <InfoRow isAR={isAR} label="ok" value={backupDirectoryResult.ok} />
-                        <InfoRow isAR={isAR} label="backupDir" value={backupDirectoryResult.ok ? backupDirectoryResult.backupDir : null} />
-                        <InfoRow isAR={isAR} label="manifestPath" value={backupDirectoryResult.ok ? backupDirectoryResult.manifestPath : null} />
+                        <InfoRow isAR={isAR} label={isAR ? "الحالة" : "ok"} value={backupDirectoryResult.ok} />
+                        <InfoRow isAR={isAR} label={isAR ? "مجلد النسخة" : "backupDir"} value={backupDirectoryResult.ok ? backupDirectoryResult.backupDir : null} />
+                        <InfoRow isAR={isAR} label={isAR ? "مسار ملف الوصف" : "manifestPath"} value={backupDirectoryResult.ok ? backupDirectoryResult.manifestPath : null} />
                       </div>
 
                       {backupDirectoryResult.ok ? (
                         <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
-                          Backup folder created successfully.
+                          {isAR ? "تم إنشاء مجلد النسخة الاحتياطية بنجاح." : "Backup folder created successfully."}
                         </div>
                       ) : (
                         <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
@@ -1466,7 +1466,7 @@ export default function DeveloperSettingsPage() {
               <div className="mb-4 flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2 text-sm font-bold text-foreground">
                   <PackageCheck className="h-4 w-4 text-primary" />
-                  <span>Backup Verification</span>
+                  <span>{isAR ? "التحقق من النسخة الاحتياطية" : "Backup Verification"}</span>
                 </div>
                 <Button
                   type="button"
@@ -1477,26 +1477,26 @@ export default function DeveloperSettingsPage() {
                   className="gap-2"
                 >
                   <RefreshCw className={cn("h-3.5 w-3.5", isBackupVerifying && "animate-spin")} />
-                  {isBackupVerifying ? "Verifying..." : "Verify Latest Backup"}
+                  {isBackupVerifying ? (isAR ? "جار التحقق..." : "Verifying...") : (isAR ? "التحقق من آخر نسخة احتياطية" : "Verify Latest Backup")}
                 </Button>
               </div>
 
               {backupVerificationResult && (
                 <div className="space-y-3">
                   <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                    <InfoRow isAR={isAR} label="verified" value={backupVerificationResult.verified} />
+                    <InfoRow isAR={isAR} label={isAR ? "تم التحقق" : "verified"} value={backupVerificationResult.verified} />
                     <InfoRow
                       isAR={isAR}
-                      label="databaseSizeBytes"
+                      label={isAR ? "حجم قاعدة البيانات بالبايت" : "databaseSizeBytes"}
                       value={backupVerificationResult.ok ? backupVerificationResult.databaseSizeBytes : null}
                     />
-                    <InfoRow isAR={isAR} label="backupDir" value={backupVerificationResult.backupDir} />
-                    <InfoRow isAR={isAR} label="warnings count" value={backupVerificationWarningsCount} />
+                    <InfoRow isAR={isAR} label={isAR ? "مجلد النسخة" : "backupDir"} value={backupVerificationResult.backupDir} />
+                    <InfoRow isAR={isAR} label={isAR ? "عدد التحذيرات" : "warnings count"} value={backupVerificationWarningsCount} />
                   </div>
 
                   {backupVerificationResult.ok && backupVerificationResult.verified ? (
                     <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
-                      Backup verified successfully.
+                      {isAR ? "تم التحقق من النسخة الاحتياطية بنجاح." : "Backup verified successfully."}
                     </div>
                   ) : (
                     <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
