@@ -196,6 +196,7 @@ function startBackend({ apiPath, serverFile, appDataDbPath }) {
       ELECTRON_RUN_AS_NODE: "1",
       NODE_ENV: "production",
       SQLITE_DB_PATH: appDataDbPath,
+      APP_DATA_ROOT: path.dirname(path.dirname(appDataDbPath)),
     },
     detached: false,
   });
@@ -256,6 +257,11 @@ function resolveDataRoot() {
         };
 
         fs.writeFileSync(configPath, `${JSON.stringify(storageConfig, null, 2)}\n`, "utf8");
+
+        const dataRootConfigPath = path.join(bestDataRoot, "config", "storage-config.json");
+        fs.mkdirSync(path.dirname(dataRootConfigPath), { recursive: true });
+        fs.writeFileSync(dataRootConfigPath, `${JSON.stringify(storageConfig, null, 2)}\n`, "utf8");
+
         dataRoot = bestDataRoot;
       }
     }
@@ -325,7 +331,7 @@ function detectBestDataDrive() {
 }
 
 function analyzeDataRootMigration() {
-  const sourceRoot = app.getPath("userData");
+  const sourceRoot = resolveDataRoot();
   const targetRoot = detectBestDataDrive();
   const warnings = [];
   let targetWritable = false;
@@ -338,7 +344,10 @@ function analyzeDataRootMigration() {
     { name: "logs", type: "folder" },
     { name: "config", type: "folder" },
   ].map((item) => {
-    const itemPath = path.join(sourceRoot, item.name);
+    const itemPath =
+  item.name === "local.db"
+    ? path.join(sourceRoot, "database", "local.db")
+    : path.join(sourceRoot, item.name);
 
     return {
       name: item.name,

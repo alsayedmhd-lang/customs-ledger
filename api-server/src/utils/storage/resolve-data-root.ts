@@ -27,6 +27,12 @@ const DATA_SUBFOLDERS = {
 
 export async function resolveDataRoot(app: ElectronPathProvider): Promise<ResolvedDataRoot> {
   const userDataPath = path.resolve(app.getPath("userData"));
+  const envDataRoot = process.env.APP_DATA_ROOT;
+
+  if (envDataRoot && envDataRoot.trim()) {
+    console.log("[DATA_ROOT] Using APP_DATA_ROOT", { dataRoot: envDataRoot });
+    return ensureDataRootStructure(path.resolve(envDataRoot.trim()), "config");
+  }
   const configPath = path.join(userDataPath, STORAGE_CONFIG_FILE);
 
   const configuredRoot = await readConfiguredDataRoot(configPath);
