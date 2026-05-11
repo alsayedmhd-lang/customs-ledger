@@ -272,6 +272,16 @@ function resolveDataRoot() {
 
   return dataRoot;
 }
+function getResolvedDatabasePath() {
+  const dataRoot = resolveDataRoot();
+  const databaseDir = path.join(dataRoot, "database");
+
+  if (!fs.existsSync(databaseDir)) {
+    fs.mkdirSync(databaseDir, { recursive: true });
+  }
+
+  return path.join(databaseDir, "local.db");
+}
 
 function ensureDataRootFolders(dataRoot) {
   const folders = ["database", "attachments", "backups", "license", "logs", "config"];
@@ -627,7 +637,7 @@ function createWindow() {
   const serverFile = path.join(apiPath, "dist", "index.cjs");
   const starterDbPath = path.join(apiPath, "lib", "db", "local.db");
   const userDataPath = resolveDataRoot();
-  const appDataDbPath = path.join(userDataPath, "local.db");
+  const appDataDbPath = getResolvedDatabasePath();
 
   console.log("AppData DB path:", appDataDbPath);
   console.log("Starter DB path:", starterDbPath);

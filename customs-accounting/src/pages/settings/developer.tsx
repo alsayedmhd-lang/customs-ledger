@@ -1025,9 +1025,9 @@ export default function DeveloperSettingsPage() {
 
   async function loadStorageInfo() {
     try {
-      const response = await fetch("/api/developer/storage/info", {
+      const response = await fetch("http://127.0.0.1:3000/api/developer/storage/info", {
         headers: {
-          Authorization: `Bearer ${sessionStorage.getItem("auth_token") || ""}`,
+          Authorization: `Bearer ${localStorage.getItem("auth_token") || sessionStorage.getItem("auth_token") || ""}`,
         },
       });
 

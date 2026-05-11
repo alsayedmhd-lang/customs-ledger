@@ -220,11 +220,11 @@ router.post("/developer/unlock", (req, res) => {
   return res.json({ success: true });
 });
 
-router.get("/storage/info", requireAdmin, async (_req, res) => {
+router.get("/developer/storage/info", requireAdmin, async (_req, res) => {
   try {
     const storageInfo = await getStorageInfo({
-      getPath(name: "userData") {
-        return path.join(process.cwd(), ".electron-user-data");
+      getPath() {
+        return process.env.APP_DATA_ROOT || process.cwd();
       },
     });
 
@@ -232,9 +232,10 @@ router.get("/storage/info", requireAdmin, async (_req, res) => {
   } catch (error) {
     console.error("[STORAGE_INFO] Failed to resolve storage info", error);
 
-    res.status(500).json({
-      message: "Failed to load storage info",
-    });
+      res.status(500).json({
+        message: "Failed to load storage info",
+        error: error instanceof Error ? error.message : String(error),
+      });
   }
 });
 
