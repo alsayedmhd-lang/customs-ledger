@@ -10,6 +10,7 @@ import packageJson from "../../../package.json";
 import { requireAdmin } from "../middleware/auth";
 import { ensureSyncQueueTable } from "../utils/ensure-sync-queue-table";
 import { runSyncWorkerOnce } from "../utils/sync-worker";
+import { getStorageInfo } from "../utils/storage/get-storage-info";
 
 const router = Router();
 const require = createRequire(path.join(process.cwd(), "package.json"));
@@ -20,6 +21,7 @@ const { Client: PgClient } = require("pg") as {
     end: () => Promise<void>;
   };
 };
+
 
 const developerPermissionColumns = [
   [
@@ -216,6 +218,24 @@ router.post("/developer/unlock", (req, res) => {
   }
 
   return res.json({ success: true });
+});
+
+router.get("/storage/info", requireAdmin, async (_req, res) => {
+  try {
+    const storageInfo = await getStorageInfo({
+      getPath(name: "userData") {
+        return path.join(process.cwd(), ".electron-user-data");
+      },
+    });
+
+    res.json(storageInfo);
+  } catch (error) {
+    console.error("[STORAGE_INFO] Failed to resolve storage info", error);
+
+    res.status(500).json({
+      message: "Failed to load storage info",
+    });
+  }
 });
 
 router.get("/developer/settings", async (_req, res) => {

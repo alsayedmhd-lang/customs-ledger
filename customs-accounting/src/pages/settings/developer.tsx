@@ -400,6 +400,7 @@ export default function DeveloperSettingsPage() {
   const [backupDirectoryResult, setBackupDirectoryResult] = useState<BackupDirectoryResult | null>(null);
   const [backupVerificationResult, setBackupVerificationResult] = useState<BackupVerificationResult | null>(null);
   const [settings, setSettings] = useState<DeveloperSettings>(defaultSettings);
+  const [storageInfo, setStorageInfo] = useState<any>(null);
   const [syncQueueStatus, setSyncQueueStatus] = useState<SyncQueueStatus>({
     pending: 0,
     synced: 0,
@@ -494,6 +495,7 @@ export default function DeveloperSettingsPage() {
       void loadSettings();
       void loadSyncQueueStatus();
       void loadReadinessStatus();
+      void loadStorageInfo();
     }
   }, [unlocked]);
 
@@ -1021,6 +1023,21 @@ export default function DeveloperSettingsPage() {
     }
   }
 
+  async function loadStorageInfo() {
+    try {
+      const response = await fetch("/api/developer/storage/info", {
+        headers: {
+          Authorization: `Bearer ${sessionStorage.getItem("auth_token") || ""}`,
+        },
+      });
+
+      const data = await response.json();
+      setStorageInfo(data);
+    } catch (error) {
+      console.error("Failed to load storage info", error);
+    }
+  }
+
   async function verifyLatestBackupDirectory() {
     setIsBackupVerifying(true);
     try {
@@ -1485,6 +1502,23 @@ export default function DeveloperSettingsPage() {
               <InfoRow isAR={isAR} label={tr("حالة API", "API status")} value={settings.apiStatus} />
               <InfoRow isAR={isAR} label={tr("حالة ملف env", "env file status")} value={settings.envFileStatus} />
               <InfoRow isAR={isAR} label={tr("حالة الموارد", "Resources status")} value={settings.resourcesStatus} />
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-lg">
+            <CardHeader>
+              <CardTitle className="text-lg">
+                {tr("مسارات تخزين البيانات", "Data Storage Paths")}
+              </CardTitle>
+            </CardHeader>
+
+            <CardContent className="grid gap-3 md:grid-cols-2">
+              <InfoRow isAR={isAR} label={tr("مسار البيانات", "Data Root")} value={storageInfo?.dataRoot} />
+              <InfoRow isAR={isAR} label={tr("مصدر المسار", "Source")} value={storageInfo?.source} />
+              <InfoRow isAR={isAR} label={tr("قاعدة البيانات", "Database Dir")} value={storageInfo?.databaseDir} />
+              <InfoRow isAR={isAR} label={tr("النسخ الاحتياطية", "Backups Dir")} value={storageInfo?.backupsDir} />
+              <InfoRow isAR={isAR} label={tr("المرفقات", "Attachments Dir")} value={storageInfo?.attachmentsDir} />
+              <InfoRow isAR={isAR} label={tr("السجلات", "Logs Dir")} value={storageInfo?.logsDir} />
             </CardContent>
           </Card>
 
