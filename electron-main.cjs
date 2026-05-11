@@ -238,7 +238,7 @@ function resolveDataRoot() {
       if (config && typeof config.dataRoot === "string" && config.dataRoot.trim()) {
         dataRoot = config.dataRoot.trim();
       }
-    } else if (!fs.existsSync(legacyDbPath)) {
+    } else {
       const bestDataRoot = detectBestDataDrive();
 
       if (bestDataRoot) {
@@ -638,6 +638,10 @@ function createWindow() {
   const starterDbPath = path.join(apiPath, "lib", "db", "local.db");
   const userDataPath = resolveDataRoot();
   const appDataDbPath = getResolvedDatabasePath();
+
+  appendBackendLog(`Resolved starter DB: ${starterDbPath}`);
+  appendBackendLog(`Starter DB exists: ${fs.existsSync(starterDbPath)}`);
+  appendBackendLog(`Resolved app DB: ${appDataDbPath}`);
 
   console.log("AppData DB path:", appDataDbPath);
   console.log("Starter DB path:", starterDbPath);
