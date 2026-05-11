@@ -1487,6 +1487,93 @@ export default function DeveloperSettingsPage() {
                 </div>
               </div>
             </div>
+            <div className="rounded-2xl border border-border bg-card p-5 shadow-sm space-y-4">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h3 className="text-lg font-semibold">
+                    {tr("إدارة مسار البيانات", "Data Root Management")}
+                  </h3>
+
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {tr(
+                      "إدارة مكان تخزين قاعدة البيانات والمرفقات والنسخ الاحتياطية والسجلات وملفات النظام.",
+                      "Manage where the application stores database, attachments, backups, logs, and configuration files."
+                    )}
+                  </p>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-border/70 bg-muted/30 p-4 space-y-2">
+                <p className="text-sm font-medium">
+                  {tr("مسار البيانات الحالي", "Current Data Root")}
+                </p>
+
+                <p className="text-xs text-muted-foreground break-all">
+                  {settings.sqlitePath
+                    ? settings.sqlitePath
+                        .replace(/\\database\\local\.db$/i, "")
+                        .replace(/\/database\/local\.db$/i, "")
+                    : tr("لم يتم التحميل بعد", "Not loaded yet")}
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                <button
+                  type="button"
+                  className="px-4 py-2 rounded-xl border bg-background hover:bg-muted transition text-sm font-medium"
+                >
+                  {tr("اختيار مجلد جديد", "Choose New Folder")}
+                </button>
+
+                <button
+                  type="button"
+                  className="px-4 py-2 rounded-xl border bg-background hover:bg-muted transition text-sm font-medium"
+                >
+                  {tr("اختبار الكتابة", "Test Write")}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const dataRoot =
+                      settings.sqlitePath
+                        ?.replace(/\\database\\local\.db$/i, "")
+                        ?.replace(/\/database\/local\.db$/i, "");
+
+                    if (!dataRoot) {
+                      alert(
+                        tr(
+                          "مسار البيانات غير متوفر",
+                          "Data root path is not available"
+                        )
+                      );
+
+                      return;
+                    }
+
+                    await window.electronAPI?.openExternalFile?.(dataRoot);
+                  }}
+                  className="px-4 py-2 rounded-xl bg-primary text-primary-foreground hover:opacity-90 transition text-sm font-medium"
+                >
+                  {tr("فتح مجلد البيانات", "Open Data Folder")}
+                </button>
+
+                <button
+                  type="button"
+                  disabled
+                  className="px-4 py-2 rounded-xl border bg-muted text-muted-foreground cursor-not-allowed text-sm font-medium"
+                >
+                  {tr("النقل الآمن", "Safe Migration")}
+                </button>
+              </div>
+
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+                {tr(
+                  "سيبقى النقل معطلاً حتى يتم ربط اختبار الكتابة وفحص المسار ومنع العمليات الحساسة.",
+                  "Migration will stay disabled until write-test, health validation, and operation-lock checks are connected."
+                )}
+              </div>
+            </div>
           </CardContent>
         </Card>
       )}

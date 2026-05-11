@@ -723,7 +723,9 @@ function createWindow() {
       "public",
       "index.html"
     );
-    console.log("FRONTEND INDEX PATH =", indexPath);
+    if (!app.isPackaged) {
+      console.log("FRONTEND INDEX PATH =", frontendPath);
+    }
     mainWindow.loadFile(indexPath);
   }, 3000);
 }
@@ -822,6 +824,27 @@ autoUpdater.on("error", (error) => {
 
 ipcMain.handle("app:get-version", () => app.getVersion());
 
+ipcMain.handle("storage:open-data-folder", async () => {
+  try {
+    const { shell } = require("electron");
+
+    const { resolveDataRoot } = require("./api-server/dist/utils/storage/resolve-data-root");
+
+    const dataRoot = resolveDataRoot();
+
+    await shell.openPath(dataRoot);
+
+    return { ok: true, dataRoot };
+  } catch (error) {
+    console.error("[DATA ROOT][OPEN ERROR]", error);
+
+    return {
+      ok: false,
+      error: error?.message || String(error),
+    };
+  }
+});
+
 ipcMain.handle("data-root:analyze-migration", async () => {
   try {
     return {
@@ -890,12 +913,18 @@ ipcMain.handle("backup:verify-directory", async (_event, backupDir) => {
 
 ipcMain.handle("open-external-file", async (_event, relativePath) => {
   try {
-    const filePath = resolveExternalFilePath(relativePath);
+    let filePath = relativePath;
+
+    if (!path.isAbsolute(filePath)) {
+      filePath = resolveExternalFilePath(relativePath);
+    }
+
     if (!filePath) {
       return { success: false, error: "File not found" };
     }
 
     const errorMessage = await shell.openPath(filePath);
+
     if (errorMessage) {
       return { success: false, error: errorMessage };
     }

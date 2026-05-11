@@ -20,7 +20,11 @@ contextBridge.exposeInMainWorld("electronAPI", {
   verifyBackupDirectory: (backupDir) =>
     ipcRenderer.invoke("backup:verify-directory", backupDir),
   openExternalFile: (relativePath) =>
-    ipcRenderer.invoke("open-external-file", relativePath),
+  ipcRenderer.invoke("open-external-file", relativePath),
+
+  openDataFolder: () => {
+    return ipcRenderer.invoke("storage:open-data-folder");
+  },
   selectAttachmentFile: () => ipcRenderer.invoke("attachments:select-file"),
   saveAttachmentFile: ({ sourcePath, declarationBaseNumber, storedName }) =>
     ipcRenderer.invoke("attachment:save-file", {
