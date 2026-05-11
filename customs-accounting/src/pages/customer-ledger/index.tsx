@@ -2,6 +2,15 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/lib/auth-context";
 import { useLanguage } from "@/lib/language-context";
+import {
+  Eye,
+  EyeOff,
+  Printer,
+  Users,
+  ArrowDownLeft,
+  ArrowUpRight,
+  Wallet,
+} from "lucide-react";
 
 type Client = {
   id: number;
@@ -53,6 +62,10 @@ export default function CustomerLedgerPage() {
   const [openingBalance, setOpeningBalance] = useState(0);
   const [clients, setClients] = useState<Client[]>([]);
   const [ledgerClient, setLedgerClient] = useState<Client | null>(null);
+  const [showAmounts, setShowAmounts] = useState(false);
+  const hiddenAmount = (
+    <span className="tracking-widest opacity-40">••••••</span>
+  );
   const [selectedClientState, setSelectedClientState] = useState<Client | null>(null);
   const [clientId, setClientId] = useState<number | "">("");
   const [hasSelectedClient, setHasSelectedClient] = useState(false);
@@ -170,37 +183,58 @@ export default function CustomerLedgerPage() {
   }, [isClient, hasSelectedClient, effectiveClientId]);
 
   const openPrintPage = () => {
-    if (!effectiveClientId) return;
+  if (!effectiveClientId) return;
 
-    navigate(
-      `/customer-ledger/print?clientId=${effectiveClientId}&from=${fromDate}&to=${toDate}&q=${encodeURIComponent(referenceSearch)}`
-    );
-  };
+  navigate(
+    `/customer-ledger/print?clientId=${effectiveClientId}&from=${fromDate}&to=${toDate}&q=${encodeURIComponent(referenceSearch)}`
+  );
+};
 
-  return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto" dir={isAR ? "rtl" : "ltr"}>
-      {/* Header */}
-      <div className="flex items-start justify-between gap-4">
-        <div className={isAR ? "text-right" : "text-left"}>
-          <h1 className="text-3xl font-bold text-gray-900">
-            {tr("ملخص العميل المالي", "Customer Financial Summary")}
-          </h1>
-          <p className="text-sm text-gray-500 mt-1">
-            {tr("كشف مختصر لحركات العميل والرصيد", "A brief statement of customer transactions and balance")}
-          </p>
-        </div>
+return (
+  <div className="p-6 space-y-6 max-w-7xl mx-auto" dir={isAR ? "rtl" : "ltr"}>
 
-        <button
-          type="button"
-          onClick={openPrintPage}
-          disabled={!effectiveClientId}
-          className="px-5 py-2 rounded-xl bg-primary text-primary-foreground shadow hover:bg-primary/90 transition disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {tr("الطباعة", "Print")}
-        </button>
-      </div>
+  {/* Header */}
+  <div className="flex items-start justify-between gap-4">
+    <div className={isAR ? "text-right" : "text-left"}>
+      <h1 className="text-3xl font-bold text-gray-900">
+        {tr("ملخص العميل المالي", "Customer Financial Summary")}
+      </h1>
+      <p className="text-sm text-gray-500 mt-1">
+        {tr("كشف مختصر لحركات العميل والرصيد", "A brief statement of customer transactions and balance")}
+      </p>
+    </div>
+
+    <div className="flex items-center gap-2">
+      <button
+        type="button"
+        onClick={() => setShowAmounts(v => !v)}
+        className="h-[36px] px-3 rounded-xl border border-yellow-400 bg-yellow-50 text-yellow-700 hover:bg-yellow-100 transition flex items-center gap-1.5 text-[11px] font-medium shadow-sm"
+      >
+        {showAmounts ? (
+          <EyeOff className="w-4 h-4" />
+        ) : (
+          <Eye className="w-4 h-4" />
+        )}
+
+        {showAmounts
+          ? tr("إخفاء الأرقام", "Hide Numbers")
+          : tr("إظهار الأرقام", "Show Numbers")}
+      </button>
+
+      <button
+        type="button"
+        onClick={openPrintPage}
+        disabled={!effectiveClientId}
+        className="h-[44px] px-7 rounded-xl bg-primary text-primary-foreground shadow hover:bg-primary/90 transition flex items-center gap-2 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        <Printer className="w-4 h-4" />
+        {tr("الطباعة", "Print")}
+      </button>
+    </div>
+  </div>
 
       {/* Filters */}
+
       <div className="bg-white border rounded-2xl shadow-sm overflow-hidden">
         <div className="px-5 py-4 border-b bg-gray-50 flex items-center justify-between">
           <div>
@@ -215,18 +249,18 @@ export default function CustomerLedgerPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-5 items-end">
-          <div>
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-3 p-4 items-end">
+          <div className="md:col-span-3">
             <label className="text-sm font-medium text-gray-700">{tr("العميل", "Client")}</label>
             {isClient ? (
-              <div className="w-full border rounded-xl px-3 py-2 mt-1 bg-gray-50 text-gray-900 min-h-[42px]">
+              <div className="w-full border rounded-xl px-3 py-1.5 mt-1 text-sm bg-gray-50 text-gray-900 min-h-[42px]">
                 {selectedClient
                   ? selectedClient.nameAr || selectedClient.nameEn || selectedClient.name
                   : "â€”"}
               </div>
             ) : (
             <select
-              className="w-full border rounded-xl px-3 py-2 mt-1 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+              className="w-full h-[38px] border rounded-xl px-3 mt-1 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-purple-500"
               value={clientId}
               onChange={(e) => {
                 handleClientSelected(e.target.value ? Number(e.target.value) : "");
@@ -243,7 +277,7 @@ export default function CustomerLedgerPage() {
             )}
           </div>
 
-          <div>
+          <div className="md:col-span-2">
             <label className="text-sm font-medium text-gray-700">
               {tr("من تاريخ", "From date")}
             </label>
@@ -251,11 +285,11 @@ export default function CustomerLedgerPage() {
               type="date"
               value={fromDate}
               onChange={(e) => setFromDate(e.target.value)}
-              className="w-full border rounded-xl px-3 py-2 mt-1 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+              className="w-full h-[38px] border rounded-xl px-3 mt-1 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-purple-500"
             />
           </div>
 
-          <div>
+          <div className="md:col-span-2">
             <label className="text-sm font-medium text-gray-700">
               {tr("إلى تاريخ", "To date")}
             </label>
@@ -263,70 +297,110 @@ export default function CustomerLedgerPage() {
               type="date"
               value={toDate}
               onChange={(e) => setToDate(e.target.value)}
-              className="w-full border rounded-xl px-3 py-2 mt-1 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+              className="w-full h-[38px] border rounded-xl px-3 mt-1 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-purple-500"
             />
           </div>
 
-          <div>
+          <div className="md:col-span-4">
             <label className="text-sm font-medium text-gray-700">
-              {tr("رقم الفاتورة أو سند القبض", "Invoice or receipt number")}
+              {tr(
+                "رقم الفاتورة أو سند القبض أو البيان أو البوليصة",
+                "Invoice, receipt, declaration or BL number"
+              )}
             </label>
             <input
               value={referenceSearch}
               onChange={(e) => setReferenceSearch(e.target.value)}
-              placeholder={tr("رقم الفاتورة أو سند القبض", "Invoice or receipt number")}
-              className="w-full border rounded-xl px-3 py-2 mt-1 bg-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+              placeholder={tr(
+                "رقم الفاتورة أو سند القبض أو البيان أو البوليصة",
+                "Invoice, receipt, declaration or BL number"
+              )}
+              className="w-full h-[38px] border rounded-xl px-3 mt-1 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-purple-500"
             />
           </div>
 
-          <button
+         <button
             type="button"
             onClick={loadLedger}
             disabled={isSearchDisabled}
-            className="h-[42px] rounded-xl bg-primary text-primary-foreground shadow hover:bg-primary/90 transition disabled:opacity-50 disabled:cursor-not-allowed"
+            className="md:col-span-1 h-[38px] rounded-xl bg-primary text-primary-foreground shadow hover:bg-primary/90 transition text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isLoading ? tr("جاري البحث...", "Searching...") : tr("بحث", "Search")}
+            {isLoading ? tr("...", "...") : tr("بحث", "Search")}
           </button>
         </div>
       </div>
 
-      {/* Summary */}
+     {/* Summary */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white border rounded-2xl p-4 shadow-sm">
-          <div className="text-sm text-gray-500">{tr("العميل", "Client")}</div>
-          <div className="font-bold text-gray-900 mt-1">
-            {selectedClient
-              ? selectedClient.nameAr || selectedClient.nameEn || selectedClient.name
-              : "—"}
+        <div className="bg-white border rounded-2xl p-4 shadow-sm flex items-center justify-between">
+          <div>
+            <div className="text-sm text-gray-500">{tr("العميل", "Client")}</div>
+
+            <div className="font-bold text-gray-900 mt-1 text-lg">
+              {selectedClient
+                ? selectedClient.nameAr || selectedClient.nameEn || selectedClient.name
+                : "—"}
+            </div>
+          </div>
+
+          <div className="w-12 h-12 rounded-2xl bg-violet-100 text-violet-600 flex items-center justify-center">
+            <Users className="w-5 h-5" />
           </div>
         </div>
 
-        <div className="bg-white border rounded-2xl p-4 shadow-sm">
-          <div className="text-sm text-gray-500">{tr("إجمالي المدين", "Total debit")}</div>
-          <div className="font-bold text-gray-900 mt-1">
-            QR {formatMoney(totalDebit)}
+        <div className="bg-white border rounded-2xl p-4 shadow-sm flex items-center justify-between">
+          <div>
+            <div className="text-sm text-gray-500">
+              {tr("إجمالي المدين", "Total debit")}
+            </div>
+
+            <div className="font-bold text-red-600 mt-1 text-2xl">
+              {showAmounts ? `QR ${formatMoney(totalDebit)}` : hiddenAmount}
+            </div>
+          </div>
+
+          <div className="w-12 h-12 rounded-2xl bg-red-100 text-red-600 flex items-center justify-center">
+            <ArrowDownLeft className="w-5 h-5" />
           </div>
         </div>
 
-        <div className="bg-white border rounded-2xl p-4 shadow-sm">
-          <div className="text-sm text-gray-500">{tr("إجمالي الدائن", "Total credit")}</div>
-          <div className="font-bold text-green-700 mt-1">
-            QR {formatMoney(totalCredit)}
+        <div className="bg-white border rounded-2xl p-4 shadow-sm flex items-center justify-between">
+          <div>
+            <div className="text-sm text-gray-500">
+              {tr("إجمالي الدائن", "Total credit")}
+            </div>
+
+            <div className="font-bold text-green-600 mt-1 text-2xl">
+              {showAmounts ? `QR ${formatMoney(totalCredit)}` : hiddenAmount}
+            </div>
+          </div>
+
+          <div className="w-12 h-12 rounded-2xl bg-green-100 text-green-600 flex items-center justify-center">
+            <ArrowUpRight className="w-5 h-5" />
           </div>
         </div>
 
-        <div className="bg-white border rounded-2xl p-4 shadow-sm">
-          <div className="text-sm text-gray-500">{tr("الرصيد", "Balance")}</div>
-          <div
-            className={`font-bold mt-1 ${
-              finalBalance > 0
-                ? "text-red-700"
-                : finalBalance < 0
-                ? "text-green-700"
-                : "text-gray-900"
-            }`}
-          >
-            QR {formatMoney(finalBalance)}
+        <div className="bg-white border rounded-2xl p-4 shadow-sm flex items-center justify-between">
+          <div>
+            <div className="text-sm text-gray-500">
+              {tr("الرصيد", "Balance")}
+            </div>
+
+            <div
+              className={`font-bold mt-1 text-2xl ${
+                finalBalance > 0
+                  ? "text-red-700"
+                  : finalBalance < 0
+                  ? "text-green-700"
+                  : "text-gray-900"
+              }`}
+            >
+              {showAmounts ? `QR ${formatMoney(finalBalance)}` : hiddenAmount}
+            </div>
+          </div>
+
+          <div className="w-12 h-12 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center">
+            <Wallet className="w-5 h-5" />
           </div>
         </div>
       </div>
@@ -353,10 +427,10 @@ export default function CustomerLedgerPage() {
                   <tr className="border-b bg-gray-50">
                     <td className="p-3 text-gray-400">—</td>
                     <td className="p-3 font-semibold">{tr("رصيد سابق", "Opening balance")}</td>
-                    <td className="p-3">QR 0.00</td>
-                    <td className="p-3">QR 0.00</td>
+                    <td className="p-3">{showAmounts ? "QR 0.00" : hiddenAmount}</td>
+                    <td className="p-3">{showAmounts ? "QR 0.00" : hiddenAmount}</td>
                     <td className="p-3 font-bold text-blue-700">
-                      QR {formatMoney(openingBalance)}
+                      {showAmounts ? `QR ${formatMoney(openingBalance)}` : hiddenAmount}
                     </td>
                   </tr>
 
@@ -378,15 +452,15 @@ export default function CustomerLedgerPage() {
                         </td>
 
                         <td className="p-3 font-medium">
-                          QR {formatMoney(Number(row.debit || 0))}
+                          {showAmounts ? `QR ${formatMoney(Number(row.debit || 0))}` : hiddenAmount}
                         </td>
 
                         <td className="p-3 font-medium text-green-700">
-                          QR {formatMoney(Number(row.credit || 0))}
+                          {showAmounts ? `QR ${formatMoney(Number(row.credit || 0))}` : hiddenAmount}
                         </td>
 
                         <td className="p-3 font-bold">
-                          QR {formatMoney(balance)}
+                          {showAmounts ? `QR ${formatMoney(balance)}` : hiddenAmount}
                         </td>
                       </tr>
                     );

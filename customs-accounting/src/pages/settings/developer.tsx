@@ -1280,6 +1280,215 @@ export default function DeveloperSettingsPage() {
             {databaseMessage && <div className="text-sm text-muted-foreground">{databaseMessage}</div>}
 
             <div className="rounded-2xl border border-border bg-background/70 p-4 shadow-sm">
+              <div className="mb-4 flex items-center gap-2 text-sm font-bold text-foreground">
+                <Database className="h-4 w-4 text-primary" />
+                <span>{tr("نوع قاعدة البيانات", "Database type")}</span>
+              </div>
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                {[
+                  { id: "local" as DatabaseMode, icon: Database, label: tr("قاعدة محلية (SQLite)", "Local database (SQLite)") },
+                  { id: "online" as DatabaseMode, icon: Cloud, label: tr("قاعدة أونلاين (PostgreSQL / MySQL لاحقًا)", "Online database (PostgreSQL / MySQL later)") },
+                ].map((option) => (
+                  <button
+                    key={option.id}
+                    type="button"
+                    onClick={() => setDatabaseMode(option.id)}
+                    className={cn(
+                      "flex items-center gap-3 rounded-xl border p-3 text-sm transition",
+                      databaseMode === option.id ? "border-primary bg-primary/5 text-primary shadow-sm" : "border-border bg-background hover:border-primary/40"
+                    )}
+                  >
+                    <option.icon className="h-4 w-4 shrink-0" />
+                    <span className="font-semibold">{option.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {databaseMode === "local" && (
+              <div className="rounded-2xl border border-border bg-background/70 p-4 shadow-sm">
+                <div className="mb-4 flex items-center gap-2 text-sm font-bold text-foreground">
+                  <Database className="h-4 w-4 text-emerald-600" />
+                  <span>{tr("قاعدة البيانات المحلية", "Local database")}</span>
+                </div>
+                <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                  <DevField label={tr("مسار قاعدة البيانات", "Database path")}>
+                    <Input
+                      value={databaseConfig.localPath}
+                      onChange={(event) => setDatabaseConfig((current) => ({ ...current, localPath: event.target.value }))}
+                      dir="ltr"
+                    />
+                  </DevField>
+                  <DevField label={tr("حالة الاتصال", "Connection status")}>
+                    <div className="flex h-10 items-center justify-between rounded-md border border-border bg-background px-3 text-sm">
+                      <span className={cn("font-semibold", databaseConfig.connectionStatus === "connected" ? "text-emerald-600" : "text-red-600")}>
+                        {formatDisplayValue(databaseConfig.connectionStatus, isAR)}
+                      </span>
+                      <span className={cn("h-2.5 w-2.5 rounded-full", databaseConfig.connectionStatus === "connected" ? "bg-emerald-500" : "bg-red-500")} />
+                    </div>
+                  </DevField>
+                </div>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <Button type="button" onClick={showLocalDatabasePreviewMessage} size="sm">{tr("إنشاء قاعدة جديدة", "Create new database")}</Button>
+                  <Button type="button" variant="outline" onClick={createSqlFile} size="sm">{tr("تحميل ملف SQL لإنشاء قاعدة جديدة", "Download SQL file to create a new database")}</Button>
+                </div>
+              </div>
+            )}
+
+            {databaseMode === "online" && (
+              <div className="rounded-2xl border border-border bg-background/70 p-4 shadow-sm">
+                <div className="mb-4 flex items-center gap-2 text-sm font-bold text-foreground">
+                  <Cloud className="h-4 w-4 text-blue-600" />
+                  <span>{tr("إعدادات قاعدة البيانات الأونلاين", "Online database settings")}</span>
+                </div>
+                <div className="mb-4 flex h-10 items-center justify-between rounded-md border border-border bg-background px-3 text-sm">
+                  <span className="text-muted-foreground">{tr("Online", "Online")}</span>
+                  <span className={cn("font-semibold", onlineDatabaseConnected ? "text-emerald-600" : "text-red-600")}>
+                    {onlineDatabaseConnected ? tr("متصل بالأونلاين", "Connected") : tr("غير متصل بالأونلاين", "Disconnected")}
+                  </span>
+                </div>
+                <label className="mb-4 flex items-center gap-2 text-sm font-semibold text-foreground">
+                  <input
+                    type="checkbox"
+                    checked={databaseConfig.useConnectionString}
+                    onChange={(event) => setDatabaseConfig((current) => ({ ...current, useConnectionString: event.target.checked }))}
+                    className="h-4 w-4 accent-primary"
+                  />
+                  <span>{tr("استخدام Connection String كامل", "Use full connection string")}</span>
+                </label>
+
+                {databaseConfig.useConnectionString ? (
+                  <DevField label="Connection String">
+                    <Input
+                      type="password"
+                      value={databaseConfig.connectionString}
+                      onChange={(event) => setDatabaseConfig((current) => ({ ...current, connectionString: event.target.value }))}
+                      placeholder="postgresql://user:password@host:5432/database"
+                      dir="ltr"
+                    />
+                  </DevField>
+                ) : (
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+                    <DevField label="Host">
+                      <Input value={databaseConfig.host} onChange={(event) => setDatabaseConfig((current) => ({ ...current, host: event.target.value }))} dir="ltr" />
+                    </DevField>
+                    <DevField label="Port">
+                      <Input value={databaseConfig.port} onChange={(event) => setDatabaseConfig((current) => ({ ...current, port: event.target.value }))} dir="ltr" />
+                    </DevField>
+                    <DevField label={tr("اسم قاعدة البيانات", "Database name")}>
+                      <Input value={databaseConfig.databaseName} onChange={(event) => setDatabaseConfig((current) => ({ ...current, databaseName: event.target.value }))} dir="ltr" />
+                    </DevField>
+                    <DevField label={tr("اسم المستخدم", "Username")}>
+                      <Input value={databaseConfig.username} onChange={(event) => setDatabaseConfig((current) => ({ ...current, username: event.target.value }))} dir="ltr" />
+                    </DevField>
+                    <DevField label={tr("كلمة المرور", "Password")}>
+                      <Input type="password" value={databaseConfig.password} onChange={(event) => setDatabaseConfig((current) => ({ ...current, password: event.target.value }))} dir="ltr" />
+                    </DevField>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="rounded-2xl border border-border bg-background/70 p-4 shadow-sm">
+              <div className="mb-4 flex flex-wrap gap-2">
+                <Button type="button" variant="outline" onClick={testPreparedConnection} size="sm" disabled={isTestingConnection}>
+                  {isTestingConnection ? tr("جارٍ الاختبار...", "Testing...") : tr("اختبار الاتصال", "Test connection")}
+                </Button>
+                <Button type="button" variant="outline" onClick={savePreparedConnection} size="sm">{tr("حفظ الإعدادات", "Save settings")}</Button>
+                {onlineDatabaseConnected ? (
+                  <Button type="button" variant="outline" onClick={disconnectOnlineDatabase} size="sm">{tr("فصل الاتصال", "Disconnect")}</Button>
+                ) : (
+                  <Button type="button" onClick={connectOnlineDatabase} size="sm" disabled={isConnectingOnline}>
+                    {isConnectingOnline ? tr("جارٍ الاتصال...", "Connecting...") : tr("اتصال", "Connect")}
+                  </Button>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+                <div>
+                  <div className="mb-3 flex items-center gap-2 text-sm font-bold text-foreground">
+                    <RefreshCw className="h-4 w-4 text-primary" />
+                    <span>{tr("خيارات المزامنة", "Sync options")}</span>
+                  </div>
+                  <div className="grid grid-cols-1 gap-2">
+                    {[
+                      { id: "local-to-online" as SyncMode, label: tr("مزامنة المحلي إلى الأونلاين", "Sync local to online") },
+                      { id: "online-to-local" as SyncMode, label: tr("مزامنة الأونلاين إلى المحلي", "Sync online to local") },
+                      { id: "bidirectional" as SyncMode, label: tr("مزامنة ثنائية الاتجاه", "Bidirectional sync") },
+                    ].map((mode) => (
+                      <label key={mode.id} className="flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-sm">
+                        <input
+                          type="radio"
+                          checked={syncConfig.mode === mode.id}
+                          onChange={() => setSyncConfig((current) => ({ ...current, mode: mode.id }))}
+                          className="h-4 w-4 accent-primary"
+                        />
+                        <span>{mode.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="mb-3 flex items-center gap-2 text-sm font-bold text-foreground">
+                    <Activity className="h-4 w-4 text-primary" />
+                    <span>{tr("الجدولة والحالة", "Schedule and status")}</span>
+                  </div>
+                  <label className="flex items-center justify-between rounded-lg border border-border bg-background px-3 py-2 text-sm">
+                    <span>{tr("مزامنة تلقائية", "Auto sync")}</span>
+                    <input
+                      type="checkbox"
+                      checked={syncConfig.autoSync}
+                      onChange={(event) => setSyncConfig((current) => ({ ...current, autoSync: event.target.checked }))}
+                      className="h-4 w-4 accent-primary"
+                    />
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <DevField label={tr("التوقيت", "Timing")}>
+                      <select
+                        value={syncConfig.timing}
+                        onChange={(event) => setSyncConfig((current) => ({ ...current, timing: event.target.value as AutoSyncTiming }))}
+                        className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm"
+                      >
+                        <option value="startup">{tr("عند بدء التشغيل", "On startup")}</option>
+                        <option value="interval">{tr("كل فترة", "Interval")}</option>
+                      </select>
+                    </DevField>
+                    <DevField label={tr("الفاصل بالدقائق", "Interval in minutes")}>
+                      <Input
+                        type="number"
+                        min={1}
+                        value={syncConfig.intervalMinutes}
+                        onChange={(event) => setSyncConfig((current) => ({ ...current, intervalMinutes: Number(event.target.value) }))}
+                      />
+                    </DevField>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <InfoRow isAR={isAR} label={tr("آخر مزامنة", "Last sync")} value={formatSyncQueueDate(syncQueueStatus.lastSync, isAR)} />
+                    <InfoRow isAR={isAR} label={tr("الحالة", "Status")} value={getSyncQueueDisplayStatus(syncQueueStatus, isAR)} />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {activeTab === "diagnostics" && (
+        <div className="space-y-4">
+          <Card className="rounded-lg">
+            <CardHeader><CardTitle className="text-lg">{tr("النظام والتشخيص", "Diagnostics")}</CardTitle></CardHeader>
+            <CardContent className="grid gap-3 md:grid-cols-2">
+              <InfoRow isAR={isAR} label={tr("إصدار التطبيق", "App version")} value={settings.appVersion || import.meta.env.VITE_APP_VERSION} />
+              <InfoRow isAR={isAR} label={tr("مسار الواجهة", "Frontend path")} value={settings.frontendPath} />
+              <InfoRow isAR={isAR} label={tr("مسار الخادم", "Backend path")} value={settings.backendPath} />
+              <InfoRow isAR={isAR} label={tr("حالة API", "API status")} value={settings.apiStatus} />
+              <InfoRow isAR={isAR} label={tr("حالة ملف env", "env file status")} value={settings.envFileStatus} />
+              <InfoRow isAR={isAR} label={tr("حالة الموارد", "Resources status")} value={settings.resourcesStatus} />
+            </CardContent>
+          </Card>
+
+            <div className="rounded-2xl border border-border bg-background/70 p-4 shadow-sm">
               <div className="mb-4 flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2 text-sm font-bold text-foreground">
                   <Database className="h-4 w-4 text-primary" />
@@ -1507,213 +1716,7 @@ export default function DeveloperSettingsPage() {
               )}
             </div>
 
-            <div className="rounded-2xl border border-border bg-background/70 p-4 shadow-sm">
-              <div className="mb-4 flex items-center gap-2 text-sm font-bold text-foreground">
-                <Database className="h-4 w-4 text-primary" />
-                <span>{tr("نوع قاعدة البيانات", "Database type")}</span>
-              </div>
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                {[
-                  { id: "local" as DatabaseMode, icon: Database, label: tr("قاعدة محلية (SQLite)", "Local database (SQLite)") },
-                  { id: "online" as DatabaseMode, icon: Cloud, label: tr("قاعدة أونلاين (PostgreSQL / MySQL لاحقًا)", "Online database (PostgreSQL / MySQL later)") },
-                ].map((option) => (
-                  <button
-                    key={option.id}
-                    type="button"
-                    onClick={() => setDatabaseMode(option.id)}
-                    className={cn(
-                      "flex items-center gap-3 rounded-xl border p-3 text-sm transition",
-                      databaseMode === option.id ? "border-primary bg-primary/5 text-primary shadow-sm" : "border-border bg-background hover:border-primary/40"
-                    )}
-                  >
-                    <option.icon className="h-4 w-4 shrink-0" />
-                    <span className="font-semibold">{option.label}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {databaseMode === "local" && (
-              <div className="rounded-2xl border border-border bg-background/70 p-4 shadow-sm">
-                <div className="mb-4 flex items-center gap-2 text-sm font-bold text-foreground">
-                  <Database className="h-4 w-4 text-emerald-600" />
-                  <span>{tr("قاعدة البيانات المحلية", "Local database")}</span>
-                </div>
-                <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-                  <DevField label={tr("مسار قاعدة البيانات", "Database path")}>
-                    <Input
-                      value={databaseConfig.localPath}
-                      onChange={(event) => setDatabaseConfig((current) => ({ ...current, localPath: event.target.value }))}
-                      dir="ltr"
-                    />
-                  </DevField>
-                  <DevField label={tr("حالة الاتصال", "Connection status")}>
-                    <div className="flex h-10 items-center justify-between rounded-md border border-border bg-background px-3 text-sm">
-                      <span className={cn("font-semibold", databaseConfig.connectionStatus === "connected" ? "text-emerald-600" : "text-red-600")}>
-                        {formatDisplayValue(databaseConfig.connectionStatus, isAR)}
-                      </span>
-                      <span className={cn("h-2.5 w-2.5 rounded-full", databaseConfig.connectionStatus === "connected" ? "bg-emerald-500" : "bg-red-500")} />
-                    </div>
-                  </DevField>
-                </div>
-                <div className="mt-4 flex flex-wrap gap-2">
-                  <Button type="button" onClick={showLocalDatabasePreviewMessage} size="sm">{tr("إنشاء قاعدة جديدة", "Create new database")}</Button>
-                  <Button type="button" variant="outline" onClick={createSqlFile} size="sm">{tr("تحميل ملف SQL لإنشاء قاعدة جديدة", "Download SQL file to create a new database")}</Button>
-                </div>
-              </div>
-            )}
-
-            {databaseMode === "online" && (
-              <div className="rounded-2xl border border-border bg-background/70 p-4 shadow-sm">
-                <div className="mb-4 flex items-center gap-2 text-sm font-bold text-foreground">
-                  <Cloud className="h-4 w-4 text-blue-600" />
-                  <span>{tr("إعدادات قاعدة البيانات الأونلاين", "Online database settings")}</span>
-                </div>
-                <div className="mb-4 flex h-10 items-center justify-between rounded-md border border-border bg-background px-3 text-sm">
-                  <span className="text-muted-foreground">{tr("Online", "Online")}</span>
-                  <span className={cn("font-semibold", onlineDatabaseConnected ? "text-emerald-600" : "text-red-600")}>
-                    {onlineDatabaseConnected ? tr("متصل بالأونلاين", "Connected") : tr("غير متصل بالأونلاين", "Disconnected")}
-                  </span>
-                </div>
-                <label className="mb-4 flex items-center gap-2 text-sm font-semibold text-foreground">
-                  <input
-                    type="checkbox"
-                    checked={databaseConfig.useConnectionString}
-                    onChange={(event) => setDatabaseConfig((current) => ({ ...current, useConnectionString: event.target.checked }))}
-                    className="h-4 w-4 accent-primary"
-                  />
-                  <span>{tr("استخدام Connection String كامل", "Use full connection string")}</span>
-                </label>
-
-                {databaseConfig.useConnectionString ? (
-                  <DevField label="Connection String">
-                    <Input
-                      type="password"
-                      value={databaseConfig.connectionString}
-                      onChange={(event) => setDatabaseConfig((current) => ({ ...current, connectionString: event.target.value }))}
-                      placeholder="postgresql://user:password@host:5432/database"
-                      dir="ltr"
-                    />
-                  </DevField>
-                ) : (
-                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-                    <DevField label="Host">
-                      <Input value={databaseConfig.host} onChange={(event) => setDatabaseConfig((current) => ({ ...current, host: event.target.value }))} dir="ltr" />
-                    </DevField>
-                    <DevField label="Port">
-                      <Input value={databaseConfig.port} onChange={(event) => setDatabaseConfig((current) => ({ ...current, port: event.target.value }))} dir="ltr" />
-                    </DevField>
-                    <DevField label={tr("اسم قاعدة البيانات", "Database name")}>
-                      <Input value={databaseConfig.databaseName} onChange={(event) => setDatabaseConfig((current) => ({ ...current, databaseName: event.target.value }))} dir="ltr" />
-                    </DevField>
-                    <DevField label={tr("اسم المستخدم", "Username")}>
-                      <Input value={databaseConfig.username} onChange={(event) => setDatabaseConfig((current) => ({ ...current, username: event.target.value }))} dir="ltr" />
-                    </DevField>
-                    <DevField label={tr("كلمة المرور", "Password")}>
-                      <Input type="password" value={databaseConfig.password} onChange={(event) => setDatabaseConfig((current) => ({ ...current, password: event.target.value }))} dir="ltr" />
-                    </DevField>
-                  </div>
-                )}
-              </div>
-            )}
-
-            <div className="rounded-2xl border border-border bg-background/70 p-4 shadow-sm">
-              <div className="mb-4 flex flex-wrap gap-2">
-                <Button type="button" variant="outline" onClick={testPreparedConnection} size="sm" disabled={isTestingConnection}>
-                  {isTestingConnection ? tr("جارٍ الاختبار...", "Testing...") : tr("اختبار الاتصال", "Test connection")}
-                </Button>
-                <Button type="button" variant="outline" onClick={savePreparedConnection} size="sm">{tr("حفظ الإعدادات", "Save settings")}</Button>
-                {onlineDatabaseConnected ? (
-                  <Button type="button" variant="outline" onClick={disconnectOnlineDatabase} size="sm">{tr("فصل الاتصال", "Disconnect")}</Button>
-                ) : (
-                  <Button type="button" onClick={connectOnlineDatabase} size="sm" disabled={isConnectingOnline}>
-                    {isConnectingOnline ? tr("جارٍ الاتصال...", "Connecting...") : tr("اتصال", "Connect")}
-                  </Button>
-                )}
-              </div>
-
-              <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-                <div>
-                  <div className="mb-3 flex items-center gap-2 text-sm font-bold text-foreground">
-                    <RefreshCw className="h-4 w-4 text-primary" />
-                    <span>{tr("خيارات المزامنة", "Sync options")}</span>
-                  </div>
-                  <div className="grid grid-cols-1 gap-2">
-                    {[
-                      { id: "local-to-online" as SyncMode, label: tr("مزامنة المحلي إلى الأونلاين", "Sync local to online") },
-                      { id: "online-to-local" as SyncMode, label: tr("مزامنة الأونلاين إلى المحلي", "Sync online to local") },
-                      { id: "bidirectional" as SyncMode, label: tr("مزامنة ثنائية الاتجاه", "Bidirectional sync") },
-                    ].map((mode) => (
-                      <label key={mode.id} className="flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-sm">
-                        <input
-                          type="radio"
-                          checked={syncConfig.mode === mode.id}
-                          onChange={() => setSyncConfig((current) => ({ ...current, mode: mode.id }))}
-                          className="h-4 w-4 accent-primary"
-                        />
-                        <span>{mode.label}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <div className="mb-3 flex items-center gap-2 text-sm font-bold text-foreground">
-                    <Activity className="h-4 w-4 text-primary" />
-                    <span>{tr("الجدولة والحالة", "Schedule and status")}</span>
-                  </div>
-                  <label className="flex items-center justify-between rounded-lg border border-border bg-background px-3 py-2 text-sm">
-                    <span>{tr("مزامنة تلقائية", "Auto sync")}</span>
-                    <input
-                      type="checkbox"
-                      checked={syncConfig.autoSync}
-                      onChange={(event) => setSyncConfig((current) => ({ ...current, autoSync: event.target.checked }))}
-                      className="h-4 w-4 accent-primary"
-                    />
-                  </label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <DevField label={tr("التوقيت", "Timing")}>
-                      <select
-                        value={syncConfig.timing}
-                        onChange={(event) => setSyncConfig((current) => ({ ...current, timing: event.target.value as AutoSyncTiming }))}
-                        className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm"
-                      >
-                        <option value="startup">{tr("عند بدء التشغيل", "On startup")}</option>
-                        <option value="interval">{tr("كل فترة", "Interval")}</option>
-                      </select>
-                    </DevField>
-                    <DevField label={tr("الفاصل بالدقائق", "Interval in minutes")}>
-                      <Input
-                        type="number"
-                        min={1}
-                        value={syncConfig.intervalMinutes}
-                        onChange={(event) => setSyncConfig((current) => ({ ...current, intervalMinutes: Number(event.target.value) }))}
-                      />
-                    </DevField>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <InfoRow isAR={isAR} label={tr("آخر مزامنة", "Last sync")} value={formatSyncQueueDate(syncQueueStatus.lastSync, isAR)} />
-                    <InfoRow isAR={isAR} label={tr("الحالة", "Status")} value={getSyncQueueDisplayStatus(syncQueueStatus, isAR)} />
-                  </div>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {activeTab === "diagnostics" && (
-        <Card className="rounded-lg">
-          <CardHeader><CardTitle className="text-lg">{tr("النظام والتشخيص", "Diagnostics")}</CardTitle></CardHeader>
-          <CardContent className="grid gap-3 md:grid-cols-2">
-            <InfoRow isAR={isAR} label={tr("إصدار التطبيق", "App version")} value={settings.appVersion || import.meta.env.VITE_APP_VERSION} />
-            <InfoRow isAR={isAR} label={tr("مسار الواجهة", "Frontend path")} value={settings.frontendPath} />
-            <InfoRow isAR={isAR} label={tr("مسار الخادم", "Backend path")} value={settings.backendPath} />
-            <InfoRow isAR={isAR} label={tr("حالة API", "API status")} value={settings.apiStatus} />
-            <InfoRow isAR={isAR} label={tr("حالة ملف env", "env file status")} value={settings.envFileStatus} />
-            <InfoRow isAR={isAR} label={tr("حالة الموارد", "Resources status")} value={settings.resourcesStatus} />
-          </CardContent>
-        </Card>
+        </div>
       )}
 
       {activeTab === "updates" && (

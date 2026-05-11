@@ -51,6 +51,7 @@ export default function StatementsIndex() {
   const [, setLocation] = useLocation();
   const [showAmounts, setShowAmounts] = useState(false);
   const [search, setSearch] = useState("");
+  const [selectedClientId, setSelectedClientId] = useState("");
   const [fromDate, setFromDate] = useState(() => getDefaultDateRange().from);
   const [toDate, setToDate] = useState(() => getDefaultDateRange().to);
   const hidden = <span className="tracking-widest opacity-35 font-mono">••••••</span>;
@@ -74,7 +75,9 @@ export default function StatementsIndex() {
     const q = search.trim().toLowerCase();
     const invoices = allInvoices?.filter(inv => {
       const issueDate = String(inv.issueDate || "").slice(0, 10);
-      const matchesClient = inv.clientId === client.id;
+      const matchesClient =
+        (!selectedClientId || String(client.id) === selectedClientId) &&
+        inv.clientId === client.id;
       const matchesSearch =
         !q ||
         String(inv.invoiceNumber || "").toLowerCase().includes(q) ||
@@ -169,28 +172,75 @@ export default function StatementsIndex() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <div className="relative">
-          <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+        <div className="md:col-span-3">
+          <label className="text-sm font-medium text-muted-foreground mb-1 block">
+            {isAR ? "العميل" : "Client"}
+          </label>
+
+          <select
+            value={selectedClientId}
+            onChange={(e) => setSelectedClientId(e.target.value)}
+            className="w-full h-[38px] px-3 bg-card border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm"
+          >
+            <option value="">
+              {isAR ? "جميع العملاء" : "All clients"}
+            </option>
+
+            {clients.map((client: any) => (
+              <option key={client.id} value={client.id}>
+                {client.nameAr || client.nameEn || client.name || client.companyName || `Client #${client.id}`}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="md:col-span-5">
+          <label className="text-sm font-medium text-muted-foreground mb-1 block">
+            {isAR ? "بحث" : "Search"}
+          </label>
+
+          <div className="relative">
+            <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={
+                isAR
+                  ? "بحث برقم الفاتورة أو البيان أو البوليصة"
+                  : "Search invoice, shipment ref, or bill of lading"
+              }
+              className="w-full h-[38px] pr-9 pl-3 bg-card border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm"
+            />
+          </div>
+        </div>
+
+        <div className="md:col-span-2">
+          <label className="text-sm font-medium text-muted-foreground mb-1 block">
+            {isAR ? "من تاريخ" : "From date"}
+          </label>
+
           <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder={isAR ? "بحث برقم الفاتورة أو البيان أو البوليصة" : "Search invoice, shipment ref, or bill of lading"}
-            className="w-full pr-9 pl-3 py-2 bg-card border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm"
+            type="date"
+            value={fromDate}
+            onChange={(e) => setFromDate(e.target.value)}
+            className="w-full h-[38px] px-3 bg-card border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm"
           />
         </div>
-        <input
-          type="date"
-          value={fromDate}
-          onChange={(e) => setFromDate(e.target.value)}
-          className="w-full px-3 py-2 bg-card border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm"
-        />
-        <input
-          type="date"
-          value={toDate}
-          onChange={(e) => setToDate(e.target.value)}
-          className="w-full px-3 py-2 bg-card border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm"
-        />
+
+        <div className="md:col-span-2">
+          <label className="text-sm font-medium text-muted-foreground mb-1 block">
+            {isAR ? "إلى تاريخ" : "To date"}
+          </label>
+
+          <input
+            type="date"
+            value={toDate}
+            onChange={(e) => setToDate(e.target.value)}
+            className="w-full h-[38px] px-3 bg-card border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm"
+          />
+        </div>
       </div>
 
       {/* Clients Table */}

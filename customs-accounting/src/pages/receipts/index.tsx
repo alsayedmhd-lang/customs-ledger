@@ -52,8 +52,26 @@ export default function ReceiptsList() {
   const isAR = lang === "ar";
   const tr = (ar: string, en: string) => (isAR ? ar : en);
   const [search, setSearch] = useState("");
-  const [fromDate, setFromDate] = useState("");
-  const [toDate, setToDate] = useState("");
+  function formatDateInput(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
+  function getDefaultDateRange() {
+    const today = new Date();
+
+    return {
+      from: formatDateInput(new Date(today.getFullYear(), today.getMonth(), 1)),
+      to: formatDateInput(today),
+    };
+  }
+
+  const [fromDate, setFromDate] = useState(() => getDefaultDateRange().from);
+  const [toDate, setToDate] = useState(() => getDefaultDateRange().to);
+  
   const [paymentMethodFilter, setPaymentMethodFilter] = useState("");
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [showAmounts, setShowAmounts] = useState(false);
@@ -163,7 +181,7 @@ const getClientName = (receipt: { clientName?: string | null; clientId?: number 
         </div>
       </motion.div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-[1.8fr_140px_140px_160px] gap-3">
         <div className="relative">
           <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
           <Input

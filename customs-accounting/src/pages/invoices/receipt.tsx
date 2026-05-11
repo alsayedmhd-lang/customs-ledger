@@ -649,7 +649,7 @@ const impExpValue =
               <img
                 src={stampSrc}
                 alt="الختم الرسمي"
-                className="absolute left-1/2 top-full w-auto -translate-x-1/2 -translate-y-[58%] object-contain"
+                className="absolute left-1/2 top-1/2 w-auto -translate-x-1/2 -translate-y-1/2 object-contain"
                 style={{
                   height: "150px",
                   maxWidth: "230px",

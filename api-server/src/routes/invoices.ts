@@ -196,21 +196,22 @@ router.get("/invoices", requireAuth, async (req, res) => {
       const filters = [eq(invoicesTable.clientId, clientId), isNull(invoicesTable.deletedAt)];
       if (ownerFilter) filters.push(ownerFilter);
       rows = await db
-        .select()
-        .from(invoicesTable)
-        .innerJoin(clientsTable, eq(invoicesTable.clientId, clientsTable.id))
-        .innerJoin(usersTable, eq(invoicesTable.createdBy, usersTable.id))
-        .where(and(...filters))
-        .orderBy(desc(invoicesTable.id));
+      .select()
+      .from(invoicesTable)
+      .innerJoin(clientsTable, eq(invoicesTable.clientId, clientsTable.id))
+      .leftJoin(usersTable, eq(invoicesTable.createdBy, usersTable.id))
+      .where(and(...filters))
+      .orderBy(desc(invoicesTable.id));
     } else {
       const filters = [isNull(invoicesTable.deletedAt)];
       if (ownerFilter) filters.push(ownerFilter);
       rows = await db
-        .select()
-        .from(invoicesTable)
-        .innerJoin(clientsTable, eq(invoicesTable.clientId, clientsTable.id))
-        .where(and(...filters))
-        .orderBy(desc(invoicesTable.id));
+      .select()
+      .from(invoicesTable)
+      .innerJoin(clientsTable, eq(invoicesTable.clientId, clientsTable.id))
+      .leftJoin(usersTable, eq(invoicesTable.createdBy, usersTable.id))
+      .where(and(...filters))
+      .orderBy(desc(invoicesTable.id));
     }
 
     const invoicesWithItems = await Promise.all(
@@ -223,7 +224,12 @@ router.get("/invoices", requireAuth, async (req, res) => {
           ...formatInvoice(
             {
               ...row.invoices,
-              createdByName: row.users?.displayNameEn || row.users?.displayNameAr || null,
+              createdByName:
+                row.users?.displayNameAr ||
+                row.users?.displayNameEn ||
+                row.users?.displayName ||
+                row.users?.username ||
+                null,
             },
             row.clients.name
           ),
