@@ -911,6 +911,129 @@ ipcMain.handle("backup:verify-directory", async (_event, backupDir) => {
   }
 });
 
+ipcMain.handle("storage:test-write", async (_event, targetPath) => {
+  try {
+    const fs = require("fs");
+    const path = require("path");
+
+    const normalizedTarget = path.resolve(targetPath).toLowerCase();
+
+    const blockedPaths = [
+      "c:\\windows",
+      "c:\\program files",
+      "c:\\program files (x86)",
+    ];
+
+    if (blockedPaths.some((blockedPath) => normalizedTarget.startsWith(blockedPath))) {
+      return {
+        ok: false,
+        writable: false,
+        path: targetPath,
+        error: "This folder is protected and cannot be used as Data Root",
+      };
+    }
+
+    const testFilePath = path.join(
+      targetPath,
+      `.write-test-${Date.now()}.tmp`
+    );
+
+    fs.writeFileSync(testFilePath, "Customs Ledger Write Test", "utf8");
+
+    const exists = fs.existsSync(testFilePath);
+
+    if (!exists) {
+      throw new Error("Write test failed");
+    }
+
+    fs.unlinkSync(testFilePath);
+
+    return {
+      ok: true,
+      writable: true,
+      path: targetPath,
+    };
+  } catch (error) {
+    console.error("[DATA ROOT][WRITE TEST ERROR]", error);
+
+    return {
+      ok: false,
+      writable: false,
+      path: targetPath,
+      error: error?.message || String(error),
+    };
+  }
+});
+
+ipcMain.handle("storage:choose-data-root", async () => {
+  try {
+    const result = await dialog.showOpenDialog({
+      title: "Choose Data Root Folder",
+      properties: ["openDirectory", "createDirectory"],
+    });
+
+    if (result.canceled || !result.filePaths?.[0]) {
+      return {
+        ok: false,
+        canceled: true,
+      };
+    }
+
+    return {
+      ok: true,
+      canceled: false,
+      path: result.filePaths[0],
+    };
+  } catch (error) {
+    console.error("[DATA ROOT][CHOOSE FOLDER ERROR]", error);
+
+    return {
+      ok: false,
+      canceled: false,
+      error: error?.message || String(error),
+    };
+  }
+});
+
+ipcMain.handle("storage:save-data-root", async (_event, targetPath) => {
+  try {
+    const fs = require("fs");
+    const path = require("path");
+
+    const configDir = path.join(targetPath, "config");
+    const configPath = path.join(configDir, "storage-config.json");
+
+    fs.mkdirSync(configDir, { recursive: true });
+
+    fs.writeFileSync(
+      configPath,
+      JSON.stringify(
+        {
+          dataRoot: targetPath,
+          updatedAt: new Date().toISOString(),
+          source: "developer-settings",
+        },
+        null,
+        2
+      ),
+      "utf8"
+    );
+
+    return {
+      ok: true,
+      configPath,
+      dataRoot: targetPath,
+    };
+  } catch (error) {
+    console.error("[DATA ROOT][SAVE CONFIG ERROR]", error);
+
+    return {
+      ok: false,
+      error: error?.message || String(error),
+    };
+  }
+});
+
 ipcMain.handle("open-external-file", async (_event, relativePath) => {
   try {
     let filePath = relativePath;

@@ -25,6 +25,17 @@ contextBridge.exposeInMainWorld("electronAPI", {
   openDataFolder: () => {
     return ipcRenderer.invoke("storage:open-data-folder");
   },
+
+  testDataRootWrite: (targetPath) => {
+    return ipcRenderer.invoke("storage:test-write", targetPath);
+  },
+  chooseDataRootFolder: () => {
+    return ipcRenderer.invoke("storage:choose-data-root");
+  },
+  saveDataRootConfig: (targetPath) => {
+    return ipcRenderer.invoke("storage:save-data-root", targetPath);
+  },
+
   selectAttachmentFile: () => ipcRenderer.invoke("attachments:select-file"),
   saveAttachmentFile: ({ sourcePath, declarationBaseNumber, storedName }) =>
     ipcRenderer.invoke("attachment:save-file", {

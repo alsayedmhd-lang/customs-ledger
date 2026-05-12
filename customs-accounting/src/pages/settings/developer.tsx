@@ -1520,13 +1520,108 @@ export default function DeveloperSettingsPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                 <button
                   type="button"
+                  onClick={async () => {
+                    const result =
+                      await window.electronAPI?.chooseDataRootFolder?.();
+
+                    if (result?.canceled) {
+                      return;
+                    }
+
+                    if (!result?.ok) {
+                      alert(
+                        result?.error ||
+                          tr(
+                            "فشل اختيار المجلد",
+                            "Failed to choose folder"
+                          )
+                      );
+
+                      return;
+                    }
+
+                    const writeTest =
+                      await window.electronAPI?.testDataRootWrite?.(result.path);
+
+                    if (!writeTest?.ok) {
+                      alert(
+                        writeTest?.error ||
+                          tr(
+                            "تم اختيار المجلد لكن فشل اختبار الكتابة",
+                            "Folder selected but write test failed"
+                          )
+                      );
+
+                      return;
+                    }
+
+                    const saveResult =
+                      await window.electronAPI?.saveDataRootConfig?.(result.path);
+
+                    if (!saveResult?.ok) {
+                      alert(
+                        saveResult?.error ||
+                          tr(
+                            "تم اختيار المجلد واختبار الكتابة، لكن فشل حفظ إعداد المسار",
+                            "Folder selected and write test passed, but saving data root setting failed"
+                          )
+                      );
+
+                      return;
+                    }
+
+                    alert(
+                      tr(
+                        "تم اختيار المجلد واختبار الكتابة وحفظ إعداد المسار بنجاح",
+                        "Folder selected, write test completed, and data root setting saved successfully"
+                      ) +
+                        "\n\n" +
+                        result.path
+                    );
+                  }}
                   className="px-4 py-2 rounded-xl border bg-background hover:bg-muted transition text-sm font-medium"
                 >
                   {tr("اختيار مجلد جديد", "Choose New Folder")}
                 </button>
-
                 <button
                   type="button"
+                  onClick={async () => {
+                    const dataRoot =
+                      settings.sqlitePath
+                        ?.replace(/\\database\\local\.db$/i, "")
+                        ?.replace(/\/database\/local\.db$/i, "");
+
+                    if (!dataRoot) {
+                      alert(
+                        tr(
+                          "مسار البيانات غير متوفر",
+                          "Data root path is not available"
+                        )
+                      );
+
+                      return;
+                    }
+
+                    const result =
+                      await window.electronAPI?.testDataRootWrite?.(dataRoot);
+
+                    if (result?.ok) {
+                      alert(
+                        tr(
+                          "تم اختبار الكتابة بنجاح",
+                          "Write test completed successfully"
+                        )
+                      );
+                    } else {
+                      alert(
+                        result?.error ||
+                          tr(
+                            "فشل اختبار الكتابة",
+                            "Write test failed"
+                          )
+                      );
+                    }
+                  }}
                   className="px-4 py-2 rounded-xl border bg-background hover:bg-muted transition text-sm font-medium"
                 >
                   {tr("اختبار الكتابة", "Test Write")}
