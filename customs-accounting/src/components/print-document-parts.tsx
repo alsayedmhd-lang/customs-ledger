@@ -110,7 +110,7 @@ export function ReceiptPrintHeader({
   const { settings, logoSrc } = usePrintSettings(override);
 
   return (
-    <div className="border-b-4 border-double border-gray-800 pb-1 pt-1 px-5 relative z-10">
+    <div className="border-b-4 border-double border-gray-800 pb-1 pt-3 px-5 relative z-10">
       <div className="flex items-center justify-between">
         <div className="text-right">
           <div className="text-sm font-black text-gray-900 leading-tight">{settings.nameAr}</div>
@@ -119,11 +119,21 @@ export function ReceiptPrintHeader({
           <div className="text-[10px] text-gray-500 mt-0.5">{settings.email}</div>
         </div>
 
-        <div className="flex flex-col items-center gap-0.5">
-          <img src={logoSrc} alt={settings.nameAr} className="h-10 w-auto object-contain" />
+        <div className="flex flex-col items-center gap-1 relative -top-2">
+          <img
+            src={logoSrc}
+            alt={settings.nameAr}
+            className="h-20 w-auto object-contain"
+          />
+
           <div className="text-center">
-            <div className="font-black text-gray-900 text-base leading-tight">سند قبض</div>
-            <div className="text-gray-400 text-[10px] font-normal">RECEIPT VOUCHER</div>
+            <div className="font-black text-gray-900 text-2xl leading-tight">
+              سند قبض
+            </div>
+
+            <div className="text-gray-500 text-xs font-bold tracking-wide">
+              RECEIPT VOUCHER
+            </div>
           </div>
         </div>
 
@@ -144,7 +154,7 @@ export function ReceiptPrintHeader({
         </div>
       </div>
 
-      <div className="flex items-center justify-between mt-1 pt-1 border-t border-gray-200">
+      <div className="flex items-center justify-between -mt-3 pt-1 border-t border-gray-200">
         <div className="text-right">
           <span className="text-xs font-bold text-gray-500">رقم السند / No: </span>
           <span className="font-mono text-blue-800 font-bold text-sm">{receiptNumber}</span>

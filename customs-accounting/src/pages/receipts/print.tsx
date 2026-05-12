@@ -215,11 +215,39 @@ export default function ReceiptPrint() {
       <style>{`
         @media print {
           @page { size: A4 portrait; margin: 10mm 10mm 10mm 15mm; }
-          body { margin: 0; background: white !important; }
+
+          body {
+            margin: 0;
+            background: white !important;
+          }
+
+          .print-page {
+            width: 170mm !important;
+            max-width: 170mm !important;
+            margin: 12mm auto 0 auto !important;
+
+            height: auto !important;
+            min-height: auto !important;
+
+            display: block !important;
+            overflow: visible !important;
+          }
+
+          .print-content {
+            height: auto !important;
+            min-height: auto !important;
+            display: block !important;
+          }
+
+          .print-footer {
+            position: relative !important;
+            margin-top: -1mm !important;
+            page-break-inside: avoid;
+          }
         }
       `}</style>
 
-      <div className="print:hidden flex gap-3 p-4 max-w-2xl mx-auto flex-wrap" dir={isAR ? "rtl" : "ltr"}>
+      <div className="print:hidden flex gap-3 p-4max-w-2xl  mx-auto flex-wrap" dir={isAR ? "rtl" : "ltr"}>
         <Link href="/receipts">
           <button className={`${isClient ? "hidden" : ""} flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-700 hover:bg-gray-50 text-sm font-medium`}>
             {isAR ? <ArrowRight className="w-4 h-4" /> : <ArrowLeft className="w-4 h-4" />}
@@ -235,6 +263,17 @@ export default function ReceiptPrint() {
         >
           <Printer className="w-4 h-4" />
           {isAR ? "طباعة السند" : "Print Receipt"}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            const fileName = `${receipt.receiptNumber} - ${receipt.clientName || "Client"}`;
+            navigator.clipboard.writeText(fileName);
+          }}
+          className="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg bg-white hover:bg-gray-50 text-sm"
+        >
+          نسخ الاسم
         </button>
 
         {!isClient && settings.showStampOnReceipts && (
@@ -263,8 +302,10 @@ export default function ReceiptPrint() {
       </div>
 
       <div
-        className="print-page max-w-2xl mx-auto print:max-w-none print:w-full print:mx-0 bg-white shadow-lg print:shadow-none border border-gray-200 print:border-none relative overflow-hidden"
-        style={{ fontFamily: "'Cairo', 'Arial', sans-serif" }}
+        className="print-page max-w-[210mm] mx-auto print:max-w-none print:w-full print:mx-0 bg-white shadow-lg print:shadow-none border border-gray-200 print:border-none relative overflow-hidden"
+        style={{
+          fontFamily: "'Cairo', 'Arial', sans-serif",
+        }}
       >
         <main className="print-content">
         {settings.showWatermark && (
@@ -301,7 +342,7 @@ export default function ReceiptPrint() {
               <div className="text-[10px] text-gray-500 mt-0.5">{printEmail}</div>
             </div>
 
-            <div className="flex flex-col items-center gap-0.5">
+            <div className="flex flex-col items-center gap-0.5 relative top-5">
               <img src={logoSrc} alt={settings.nameAr} className="h-10 w-auto object-contain" />
               <div className="text-center">
                 <div className="font-black text-gray-900 text-base leading-tight">سند قبض</div>
@@ -441,15 +482,15 @@ export default function ReceiptPrint() {
         </main>
 
         <div className="print-footer">
-          <div className="print-signature-stamp-area relative grid grid-cols-2 gap-8 px-10 pb-3 pt-4 border-t border-gray-300" style={{ zIndex: 3 }}>
+          <div className="print-signature-stamp-area relative grid grid-cols-2 gap-8 px-10 pb-3 pt-4 " style={{ zIndex: 3 }}>
             <div className="text-center">
-              <div className="h-12 border-b-2 border-gray-400" />
+              <div className="h-12 border-b border-gray-300" />
               <p className="text-xs text-gray-500 mt-1 font-bold">توقيع المستلم</p>
               <p className="text-xs text-gray-400">Receiver Signature</p>
             </div>
 
             <div className="text-center">
-              <div className="h-12 border-b-2 border-gray-400" />
+              <div className="h-12 border-b border-gray-300" />
               <p className="text-xs text-gray-500 mt-1 font-bold">توقيع المحاسب</p>
               <p className="text-xs text-gray-400">Accountant Signature</p>
             </div>
@@ -462,21 +503,21 @@ export default function ReceiptPrint() {
                     <img
                       src={(user as any)?.signatureBase64 || (user as any)?.receiverSignatureBase64}
                       alt="Receiver Signature"
-                      className="absolute bottom-10 right-[12%] h-14 w-auto object-contain pointer-events-none"
-                      style={{ zIndex: 3, opacity: 0.9, mixBlendMode: "multiply" }}
+                      className="absolute bottom-10 right-[9%] h-20 w-auto object-contain bg-transparent pointer-events-none"
+                      style={{ zIndex: 3, opacity: 1, mixBlendMode: "multiply",background: "transparent", }}
                     />
 
                     {/* اسم المستلم بجانب التوقيع */}
                     <span
                       className="absolute text-xs font-semibold text-gray-700"
                       style={{
-                        bottom: "38px",
+                        bottom: "20px",
                         right: "calc(12% - 70px)", // بجانب التوقيع
                         width: "120px",
                         textAlign: "center"
                       }}
                     >
-                      {(receipt as any).receivedByName || ""}
+                      {(user as any)?.displayNameAr || (user as any)?.displayName || (user as any)?.username || ""}
                     </span>
                   </>
                 )}
@@ -485,21 +526,29 @@ export default function ReceiptPrint() {
               <img
                 src={settings.accountantSignatureBase64}
                 alt="Accountant Signature"
-                className="absolute bottom-10 left-[12%] h-14 w-auto object-contain pointer-events-none"
-                style={{ zIndex: 3, opacity: 0.9, mixBlendMode: "multiply" }}
+                className="absolute -bottom-20 left-[12%] h-14 w-auto object-contain pointer-events-none"
+                style={{ zIndex: 3, opacity: 1, mixBlendMode: "multiply",background: "transparent", }}
               />
             )}
 
             {settings.showStampOnReceipts && showStamp && (
               <div
-                className="absolute inset-0 flex items-center justify-center pointer-events-none"
-                style={{ zIndex: 2 }}
+                className="absolute inset-0 pointer-events-none"
+                style={{ zIndex: 50 }}
               >
                 <img
                   src={stampSrc}
                   alt="الختم الرسمي"
-                  className="w-auto object-contain"
-                  style={{ height: "110px", maxWidth: "170px", opacity: 0.92 }}
+                  className="absolute w-auto object-contain select-none"
+                  style={{
+                    height: "160px",
+                    maxWidth: "250px",
+                    opacity: 0.95,
+                    bottom: "-18px",
+                    left: "50%",
+                    transform: "translateX(-50%) rotate(-8deg)",
+                    mixBlendMode: "multiply",
+                  }}
                 />
               </div>
             )}
