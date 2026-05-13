@@ -175,12 +175,28 @@ export default function ReceiptPrint() {
     }
   });
   const [showSignatures, setShowSignatures] = useState(false);
+
+  const [stampOverAccountant, setStampOverAccountant] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem("receipt_stamp_over_accountant") === "true";
+    } catch {
+      return false;
+    }
+  });
+
   function toggleStamp(val: boolean) {
     setShowStamp(val);
     try {
       localStorage.setItem("receipt_show_stamp", val ? "true" : "false");
     } catch {}
   }
+
+  function toggleStampPosition(val: boolean) {
+  setStampOverAccountant(val);
+  try {
+    localStorage.setItem("receipt_stamp_over_accountant", val ? "true" : "false");
+  } catch {}
+}
 
   const getClientName = (r: { clientName?: string | null; clientId?: number | null }) => {
     if (r.clientName && r.clientName.trim()) return r.clientName;
@@ -288,6 +304,22 @@ export default function ReceiptPrint() {
             <span className="text-sm font-medium text-gray-700">{isAR ? "إظهار الختم" : "Show Stamp"}</span>
           </label>
         )}
+
+        {!isClient && settings.showStampOnReceipts && (
+          <label className="flex items-center gap-2 cursor-pointer px-3 py-2 border border-gray-300 rounded-lg bg-white hover:bg-gray-50 select-none">
+            <input
+              type="checkbox"
+              checked={stampOverAccountant}
+              onChange={(e) => toggleStampPosition(e.target.checked)}
+              className="accent-blue-700 w-4 h-4 cursor-pointer"
+            />
+
+            <span className="text-sm font-medium text-gray-700">
+              {isAR ? "الختم فوق المحاسب" : "Stamp Over Accountant"}
+            </span>
+          </label>
+        )}
+
         {!isClient && <label className="flex items-center gap-2 px-4 py-2 h-[42px] border border-gray-300 rounded-lg bg-white cursor-pointer select-none hover:bg-gray-50">
           <input
             type="checkbox"
@@ -541,19 +573,21 @@ export default function ReceiptPrint() {
                   alt="الختم الرسمي"
                   className="absolute w-auto object-contain select-none"
                   style={{
-                    height: "160px",
-                    maxWidth: "250px",
+                    height: "115px",
+                    maxWidth: "180px",
                     opacity: 0.95,
-                    bottom: "-18px",
-                    left: "50%",
-                    transform: "translateX(-50%) rotate(-8deg)",
+                    bottom: stampOverAccountant ? "-8px" : "-18px",
+                    left: stampOverAccountant ? "22%" : "50%",
+                    transform: stampOverAccountant
+                      ? "translateX(-50%) rotate(-8deg)"
+                      : "translateX(-50%) rotate(-8deg)",
                     mixBlendMode: "multiply",
                   }}
                 />
               </div>
             )}
             </div>
-          <PrintDocumentFooter kind="receipt" reference={receipt.receiptNumber} />
+          {/* <PrintDocumentFooter kind="receipt" reference={receipt.receiptNumber} />
           <div className="hidden">
             طُبع في{" "}
             {new Date().toLocaleDateString("ar-EG-u-nu-latn", {
@@ -562,7 +596,7 @@ export default function ReceiptPrint() {
               day: "numeric",
             })}
             {" — "} رقم السند: {receipt.receiptNumber}
-          </div>
+          </div> */}
         </div>
       </div>
     </div>

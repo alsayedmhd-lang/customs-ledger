@@ -109,15 +109,25 @@ export default function InvoicesList() {
     ),
   ];
 
+  function getDeclarationBaseNumber(value: string | null | undefined) {
+    return String(value ?? "")
+      .replace(/[^a-zA-Z0-9]/g, "")
+      .trim();
+  }
+
   const q = search.toLowerCase();
 
   const filtered = invoices?.filter((i: any) => {
     const issueDate = String(i.issueDate || "").slice(0, 10);
 
+    const shipmentBase = getDeclarationBaseNumber(i.shipmentRef);
+    const searchBase = getDeclarationBaseNumber(q);
+
     const matchesSearch =
       i.invoiceNumber?.toLowerCase().includes(q) ||
       i.clientName?.toLowerCase().includes(q) ||
       (i.shipmentRef && i.shipmentRef.toLowerCase().includes(q)) ||
+      (searchBase && shipmentBase && shipmentBase.includes(searchBase)) ||
       (i.billOfLading && i.billOfLading.toLowerCase().includes(q));
 
     const matchesFrom = !fromDate || issueDate >= fromDate;

@@ -583,19 +583,22 @@ router.put("/invoices/:id", async (req, res) => {
     }
 
     const shipmentBase = getShipmentBase(shipmentRef);
+    const shipmentFull = normalizeShipmentFullNumber(shipmentRef);
 
-    if (shipmentBase && shipmentBase.length >= 14) {
+    if (shipmentFull) {
       const allInvoices = await db.select().from(invoicesTable);
 
       const existing = allInvoices.find(
         (inv: any) =>
-          getShipmentBase(inv.shipmentRef) === shipmentBase &&
+          normalizeShipmentFullNumber(inv.shipmentRef) === shipmentFull &&
           String(inv.id) !== String(id)
       );
 
       if (existing) {
-        res.status(400).json({ error: "تم عمل فاتورة لهذا البيان" });
-        return;
+        console.warn(
+          "[INVOICE WARNING] Duplicate shipment ref:",
+          shipmentRef
+        );
       }
     }
 
@@ -912,6 +915,13 @@ export function formatItem(item: typeof invoiceItemsTable.$inferSelect) {
 
 function getShipmentBase(value: unknown) {
   return String(value ?? "").trim().slice(0, 14);
+}
+
+function normalizeShipmentFullNumber(value: string | null | undefined) {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "");
 }
 
 router.post("/invoices/import", requireAuth, async (req, res) => {

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useParams, Link } from "wouter";
 import { motion } from "framer-motion";
 import { useForm, useFieldArray } from "react-hook-form";
@@ -640,13 +640,10 @@ export default function InvoiceForm() {
           ...existingInvoice,
           id: undefined,
           invoiceNumber: undefined,
-          shipmentRef: "",
-          billOfLading: "",
-          packageCount: null,
-          shipmentWeight: null,
-          notes: "",
           issueDate: new Date().toISOString().split("T")[0],
           dueDate: "",
+          status: "draft",
+          notes: "",
         })
       );
 
@@ -668,8 +665,8 @@ export default function InvoiceForm() {
       advancePayment: data.advancePayment ?? 0,
       shipmentRef: String(data.shipmentRef ?? ""),
       billOfLading: String(data.billOfLading ?? ""),
-      packageCount: undefined,
-      shipmentWeight: undefined,
+      packageCount: data.packageCount ?? undefined,
+      shipmentWeight: data.shipmentWeight ?? undefined,
       portOfEntry: String(data.portOfEntry ?? ""),
       notes: String(data.notes ?? ""),
       items: data.items?.map((i: any) => ({
@@ -737,10 +734,15 @@ export default function InvoiceForm() {
   const taxAmount = subtotal * (Number(taxRateWatch) / 100);
   const total = subtotal + taxAmount - Number(advancePaymentWatch);
 
+  function normalizeDeclarationFullNumber(value: string | null | undefined) {
+    return String(value ?? "")
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, "");
+  }
+
   const onSubmit = async (data: InvoiceFormValues) => {
-    const cleanShipmentRef = String(data.shipmentRef ?? "")
-      .replace(/[\/-]/g, "")
-      .trim();
+    const cleanShipmentRef = normalizeDeclarationFullNumber(data.shipmentRef);
 
     if (cleanShipmentRef) {
       const token = sessionStorage.getItem("auth_token");
@@ -756,9 +758,7 @@ export default function InvoiceForm() {
       const matchedInvoice = cachedInvoices.find((inv: any) => {
         if (isEdit && String(inv.id) === String(invoiceId)) return false;
 
-        const oldRef = String(inv.shipmentRef ?? "")
-          .replace(/[\/-]/g, "")
-          .trim();
+        const oldRef = normalizeDeclarationFullNumber(inv.shipmentRef);
 
         return oldRef && oldRef === cleanShipmentRef;
       });
@@ -1218,13 +1218,10 @@ export default function InvoiceForm() {
                     ...existingInvoice,
                     id: undefined,
                     invoiceNumber: undefined,
-                    shipmentRef: "",
-                    billOfLading: "",
-                    shipmentWeight: null,
-                    packageCount: null,
-                    notes: "",
                     issueDate: new Date().toISOString().split("T")[0],
                     dueDate: "",
+                    status: "draft",
+                    notes: "",
                   })
                 );
 
@@ -1407,14 +1404,15 @@ export default function InvoiceForm() {
               <input
                 {...register("shipmentRef", {
                   onBlur: (e) => {
-                    const value = e.target.value.trim().slice(0, 14);
+                    const value = normalizeDeclarationFullNumber(e.target.value);
 
                     const found = invoices?.find(
                       (inv: any) =>
-                        String(inv.shipmentRef ?? "").trim().slice(0, 14) === value
+                        (!isEdit || String(inv.id) !== String(invoiceId)) &&
+                        normalizeDeclarationFullNumber(inv.shipmentRef) === value
                     );
 
-                    if (found) {
+                    if (value && found) {
                       const sameUser = String(found.createdBy) === String(user?.id || "");
 
                       if (sameUser) {
