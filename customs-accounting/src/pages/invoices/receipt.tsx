@@ -178,10 +178,25 @@ export default function InvoiceReceipt() {
 
   const [showSignatures, setShowSignatures] = useState(false);
 
+  const [stampOverAccountant, setStampOverAccountant] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem("invoice_stamp_over_accountant") === "true";
+    } catch {
+      return false;
+    }
+  });
+
   function toggleStamp(val: boolean) {
     setShowStamp(val);
     try {
       localStorage.setItem("invoice_show_stamp", val ? "true" : "false");
+    } catch {}
+  }
+
+  function toggleStampPosition(val: boolean) {
+    setStampOverAccountant(val);
+    try {
+      localStorage.setItem("invoice_stamp_over_accountant", val ? "true" : "false");
     } catch {}
   }
 
@@ -323,6 +338,21 @@ const impExpValue =
             <Stamp className="w-4 h-4 text-gray-500" />
             <span className="text-sm font-medium text-gray-700">
               {isAR ? "إظهار الختم" : "Show Stamp"}
+            </span>
+          </label>
+        )}
+
+        {!isClient && company.showStampOnInvoices && (
+          <label className="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg bg-white cursor-pointer select-none hover:bg-gray-50">
+            <input
+              type="checkbox"
+              checked={stampOverAccountant}
+              onChange={(e) => toggleStampPosition(e.target.checked)}
+              className="w-4 h-4 accent-blue-700"
+            />
+
+            <span className="text-sm font-medium text-gray-700">
+              {isAR ? "الختم فوق المحاسب" : "Stamp Over Accountant"}
             </span>
           </label>
         )}
@@ -642,19 +672,22 @@ const impExpValue =
           )}
 
           <div
-            className="order-2 relative flex min-h-32 items-center justify-center pointer-events-none"
-            style={{ zIndex: 50 }}
+            className="order-2 relative flex min-h-32 items-center justify-center pointer-events-none overflow-visible"
           >
             {company.showStampOnInvoices && showStamp && (
               <img
                 src={stampSrc}
                 alt="الختم الرسمي"
-                className="absolute left-1/2 top-1/2 w-auto -translate-x-1/2 -translate-y-1/2 object-contain"
+                className="absolute object-contain select-none"
                 style={{
                   height: "150px",
-                  maxWidth: "230px",
-                  opacity: 0.56,
-                  zIndex: 50,
+                  width: "auto",
+                  opacity: 0.55,
+                  zIndex: 60,
+                  left: stampOverAccountant ? "-60%" : "50%",
+                  bottom: "-18px",
+                  transform: "translateX(-50%) rotate(-8deg)",
+                  mixBlendMode: "multiply",
                 }}
               />
             )}

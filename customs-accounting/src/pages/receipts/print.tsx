@@ -374,7 +374,7 @@ export default function ReceiptPrint() {
               <div className="text-[10px] text-gray-500 mt-0.5">{printEmail}</div>
             </div>
 
-            <div className="flex flex-col items-center gap-0.5 relative top-5">
+            <div className="flex flex-col items-center gap-0.5 relative top-1">
               <img src={logoSrc} alt={settings.nameAr} className="h-10 w-auto object-contain" />
               <div className="text-center">
                 <div className="font-black text-gray-900 text-base leading-tight">سند قبض</div>
@@ -573,10 +573,10 @@ export default function ReceiptPrint() {
                   alt="الختم الرسمي"
                   className="absolute w-auto object-contain select-none"
                   style={{
-                    height: "115px",
-                    maxWidth: "180px",
+                    height: "128px",
+                    maxWidth: "200px",
                     opacity: 0.95,
-                    bottom: stampOverAccountant ? "-8px" : "-18px",
+                    bottom: "-8px",
                     left: stampOverAccountant ? "22%" : "50%",
                     transform: stampOverAccountant
                       ? "translateX(-50%) rotate(-8deg)"

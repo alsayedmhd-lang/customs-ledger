@@ -637,7 +637,7 @@ export default function InvoiceForm() {
       sessionStorage.setItem(
         "copy_invoice",
         JSON.stringify({
-          ...existingInvoice,
+          ...(existingInvoice as any),
           id: undefined,
           invoiceNumber: undefined,
           issueDate: new Date().toISOString().split("T")[0],
@@ -1215,7 +1215,7 @@ export default function InvoiceForm() {
                 sessionStorage.setItem(
                   "copy_invoice",
                   JSON.stringify({
-                    ...existingInvoice,
+                    ...(invoiceToCopy || existingInvoice),
                     id: undefined,
                     invoiceNumber: undefined,
                     issueDate: new Date().toISOString().split("T")[0],
