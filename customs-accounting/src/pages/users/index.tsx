@@ -489,10 +489,10 @@ export default function UsersPage() {
           <form onSubmit={handleAdd} className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
               <Field label={isAR ? "الاسم بالعربية" : "Name in Arabic"}>
-                <input value={form.displayNameAr} onChange={e => setForm(p => ({ ...p, displayNameAr: e.target.value, displayName: e.target.value || p.displayNameEn || p.displayName }))} className={inputCls} dir="rtl" placeholder="محمد أحمد" />
+                <input value={form.displayNameAr} onChange={e => setForm(p => ({ ...p, displayNameAr: e.target.value, displayName: e.target.value || p.displayNameEn || p.displayName }))} className={inputCls} dir="rtl" placeholder="الاسم بالعربي" />
               </Field>
               <Field label={isAR ? "الاسم بالإنجليزية" : "Name in English"}>
-                <input value={form.displayNameEn} onChange={e => setForm(p => ({ ...p, displayNameEn: e.target.value, displayName: p.displayNameAr || e.target.value || p.displayName }))} className={inputCls} dir="ltr" placeholder="Mohamed Ahmed" />
+                <input value={form.displayNameEn} onChange={e => setForm(p => ({ ...p, displayNameEn: e.target.value, displayName: p.displayNameAr || e.target.value || p.displayName }))} className={inputCls} dir="ltr" placeholder="Name In English" />
               </Field>
             </div>
             <Field label={isAR ? "الاسم الكامل (احتياطي)" : "Full Name (fallback)"}>
@@ -531,18 +531,35 @@ export default function UsersPage() {
           <form onSubmit={handleEdit} className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
               <Field label={isAR ? "الاسم بالعربية" : "Name in Arabic"}>
-                <input value={editForm.displayNameAr} onChange={e => setEditForm(p => ({ ...p, displayNameAr: e.target.value }))} className={inputCls} dir="rtl" placeholder="محمد أحمد" />
+                <input value={editForm.displayNameAr} onChange={e => setEditForm(p => ({ ...p, displayNameAr: e.target.value }))} className={inputCls} dir="rtl" placeholder="الاسم بالعربية" />
               </Field>
               <Field label={isAR ? "الاسم بالإنجليزية" : "Name in English"}>
-                <input value={editForm.displayNameEn} onChange={e => setEditForm(p => ({ ...p, displayNameEn: e.target.value }))} className={inputCls} dir="ltr" placeholder="Mohamed Ahmed" />
+                <input value={editForm.displayNameEn} onChange={e => setEditForm(p => ({ ...p, displayNameEn: e.target.value }))} className={inputCls} dir="ltr" placeholder="Name In English" />
               </Field>
             </div>
             <Field label={isAR ? "الاسم الكامل (احتياطي)" : "Full Name (fallback)"}><input value={editForm.displayName} onChange={e => setEditForm(p => ({ ...p, displayName: e.target.value }))} className={inputCls} required /></Field>
             <Field label={isAR ? "الدور" : "Role"}>
-              <select value={editForm.role} onChange={e => setEditForm(p => ({ ...p, role: e.target.value, clientId: e.target.value === "client" ? p.clientId : "" }))} className={inputCls}>
-                <option value="user">{getRoleLabel("user", isAR)}</option>
-                <option value="supervisor">{getRoleLabel("supervisor", isAR)}</option>
-                <option value="client">{getRoleLabel("client", isAR)}</option>
+              <select
+                value={editForm.role}
+                onChange={e =>
+                  setEditForm(p => ({
+                    ...p,
+                    role: e.target.value,
+                    clientId: e.target.value === "client" ? p.clientId : "",
+                  }))
+                }
+                className={inputCls}
+                disabled={editForm.role === "admin"}
+              >
+                {editForm.role === "admin" ? (
+                  <option value="admin">{getRoleLabel("admin", isAR)}</option>
+                ) : (
+                  <>
+                    <option value="user">{getRoleLabel("user", isAR)}</option>
+                    <option value="supervisor">{getRoleLabel("supervisor", isAR)}</option>
+                    <option value="client">{getRoleLabel("client", isAR)}</option>
+                  </>
+                )}
               </select>
             </Field>
             {editForm.role === "client" && (
@@ -556,7 +573,17 @@ export default function UsersPage() {
               />
             )}
             <Field label={isAR ? "الحالة" : "Status"}>
-              <select value={editForm.isActive ? "true" : "false"} onChange={e => setEditForm(p => ({ ...p, isActive: e.target.value === "true" }))} className={inputCls}>
+              <select
+                value={editForm.isActive ? "true" : "false"}
+                onChange={e =>
+                  setEditForm(p => ({
+                    ...p,
+                    isActive: e.target.value === "true",
+                  }))
+                }
+                className={inputCls}
+                disabled={editForm.role === "admin"}
+              >
                 <option value="true">{isAR ? "نشط" : "Active"}</option>
                 <option value="false">{isAR ? "موقوف" : "Suspended"}</option>
               </select>

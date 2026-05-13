@@ -105,8 +105,11 @@ router.post("/users", requireAdmin, async (req, res) => {
   if (!username || !password || !displayName) {
     return res.status(400).json({ message: "All required fields must be provided" });
   }
+
   if (blockedManagerRoles.has(role)) {
-    return res.status(403).json({ message: "Creating another manager is not allowed" });
+    return res.status(403).json({
+      message: "Creating another manager is not allowed"
+    });
   }
 
   const normalizedRole = editableRoles.has(role) ? role : "user";
@@ -188,11 +191,39 @@ router.patch("/users/:id", requireAdmin, async (req, res) => {
   if (typeof displayNameEn !== "undefined") updates.displayNameEn = displayNameEn?.trim() || null;
   if (role) {
     if (blockedManagerRoles.has(role)) {
-      return res.status(403).json({ message: "Changing a user to manager is not allowed" });
+      if (currentUser.role !== role) {
+        return res.status(403).json({
+          message: "Changing a user to manager is not allowed"
+        });
+      }
+
+      updates.role = role;
+    } else {
+      if (blockedManagerRoles.has(currentUser.role)) {
+        return res.status(403).json({
+          message: "Changing manager role is not allowed"
+        });
+      }
+
+      updates.role = editableRoles.has(role) ? role : "user";
     }
-    updates.role = editableRoles.has(role) ? role : "user";
   }
-  if (typeof isActive === "boolean") updates.isActive = isActive;
+  if (typeof isActive === "boolean") {
+    if (!isActive && blockedManagerRoles.has(currentUser.role)) {
+      const users = await db.select().from(usersTable);
+      const hasOtherActiveManager = users.some((user) =>
+        user.id !== currentUser.id && blockedManagerRoles.has(user.role) && user.isActive
+      );
+
+      if (!hasOtherActiveManager) {
+        return res.status(403).json({
+          message: "Cannot deactivate the only active manager"
+        });
+      }
+    }
+
+    updates.isActive = isActive;
+  }
   if (typeof pendingApproval === "boolean") updates.pendingApproval = pendingApproval;
   if (password) updates.passwordHash = await bcrypt.hash(password, 10);
   if (typeof email !== "undefined") updates.email = email?.trim() || null;
