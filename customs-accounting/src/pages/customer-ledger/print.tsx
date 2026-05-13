@@ -73,6 +73,20 @@ export default function CustomerLedgerPrintPage() {
   const referenceSearch = params.get("q") || "";
 
   const [showStamp, setShowStamp] = useState(true);
+  const [stampOverAccountant, setStampOverAccountant] = useState<boolean>(() => {
+    try {
+      return sessionStorage.getItem("customer_ledger_stamp_over_accountant") === "true";
+    } catch {
+      return false;
+    }
+  });
+
+  function toggleStampPosition(val: boolean) {
+    setStampOverAccountant(val);
+    try {
+      sessionStorage.setItem("customer_ledger_stamp_over_accountant", val ? "true" : "false");
+    } catch {}
+  }
 
   useEffect(() => {
     if (!isClient && !user?.permissions?.canViewStatements) {
@@ -224,6 +238,20 @@ export default function CustomerLedgerPrintPage() {
             <FileDown className="w-4 h-4" />
             {isAR ? "تصدير Excel" : "Export Excel"}
             </button>
+        )}
+
+        {!isClient && settings.showStampOnStatements && (
+          <label className="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg bg-white cursor-pointer select-none hover:bg-gray-50">
+            <input
+              type="checkbox"
+              checked={stampOverAccountant}
+              onChange={(e) => toggleStampPosition(e.target.checked)}
+              className="w-4 h-4 accent-blue-700"
+            />
+            <span className="text-sm font-medium text-gray-700">
+              {isAR ? "الختم فوق المحاسب" : "Stamp Over Accountant"}
+            </span>
+          </label>
         )}
 
         {!isClient && settings.showStampOnStatements && (
@@ -545,8 +573,13 @@ export default function CustomerLedgerPrintPage() {
         <footer className="print-footer relative">
         {settings.showStampOnStatements && showStamp && (
           <div
-            className="print-signature-stamp-area pointer-events-none absolute left-1/2 bottom-8 -translate-x-1/2"
-            style={{ zIndex: 30, mixBlendMode: "multiply" }}
+            className="print-signature-stamp-area pointer-events-none absolute bottom-8"
+            style={{
+              zIndex: 30,
+              mixBlendMode: "multiply",
+              left: stampOverAccountant ? "22%" : "50%",
+              transform: "translateX(-50%) rotate(-8deg)",
+            }}
           >
             <img
               src={stampSrc}

@@ -415,8 +415,13 @@ export default function ClientStatement() {
         <footer className="print-footer" style={{ position: "relative", zIndex: 1 }}>
           {settings.showStampOnStatements && showStamp && (
             <div
-              className="print-signature-stamp-area pointer-events-none absolute left-1/2 bottom-8 -translate-x-1/2"
-              style={{ zIndex: 30, mixBlendMode: "multiply" }}
+              className="print-signature-stamp-area pointer-events-none absolute bottom-8"
+              style={{
+                zIndex: 30,
+                mixBlendMode: "multiply",
+                left: stampOverAccountant ? "22%" : "50%",
+                transform: "translateX(-50%) rotate(-8deg)",
+              }}
             >
               <img
                 src={stampSrc}
