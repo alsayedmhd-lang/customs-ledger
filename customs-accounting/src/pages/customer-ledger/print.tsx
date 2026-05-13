@@ -542,9 +542,12 @@ export default function CustomerLedgerPrintPage() {
         </main>
 
         {/* FOOTER */}
-        <footer className="print-footer">
+        <footer className="print-footer relative">
         {settings.showStampOnStatements && showStamp && (
-          <div className="print-signature-stamp-area flex justify-center px-6 py-3 pointer-events-none">
+          <div
+            className="print-signature-stamp-area pointer-events-none absolute left-1/2 bottom-8 -translate-x-1/2"
+            style={{ zIndex: 30, mixBlendMode: "multiply" }}
+          >
             <img
               src={stampSrc}
               alt="stamp"

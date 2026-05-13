@@ -74,10 +74,19 @@ export default function ClientStatement() {
     try { return sessionStorage.getItem("statement_show_stamp") !== "false"; }
     catch { return true; }
   });
+  const [stampOverAccountant, setStampOverAccountant] = useState<boolean>(() => {
+    try { return sessionStorage.getItem("statement_stamp_over_accountant") === "true"; }
+    catch { return false; }
+  });
 
   function toggleStamp(val: boolean) {
     setShowStamp(val);
     try { sessionStorage.setItem("statement_show_stamp", val ? "true" : "false"); } catch {}
+  }
+
+  function toggleStampPosition(val: boolean) {
+    setStampOverAccountant(val);
+    try { sessionStorage.setItem("statement_stamp_over_accountant", val ? "true" : "false"); } catch {}
   }
 
   useEffect(() => {
@@ -137,6 +146,17 @@ export default function ClientStatement() {
           <Printer className="w-4 h-4" />
           {isAR ? "طباعة " : "Print "}
         </button>
+        {!isClient && settings.showStampOnStatements && (
+          <label className="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg bg-white cursor-pointer select-none hover:bg-gray-50">
+            <input
+              type="checkbox"
+              checked={stampOverAccountant}
+              onChange={e => toggleStampPosition(e.target.checked)}
+              className="w-4 h-4 accent-blue-700"
+            />
+            <span className="text-sm font-medium text-gray-700">{isAR ? "الختم فوق المحاسب" : "Stamp Over Accountant"}</span>
+          </label>
+        )}
         {!isClient && settings.showStampOnStatements && (
           <label className="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg bg-white cursor-pointer select-none hover:bg-gray-50">
             <input
@@ -394,7 +414,10 @@ export default function ClientStatement() {
         {/* ══ FOOTER ══════════════════════════════════════════════════════ */}
         <footer className="print-footer" style={{ position: "relative", zIndex: 1 }}>
           {settings.showStampOnStatements && showStamp && (
-            <div className="print-signature-stamp-area flex justify-center px-6 py-3 pointer-events-none">
+            <div
+              className="print-signature-stamp-area pointer-events-none absolute left-1/2 bottom-8 -translate-x-1/2"
+              style={{ zIndex: 30, mixBlendMode: "multiply" }}
+            >
               <img
                 src={stampSrc}
                 alt="الختم الرسمي"
