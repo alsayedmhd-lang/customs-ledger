@@ -415,6 +415,10 @@ export default function DeveloperSettingsPage() {
   });
   const [databaseMode, setDatabaseMode] = useState<DatabaseMode>("local");
   const [licenseDeviceId, setLicenseDeviceId] = useState("");
+  const [licenseCustomerName, setLicenseCustomerName] = useState("");
+  const [licenseTargetDeviceId, setLicenseTargetDeviceId] = useState("");
+  const [licenseExpiryDate, setLicenseExpiryDate] = useState("");
+  const [generatedLicenseText, setGeneratedLicenseText] = useState("");
   const [databaseConfig, setDatabaseConfig] = useState({
     localPath: "lib/db/local.db",
     connectionStatus: "connected",
@@ -819,6 +823,18 @@ export default function DeveloperSettingsPage() {
     }, 2000);
   }
 
+  function generateClientLicenseText() {
+    const license = {
+      customerName: licenseCustomerName || "TRIAL CUSTOMER",
+      licenseType: "trial",
+      deviceId: licenseTargetDeviceId,
+      expiryDate: licenseExpiryDate,
+      issuedAt: new Date().toISOString(),
+    };
+
+    setGeneratedLicenseText(JSON.stringify(license, null, 2));
+  }
+
 
   function createSqlFile() {
     window.open(`${API_BASE}/developer/database/sql`, "_blank");
@@ -1218,6 +1234,50 @@ export default function DeveloperSettingsPage() {
                     "Send this device ID to activate the software"
                   )}
                 </p>
+              </div>
+              <div className="rounded-xl border border-border bg-muted/30 p-3 space-y-3">
+                <div className="font-semibold text-sm">
+                  {tr("مولد ترخيص العميل", "Client License Generator")}
+                </div>
+
+                <Input
+                  value={licenseCustomerName}
+                  onChange={(event) => setLicenseCustomerName(event.target.value)}
+                  placeholder={tr("اسم العميل", "Customer name")}
+                />
+
+                <Input
+                  value={licenseTargetDeviceId}
+                  onChange={(event) => setLicenseTargetDeviceId(event.target.value)}
+                  placeholder={tr("رقم جهاز العميل", "Customer Device ID")}
+                  dir="ltr"
+                  className="font-mono text-xs"
+                />
+
+                <Input
+                  value={licenseExpiryDate}
+                  onChange={(event) => setLicenseExpiryDate(event.target.value)}
+                  placeholder="2026-06-30"
+                  dir="ltr"
+                />
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  onClick={generateClientLicenseText}
+                >
+                  {tr("توليد الترخيص", "Generate License")}
+                </Button>
+
+                {generatedLicenseText && (
+                  <Textarea
+                    value={generatedLicenseText}
+                    readOnly
+                    dir="ltr"
+                    className="min-h-40 font-mono text-xs"
+                  />
+                )}
               </div>
             </CardContent>
           </Card>
