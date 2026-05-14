@@ -9,6 +9,7 @@ import {
 } from "@/components/print-document-parts";
 import { useState, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
+import { useLocation } from "wouter";
 import SettingsShell from "@/components/layout/SettingsShell";
 import { useAuth } from "@/lib/auth-context";
 import { useLanguage } from "@/lib/language-context";
@@ -962,6 +963,7 @@ const writePreviewZoom = (key: string, value: number) => {
 };
 
 export default function SettingsPage() {
+  const [, setLocation] = useLocation();
   const { user } = useAuth();
   const { lang, isRTL } = useLanguage();
   const isAR = lang === "ar";
@@ -1831,7 +1833,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
               <button
                 type="button"
                 onClick={() => {
-                  window.location.hash = "/settings/developer";
+                  setLocation("/settings/developer");
                 }}
                 className="inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-background px-3 py-2.5 text-sm font-semibold text-muted-foreground shadow-sm transition hover:bg-muted hover:text-foreground"
               >
@@ -1872,7 +1874,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                 {canSeeDeveloperLink && (
                   <span
                     onDoubleClick={() => {
-                      window.location.hash = "/settings/developer";
+                      setLocation("/settings/developer");
                     }}
                     className="mt-1 text-[10px] text-muted-foreground/40 hover:text-muted-foreground/70 select-none"
                   >

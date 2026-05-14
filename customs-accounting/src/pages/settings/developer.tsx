@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useLocation } from "wouter";
 import { Shield, Users, Database, Activity, PackageCheck, Copy, FileText, RefreshCw, Save, Cloud } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -265,9 +266,19 @@ const licenseFields: Array<[TextKey, string, string]> = [
 
 function authHeaders() {
   const token = sessionStorage.getItem("auth_token");
+  const developerModeFromLogin =
+    sessionStorage.getItem("developer_entry_from_login") === "true" &&
+    isDeveloperUnlockValid();
+
   return {
     "Content-Type": "application/json",
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(developerModeFromLogin
+      ? {
+          "x-developer-mode": "true",
+          "x-developer-unlocked": "true",
+        }
+      : {}),
   };
 }
 
@@ -371,6 +382,7 @@ function DevField({ label, children }: { label: string; children: React.ReactNod
 }
 
 export default function DeveloperSettingsPage() {
+  const [location, setLocation] = useLocation();
   const { lang, isRTL } = useLanguage();
   const isAR = lang === "ar";
   const tr = (ar: string, en: string) => (isAR ? ar : en);
@@ -454,6 +466,13 @@ export default function DeveloperSettingsPage() {
     ...tab,
     label: isAR ? tab.labelAr : tab.labelEn,
   }));
+  const isDeveloperSettingsRoute = location === "/settings/developer";
+
+  useEffect(() => {
+    if (!isDeveloperSettingsRoute) {
+      setLocation("/settings");
+    }
+  }, [isDeveloperSettingsRoute, setLocation]);
 
   useEffect(() => {
     if (isDeveloperUnlockValid()) {
@@ -464,12 +483,6 @@ export default function DeveloperSettingsPage() {
 
     setOnlineDatabaseConnected(sessionStorage.getItem(ONLINE_DATABASE_CONNECTED_KEY) === "true");
     void loadCurrentLicenseStatus();
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      clearDeveloperUnlockSession();
-    };
   }, []);
 
   useEffect(() => {
@@ -609,6 +622,7 @@ export default function DeveloperSettingsPage() {
       sessionStorage.setItem(UNLOCKED_AT_KEY, Date.now().toString());
       setUnlocked(true);
       setPassword("");
+      setError("");
     } catch (err) {
       setError(err instanceof Error ? err.message : tr("كلمة المرور غير صحيحة", "Incorrect password"));
     } finally {
@@ -937,8 +951,24 @@ export default function DeveloperSettingsPage() {
   }
 
 
-  function createSqlFile() {
-    window.open(`${API_BASE}/developer/database/sql`, "_blank");
+  async function createSqlFile() {
+    setError("");
+    try {
+      const res = await fetch(`${API_BASE}/developer/database/sql`, { headers: authHeaders() });
+      if (!res.ok) throw new Error(tr("تعذر تنزيل ملف SQL", "Failed to download SQL file"));
+
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "database-schema.sql";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : tr("تعذر تنزيل ملف SQL", "Failed to download SQL file"));
+    }
   }
 
   async function testPreparedConnection() {
@@ -1173,11 +1203,7 @@ export default function DeveloperSettingsPage() {
 
   async function loadStorageInfo() {
     try {
-      const response = await fetch("http://127.0.0.1:3000/api/developer/storage/info", {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("auth_token") || sessionStorage.getItem("auth_token") || ""}`,
-        },
-      });
+      const response = await fetch(`${API_BASE}/developer/storage/info`, { headers: authHeaders() });
 
       const data = await response.json();
       setStorageInfo(data);
@@ -1234,6 +1260,10 @@ export default function DeveloperSettingsPage() {
   const backupReadinessReport = backupReadinessAnalysis?.ok ? backupReadinessAnalysis.report : null;
   const backupManifest = backupManifestResult?.ok ? backupManifestResult.manifest : null;
   const backupVerificationWarningsCount = backupVerificationResult?.ok ? backupVerificationResult.warnings.length : null;
+
+  if (!isDeveloperSettingsRoute) {
+    return null;
+  }
 
   if (!unlocked) {
     return (

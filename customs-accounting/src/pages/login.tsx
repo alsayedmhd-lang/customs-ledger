@@ -61,6 +61,7 @@ type Mode = "login" | "register" | "otp" | "registered" | "forgot" | "reset-otp"
 
 type ElectronAPI = {
   getAppVersion?: () => Promise<string>;
+  developerUnlock?: (password: string) => Promise<{ ok?: boolean } | null | undefined>;
   getLicenseDeviceId?: () => Promise<string>;
   getLicenseStatus?: () => Promise<{ valid?: boolean } | null | undefined>;
   saveCurrentLicense?: (license: unknown) => Promise<{ ok?: boolean; success?: boolean; message?: string } | null | undefined>;
@@ -127,6 +128,12 @@ export default function LoginPage() {
   const [licenseMessageType, setLicenseMessageType] = useState<"success" | "error">("success");
   const [licenseLoading, setLicenseLoading] = useState(false);
   const licenseFileInputRef = useRef<HTMLInputElement | null>(null);
+  const [showDeveloperUnlockModal, setShowDeveloperUnlockModal] = useState(false);
+  const [developerPassword, setDeveloperPassword] = useState("");
+  const [developerUnlockMessage, setDeveloperUnlockMessage] = useState("");
+  const [isDeveloperUnlocking, setIsDeveloperUnlocking] = useState(false);
+  const versionClickCountRef = useRef(0);
+  const versionClickResetTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -169,6 +176,24 @@ export default function LoginPage() {
     }
 
     loadLicenseDeviceId();
+  }, []);
+
+  useEffect(() => {
+    function handleDeveloperShortcut(event: globalThis.KeyboardEvent) {
+      if (event.ctrlKey && event.shiftKey && event.code === "KeyD") {
+        event.preventDefault();
+        setShowDeveloperUnlockModal(true);
+      }
+    }
+
+    window.addEventListener("keydown", handleDeveloperShortcut, true);
+
+    return () => {
+      window.removeEventListener("keydown", handleDeveloperShortcut, true);
+      if (versionClickResetTimerRef.current) {
+        window.clearTimeout(versionClickResetTimerRef.current);
+      }
+    };
   }, []);
 
   async function saveClientLicense(parsedLicense: unknown) {
@@ -226,6 +251,37 @@ export default function LoginPage() {
     } finally {
       setLicenseLoading(false);
     }
+  }
+
+  async function handleDeveloperUnlock(e: FormEvent) {
+    e.preventDefault();
+    setDeveloperUnlockMessage("");
+    setIsDeveloperUnlocking(true);
+
+    try {
+      const result = await (window as Window & { electronAPI?: ElectronAPI }).electronAPI?.developerUnlock?.(developerPassword);
+
+      if (!result?.ok) {
+        throw new Error("Invalid developer password");
+      }
+
+      enterDeveloperModeFromLogin();
+      setDeveloperUnlockMessage("تم تفعيل وضع المطور");
+      setShowDeveloperUnlockModal(false);
+      setDeveloperPassword("");
+    } catch {
+      setDeveloperUnlockMessage("كلمة مرور المطور غير صحيحة");
+    } finally {
+      setIsDeveloperUnlocking(false);
+    }
+  }
+
+  function enterDeveloperModeFromLogin() {
+    sessionStorage.setItem("developer_unlocked", "true");
+    sessionStorage.setItem("developer_unlocked_at", Date.now().toString());
+    sessionStorage.setItem("developer_entry_from_login", "true");
+    window.dispatchEvent(new Event("developer-temp-login"));
+    setLocation("/settings/developer");
   }
 
 
@@ -427,6 +483,26 @@ export default function LoginPage() {
     if (otpPending?.maskedEmail) parts.push(`${isAR ? "البريد" : "email"} ${otpPending.maskedEmail}`);
     if (otpPending?.maskedPhone) parts.push(`${isAR ? "الهاتف" : "phone"} ${otpPending.maskedPhone}`);
     return parts.join(isAR ? " أو " : " or ");
+  }
+
+  function handleVersionClick() {
+    if (versionClickResetTimerRef.current) {
+      window.clearTimeout(versionClickResetTimerRef.current);
+    }
+
+    versionClickCountRef.current += 1;
+
+    if (versionClickCountRef.current >= 5) {
+      versionClickCountRef.current = 0;
+      versionClickResetTimerRef.current = null;
+      setShowDeveloperUnlockModal(true);
+      return;
+    }
+
+    versionClickResetTimerRef.current = window.setTimeout(() => {
+      versionClickCountRef.current = 0;
+      versionClickResetTimerRef.current = null;
+    }, 2000);
   }
 
   const inputCls =
@@ -1024,10 +1100,65 @@ export default function LoginPage() {
         <p className="text-center text-white/25 text-xs mt-6 font-medium">
           {loginFooterText}
                   </p>
-        <p className="text-center text-white/25 text-xs mt-2 font-medium">
+        <p
+          onClick={handleVersionClick}
+          className="text-center text-white/25 text-xs mt-2 font-medium cursor-default select-none"
+        >
           Version {appVersion}
         </p>
       </motion.div>
+
+      {showDeveloperUnlockModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm">
+          <form
+            onSubmit={handleDeveloperUnlock}
+            className="w-full max-w-sm rounded-2xl border border-white/15 bg-slate-950/95 p-6 shadow-2xl"
+            dir="rtl"
+          >
+            <h2 className="mb-5 text-center text-xl font-bold text-white">دخول المطور</h2>
+
+            <div className="space-y-2">
+              <label className="block text-xs font-semibold text-white/70">كلمة المرور</label>
+              <input
+                type="password"
+                value={developerPassword}
+                onChange={(event) => setDeveloperPassword(event.target.value)}
+                className={inputCls}
+                autoComplete="off"
+                autoFocus
+                dir="ltr"
+              />
+            </div>
+
+            {developerUnlockMessage && (
+              <div className="mt-4 rounded-xl bg-red-500/15 px-3 py-2 text-sm font-medium text-red-200">
+                {developerUnlockMessage}
+              </div>
+            )}
+
+            <div className="mt-6 flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDeveloperUnlockModal(false);
+                  setDeveloperPassword("");
+                  setDeveloperUnlockMessage("");
+                }}
+                className="flex-1 rounded-xl border border-white/20 px-4 py-2.5 text-sm font-bold text-white/80 transition hover:bg-white/10"
+              >
+                إلغاء
+              </button>
+              <button
+                type="submit"
+                disabled={isDeveloperUnlocking || !developerPassword.trim()}
+                className="flex-1 rounded-xl bg-primary px-4 py-2.5 text-sm font-bold text-primary-foreground transition hover:bg-primary/90 disabled:opacity-50"
+              >
+                {isDeveloperUnlocking ? "جاري الدخول..." : "دخول"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 }

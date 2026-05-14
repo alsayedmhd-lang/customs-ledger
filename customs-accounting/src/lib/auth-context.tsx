@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback } from "react";
+import { useLocation } from "wouter";
 
 export interface UserPermissions {
   canEditInvoices: boolean;
@@ -70,6 +71,8 @@ const AuthContext = createContext<AuthContextType | null>(null);
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || "http://localhost:10000").replace(/\/$/, "") + "/api";
 const DEVELOPER_UNLOCK_KEY = "developer_unlocked";
 const DEVELOPER_UNLOCKED_AT_KEY = "developer_unlocked_at";
+const DEVELOPER_ENTRY_FROM_LOGIN_KEY = "developer_entry_from_login";
+const DEVELOPER_IDLE_TIMEOUT_MS = 5 * 60 * 1000;
 const ONLINE_DATABASE_CONNECTED_KEY = "developer_online_database_connected";
 
 async function checkSyncConnection(token: string) {
@@ -98,14 +101,39 @@ async function checkSyncConnection(token: string) {
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [location] = useLocation();
   const [user, setUser] = useState<AuthUser | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  const enterDeveloperFrontendAccess = useCallback(() => {
+    const stored = sessionStorage.getItem("auth_token");
+    const developerEntry = sessionStorage.getItem(DEVELOPER_ENTRY_FROM_LOGIN_KEY) === "true";
+    const developerUnlocked = sessionStorage.getItem(DEVELOPER_UNLOCK_KEY) === "true";
+    const developerUnlockedAt = Number(sessionStorage.getItem(DEVELOPER_UNLOCKED_AT_KEY) || 0);
+    const developerUnlockValid = developerUnlockedAt > 0 && Date.now() - developerUnlockedAt < DEVELOPER_IDLE_TIMEOUT_MS;
+    const isDeveloperRoute = location.startsWith("/settings/developer");
+
+    if (stored || !developerEntry || !developerUnlocked || !developerUnlockValid || !isDeveloperRoute) {
+      return false;
+    }
+
+    setToken(null);
+    setUser({
+      id: 0,
+      username: "developer",
+      displayName: "Developer",
+      role: "admin",
+      permissions: ALL_PERMISSIONS,
+    });
+    return true;
+  }, [location]);
 
   const logout = useCallback(() => {
     sessionStorage.removeItem("auth_token");
     sessionStorage.removeItem(DEVELOPER_UNLOCK_KEY);
     sessionStorage.removeItem(DEVELOPER_UNLOCKED_AT_KEY);
+    sessionStorage.removeItem(DEVELOPER_ENTRY_FROM_LOGIN_KEY);
     sessionStorage.removeItem(ONLINE_DATABASE_CONNECTED_KEY);
     setToken(null);
     setUser(null);
@@ -131,10 +159,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       clearTimeout(timer);
       events.forEach((e) => window.removeEventListener(e, reset));
     };
-  }, [user, logout]);
+    }, [user, logout]);
 
     useEffect(() => {
       const stored = sessionStorage.getItem("auth_token");
+      if (enterDeveloperFrontendAccess()) {
+        setIsLoading(false);
+        return;
+      }
+
       if (!stored) {
         setIsLoading(false);
         return;
@@ -151,10 +184,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         })
         .catch(() => {
           sessionStorage.removeItem("auth_token");
+          sessionStorage.removeItem(DEVELOPER_ENTRY_FROM_LOGIN_KEY);
           setToken(null);
         })
         .finally(() => setIsLoading(false));
-    }, []);
+    }, [enterDeveloperFrontendAccess]);
+
+  useEffect(() => {
+    const handleDeveloperTempLogin = () => {
+      enterDeveloperFrontendAccess();
+    };
+
+    window.addEventListener("developer-temp-login", handleDeveloperTempLogin);
+    return () => window.removeEventListener("developer-temp-login", handleDeveloperTempLogin);
+  }, [enterDeveloperFrontendAccess]);
+
+  useEffect(() => {
+    if (sessionStorage.getItem(DEVELOPER_ENTRY_FROM_LOGIN_KEY) !== "true") return;
+    if (location.startsWith("/settings/developer")) {
+      enterDeveloperFrontendAccess();
+      return;
+    }
+
+    setToken(null);
+    setUser(null);
+  }, [location, enterDeveloperFrontendAccess]);
 
   const login = useCallback(async (username: string, password: string): Promise<OtpPending | undefined> => {
     const res = await fetch(`${API_BASE}/auth/login`, {
@@ -174,6 +228,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const { token: newToken, user: newUser } = data;
     sessionStorage.setItem("auth_token", newToken);
+    sessionStorage.removeItem(DEVELOPER_ENTRY_FROM_LOGIN_KEY);
     console.log("verifyOtp saved token:", newToken);
     console.log("verifyOtp readback token:", sessionStorage.getItem("auth_token"));
 
@@ -195,6 +250,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     const { token: newToken, user: newUser } = await res.json();
     sessionStorage.setItem("auth_token", newToken);
+    sessionStorage.removeItem(DEVELOPER_ENTRY_FROM_LOGIN_KEY);
     setToken(newToken);
     setUser({ ...newUser, permissions: newUser.permissions ?? ALL_PERMISSIONS });
     void checkSyncConnection(newToken);

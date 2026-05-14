@@ -6,7 +6,6 @@ import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { LanguageProvider, useLanguage } from "@/lib/language-context";
 import { CompanySettingsProvider } from "@/lib/company-settings-context";
 import { DisplaySettingsProvider } from "@/lib/display-settings-context";
-import { useEffect } from "react";
 import CustomerLedgerPrintPage from "@/pages/customer-ledger/print";
 import NotFound from "@/pages/not-found";
 
@@ -43,7 +42,11 @@ function RouteWrapper({ children }: { children: React.ReactNode }) {
 function ProtectedRouter() {
   const { user, isLoading } = useAuth();
   const { lang } = useLanguage();
+  const [location] = useLocation();
   const isAR = lang === "ar";
+  const isDeveloperFrontendOnly =
+    sessionStorage.getItem("developer_entry_from_login") === "true" &&
+    !sessionStorage.getItem("auth_token");
 
   if (isLoading) {
     return (
@@ -53,7 +56,7 @@ function ProtectedRouter() {
     );
   }
 
-  if (!user) {
+  if (!user || (isDeveloperFrontendOnly && !location.startsWith("/settings/developer"))) {
     return <LoginPage />;
   }
 
@@ -89,10 +92,6 @@ function ProtectedRouter() {
 }
 
 function App() {
-  useEffect(() => {
-    window.location.hash = "/dev";
-  }, []);
-
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
