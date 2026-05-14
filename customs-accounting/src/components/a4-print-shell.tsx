@@ -1,4 +1,5 @@
 import type { CSSProperties, ReactNode } from "react";
+import { PrintStyles } from "@/components/print-styles";
 import { cn } from "@/lib/utils";
 
 type A4PrintShellProps = {
@@ -27,40 +28,7 @@ export function A4PrintShell({
 }: A4PrintShellProps) {
   return (
     <div className={cn("bg-gray-100 print:bg-white", className)} dir={dir}>
-      <style>{`
-        @media print {
-          @page { size: A4 portrait; margin: 10mm 10mm 10mm 15mm; }
-
-          body {
-            margin: 0;
-            background: white !important;
-          }
-
-          .print-page {
-            width: 170mm !important;
-            max-width: 170mm !important;
-            margin: 12mm auto 0 auto !important;
-
-            height: auto !important;
-            min-height: auto !important;
-
-            display: block !important;
-            overflow: visible !important;
-          }
-
-          .print-content {
-            height: auto !important;
-            min-height: auto !important;
-            display: block !important;
-          }
-
-          .print-footer {
-            position: relative !important;
-            margin-top: -1mm !important;
-            page-break-inside: avoid;
-          }
-        }
-      `}</style>
+      <PrintStyles />
 
       {controls}
 
