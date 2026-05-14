@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, Link } from "wouter";
 import { Printer, ArrowRight, ArrowLeft, Stamp } from "lucide-react";
 import Barcode from "react-barcode";
+import { A4PrintShell } from "@/components/a4-print-shell";
 import { PrintDocumentFooter, ReceiptPrintHeader } from "@/components/print-document-parts";
 import { formatNumber, formatDate } from "@/lib/utils";
 import { useLanguage } from "@/lib/language-context";
@@ -227,43 +228,10 @@ export default function ReceiptPrint() {
   const receiptNum = receipt.receiptNumber;
 
   return (
-    <div className="bg-gray-100 print:bg-white" dir="rtl">
-      <style>{`
-        @media print {
-          @page { size: A4 portrait; margin: 10mm 10mm 10mm 15mm; }
-
-          body {
-            margin: 0;
-            background: white !important;
-          }
-
-          .print-page {
-            width: 170mm !important;
-            max-width: 170mm !important;
-            margin: 12mm auto 0 auto !important;
-
-            height: auto !important;
-            min-height: auto !important;
-
-            display: block !important;
-            overflow: visible !important;
-          }
-
-          .print-content {
-            height: auto !important;
-            min-height: auto !important;
-            display: block !important;
-          }
-
-          .print-footer {
-            position: relative !important;
-            margin-top: -1mm !important;
-            page-break-inside: avoid;
-          }
-        }
-      `}</style>
-
-      <div className="print:hidden flex gap-3 p-4max-w-2xl  mx-auto flex-wrap" dir={isAR ? "rtl" : "ltr"}>
+    <A4PrintShell
+      dir="rtl"
+      controls={
+        <div className="print:hidden flex gap-3 p-4max-w-2xl  mx-auto flex-wrap" dir={isAR ? "rtl" : "ltr"}>
         <Link href="/receipts">
           <button className={`${isClient ? "hidden" : ""} flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-700 hover:bg-gray-50 text-sm font-medium`}>
             {isAR ? <ArrowRight className="w-4 h-4" /> : <ArrowLeft className="w-4 h-4" />}
@@ -331,14 +299,9 @@ export default function ReceiptPrint() {
             {isAR ? "إظهار التوقيع" : "Show Signatures"}
           </span>
         </label>}
-      </div>
-
-      <div
-        className="print-page max-w-[210mm] mx-auto print:max-w-none print:w-full print:mx-0 bg-white shadow-lg print:shadow-none border border-gray-200 print:border-none relative overflow-hidden"
-        style={{
-          fontFamily: "'Cairo', 'Arial', sans-serif",
-        }}
-      >
+        </div>
+      }
+    >
         <main className="print-content">
         {settings.showWatermark && (
           <div
@@ -598,8 +561,7 @@ export default function ReceiptPrint() {
             {" — "} رقم السند: {receipt.receiptNumber}
           </div> */}
         </div>
-      </div>
-    </div>
+    </A4PrintShell>
   );
 };
 
