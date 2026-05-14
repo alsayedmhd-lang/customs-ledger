@@ -440,7 +440,7 @@ export default function ClientStatement() {
                 src={stampSrc}
                 alt="الختم الرسمي"
                 className="w-auto object-contain"
-                style={{ height: "105px", maxWidth: "180px", opacity: 0.92 }}
+                style={{ height: "150px", maxWidth: "230px", opacity: 0.92 }}
               />
             </div>
           )}

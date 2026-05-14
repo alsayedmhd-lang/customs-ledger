@@ -607,7 +607,7 @@ export default function CustomerLedgerPrintPage() {
               src={stampSrc}
               alt="stamp"
               className="w-auto object-contain"
-              style={{ height: 105, maxWidth: 180, opacity: 0.92 }}
+              style={{ height: 150, maxWidth: 230, opacity: 0.92 }}
             />
           </div>
         )}
