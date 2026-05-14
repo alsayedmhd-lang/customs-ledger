@@ -3,6 +3,7 @@ import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, FileDown, Printer, Stamp } from "lucide-react";
 import Barcode from "react-barcode";
+import { A4PrintShell } from "@/components/a4-print-shell";
 import { PrintDocumentFooter, PrintTitleBlock, StatementPrintHeader } from "@/components/print-document-parts";
 
 import { useAuth } from "@/lib/auth-context";
@@ -196,15 +197,37 @@ export default function CustomerLedgerPrintPage() {
   let runningBalance = openingBalance;
 
   return (
-    <div className="bg-gray-100 print:bg-white" dir="rtl">
+    <A4PrintShell
+      dir="rtl"
+      pageClassName="max-w-4xl shadow-xl"
+      controls={
+        <>
       <style>{`
         @media print {
           @page { size: A4 portrait; margin: 10mm; }
           body { margin: 0; background: white !important; }
           .print\\:hidden { display: none !important; }
-          .print-page { min-height: 297mm; height: auto; display: flex; flex-direction: column; overflow: visible !important; }
-          .print-content { flex: 1 1 auto; min-height: 0; }
-          .print-footer { flex: 0 0 auto; margin-top: auto; page-break-inside: avoid; break-inside: avoid; }
+          .print-page {
+            width: 100% !important;
+            max-width: none !important;
+            margin: 0 !important;
+            min-height: 297mm !important;
+            height: auto !important;
+            display: flex !important;
+            flex-direction: column;
+            overflow: visible !important;
+          }
+          .print-content {
+            flex: 1 1 auto;
+            min-height: 0 !important;
+            display: block !important;
+          }
+          .print-footer {
+            flex: 0 0 auto;
+            margin-top: auto !important;
+            page-break-inside: avoid;
+            break-inside: avoid;
+          }
         }
       `}</style>
 
@@ -269,12 +292,11 @@ export default function CustomerLedgerPrintPage() {
           </label>
         )}
       </div>
+        </>
+      }
+    >
 
       {/* A4 DOCUMENT */}
-      <div
-        className="print-page max-w-4xl mx-auto print:max-w-none print:w-full print:mx-0 bg-white shadow-xl print:shadow-none border border-gray-200 print:border-none relative overflow-hidden"
-        style={{ fontFamily: "'Cairo', 'Arial', sans-serif" }}
-      >
         <main className="print-content">
         {/* WATERMARK */}
         {settings.showWatermark && (
@@ -616,7 +638,6 @@ export default function CustomerLedgerPrintPage() {
           </div>
         </div>
         </footer>
-      </div>
-    </div>
+    </A4PrintShell>
   );
 }
