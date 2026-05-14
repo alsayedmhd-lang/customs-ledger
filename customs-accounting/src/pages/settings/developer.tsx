@@ -414,6 +414,7 @@ export default function DeveloperSettingsPage() {
     onlineStatus: typeof navigator !== "undefined" && navigator.onLine ? "online" : "offline",
   });
   const [databaseMode, setDatabaseMode] = useState<DatabaseMode>("local");
+  const [licenseDeviceId, setLicenseDeviceId] = useState("");
   const [databaseConfig, setDatabaseConfig] = useState({
     localPath: "lib/db/local.db",
     connectionStatus: "connected",
@@ -784,10 +785,40 @@ export default function DeveloperSettingsPage() {
     }
   }
 
+  useEffect(() => {
+    async function loadLicenseDeviceId() {
+      try {
+        const id = await window.electronAPI?.getLicenseDeviceId?.();
+
+        if (id) {
+          setLicenseDeviceId(id);
+        }
+      } catch (error) {
+        console.error("Failed to load license device id", error);
+      }
+    }
+
+    loadLicenseDeviceId();
+  }, []);
   async function copyDatabasePath() {
     await navigator.clipboard?.writeText(settings.sqlitePath || "");
     setDatabaseMessage(settings.sqlitePath ? tr("تم نسخ المسار", "Path copied") : tr("المسار غير متاح", "Path unavailable"));
   }
+  async function copyLicenseDeviceId() {
+    await navigator.clipboard?.writeText(licenseDeviceId || "");
+
+    setSavedMessage(
+      tr(
+        "تم نسخ رقم الجهاز بنجاح",
+        "Device ID copied successfully"
+      )
+    );
+
+    setTimeout(() => {
+      setSavedMessage("");
+    }, 2000);
+  }
+
 
   function createSqlFile() {
     window.open(`${API_BASE}/developer/database/sql`, "_blank");
@@ -1156,12 +1187,44 @@ export default function DeveloperSettingsPage() {
                   <Input value={settings[key] || ""} onChange={(event) => setText(key, event.target.value)} />
                 </div>
               ))}
+              <div className="rounded-xl border border-border bg-muted/30 p-3 space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <Label>{tr("رقم الجهاز", "Device ID")}</Label>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                    onClick={copyLicenseDeviceId}
+                    disabled={!licenseDeviceId}
+                  >
+                    <Copy className="h-4 w-4" />
+                    {tr("نسخ", "Copy")}
+                  </Button>
+                </div>
+
+                <Input
+                  value={licenseDeviceId}
+                  readOnly
+                  dir="ltr"
+                  className="font-mono text-xs"
+                  placeholder={tr("جاري تحميل رقم الجهاز...", "Loading device ID...")}
+                />
+
+                <p className="text-xs text-muted-foreground">
+                  {tr(
+                    "أرسل رقم الجهاز لتفعيل البرنامج",
+                    "Send this device ID to activate the software"
+                  )}
+                </p>
+              </div>
             </CardContent>
           </Card>
         </div>
-      )}
+       )}
 
-      {activeTab === "manager" && (
+       {activeTab === "manager" && (
         <Card className="rounded-lg">
           <CardHeader><CardTitle className="text-lg">{tr("صلاحيات المدير", "Manager Access")}</CardTitle></CardHeader>
           <CardContent className="grid gap-3 md:grid-cols-2">
@@ -1949,3 +2012,4 @@ export default function DeveloperSettingsPage() {
     </SettingsShell>
   );
 }
+
