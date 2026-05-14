@@ -191,10 +191,10 @@ export default function CustomerLedgerPage() {
 };
 
 return (
-  <div className="p-6 space-y-6 max-w-7xl mx-auto" dir={isAR ? "rtl" : "ltr"}>
+  <div className="p-6 flex flex-col gap-6 max-w-7xl mx-auto" dir={isAR ? "rtl" : "ltr"}>
 
   {/* Header */}
-  <div className="flex items-start justify-between gap-4">
+  <div className="order-1 flex items-start justify-between gap-4">
     <div className={isAR ? "text-right" : "text-left"}>
       <h1 className="text-3xl font-bold text-gray-900">
         {tr("ملخص العميل المالي", "Customer Financial Summary")}
@@ -235,7 +235,7 @@ return (
 
       {/* Filters */}
 
-      <div className="bg-white border rounded-2xl shadow-sm overflow-hidden">
+      <div className="order-3 bg-white border rounded-2xl shadow-sm overflow-hidden">
         <div className="px-5 py-4 border-b bg-gray-50 flex items-center justify-between">
           <div>
             <div className="font-semibold text-gray-900">{tr("البحث والتصفية", "Search and filters")}</div>
@@ -331,7 +331,7 @@ return (
       </div>
 
      {/* Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="order-2 grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-white border rounded-2xl p-4 shadow-sm flex items-center justify-between">
           <div>
             <div className="text-sm text-gray-500">{tr("العميل", "Client")}</div>
@@ -406,7 +406,7 @@ return (
       </div>
 
       {/* Table */}
-      <div className="bg-white border rounded-2xl shadow-sm overflow-hidden">
+      <div className="order-4 bg-white border rounded-2xl shadow-sm overflow-hidden">
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-gray-50 border-b text-gray-600">
