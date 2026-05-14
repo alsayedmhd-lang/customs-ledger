@@ -117,6 +117,9 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [appVersion, setAppVersion] = useState("2.0.0");
 
+  const [licenseDeviceId, setLicenseDeviceId] = useState("");
+  const [licenseNotConfigured, setLicenseNotConfigured] = useState(true);
+
   useEffect(() => {
     let active = true;
     const api = (window as Window & { electronAPI?: ElectronAPI }).electronAPI;
@@ -138,6 +141,24 @@ export default function LoginPage() {
       active = false;
     };
   }, []);
+  useEffect(() => {
+    async function loadLicenseDeviceId() {
+      try {
+        const api = (window as Window & { electronAPI?: ElectronAPI }).electronAPI;
+
+        const id = await api?.getLicenseDeviceId?.();
+
+        if (id) {
+          setLicenseDeviceId(id);
+        }
+      } catch (error) {
+        console.error("Failed to load license device id", error);
+      }
+    }
+
+    loadLicenseDeviceId();
+  }, []);
+
 
   // Forgot password state
   const [forgotUsername, setForgotUsername] = useState("");
@@ -403,7 +424,37 @@ export default function LoginPage() {
                 </button>
               </div>
 
-              <form onSubmit={handleLogin} className="space-y-4">
+              
+              {licenseNotConfigured && (
+                <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 space-y-3">
+                  <div className="text-sm font-bold text-amber-700 dark:text-amber-300">
+                    {isAR
+                      ? "هذا البرنامج غير مفعل"
+                      : "This software is not activated"}
+                  </div>
+
+                  <div className="text-xs text-amber-700/80 dark:text-amber-200/80">
+                    {isAR
+                      ? "أرسل رقم الجهاز التالي لتفعيل البرنامج"
+                      : "Send the following device ID to activate the software"}
+                  </div>
+
+                  <div className="rounded-lg border bg-background px-3 py-2 font-mono text-xs break-all text-center">
+                    {licenseDeviceId || "Loading..."}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await navigator.clipboard?.writeText(licenseDeviceId || "");
+                    }}
+                    className="w-full rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm font-medium text-amber-700 hover:bg-amber-500/20 transition"
+                  >
+                    {isAR ? "نسخ رقم الجهاز" : "Copy Device ID"}
+                  </button>
+                </div>
+              )}
+<form onSubmit={handleLogin} className="space-y-4">
                 <div className="space-y-1.5">
                   <label className="block text-xs font-semibold uppercase tracking-wider"
                     style={{ color: loginTheme.textMuted }}>{isAR ? "اسم المستخدم" : "Username"}</label>
@@ -850,3 +901,4 @@ export default function LoginPage() {
     </div>
   );
 }
+
