@@ -516,7 +516,7 @@ export default function LoginPage() {
     welcome: "border-cyan-200/30 bg-gradient-to-br from-emerald-400/20 via-cyan-400/10 to-blue-500/15 text-cyan-50 shadow-cyan-950/15",
     notice: "border-amber-200/35 bg-gradient-to-br from-amber-300/20 via-yellow-300/15 to-orange-300/10 text-amber-50 shadow-amber-950/15",
     warning: "border-red-200/30 bg-gradient-to-br from-red-400/20 via-rose-400/10 to-red-500/10 text-red-50 shadow-red-950/15",
-    quote: "border-white/25 bg-gradient-to-br from-white/15 via-sky-200/10 to-emerald-200/10 text-center text-base font-semibold italic leading-8 tracking-wide text-white/90 shadow-slate-950/15",
+    quote: "border-white/25 bg-gradient-to-br from-white/15 via-sky-200/10 to-emerald-200/10 text-base font-semibold italic leading-8 tracking-wide text-white/90 shadow-slate-950/15",
   };
 
   return (
