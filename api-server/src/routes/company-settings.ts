@@ -39,6 +39,8 @@ function ensureCompanySettingsPrintTitleColumns() {
     ["customer_ledger_subtitle_ar", "ALTER TABLE company_settings ADD COLUMN customer_ledger_subtitle_ar TEXT DEFAULT ''"],
     ["customer_ledger_subtitle_en", "ALTER TABLE company_settings ADD COLUMN customer_ledger_subtitle_en TEXT DEFAULT ''"],
     ["customer_ledger_subtitle_font_size", "ALTER TABLE company_settings ADD COLUMN customer_ledger_subtitle_font_size INTEGER DEFAULT 12"],
+    ["login_message_text", "ALTER TABLE company_settings ADD COLUMN login_message_text TEXT DEFAULT ''"],
+    ["login_message_type", "ALTER TABLE company_settings ADD COLUMN login_message_type TEXT DEFAULT 'welcome'"],
   ];
 
   for (const [column, sql] of statements) {

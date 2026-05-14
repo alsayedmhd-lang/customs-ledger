@@ -74,6 +74,8 @@ export const companySettingsTableSqlite = sqliteTable("company_settings", {
   lockLegalInfo: integer("lock_legal_info", { mode: "boolean" }).default(false),
   lockFooterBranding: integer("lock_footer_branding", { mode: "boolean" }).default(false),
   loginFooterText: text("login_footer_text").default(""),
+  loginMessageText: text("login_message_text").default(""),
+  loginMessageType: text("login_message_type").default("welcome"),
   preventRebrandToAnotherCompany: integer("prevent_rebrand_to_another_company", { mode: "boolean" }).default(false),
   licenseStatus: text("license_status").default("not_configured"),
   licensedCompanyName: text("licensed_company_name").default(""),

@@ -11,6 +11,7 @@ const LOGO = `${import.meta.env.BASE_URL}logo_nobg.png`;
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
 const LOGIN_FOOTER_TEXT_AR = "نظام المحاسبة الداخلي للشركات - alsayed.mhd@gmail.com - تلفون  - 00201009697521 - 0097460020446 ";
 const LOGIN_FOOTER_TEXT_EN = "Internal Accounting System For Companes - alsayed.mhd@gmail.com - Phone - 00201009697521 - 0097460020446";
+type LoginMessageType = "welcome" | "notice" | "warning" | "quote";
 
 function OtpInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const inputs = useRef<(HTMLInputElement | null)[]>([]);
@@ -80,6 +81,8 @@ export default function LoginPage() {
   const primaryShadow = "0 6px 20px hsl(var(--primary) / 0.35)";
   const logoShadow = `drop-shadow(0 0 24px ${displayPrimary.hex}66)`;
   const loginFooterText = settings.loginFooterText?.trim() || (isAR ? LOGIN_FOOTER_TEXT_AR : LOGIN_FOOTER_TEXT_EN);
+  const loginMessageText = settings.loginMessageText?.trim() || "";
+  const loginMessageType = (settings.loginMessageType || "welcome") as LoginMessageType;
 
   const loginTheme = isDark
     ? {
@@ -508,6 +511,13 @@ export default function LoginPage() {
 
   const inputCls =
   "w-full px-4 py-3 bg-white/90 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 outline-none focus:ring-2 focus:ring-blue-400/60 focus:border-blue-400 transition-all text-sm font-medium shadow-sm";
+  const loginMessageBaseClass = "mb-5 whitespace-pre-wrap rounded-2xl border px-4 py-3.5 text-[15px] font-medium leading-8 tracking-normal shadow-lg backdrop-blur-md";
+  const loginMessageClass: Record<LoginMessageType, string> = {
+    welcome: "border-cyan-200/30 bg-gradient-to-br from-emerald-400/20 via-cyan-400/10 to-blue-500/15 text-cyan-50 shadow-cyan-950/15",
+    notice: "border-amber-200/35 bg-gradient-to-br from-amber-300/20 via-yellow-300/15 to-orange-300/10 text-amber-50 shadow-amber-950/15",
+    warning: "border-red-200/30 bg-gradient-to-br from-red-400/20 via-rose-400/10 to-red-500/10 text-red-50 shadow-red-950/15",
+    quote: "border-white/25 bg-gradient-to-br from-white/15 via-sky-200/10 to-emerald-200/10 text-center text-base font-semibold italic leading-8 tracking-wide text-white/90 shadow-slate-950/15",
+  };
 
   return (
     <div
@@ -544,6 +554,11 @@ export default function LoginPage() {
             </div>
           </div>
         </div>
+        {loginMessageText && (
+          <div dir="auto" className={`${loginMessageBaseClass} ${loginMessageClass[loginMessageType] || loginMessageClass.welcome}`}>
+            {loginMessageText}
+          </div>
+        )}
         <AnimatePresence mode="wait">
 
           {/* ── LOGIN ── */}
@@ -570,7 +585,6 @@ export default function LoginPage() {
                 </button>
               </div>
 
-              
               {licenseNotConfigured && (
                 <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 space-y-3">
                   <div className="text-sm font-bold text-amber-700 dark:text-amber-300">

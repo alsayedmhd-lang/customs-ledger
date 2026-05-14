@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import SettingsShell from "@/components/layout/SettingsShell";
@@ -19,6 +20,7 @@ const ONLINE_DATABASE_CONNECTED_KEY = "developer_online_database_connected";
 const DEVELOPER_IDLE_TIMEOUT_MS = 5 * 60 * 1000;
 const AUTO_SYNC_INTERVAL_MS = 2 * 60 * 1000;
 const DEFAULT_LOGIN_FOOTER_TEXT = "Internal Accounting System For Companes - alsayed.mhd@gmail.com - Phone - 00201009697521 - 0097460020446";
+type LoginMessageType = "welcome" | "notice" | "warning" | "quote";
 
 type DeveloperSettings = {
   lockCompanyIdentity: boolean;
@@ -28,6 +30,8 @@ type DeveloperSettings = {
   lockLegalInfo: boolean;
   lockFooterBranding: boolean;
   loginFooterText: string;
+  loginMessageText: string;
+  loginMessageType: LoginMessageType;
   preventRebrandToAnotherCompany: boolean;
   licenseStatus: string;
   licensedCompanyName: string;
@@ -83,6 +87,8 @@ const defaultSettings: DeveloperSettings = {
   lockLegalInfo: false,
   lockFooterBranding: false,
   loginFooterText: "",
+  loginMessageText: "",
+  loginMessageType: "welcome",
   preventRebrandToAnotherCompany: false,
   licenseStatus: "not_configured",
   licensedCompanyName: "",
@@ -262,6 +268,13 @@ const licenseFields: Array<[TextKey, string, string]> = [
   ["hardwareId", "معرّف الجهاز", "Hardware ID"],
   ["issuedAt", "تاريخ الإصدار", "Issued at"],
   ["expiresAt", "تاريخ الانتهاء", "Expires at"],
+];
+
+const loginMessageTypeOptions: Array<{ value: LoginMessageType; labelAr: string; labelEn: string }> = [
+  { value: "welcome", labelAr: "واجهة / ترحيب", labelEn: "Welcome" },
+  { value: "notice", labelAr: "تنبيه", labelEn: "Notice" },
+  { value: "warning", labelAr: "تحذير", labelEn: "Warning" },
+  { value: "quote", labelAr: "آية / اقتباس", labelEn: "Verse / Quote" },
 ];
 
 function authHeaders() {
@@ -1323,6 +1336,7 @@ export default function DeveloperSettingsPage() {
 
       {activeTab === "security" && (
         <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+          <div className="grid gap-4">
           <Card className="rounded-lg">
             <CardHeader><CardTitle className="text-lg">{tr("الحماية والترخيص", "Security & License")}</CardTitle></CardHeader>
             <CardContent className="space-y-3">
@@ -1331,6 +1345,42 @@ export default function DeveloperSettingsPage() {
               ))}
             </CardContent>
           </Card>
+          <Card className="rounded-lg">
+            <CardHeader><CardTitle className="text-lg">{tr("رسالة صفحة تسجيل الدخول", "Login Page Message")}</CardTitle></CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label>{tr("نص الرسالة", "Message text")}</Label>
+                <Textarea
+                  value={settings.loginMessageText}
+                  onChange={(event) => setText("loginMessageText", event.target.value)}
+                  className="min-h-28"
+                  placeholder={tr("اتركها فارغة لإخفاء الرسالة", "Leave empty to hide the message")}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>{tr("نوع الرسالة", "Message type")}</Label>
+                <RadioGroup
+                  value={settings.loginMessageType || "welcome"}
+                  onValueChange={(value) => setText("loginMessageType", value as LoginMessageType)}
+                  className="grid gap-2 md:grid-cols-2"
+                >
+                  {loginMessageTypeOptions.map((option) => (
+                    <Label key={option.value} className="flex cursor-pointer items-center gap-3 rounded-lg border border-border bg-background px-3 py-2 text-sm font-medium">
+                      <RadioGroupItem value={option.value} />
+                      <span>{tr(option.labelAr, option.labelEn)}</span>
+                    </Label>
+                  ))}
+                </RadioGroup>
+              </div>
+              <div className="flex justify-end">
+                <Button type="button" onClick={saveSettings} disabled={isSaving} className="gap-2">
+                  <Save className="h-4 w-4" />
+                  {isSaving ? tr("جاري الحفظ...", "Saving...") : tr("حفظ", "Save")}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+          </div>
           <Card className="rounded-lg">
             <CardHeader><CardTitle className="text-lg">{tr("بيانات الترخيص", "License Details")}</CardTitle></CardHeader>
             <CardContent className="grid gap-3">
@@ -1450,6 +1500,7 @@ export default function DeveloperSettingsPage() {
        )}
 
        {activeTab === "manager" && (
+        <div className="grid gap-4">
         <Card className="rounded-lg">
           <CardHeader><CardTitle className="text-lg">{tr("صلاحيات المدير", "Manager Access")}</CardTitle></CardHeader>
           <CardContent className="grid gap-3 md:grid-cols-2">
@@ -1458,6 +1509,7 @@ export default function DeveloperSettingsPage() {
             ))}
           </CardContent>
         </Card>
+        </div>
       )}
 
       {activeTab === "database" && (

@@ -29,6 +29,8 @@ export interface CompanySettings {
   showStampOnStatements: boolean;
   footerText: string;
   loginFooterText: string;
+  loginMessageText: string;
+  loginMessageType: "welcome" | "notice" | "warning" | "quote";
   invoiceCashTitleAr: string;
   invoiceCashTitleEn: string;
   invoiceCreditTitleAr: string;
@@ -88,6 +90,8 @@ export const DEFAULT_SETTINGS: CompanySettings = {
   showStampOnStatements: true,
   footerText: "",
   loginFooterText: "",
+  loginMessageText: "",
+  loginMessageType: "welcome",
   invoiceCashTitleAr: "فاتورة نقداً",
   invoiceCashTitleEn: "Cash Invoice",
   invoiceCreditTitleAr: "فاتورة نقداً / على الحساب",
@@ -182,6 +186,30 @@ export function CompanySettingsProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    function handleDeveloperSettingsUpdated(event: Event) {
+      const detail = (event as CustomEvent<Partial<CompanySettings>>).detail;
+      if (!detail) return;
+
+      setSettings((current) => {
+        const merged = {
+          ...DEFAULT_SETTINGS,
+          ...current,
+          ...detail,
+        };
+
+        localStorage.setItem(LS_KEY, JSON.stringify(merged));
+        return merged;
+      });
+    }
+
+    window.addEventListener("developer-settings-updated", handleDeveloperSettingsUpdated);
+
+    return () => {
+      window.removeEventListener("developer-settings-updated", handleDeveloperSettingsUpdated);
+    };
+  }, []);
 
   const logoSrc = settings.logoBase64 || defaultLogoSrc;
   const stampSrc = settings.stampBase64 || defaultStampSrc;
