@@ -3,6 +3,7 @@ import { useParams, Link } from "wouter";
 import { useGetInvoice } from "@workspace/api-client-react";
 import { Printer, ArrowRight, ArrowLeft, Stamp, Calculator } from "lucide-react";
 import Barcode from "react-barcode";
+import { A4PrintShell } from "@/components/a4-print-shell";
 import InvoicePrintHeader from "@/components/invoice-print-header";
 import { PrintDocumentFooter } from "@/components/print-document-parts";
 import { arabicNums, formatNumber } from "@/lib/utils";
@@ -250,7 +251,11 @@ const impExpValue =
   };
 
   return (
-    <div className="bg-gray-100 print:bg-white" dir="rtl">
+    <A4PrintShell
+      dir="rtl"
+      pageClassName="max-w-4xl shadow-xl"
+      controls={
+        <>
       <style>{`
         @media print {
           @page {
@@ -369,13 +374,11 @@ const impExpValue =
           </span>
         </label>}
       </div>
+        </>
+      }
+    >
 
       {/* ── A4 Invoice ────────────────────────────────────────────────────── */}
-      <div
-        id="invoice-print"
-        className="print-page max-w-4xl mx-auto print:max-w-none print:w-full print:mx-0 bg-white shadow-xl print:shadow-none border border-gray-200 print:border-none relative overflow-hidden"
-        style={{ fontFamily: "'Cairo', 'Arial', sans-serif" }}
-      >
         <div className="print-content">
         {/* ══ WATERMARK ═══════════════════════════════════════════════════ */}
         {company.showWatermark && (
@@ -723,8 +726,7 @@ const impExpValue =
           </div>
         </div>
         </div>
-      </div>
-    </div>
+    </A4PrintShell>
   );
 }
 
