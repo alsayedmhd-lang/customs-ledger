@@ -7,6 +7,7 @@ import { Printer, ArrowRight, ArrowLeft, Stamp } from "lucide-react";
 import Barcode from "react-barcode";
 import { useLanguage } from "@/lib/language-context";
 import { useCompanySettings } from "@/lib/company-settings-context";
+import { A4PrintShell } from "@/components/a4-print-shell";
 import { PrintTitleBlock } from "@/components/print-document-parts";
 
 const STATUS_AR: Record<string, string> = {
@@ -115,14 +116,27 @@ export default function ClientStatement() {
   });
 
   return (
-    <div className="bg-gray-100 print:bg-white" dir="rtl">
+    <A4PrintShell
+      dir="rtl"
+      pageClassName="max-w-4xl shadow-xl"
+      controls={
+        <>
       {/* Print CSS */}
       <style>{`
         @media print {
           @page { size: A4 portrait; margin: 10mm 10mm 10mm 15mm; }
           body { margin: 0; }
           .print\\:hidden { display: none !important; }
-          .print-page { min-height: 297mm; height: auto; display: flex; flex-direction: column; overflow: visible !important; }
+          .print-page {
+            width: 100% !important;
+            max-width: none !important;
+            margin: 0 !important;
+            min-height: 297mm;
+            height: auto;
+            display: flex;
+            flex-direction: column;
+            overflow: visible !important;
+          }
           .print-content { flex: 1 1 auto; min-height: 0; }
           .print-footer { flex: 0 0 auto; margin-top: auto; page-break-inside: avoid; break-inside: avoid; }
         }
@@ -170,12 +184,11 @@ export default function ClientStatement() {
           </label>
         )}
       </div>
+        </>
+      }
+    >
 
       {/* ── A4 Statement Document ────────────────────────────────────────────── */}
-      <div
-        className="print-page max-w-4xl mx-auto print:max-w-none print:w-full print:mx-0 bg-white shadow-xl print:shadow-none border border-gray-200 print:border-none relative overflow-hidden"
-        style={{ fontFamily: "'Cairo', 'Arial', sans-serif" }}
-      >
         <main className="print-content">
         {/* ══ WATERMARK ═══════════════════════════════════════════════════ */}
         {settings.showWatermark && (
@@ -447,7 +460,6 @@ export default function ClientStatement() {
           </div>
           </div>
         </footer>
-      </div>
-    </div>
+    </A4PrintShell>
   );
 }
