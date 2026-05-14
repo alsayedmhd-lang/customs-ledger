@@ -127,6 +127,7 @@ export default function LoginPage() {
   const [licenseMessage, setLicenseMessage] = useState("");
   const [licenseMessageType, setLicenseMessageType] = useState<"success" | "error">("success");
   const [licenseLoading, setLicenseLoading] = useState(false);
+  const [showManualLicenseInput, setShowManualLicenseInput] = useState(false);
   const licenseFileInputRef = useRef<HTMLInputElement | null>(null);
   const [showDeveloperUnlockModal, setShowDeveloperUnlockModal] = useState(false);
   const [developerPassword, setDeveloperPassword] = useState("");
@@ -617,26 +618,37 @@ export default function LoginPage() {
                       : (isAR ? "اختيار ملف الترخيص" : "Choose license file")}
                   </button>
 
-                  <div className="space-y-2">
-                    <label className="block text-xs font-semibold text-amber-700/80 dark:text-amber-200/80">
-                      {isAR ? "أو الصق الترخيص يدويًا" : "Or paste the license manually"}
-                    </label>
-                    <textarea
-                      value={licenseText}
-                      onChange={(event) => setLicenseText(event.target.value)}
-                      className="min-h-[110px] w-full rounded-xl border border-amber-500/30 bg-white/90 px-3 py-2 font-mono text-xs text-slate-900 outline-none focus:ring-2 focus:ring-amber-400/50"
-                      dir="ltr"
-                      placeholder='{"licenseId":"..."}'
-                    />
-                    <button
-                      type="button"
-                      onClick={handleManualLicenseActivation}
-                      disabled={licenseLoading || !licenseText.trim()}
-                      className="w-full rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm font-medium text-amber-700 hover:bg-amber-500/20 disabled:opacity-50 transition"
-                    >
-                      {isAR ? "تفعيل الترخيص يدويًا" : "Activate manual license"}
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowManualLicenseInput((value) => !value)}
+                    className="text-xs font-semibold text-amber-700/80 underline-offset-4 transition hover:text-amber-700 hover:underline dark:text-amber-200/80 dark:hover:text-amber-200"
+                    aria-expanded={showManualLicenseInput}
+                  >
+                    {isAR ? "لدي كود ترخيص يدوي" : "I have a manual license code"}
+                  </button>
+
+                  {showManualLicenseInput && (
+                    <div className="space-y-2">
+                      <label className="block text-xs font-semibold text-amber-700/80 dark:text-amber-200/80">
+                        {isAR ? "أو الصق الترخيص يدويًا" : "Or paste the license manually"}
+                      </label>
+                      <textarea
+                        value={licenseText}
+                        onChange={(event) => setLicenseText(event.target.value)}
+                        className="min-h-[110px] w-full rounded-xl border border-amber-500/30 bg-white/90 px-3 py-2 font-mono text-xs text-slate-900 outline-none focus:ring-2 focus:ring-amber-400/50"
+                        dir="ltr"
+                        placeholder='{"licenseId":"..."}'
+                      />
+                      <button
+                        type="button"
+                        onClick={handleManualLicenseActivation}
+                        disabled={licenseLoading || !licenseText.trim()}
+                        className="w-full rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm font-medium text-amber-700 hover:bg-amber-500/20 disabled:opacity-50 transition"
+                      >
+                        {isAR ? "تفعيل الترخيص يدويًا" : "Activate manual license"}
+                      </button>
+                    </div>
+                  )}
 
                   {licenseMessage && (
                     <div
