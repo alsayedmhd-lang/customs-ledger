@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import SettingsShell from "@/components/layout/SettingsShell";
+import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/lib/language-context";
 import { cn } from "@/lib/utils";
 
@@ -373,12 +374,14 @@ export default function DeveloperSettingsPage() {
   const { lang, isRTL } = useLanguage();
   const isAR = lang === "ar";
   const tr = (ar: string, en: string) => (isAR ? ar : en);
+  const { toast } = useToast();
   const [password, setPassword] = useState("");
   const [unlocked, setUnlocked] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>("security");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isActivatingLicense, setIsActivatingLicense] = useState(false);
   const [isTestingConnection, setIsTestingConnection] = useState(false);
   const [isConnectingOnline, setIsConnectingOnline] = useState(false);
   const [isSyncQueueLoading, setIsSyncQueueLoading] = useState(false);
@@ -460,6 +463,7 @@ export default function DeveloperSettingsPage() {
     }
 
     setOnlineDatabaseConnected(sessionStorage.getItem(ONLINE_DATABASE_CONNECTED_KEY) === "true");
+    void loadCurrentLicenseStatus();
   }, []);
 
   useEffect(() => {
@@ -497,7 +501,10 @@ export default function DeveloperSettingsPage() {
 
   useEffect(() => {
     if (unlocked) {
-      void loadSettings();
+      void (async () => {
+        await loadSettings();
+        await loadCurrentLicenseStatus();
+      })();
       void loadSyncQueueStatus();
       void loadReadinessStatus();
       void loadStorageInfo();
@@ -529,6 +536,29 @@ export default function DeveloperSettingsPage() {
       status: nextSettings.syncStatus || "idle",
     }));
     sessionStorage.setItem("developer_settings", JSON.stringify(nextSettings));
+  }
+
+  function applyLicenseStatusState(status: any) {
+    if (!status) return;
+
+    setSettings((current) => ({
+      ...current,
+      licenseStatus: status.status || (status.valid ? "active" : status.reason || current.licenseStatus),
+      licensedCompanyName: status.customerName || current.licensedCompanyName,
+      licenseId: status.licenseId || current.licenseId,
+      hardwareId: status.hardwareId || status.deviceId || status.currentDeviceId || current.hardwareId,
+      issuedAt: status.issuedAt || current.issuedAt,
+      expiresAt: status.expiresAt || status.expiryDate || current.expiresAt,
+    }));
+  }
+
+  async function loadCurrentLicenseStatus() {
+    try {
+      const status = await window.electronAPI?.getLicenseStatus?.();
+      applyLicenseStatusState(status);
+    } catch (error) {
+      console.error("Failed to load license status", error);
+    }
   }
 
   function buildDeveloperSettingsPayload() {
@@ -833,6 +863,51 @@ export default function DeveloperSettingsPage() {
     };
 
     setGeneratedLicenseText(JSON.stringify(license, null, 2));
+  }
+
+  async function activateCurrentLicense() {
+    try {
+      setIsActivatingLicense(true);
+      const issuedAt = new Date().toISOString();
+      const license = {
+        licenseId: `DEV-${Date.now()}`,
+        customerName: licenseCustomerName || "TRIAL CUSTOMER",
+        licenseType: "trial",
+        deviceId: licenseTargetDeviceId || licenseDeviceId,
+        expiryDate: licenseExpiryDate,
+        issuedAt,
+      };
+
+      const result = await window.electronAPI?.saveCurrentLicense?.(license);
+
+      if (!result?.ok && !result?.success) {
+        setSavedMessage(tr("فشل تفعيل الترخيص", "Failed to activate license"));
+        return;
+      }
+
+      setSettings((current) => ({
+        ...current,
+        licenseStatus: "active",
+        licensedCompanyName: license.customerName,
+        licenseId: license.licenseId,
+        hardwareId: license.deviceId,
+        issuedAt: license.issuedAt,
+        expiresAt: license.expiryDate,
+      }));
+
+      const status = await window.electronAPI?.getLicenseStatus?.();
+      applyLicenseStatusState(status);
+
+      toast({
+        title: tr("تم تفعيل النسخة", "Build activated"),
+        description: tr("تم حفظ الترخيص بنجاح", "License saved successfully"),
+      });
+    } catch (error) {
+      console.error("Failed to activate current license", error);
+      setSavedMessage(tr("حدث خطأ أثناء تفعيل الترخيص", "License activation failed"));
+    } finally {
+      setIsActivatingLicense(false);
+    }
   }
 
 
@@ -1268,6 +1343,16 @@ export default function DeveloperSettingsPage() {
                   onClick={generateClientLicenseText}
                 >
                   {tr("توليد الترخيص", "Generate License")}
+                </Button>
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  onClick={activateCurrentLicense}
+                  disabled={isActivatingLicense}
+                >
+                  {isActivatingLicense ? tr("جاري التفعيل...", "Activating...") : tr("تفعيل هذه النسخة", "Activate This Build")}
                 </Button>
 
                 {generatedLicenseText && (

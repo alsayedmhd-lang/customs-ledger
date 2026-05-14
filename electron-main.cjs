@@ -1260,6 +1260,65 @@ ipcMain.handle("license:get-device-id", () => {
   return generateLicenseDeviceId();
 });
 
+function getLicenseStatus() {
+  try {
+    const fs = require("fs");
+    const licensePath = path.join(process.cwd(), "api-server", "src", "utils", "license", "license.json");
+
+    if (!fs.existsSync(licensePath)) {
+      return { valid: false, reason: "LICENSE_FILE_NOT_FOUND" };
+    }
+
+    const license = JSON.parse(fs.readFileSync(licensePath, "utf-8"));
+    const currentDeviceId = generateLicenseDeviceId();
+
+    if (license.deviceId !== currentDeviceId) {
+      return { valid: false, reason: "DEVICE_ID_MISMATCH", currentDeviceId };
+    }
+
+    const expiry = new Date(`${license.expiryDate}T23:59:59`);
+    if (Number.isNaN(expiry.getTime())) {
+      return { valid: false, reason: "INVALID_EXPIRY_DATE", currentDeviceId };
+    }
+
+    if (new Date() > expiry) {
+      return { valid: false, reason: "LICENSE_EXPIRED", expiryDate: license.expiryDate, currentDeviceId };
+    }
+
+    return {
+      valid: true,
+      reason: "LICENSE_VALID",
+      customerName: license.customerName,
+      licenseType: license.licenseType,
+      expiryDate: license.expiryDate,
+      currentDeviceId,
+    };
+  } catch (error) {
+    return { valid: false, reason: "LICENSE_CHECK_FAILED", message: String(error) };
+  }
+}
+
+ipcMain.handle("license:get-status", () => {
+  return getLicenseStatus();
+});
+
+ipcMain.handle("license:save-current", async (_event, license) => {
+  try {
+    const fs = require("fs");
+    const licenseDir = path.join(process.cwd(), "api-server", "src", "utils", "license");
+    const licensePath = path.join(licenseDir, "license.json");
+
+    fs.mkdirSync(licenseDir, { recursive: true });
+    fs.writeFileSync(licensePath, JSON.stringify(license, null, 2), "utf-8");
+
+    return { success: true, licensePath };
+  } catch (error) {
+    return { success: false, message: String(error) };
+  }
+});
+
+
+
 app.whenReady().then(() => {
   createWindow();
   setupApplicationMenu();

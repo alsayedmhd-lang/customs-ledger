@@ -147,12 +147,16 @@ export default function LoginPage() {
         const api = (window as Window & { electronAPI?: ElectronAPI }).electronAPI;
 
         const id = await api?.getLicenseDeviceId?.();
+        const status = await api?.getLicenseStatus?.();
 
         if (id) {
           setLicenseDeviceId(id);
         }
+
+        setLicenseNotConfigured(!status?.valid);
       } catch (error) {
-        console.error("Failed to load license device id", error);
+        console.error("Failed to load license status", error);
+        setLicenseNotConfigured(true);
       }
     }
 
@@ -901,4 +905,5 @@ export default function LoginPage() {
     </div>
   );
 }
+
 

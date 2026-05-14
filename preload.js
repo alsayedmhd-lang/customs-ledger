@@ -16,6 +16,12 @@ contextBridge.exposeInMainWorld("electronAPI", {
 
   getLicenseDeviceId: () =>
     ipcRenderer.invoke("license:get-device-id"),
+
+  getLicenseStatus: () =>
+    ipcRenderer.invoke("license:get-status"),
+
+  saveCurrentLicense: (license) =>
+    ipcRenderer.invoke("license:save-current", license),
   analyzeDataRootMigration: () => ipcRenderer.invoke("data-root:analyze-migration"),
   analyzeBackupReadiness: () => ipcRenderer.invoke("backup:analyze-readiness"),
   createBackupManifest: () => ipcRenderer.invoke("backup:create-manifest"),
