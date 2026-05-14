@@ -109,7 +109,7 @@ const getClientName = (receipt: { clientName?: string | null; clientId?: number 
     );
   });
 
-  const totalAmount = (receipts ?? []).reduce((sum, r) => sum + r.amount, 0);
+  const totalAmount = filtered.reduce((sum, r) => sum + r.amount, 0);
 
   const handleDelete = async () => {
     if (deleteId == null) return;
@@ -177,7 +177,7 @@ const getClientName = (receipt: { clientName?: string | null; clientId?: number 
 
         <div className="ms-auto text-end">
           <p className="text-sm text-muted-foreground">{t("receiptCount")}</p>
-          <p className="text-2xl font-bold">{(receipts ?? []).length}</p>
+          <p className="text-2xl font-bold">{filtered.length}</p>
         </div>
       </motion.div>
 
