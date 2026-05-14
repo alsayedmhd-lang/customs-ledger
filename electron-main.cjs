@@ -1,4 +1,6 @@
 const { app, BrowserWindow, ipcMain, dialog, Menu, shell } = require("electron");
+const os = require("node:os");
+const crypto = require("node:crypto");
 const { autoUpdater } = require("electron-updater");
 const { spawn } = require("child_process");
 const path = require("path");
@@ -827,7 +829,6 @@ ipcMain.handle("app:get-version", () => app.getVersion());
 ipcMain.handle("storage:open-data-folder", async () => {
   try {
     const { shell } = require("electron");
-
     const { resolveDataRoot } = require("./api-server/dist/utils/storage/resolve-data-root");
 
     const dataRoot = resolveDataRoot();
@@ -1238,6 +1239,27 @@ ipcMain.handle("install-update", async () => {
   return { success: true };
 });
 
+
+function generateLicenseDeviceId() {
+  const hostname = os.hostname();
+  const platform = os.platform();
+  const arch = os.arch();
+  const cpuInfo = os.cpus()?.[0]?.model || "unknown-cpu";
+
+  const raw = [hostname, platform, arch, cpuInfo].join("|");
+
+  return crypto
+    .createHash("sha256")
+    .update(raw)
+    .digest("hex")
+    .slice(0, 32)
+    .toUpperCase();
+}
+
+ipcMain.handle("license:get-device-id", () => {
+  return generateLicenseDeviceId();
+});
+
 app.whenReady().then(() => {
   createWindow();
   setupApplicationMenu();
@@ -1249,3 +1271,4 @@ app.on("window-all-closed", () => {
   }
   app.quit();
 });
+

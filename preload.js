@@ -13,6 +13,9 @@ window.addEventListener(
 
 contextBridge.exposeInMainWorld("electronAPI", {
   getAppVersion: () => ipcRenderer.invoke("app:get-version"),
+
+  getLicenseDeviceId: () =>
+    ipcRenderer.invoke("license:get-device-id"),
   analyzeDataRootMigration: () => ipcRenderer.invoke("data-root:analyze-migration"),
   analyzeBackupReadiness: () => ipcRenderer.invoke("backup:analyze-readiness"),
   createBackupManifest: () => ipcRenderer.invoke("backup:create-manifest"),
@@ -73,3 +76,4 @@ contextBridge.exposeInMainWorld("electronAPI", {
     };
   },
 });
+
