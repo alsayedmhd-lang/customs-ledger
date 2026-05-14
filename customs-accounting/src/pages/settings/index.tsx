@@ -982,6 +982,7 @@ export default function SettingsPage() {
   const receiverSignatureRef = useRef<HTMLInputElement>(null);
   const stampRef = useRef<HTMLInputElement>(null);
   const watermarkRef = useRef<HTMLInputElement>(null);
+  const developerVersionTapRef = useRef({ count: 0, lastTapAt: 0 });
   const [allowManagerEditAccountantSignature, setAllowManagerEditAccountantSignature] = useState(false);
   const [allowManagerEditAppearance, setAllowManagerEditAppearance] = useState(false);
   const [allowManagerEditInvoicesBackupImport, setAllowManagerEditInvoicesBackupImport] = useState(false);
@@ -1023,6 +1024,30 @@ export default function SettingsPage() {
   const [customerLedgerPreviewScale, setCustomerLedgerPreviewScale] = useState(() =>
     readPreviewZoom(previewZoomStorageKeys.customerLedger, 0.78)
   );
+  useEffect(() => {
+    const handleDeveloperShortcut = (event: KeyboardEvent) => {
+      if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === "d") {
+        event.preventDefault();
+        setLocation("/settings/developer");
+      }
+    };
+
+    window.addEventListener("keydown", handleDeveloperShortcut);
+    return () => window.removeEventListener("keydown", handleDeveloperShortcut);
+  }, [setLocation]);
+  const handleVersionClick = () => {
+    const now = Date.now();
+    const nextCount = now - developerVersionTapRef.current.lastTapAt <= 2000
+      ? developerVersionTapRef.current.count + 1
+      : 1;
+
+    developerVersionTapRef.current = { count: nextCount, lastTapAt: now };
+
+    if (nextCount >= 5) {
+      developerVersionTapRef.current = { count: 0, lastTapAt: 0 };
+      setLocation("/settings/developer");
+    }
+  };
   useEffect(() => {
     writePreviewZoom(previewZoomStorageKeys.invoice, invoicePreviewScale);
   }, [invoicePreviewScale]);
@@ -1829,7 +1854,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
         onTabChange={setActiveTab}
         actions={
           <>
-            {canSeeDeveloperLink && (
+            {false && canSeeDeveloperLink && (
               <button
                 type="button"
                 onClick={() => {
@@ -2471,7 +2496,18 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                       <div className="text-xs font-semibold uppercase text-muted-foreground">
                         {isAR ? "الإصدار الحالي" : "Current Version"}
                       </div>
-                      <div className="mt-1 font-mono text-sm font-bold text-foreground">
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        onClick={handleVersionClick}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            handleVersionClick();
+                          }
+                        }}
+                        className="mt-1 font-mono text-sm font-bold text-foreground"
+                      >
                         {import.meta.env.VITE_APP_VERSION || "2.0.0"}
                       </div>
                     </div>
