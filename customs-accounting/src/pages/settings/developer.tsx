@@ -865,6 +865,32 @@ export default function DeveloperSettingsPage() {
     setGeneratedLicenseText(JSON.stringify(license, null, 2));
   }
 
+  function downloadGeneratedLicenseFile() {
+    if (!generatedLicenseText) return;
+
+    const safeCustomerName =
+      (licenseCustomerName || "customer")
+        .trim()
+        .replace(/[<>:"/\\|?*\x00-\x1F]/g, "")
+        .replace(/\s+/g, "-") || "customer";
+    const blob = new Blob([generatedLicenseText], { type: "application/json;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+
+    link.href = url;
+    link.download = `license-${safeCustomerName}.json`;
+
+    try {
+      link.click();
+      toast({
+        title: tr("تم حفظ ملف الترخيص", "License file saved"),
+        description: tr("يمكنك إرسال الملف للعميل لتفعيل النسخة", "You can send the file to the customer to activate the build"),
+      });
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  }
+
   async function activateCurrentLicense() {
     try {
       setIsActivatingLicense(true);
@@ -1356,12 +1382,22 @@ export default function DeveloperSettingsPage() {
                 </Button>
 
                 {generatedLicenseText && (
-                  <Textarea
-                    value={generatedLicenseText}
-                    readOnly
-                    dir="ltr"
-                    className="min-h-40 font-mono text-xs"
-                  />
+                  <>
+                    <Textarea
+                      value={generatedLicenseText}
+                      readOnly
+                      dir="ltr"
+                      className="min-h-40 font-mono text-xs"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full"
+                      onClick={downloadGeneratedLicenseFile}
+                    >
+                      {tr("حفظ ملف الترخيص", "Save License File")}
+                    </Button>
+                  </>
                 )}
               </div>
             </CardContent>

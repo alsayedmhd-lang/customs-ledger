@@ -1,6 +1,6 @@
 import { useCompanySettings } from "@/lib/company-settings-context";
 import { COLOR_PRESETS, useDisplaySettings } from "@/lib/display-settings-context";
-import { useState, FormEvent, useRef, KeyboardEvent, useEffect } from "react";
+import { useState, FormEvent, useRef, KeyboardEvent, useEffect, ChangeEvent } from "react";
 import { useAuth, type OtpPending } from "@/lib/auth-context";
 import { useLocation } from "wouter";
 import { useLanguage } from "@/lib/language-context";
@@ -61,6 +61,9 @@ type Mode = "login" | "register" | "otp" | "registered" | "forgot" | "reset-otp"
 
 type ElectronAPI = {
   getAppVersion?: () => Promise<string>;
+  getLicenseDeviceId?: () => Promise<string>;
+  getLicenseStatus?: () => Promise<{ valid?: boolean } | null | undefined>;
+  saveCurrentLicense?: (license: unknown) => Promise<{ ok?: boolean; success?: boolean; message?: string } | null | undefined>;
 };
 
 export default function LoginPage() {
@@ -119,6 +122,11 @@ export default function LoginPage() {
 
   const [licenseDeviceId, setLicenseDeviceId] = useState("");
   const [licenseNotConfigured, setLicenseNotConfigured] = useState(true);
+  const [licenseText, setLicenseText] = useState("");
+  const [licenseMessage, setLicenseMessage] = useState("");
+  const [licenseMessageType, setLicenseMessageType] = useState<"success" | "error">("success");
+  const [licenseLoading, setLicenseLoading] = useState(false);
+  const licenseFileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -162,6 +170,63 @@ export default function LoginPage() {
 
     loadLicenseDeviceId();
   }, []);
+
+  async function saveClientLicense(parsedLicense: unknown) {
+    const api = (window as Window & { electronAPI?: ElectronAPI }).electronAPI;
+
+    if (!api?.saveCurrentLicense) {
+      throw new Error(isAR ? "خدمة حفظ الترخيص غير متاحة" : "License save service is not available");
+    }
+
+    const result = await api.saveCurrentLicense(parsedLicense);
+
+    if (!result?.ok && !result?.success) {
+      throw new Error(result?.message || (isAR ? "فشل تفعيل الترخيص" : "Failed to activate license"));
+    }
+
+    setLicenseMessageType("success");
+    setLicenseMessage(isAR ? "تم تفعيل النسخة بنجاح" : "License activated successfully");
+    setLicenseText("");
+
+    const status = await api.getLicenseStatus?.();
+    setLicenseNotConfigured(!status?.valid);
+  }
+
+  async function handleLicenseFileChange(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+
+    if (!file) return;
+
+    setLicenseLoading(true);
+    setLicenseMessage("");
+
+    try {
+      const content = await file.text();
+      const parsedLicense = JSON.parse(content);
+      await saveClientLicense(parsedLicense);
+    } catch (err: unknown) {
+      setLicenseMessageType("error");
+      setLicenseMessage(err instanceof Error ? err.message : (isAR ? "تعذر قراءة ملف الترخيص" : "Unable to read license file"));
+    } finally {
+      setLicenseLoading(false);
+    }
+  }
+
+  async function handleManualLicenseActivation() {
+    setLicenseLoading(true);
+    setLicenseMessage("");
+
+    try {
+      const parsedLicense = JSON.parse(licenseText);
+      await saveClientLicense(parsedLicense);
+    } catch (err: unknown) {
+      setLicenseMessageType("error");
+      setLicenseMessage(err instanceof Error ? err.message : (isAR ? "صيغة الترخيص غير صحيحة" : "Invalid license format"));
+    } finally {
+      setLicenseLoading(false);
+    }
+  }
 
 
   // Forgot password state
@@ -433,7 +498,7 @@ export default function LoginPage() {
                 <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 space-y-3">
                   <div className="text-sm font-bold text-amber-700 dark:text-amber-300">
                     {isAR
-                      ? "هذا البرنامج غير مفعل"
+                      ? "تفعيل نسخة العميل"
                       : "This software is not activated"}
                   </div>
 
@@ -456,8 +521,67 @@ export default function LoginPage() {
                   >
                     {isAR ? "نسخ رقم الجهاز" : "Copy Device ID"}
                   </button>
+
+                  <input
+                    ref={licenseFileInputRef}
+                    type="file"
+                    accept=".json,application/json"
+                    className="hidden"
+                    onChange={handleLicenseFileChange}
+                  />
+
+                  <button
+                    type="button"
+                    onClick={() => licenseFileInputRef.current?.click()}
+                    disabled={licenseLoading}
+                    className="w-full rounded-xl bg-emerald-600 px-3 py-2 text-sm font-bold text-white hover:bg-emerald-500 disabled:opacity-50 transition"
+                  >
+                    {licenseLoading
+                      ? (isAR ? "جاري التفعيل..." : "Activating...")
+                      : (isAR ? "اختيار ملف الترخيص" : "Choose license file")}
+                  </button>
+
+                  <div className="space-y-2">
+                    <label className="block text-xs font-semibold text-amber-700/80 dark:text-amber-200/80">
+                      {isAR ? "أو الصق الترخيص يدويًا" : "Or paste the license manually"}
+                    </label>
+                    <textarea
+                      value={licenseText}
+                      onChange={(event) => setLicenseText(event.target.value)}
+                      className="min-h-[110px] w-full rounded-xl border border-amber-500/30 bg-white/90 px-3 py-2 font-mono text-xs text-slate-900 outline-none focus:ring-2 focus:ring-amber-400/50"
+                      dir="ltr"
+                      placeholder='{"licenseId":"..."}'
+                    />
+                    <button
+                      type="button"
+                      onClick={handleManualLicenseActivation}
+                      disabled={licenseLoading || !licenseText.trim()}
+                      className="w-full rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm font-medium text-amber-700 hover:bg-amber-500/20 disabled:opacity-50 transition"
+                    >
+                      {isAR ? "تفعيل الترخيص يدويًا" : "Activate manual license"}
+                    </button>
+                  </div>
+
+                  {licenseMessage && (
+                    <div
+                      className={`rounded-xl px-3 py-2 text-sm font-medium ${
+                        licenseMessageType === "success"
+                          ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-200"
+                          : "bg-red-500/15 text-red-700 dark:text-red-200"
+                      }`}
+                    >
+                      {licenseMessage}
+                    </div>
+                  )}
                 </div>
               )}
+              {!licenseNotConfigured && (
+                <>
+                  {licenseMessage && licenseMessageType === "success" && (
+                    <div className="mb-4 rounded-xl bg-emerald-500/15 px-3 py-2 text-sm font-medium text-emerald-700 dark:text-emerald-200">
+                      {licenseMessage}
+                    </div>
+                  )}
 <form onSubmit={handleLogin} className="space-y-4">
                 <div className="space-y-1.5">
                   <label className="block text-xs font-semibold uppercase tracking-wider"
@@ -527,6 +651,8 @@ export default function LoginPage() {
                   {isAR ? "إنشاء حساب جديد" : "Create new account"}
                 </button>
               </div>
+                </>
+              )}
             </motion.div>
           )}
 
