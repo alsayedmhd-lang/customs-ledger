@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import crypto from "node:crypto";
 
 import { generateDeviceId } from "./device-id";
 
@@ -8,11 +9,40 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 type LicenseFile = {
+  licenseId?: string;
   customerName: string;
   licenseType: "trial" | "paid";
   deviceId: string;
   expiryDate: string;
+  productSerial?: string;
+  signature?: string;
 };
+
+const LICENSE_SECRET = "customs-ledger-sqlite-offline-license-v2-2026";
+
+function calculateLicenseSignature(license: LicenseFile) {
+  return crypto
+    .createHash("sha256")
+    .update(
+      [
+        license.customerName,
+        license.deviceId,
+        license.expiryDate,
+        license.productSerial,
+        LICENSE_SECRET,
+      ]
+        .map((value) => String(value ?? ""))
+        .join("|")
+    )
+    .digest("hex");
+}
+
+function timingSafeStringEqual(left: string, right: string) {
+  const leftBuffer = Buffer.from(left, "utf8");
+  const rightBuffer = Buffer.from(right, "utf8");
+
+  return leftBuffer.length === rightBuffer.length && crypto.timingSafeEqual(leftBuffer, rightBuffer);
+}
 
 export function validateLicense() {
   const licensePath = path.join(__dirname, "license.json");
@@ -29,6 +59,14 @@ export function validateLicense() {
   const license = JSON.parse(raw) as LicenseFile;
 
   const currentDeviceId = generateDeviceId();
+
+  if (!license.signature || !timingSafeStringEqual(license.signature, calculateLicenseSignature(license))) {
+    return {
+      valid: false,
+      reason: "LICENSE_SIGNATURE_INVALID",
+      message: "ملف الترخيص غير صالح أو تم تعديله / License file is invalid or has been modified",
+    };
+  }
 
   if (license.deviceId !== currentDeviceId) {
     return {

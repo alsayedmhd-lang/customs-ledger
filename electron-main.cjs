@@ -13,6 +13,9 @@ let updateDownloaded = false;
 const MIN_ZOOM_FACTOR = 0.5;
 const MAX_ZOOM_FACTOR = 3;
 const ZOOM_STEP = 0.1;
+const LICENSE_SECRET = "customs-ledger-sqlite-offline-license-v2-2026";
+const INVALID_LICENSE_SIGNATURE_MESSAGE =
+  "ملف الترخيص غير صالح أو تم تعديله / License file is invalid or has been modified";
 
 function clampZoomFactor(value) {
   const zoomFactor = Number(value);
@@ -826,6 +829,37 @@ autoUpdater.on("error", (error) => {
 
 ipcMain.handle("app:get-version", () => app.getVersion());
 
+function readPackagedEnvValue(key) {
+  try {
+    const envPath = path.join(process.resourcesPath, "api-server", ".env");
+    const content = fs.readFileSync(envPath, "utf8");
+
+    const line = content
+      .split(/\r?\n/)
+      .find((entry) => entry.trim().startsWith(`${key}=`));
+
+    if (!line) return "";
+
+    return line
+      .slice(line.indexOf("=") + 1)
+      .trim()
+      .replace(/^["']|["']$/g, "");
+  } catch {
+    return "";
+  }
+}
+
+ipcMain.handle("developer:unlock", async (_event, password) => {
+  const expectedPassword =
+    process.env.DEVELOPER_PASSWORD || readPackagedEnvValue("DEVELOPER_PASSWORD");
+
+  if (!expectedPassword || password !== expectedPassword) {
+    return { ok: false };
+  }
+
+  return { ok: true };
+});
+
 ipcMain.handle("storage:open-data-folder", async () => {
   try {
     const { shell } = require("electron");
@@ -1256,13 +1290,51 @@ function generateLicenseDeviceId() {
     .toUpperCase();
 }
 
+function calculateLicenseSignature(license) {
+  const payload = [
+    license?.customerName,
+    license?.deviceId,
+    license?.expiryDate,
+    license?.productSerial,
+    LICENSE_SECRET,
+  ]
+    .map((value) => String(value ?? ""))
+    .join("|");
+
+  return crypto.createHash("sha256").update(payload).digest("hex");
+}
+
+function timingSafeStringEqual(left, right) {
+  if (typeof left !== "string" || typeof right !== "string") return false;
+
+  const leftBuffer = Buffer.from(left, "utf8");
+  const rightBuffer = Buffer.from(right, "utf8");
+
+  return leftBuffer.length === rightBuffer.length && crypto.timingSafeEqual(leftBuffer, rightBuffer);
+}
+
+function signLicense(license) {
+  const signedLicense = {
+    ...license,
+  };
+
+  signedLicense.signature = calculateLicenseSignature(signedLicense);
+  return signedLicense;
+}
+
+function validateLicenseSignature(license) {
+  if (!license || typeof license !== "object") return false;
+  if (typeof license.signature !== "string" || !license.signature.trim()) return false;
+
+  return timingSafeStringEqual(license.signature, calculateLicenseSignature(license));
+}
+
 ipcMain.handle("license:get-device-id", () => {
   return generateLicenseDeviceId();
 });
 
 function getLicenseStatus() {
   try {
-    const fs = require("fs");
     const licensePath = path.join(process.cwd(), "api-server", "src", "utils", "license", "license.json");
 
     if (!fs.existsSync(licensePath)) {
@@ -1271,6 +1343,15 @@ function getLicenseStatus() {
 
     const license = JSON.parse(fs.readFileSync(licensePath, "utf-8"));
     const currentDeviceId = generateLicenseDeviceId();
+
+    if (!validateLicenseSignature(license)) {
+      return {
+        valid: false,
+        reason: "LICENSE_SIGNATURE_INVALID",
+        message: INVALID_LICENSE_SIGNATURE_MESSAGE,
+        currentDeviceId,
+      };
+    }
 
     if (license.deviceId !== currentDeviceId) {
       return { valid: false, reason: "DEVICE_ID_MISMATCH", currentDeviceId };
@@ -1302,9 +1383,23 @@ ipcMain.handle("license:get-status", () => {
   return getLicenseStatus();
 });
 
+ipcMain.handle("license:create-signed", async (_event, license) => {
+  try {
+    return { success: true, license: signLicense(license || {}) };
+  } catch (error) {
+    return { success: false, message: String(error) };
+  }
+});
+
 ipcMain.handle("license:save-current", async (_event, license) => {
   try {
-    const fs = require("fs");
+    if (!validateLicenseSignature(license)) {
+      return {
+        success: false,
+        message: INVALID_LICENSE_SIGNATURE_MESSAGE,
+      };
+    }
+
     const licenseDir = path.join(process.cwd(), "api-server", "src", "utils", "license");
     const licensePath = path.join(licenseDir, "license.json");
 

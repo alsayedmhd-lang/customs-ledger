@@ -14,6 +14,9 @@ window.addEventListener(
 contextBridge.exposeInMainWorld("electronAPI", {
   getAppVersion: () => ipcRenderer.invoke("app:get-version"),
 
+  developerUnlock: (password) =>
+    ipcRenderer.invoke("developer:unlock", password),
+
   getLicenseDeviceId: () =>
     ipcRenderer.invoke("license:get-device-id"),
 
@@ -22,6 +25,9 @@ contextBridge.exposeInMainWorld("electronAPI", {
 
   saveCurrentLicense: (license) =>
     ipcRenderer.invoke("license:save-current", license),
+
+  createSignedLicense: (license) =>
+    ipcRenderer.invoke("license:create-signed", license),
   analyzeDataRootMigration: () => ipcRenderer.invoke("data-root:analyze-migration"),
   analyzeBackupReadiness: () => ipcRenderer.invoke("backup:analyze-readiness"),
   createBackupManifest: () => ipcRenderer.invoke("backup:create-manifest"),

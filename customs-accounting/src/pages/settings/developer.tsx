@@ -867,7 +867,7 @@ export default function DeveloperSettingsPage() {
     }, 2000);
   }
 
-  function generateClientLicenseText() {
+  async function generateClientLicenseText() {
     const license = {
       customerName: licenseCustomerName || "TRIAL CUSTOMER",
       licenseType: "trial",
@@ -876,7 +876,14 @@ export default function DeveloperSettingsPage() {
       issuedAt: new Date().toISOString(),
     };
 
-    setGeneratedLicenseText(JSON.stringify(license, null, 2));
+    const result = await (window as any).electronAPI?.createSignedLicense?.(license);
+
+    if (!result?.success || !result.license) {
+      setSavedMessage(tr("فشل توليد توقيع الترخيص", "Failed to sign license"));
+      return;
+    }
+
+    setGeneratedLicenseText(JSON.stringify(result.license, null, 2));
   }
 
   function downloadGeneratedLicenseFile() {
@@ -918,7 +925,14 @@ export default function DeveloperSettingsPage() {
         issuedAt,
       };
 
-      const result = await window.electronAPI?.saveCurrentLicense?.(license);
+      const signedResult = await (window as any).electronAPI?.createSignedLicense?.(license);
+
+      if (!signedResult?.success || !signedResult.license) {
+        setSavedMessage(tr("فشل توليد توقيع الترخيص", "Failed to sign license"));
+        return;
+      }
+
+      const result = await window.electronAPI?.saveCurrentLicense?.(signedResult.license);
 
       if (!result?.ok && !result?.success) {
         setSavedMessage(tr("فشل تفعيل الترخيص", "Failed to activate license"));
