@@ -160,7 +160,7 @@ export default function ReceiptPrint() {
   const { data: clients } = useListClients();
   const { currencySymbol, lang } = useLanguage();
   const isAR = lang === "ar";
-  const { settings, logoSrc, stampSrc } = useCompanySettings();
+  const { settings, logoSrc, stampSrc, watermarkSrc } = useCompanySettings();
   const { user } = useAuth();
   const isClient = user?.role === "client";
 
@@ -226,10 +226,6 @@ export default function ReceiptPrint() {
   const amountWords = numberToArabicWords(Number(receipt.amount));
   const amountWordsEn = numberToEnglishWords(Number(receipt.amount));
   const receiptNum = receipt.receiptNumber;
-  const receiptBackgroundSrc =
-    (settings as any).backgroundImage ||
-    (settings as any).backgroundImageBase64 ||
-    settings.watermarkBase64;
 
   return (
     <A4PrintShell
@@ -333,13 +329,20 @@ export default function ReceiptPrint() {
       }
     >
         <main className="receipt-print-content">
-        {settings.showWatermark && receiptBackgroundSrc && (
+        {settings.showWatermark && (
           <div
-            className="absolute inset-x-0 top-[32mm] flex items-start justify-center pointer-events-none select-none"
-            style={{ opacity: 0.06, zIndex: 0 }}
+            className="absolute inset-0 -top-8 flex flex-col items-center justify-center pointer-events-none select-none"
+            style={{ opacity: 0.1, zIndex: 0 }}
             aria-hidden="true"
           >
-            <img src={receiptBackgroundSrc} alt="" className="w-56 max-w-[60%] object-contain" />
+            <img src={watermarkSrc} alt="" className="w-80 object-contain mb-4" />
+            <div className="text-center leading-tight">
+              <div className="text-5xl font-black text-blue-800" style={{ fontFamily: "'Cairo', sans-serif" }}>
+                {settings.nameAr}
+              </div>
+              <div className="text-3xl font-black text-blue-800 mt-2">{settings.nameEn.split(" ").slice(0, 3).join(" ")}</div>
+              <div className="text-2xl font-bold text-blue-800">{settings.subtitleEn}</div>
+            </div>
           </div>
         )}
 
