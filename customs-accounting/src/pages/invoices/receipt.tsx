@@ -334,6 +334,8 @@ const impExpValue =
 
           <button
             onClick={() => {
+              const fileName = `${invoice.invoiceNumber || "invoice"} - ${invoice.clientName || "client"}`.replace(/[\/\\:*?"<>|]/g, "-");
+              void navigator.clipboard.writeText(fileName).catch(() => {});
               setTimeout(() => {
                 window.print();
               }, 300);
@@ -342,14 +344,6 @@ const impExpValue =
           >
           <Printer className="w-4 h-4" />
           {isAR ? "الطباعة" : "Print Invoice"}
-        </button>
-
-        <button
-          type="button"
-          onClick={handleCopyFileName}
-          className={`${isClient ? "hidden" : ""} no-print flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-700 hover:bg-gray-50 text-sm font-medium`}
-        >
-          نسخ اسم الملف
         </button>
 
         <Link href={`/accounting?invoice=${encodeURIComponent(invoice.invoiceNumber)}`}>

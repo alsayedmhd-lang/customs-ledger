@@ -230,7 +230,7 @@ export default function ReceiptPrint() {
   return (
     <A4PrintShell
       dir="rtl"
-      pageClassName="receipt-print-page"
+      pageClassName="receipt-print-page mt-2 print:mt-0"
       controls={
         <>
         <style>{`
@@ -256,9 +256,9 @@ export default function ReceiptPrint() {
           }
         `}</style>
 
-        <div className="print:hidden flex gap-3 p-4max-w-2xl  mx-auto flex-wrap" dir={isAR ? "rtl" : "ltr"}>
+        <div className="print:hidden flex items-center gap-3 p-6 max-w-4xl mx-auto flex-wrap" dir={isAR ? "rtl" : "ltr"}>
         <Link href="/receipts">
-          <button className={`${isClient ? "hidden" : ""} flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-700 hover:bg-gray-50 text-sm font-medium`}>
+          <button className={`${isClient ? "hidden" : ""} flex h-10 items-center gap-2 px-4 border border-gray-300 rounded-lg bg-white text-gray-700 hover:bg-gray-50 text-sm font-medium`}>
             {isAR ? <ArrowRight className="w-4 h-4" /> : <ArrowLeft className="w-4 h-4" />}
             {isAR ? "العودة" : "Back"}
           </button>
@@ -266,27 +266,23 @@ export default function ReceiptPrint() {
 
         <button
           onClick={() => {
+            const previousTitle = document.title;
+            const fileName = `${receipt.receiptNumber} - ${getClientName(receipt)}`.replace(/[\/\\:*?"<>|]/g, "-");
+            void navigator.clipboard.writeText(fileName).catch(() => {});
+            document.title = fileName;
             window.print();
+            setTimeout(() => {
+              document.title = previousTitle;
+            }, 1000);
           }}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-700 text-white rounded-lg text-sm font-medium hover:bg-blue-800"
+          className="flex h-10 items-center gap-2 px-5 bg-blue-700 text-white rounded-lg text-sm font-medium hover:bg-blue-800"
         >
           <Printer className="w-4 h-4" />
           {isAR ? "طباعة السند" : "Print Receipt"}
         </button>
 
-        <button
-          type="button"
-          onClick={() => {
-            const fileName = `${receipt.receiptNumber} - ${receipt.clientName || "Client"}`;
-            navigator.clipboard.writeText(fileName);
-          }}
-          className="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg bg-white hover:bg-gray-50 text-sm"
-        >
-          نسخ الاسم
-        </button>
-
         {!isClient && settings.showStampOnReceipts && (
-          <label className="flex items-center gap-2 cursor-pointer px-3 py-2 border border-gray-300 rounded-lg bg-white hover:bg-gray-50 select-none">
+          <label className="flex h-10 items-center gap-2 cursor-pointer px-3 border border-gray-300 rounded-lg bg-white hover:bg-gray-50 select-none">
             <input
               type="checkbox"
               checked={showStamp}
@@ -299,7 +295,7 @@ export default function ReceiptPrint() {
         )}
 
         {!isClient && settings.showStampOnReceipts && (
-          <label className="flex items-center gap-2 cursor-pointer px-3 py-2 border border-gray-300 rounded-lg bg-white hover:bg-gray-50 select-none">
+          <label className="flex h-10 items-center gap-2 cursor-pointer px-3 border border-gray-300 rounded-lg bg-white hover:bg-gray-50 select-none">
             <input
               type="checkbox"
               checked={stampOverAccountant}
@@ -313,7 +309,7 @@ export default function ReceiptPrint() {
           </label>
         )}
 
-        {!isClient && <label className="flex items-center gap-2 px-4 py-2 h-[42px] border border-gray-300 rounded-lg bg-white cursor-pointer select-none hover:bg-gray-50">
+        {!isClient && <label className="flex h-10 items-center gap-2 px-3 border border-gray-300 rounded-lg bg-white cursor-pointer select-none hover:bg-gray-50">
           <input
             type="checkbox"
             checked={showSignatures}
