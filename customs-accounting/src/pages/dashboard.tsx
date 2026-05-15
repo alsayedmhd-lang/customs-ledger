@@ -124,13 +124,13 @@ export default function Dashboard() {
       {/* Welcome Banner */}
       <motion.div
         variants={item}
-        className="relative overflow-hidden rounded-3xl border border-border bg-card shadow-sm"
+        className="relative overflow-hidden rounded-3xl border border-white/10 [background:linear-gradient(135deg,var(--sb-from)_0%,var(--sb-to)_100%)] shadow-sm dark:border-border dark:[background:hsl(var(--card))]"
       >
         {/* Decorative circles */}
         <div className="absolute top-[-60px] right-[-60px] w-[220px] h-[220px] rounded-full opacity-15"
-          style={{ background: "radial-gradient(circle, hsl(var(--foreground) / 0.18), transparent)" }} />
+          style={{ background: "radial-gradient(circle, rgba(255,255,255,0.7), transparent)" }} />
         <div className="absolute bottom-[-40px] left-[20%] w-[160px] h-[160px] rounded-full opacity-10"
-          style={{ background: "radial-gradient(circle, hsl(var(--foreground) / 0.14), transparent)" }} />
+          style={{ background: "radial-gradient(circle, rgba(255,255,255,0.55), transparent)" }} />
 
         <div className="relative z-10 flex items-center gap-5 p-6 sm:p-8">
           {/* Logo */}
@@ -138,22 +138,22 @@ export default function Dashboard() {
             src={LOGO}
             alt="شعار الشركة"
             className="w-20 h-20 sm:w-28 sm:h-28 flex-shrink-0 object-contain drop-shadow-2xl"
-            style={{ filter: "drop-shadow(0 0 20px hsl(var(--foreground) / 0.22))" }}
+            style={{ filter: "drop-shadow(0 0 20px rgba(255,255,255,0.24))" }}
             onError={(e) => {
               const el = e.currentTarget;
               el.style.display = "none";
               const fallback = document.createElement("div");
-              fallback.className = "w-20 h-20 rounded-2xl bg-muted/30 flex items-center justify-center";
-              fallback.innerHTML = '<span class="text-4xl font-black text-foreground">ح</span>';
+              fallback.className = "w-20 h-20 rounded-2xl bg-white/15 dark:bg-muted/30 flex items-center justify-center";
+              fallback.innerHTML = '<span class="text-4xl font-black text-white dark:text-foreground">ح</span>';
               el.parentElement!.prepend(fallback);
             }}
           />
           <div>
-            <p className="text-muted-foreground text-sm font-semibold mb-0.5">{greeting()}{lang === "ar" ? "،" : ","}</p>
-            <h1 className="text-2xl sm:text-3xl font-black text-foreground leading-tight">
+            <p className="text-white/80 dark:text-muted-foreground text-sm font-semibold mb-0.5">{greeting()}{lang === "ar" ? "،" : ","}</p>
+            <h1 className="text-2xl sm:text-3xl font-black text-white dark:text-foreground leading-tight">
               {(lang === "ar" ? user?.displayNameAr : user?.displayNameEn) || user?.displayName || (lang === "ar" ? "المستخدم" : "User")}
             </h1>
-            <p className="text-muted-foreground text-sm mt-1 font-medium">
+            <p className="text-white/80 dark:text-muted-foreground text-sm mt-1 font-medium">
               {t("dashboardDesc")} · {lang === "ar" ? settings.nameAr : settings.nameEn}
             </p>
           </div>
