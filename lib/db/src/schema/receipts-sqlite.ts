@@ -7,6 +7,7 @@ export const receiptsTableSqlite = sqliteTable("receipts", {
   invoiceId: integer("invoice_id"),
   amount: real("amount").notNull(),
   paymentMethod: text("payment_method").default("cash"),
+  status: text("status").notNull().default("draft"),
   notes: text("notes"),
   receiptDate: text("receipt_date").notNull(),
   createdBy: integer("created_by"),

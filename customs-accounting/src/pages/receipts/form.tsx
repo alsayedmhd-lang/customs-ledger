@@ -12,6 +12,7 @@ import {
   useGetReceipt,
   useUpdateReceipt,
   getListReceiptsQueryKey,
+  getListInvoicesQueryKey,
 } from "@workspace/api-client-react";
 import { formatCurrency } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -36,6 +37,7 @@ const formSchema = z.object({
   invoiceNumber: z.string().optional().nullable(),
   amount: z.coerce.number().min(0.01, "Amount is required"),
   paymentMethod: z.enum(["cash", "transfer", "check"]),
+  status: z.enum(["draft", "issued"]).default("draft"),
   notes: z.string().optional(),
   receiptDate: z.string(),
 });
@@ -46,6 +48,11 @@ const PAYMENT_METHOD_LABELS: Record<string, { ar: string; en: string }> = {
   cash: { ar: "نقداً", en: "Cash" },
   transfer: { ar: "تحويل بنكي", en: "Bank transfer" },
   check: { ar: "شيك", en: "Cheque" },
+};
+
+const RECEIPT_STATUS_LABELS: Record<"draft" | "issued", { ar: string; en: string }> = {
+  draft: { ar: "مسودة", en: "Draft" },
+  issued: { ar: "صادر", en: "Issued" },
 };
 
 export default function ReceiptForm() {
@@ -87,10 +94,31 @@ export default function ReceiptForm() {
       invoiceNumber: "",
       amount: 0,
       paymentMethod: "cash",
+      status: "draft",
       notes: "",
       receiptDate: new Date().toISOString().split("T")[0],
     },
   });
+
+  async function issueReceipt(receiptId: number) {
+    const token = sessionStorage.getItem("auth_token");
+    const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/receipts/${receiptId}/issue`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      throw Object.assign(new Error(data.error || data.errorEn || "Failed to issue receipt"), {
+        status: res.status,
+        data,
+      });
+    }
+
+    return res.json();
+  }
 
   useEffect(() => {
     if (isEdit || !invoiceIdFromUrlNumber || !linkedInvoice) return;
@@ -147,6 +175,7 @@ export default function ReceiptForm() {
           "",
         amount: Number(existing.amount),
         paymentMethod: existing.paymentMethod as "cash" | "transfer" | "check",
+        status: ((existing as any).status === "issued" ? "issued" : "draft") as "draft" | "issued",
         notes: existing.notes ?? "",
         receiptDate: existing.receiptDate,
       });
@@ -180,6 +209,7 @@ export default function ReceiptForm() {
         invoiceId: data.invoiceId ? Number(data.invoiceId) : null,
         amount: Number(data.amount),
         paymentMethod: data.paymentMethod,
+        status: data.status,
         notes: data.notes?.trim() || null,
         receiptDate: data.receiptDate,
       };
@@ -192,6 +222,7 @@ export default function ReceiptForm() {
       }
 
       queryClient.invalidateQueries({ queryKey: getListReceiptsQueryKey() });
+      queryClient.invalidateQueries({ queryKey: getListInvoicesQueryKey() });
       toast({
         title: tr("تم الحفظ", "Saved"),
         description: isEdit ? tr("تم تحديث سند القبض بنجاح", "Receipt updated successfully") : tr("تم إنشاء سند القبض بنجاح", "Receipt created successfully"),
@@ -217,6 +248,37 @@ export default function ReceiptForm() {
       });
     }
 
+  };
+
+  const handleIssue = async () => {
+    if (!isEdit || !receiptId) return;
+
+    try {
+      const issued = await issueReceipt(receiptId);
+      queryClient.invalidateQueries({ queryKey: getListReceiptsQueryKey() });
+      queryClient.invalidateQueries({ queryKey: getListInvoicesQueryKey() });
+      reset({
+        clientId: Number(issued.clientId),
+        clientName: issued.clientName || watch("clientName") || "",
+        invoiceId: issued.invoiceId ? Number(issued.invoiceId) : undefined,
+        invoiceNumber: issued.invoiceNumber || watch("invoiceNumber") || "",
+        amount: Number(issued.amount),
+        paymentMethod: issued.paymentMethod as "cash" | "transfer" | "check",
+        status: "issued",
+        notes: issued.notes ?? "",
+        receiptDate: issued.receiptDate,
+      });
+      toast({
+        title: tr("تم إصدار السند", "Receipt issued"),
+        description: tr("تم تطبيق أثر سند القبض على الفاتورة", "The receipt now affects the invoice balance"),
+      });
+    } catch (err) {
+      toast({
+        title: tr("تعذر إصدار السند", "Failed to issue receipt"),
+        description: (err as any)?.data?.error || (err as any)?.data?.errorEn || tr("راجع بيانات السند والمتبقي على الفاتورة", "Check the receipt details and remaining invoice balance"),
+        variant: "destructive",
+      });
+    }
   };
 
   const selectedInvoiceNumber =
@@ -378,24 +440,46 @@ export default function ReceiptForm() {
           </div>
 
           {/* Payment Method */}
-          <div className="space-y-2">
-            <Label>{tr("طريقة الدفع", "Payment method")} <span className="text-destructive">*</span></Label>
-            <Select
-              value={watch("paymentMethod")}
-              onValueChange={(v) => setValue("paymentMethod", v as "cash" | "transfer" | "check", { shouldValidate: true })}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent
-                  position="popper"
-                  className="z-[9999] bg-white dark:bg-slate-900 opacity-100 backdrop-blur-none border border-slate-300 shadow-2xl"
-                >
-                {Object.entries(PAYMENT_METHOD_LABELS).map(([value, label]) => (
-                  <SelectItem key={value} value={value}>{isAR ? label.ar : label.en}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div className="space-y-2">
+              <Label>{tr("طريقة الدفع", "Payment method")} <span className="text-destructive">*</span></Label>
+              <Select
+                value={watch("paymentMethod")}
+                onValueChange={(v) => setValue("paymentMethod", v as "cash" | "transfer" | "check", { shouldValidate: true })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent
+                    position="popper"
+                    className="z-[9999] bg-white dark:bg-slate-900 opacity-100 backdrop-blur-none border border-slate-300 shadow-2xl"
+                  >
+                  {Object.entries(PAYMENT_METHOD_LABELS).map(([value, label]) => (
+                    <SelectItem key={value} value={value}>{isAR ? label.ar : label.en}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>{tr("حالة السند", "Receipt status")} <span className="text-destructive">*</span></Label>
+              <Select
+                value={watch("status")}
+                onValueChange={(v) => setValue("status", v as "draft" | "issued", { shouldValidate: true })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent
+                    position="popper"
+                    className="z-[9999] bg-white dark:bg-slate-900 opacity-100 backdrop-blur-none border border-slate-300 shadow-2xl"
+                  >
+                  {Object.entries(RECEIPT_STATUS_LABELS).map(([value, label]) => (
+                    <SelectItem key={value} value={value}>{isAR ? label.ar : label.en}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           {/* Notes */}
@@ -420,6 +504,17 @@ export default function ReceiptForm() {
             <Save className="w-4 h-4" />
             {isSubmitting ? tr("جارٍ الحفظ...", "Saving...") : isEdit ? tr("تحديث السند", "Update receipt") : tr("حفظ وطباعة", "Save and print")}
           </Button>
+          {isEdit && watch("status") !== "issued" && (
+            <Button
+              type="button"
+              disabled={isSubmitting}
+              onClick={handleIssue}
+              className="gap-2 bg-emerald-700 text-white hover:bg-emerald-800 shadow-lg shadow-emerald-700/20"
+            >
+              <Printer className="w-4 h-4" />
+              {tr("إصدار السند", "Issue receipt")}
+            </Button>
+          )}
         </div>
         {/* Spacer for fixed bar */}
         <div className="h-20" />

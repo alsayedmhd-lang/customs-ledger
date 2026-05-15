@@ -50,7 +50,13 @@ async function getActiveReceiptTotal(invoiceId: number): Promise<number> {
   const receipts = await db
     .select({ amount: receiptsTable.amount })
     .from(receiptsTable)
-    .where(and(eq(receiptsTable.invoiceId, invoiceId), isNull(receiptsTable.deletedAt)));
+    .where(
+      and(
+        eq(receiptsTable.invoiceId, invoiceId),
+        eq(receiptsTable.status, "issued"),
+        isNull(receiptsTable.deletedAt),
+      ),
+    );
 
   return receipts.reduce((sum, receipt) => sum + Number(receipt.amount ?? 0), 0);
 }
@@ -63,7 +69,13 @@ async function getExistingAutoClosingReceipt(invoiceId: number) {
       notes: receiptsTable.notes,
     })
     .from(receiptsTable)
-    .where(and(eq(receiptsTable.invoiceId, invoiceId), isNull(receiptsTable.deletedAt)));
+    .where(
+      and(
+        eq(receiptsTable.invoiceId, invoiceId),
+        eq(receiptsTable.status, "issued"),
+        isNull(receiptsTable.deletedAt),
+      ),
+    );
 
   return receipts.find((receipt) => {
     const notes = String(receipt.notes ?? "");
@@ -147,6 +159,7 @@ async function createDirectClosingReceipt(input: {
       invoiceId: input.invoiceId,
       amount: input.amount.toFixed(2),
       paymentMethod: "cash",
+      status: "issued",
       notes: directClosingPaymentDescriptionEn,
       receiptDate: input.receiptDate,
       createdBy: input.createdBy,

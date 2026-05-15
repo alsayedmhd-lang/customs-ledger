@@ -165,7 +165,13 @@
       const receiptRows = await db
         .select()
         .from(receiptsTable)
-        .where(and(eq(receiptsTable.clientId, clientId), isNull(receiptsTable.deletedAt)));
+        .where(
+          and(
+            eq(receiptsTable.clientId, clientId),
+            eq(receiptsTable.status, "issued"),
+            isNull(receiptsTable.deletedAt),
+          ),
+        );
 
       const allRows: LedgerRow[] = [];
 

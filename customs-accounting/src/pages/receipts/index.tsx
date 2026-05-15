@@ -88,6 +88,16 @@ const paymentMethodLabel: Record<string, string> = {
   check: t("check"),
 };
 
+const receiptStatusLabel: Record<string, string> = {
+  draft: tr("مسودة", "Draft"),
+  issued: tr("صادر", "Issued"),
+};
+
+const receiptStatusClass: Record<string, string> = {
+  draft: "bg-slate-100 text-slate-600 border-slate-200",
+  issued: "bg-emerald-100 text-emerald-700 border-emerald-200",
+};
+
 const getClientName = (receipt: { clientName?: string | null; clientId?: number | null }) => {
   if (receipt.clientName && receipt.clientName.trim()) return receipt.clientName;
 
@@ -109,7 +119,8 @@ const getClientName = (receipt: { clientName?: string | null; clientId?: number 
     );
   });
 
-  const totalAmount = filtered.reduce((sum, r) => sum + r.amount, 0);
+  const issuedReceipts = filtered.filter((r) => (r as any).status === "issued");
+  const totalAmount = issuedReceipts.reduce((sum, r) => sum + r.amount, 0);
 
   const handleDelete = async () => {
     if (deleteId == null) return;
@@ -239,6 +250,9 @@ const getClientName = (receipt: { clientName?: string | null; clientId?: number 
                     {tr("طريقة الدفع", "Payment Method")}
                   </th>
                   <th className="text-start px-4 py-3 font-semibold text-muted-foreground">
+                    {tr("الحالة", "Status")}
+                  </th>
+                  <th className="text-start px-4 py-3 font-semibold text-muted-foreground">
                     {tr("المستلم", "Received By")}
                   </th>
                   <th className="text-start px-4 py-3 font-semibold text-muted-foreground">
@@ -289,6 +303,15 @@ const getClientName = (receipt: { clientName?: string | null; clientId?: number 
                       >
                         {PAYMENT_METHOD_ICONS[receipt.paymentMethod]}
                         {paymentMethodLabel[receipt.paymentMethod] ?? receipt.paymentMethod}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span
+                        className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${
+                          receiptStatusClass[(receipt as any).status] || receiptStatusClass.draft
+                        }`}
+                      >
+                        {receiptStatusLabel[(receipt as any).status] || receiptStatusLabel.draft}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-center">

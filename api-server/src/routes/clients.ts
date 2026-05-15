@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
-import { db, clientsTable, invoicesTable, invoiceItemsTable, usersTable } from "@workspace/db";
-import { eq, desc } from "drizzle-orm";
+import { db, clientsTable, invoicesTable, invoiceItemsTable, usersTable, receiptsTable } from "@workspace/db";
+import { and, eq, desc, isNull } from "drizzle-orm";
 
 const router: IRouter = Router();
 
@@ -18,6 +18,20 @@ function rejectClientWrite(req: any, res: any) {
   if (req.user?.role !== "client") return false;
   res.status(403).json({ error: "Client users have read-only access" });
   return true;
+}
+
+function getOriginalInvoiceTotal(input: {
+  subtotal?: unknown;
+  taxAmount?: unknown;
+  total?: unknown;
+  advancePayment?: unknown;
+}) {
+  const subtotal = Number(input.subtotal ?? 0);
+  const taxAmount = Number(input.taxAmount ?? 0);
+  const grossTotal = subtotal + taxAmount;
+
+  if (grossTotal > 0) return grossTotal;
+  return Number(input.total ?? 0) + Number(input.advancePayment ?? 0);
 }
 
 router.get("/clients", async (req, res) => {
@@ -129,6 +143,17 @@ router.get("/clients/:id/statement", async (req, res) => {
       .where(eq(invoicesTable.clientId, id))
       .orderBy(desc(invoicesTable.issueDate));
 
+    const issuedReceipts = await db
+      .select()
+      .from(receiptsTable)
+      .where(
+        and(
+          eq(receiptsTable.clientId, id),
+          eq(receiptsTable.status, "issued"),
+          isNull(receiptsTable.deletedAt),
+        ),
+      );
+
     const invoicesWithItems = await Promise.all(
       invoices.map(async (inv) => {
         const items = await db
@@ -143,18 +168,18 @@ router.get("/clients/:id/statement", async (req, res) => {
     );
 
     const totalDue = invoices
-      .filter((i) => i.status === "issued")
-      .reduce((sum, i) => sum + parseFloat(i.total ?? "0"), 0);
-    const totalPaid = invoices
-      .filter((i) => i.status === "paid")
-      .reduce((sum, i) => sum + parseFloat(i.total ?? "0"), 0);
+      .filter((i) => i.status !== "cancelled")
+      .reduce((sum, i) => sum + getOriginalInvoiceTotal(i), 0);
+    const totalPaid =
+      invoices.reduce((sum, i) => sum + Number((i as any).advancePayment ?? 0), 0) +
+      issuedReceipts.reduce((sum, r) => sum + Number(r.amount ?? 0), 0);
 
     res.json({
       client: formatClient(client),
       invoices: invoicesWithItems,
       totalDue,
       totalPaid,
-      balance: totalDue,
+      balance: totalDue - totalPaid,
     });
   } catch (err) {
     console.error(err);

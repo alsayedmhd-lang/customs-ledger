@@ -6,34 +6,40 @@ export function PrintStyles(_: PrintStylesProps) {
   return (
     <style>{`
       @media print {
-        @page { size: A4 portrait; margin: 10mm 10mm 10mm 15mm; }
+        @page { size: A4 portrait; margin: 4mm; }
 
+        html,
         body {
-          margin: 0;
+          margin: 0 !important;
+          padding: 0 !important;
           background: white !important;
         }
 
         .print-page {
-          width: 170mm !important;
-          max-width: 170mm !important;
-          margin: 12mm auto 0 auto !important;
+          width: 202mm !important;
+          max-width: none !important;
+          margin: 0 auto !important;
+          padding-bottom: 18mm !important;
+          box-sizing: border-box !important;
 
           height: auto !important;
-          min-height: auto !important;
+          min-height: 289mm !important;
 
-          display: block !important;
+          display: flex !important;
+          flex-direction: column !important;
           overflow: visible !important;
         }
 
         .print-content {
-          height: auto !important;
-          min-height: auto !important;
-          display: block !important;
+          flex: 1 1 auto !important;
+          min-height: 0 !important;
+          display: flex !important;
+          flex-direction: column !important;
         }
 
         .print-footer {
           position: relative !important;
-          margin-top: -1mm !important;
+          margin-top: 0 !important;
           page-break-inside: avoid;
         }
       }

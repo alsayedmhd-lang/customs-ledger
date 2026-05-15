@@ -1,6 +1,6 @@
 import { useParams, Link } from "wouter";
 import { motion } from "framer-motion";
-import { useGetClient, useListInvoices, useUpdateClient, getGetClientQueryKey } from "@workspace/api-client-react";
+import { useGetClient, useListInvoices, useListReceipts, useUpdateClient, getGetClientQueryKey } from "@workspace/api-client-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { StatusBadge } from "../dashboard";
 import { Building2, Mail, Phone, MapPin, FileText, Printer, ArrowRight, ArrowLeft, Edit2 } from "lucide-react";
@@ -45,6 +45,7 @@ export default function ClientDetail() {
   
   const { data: client, isLoading: loadingClient } = useGetClient(clientId);
   const { data: invoices, isLoading: loadingInvoices } = useListInvoices({ clientId });
+  const { data: receipts } = useListReceipts({ clientId });
   
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -70,7 +71,21 @@ export default function ClientDetail() {
   if (!client) return <div className="p-8 text-center text-destructive">العميل غير موجود</div>;
 
   const totalInvoiced = filteredInvoices.reduce((sum, inv) => sum + inv.total, 0) || 0;
-  const totalPaid = filteredInvoices.filter(i => i.status === 'paid').reduce((sum, inv) => sum + inv.total, 0) || 0;
+  const filteredInvoiceIds = new Set(filteredInvoices.map((inv: any) => Number(inv.id)));
+  const issuedReceiptTotal = (receipts ?? [])
+    .filter((receipt: any) => {
+      const receiptDate = String(receipt.receiptDate || "").slice(0, 10);
+      return (
+        receipt.status === "issued" &&
+        (!receipt.invoiceId || filteredInvoiceIds.has(Number(receipt.invoiceId))) &&
+        (!fromDate || receiptDate >= fromDate) &&
+        (!toDate || receiptDate <= toDate)
+      );
+    })
+    .reduce((sum: number, receipt: any) => sum + Number(receipt.amount ?? 0), 0);
+  const totalPaid =
+    filteredInvoices.reduce((sum, inv: any) => sum + Number(inv.advancePayment ?? 0), 0) +
+    issuedReceiptTotal;
   const balance = totalInvoiced - totalPaid;
 
   return (

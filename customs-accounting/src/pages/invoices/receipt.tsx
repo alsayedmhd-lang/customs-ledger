@@ -260,7 +260,7 @@ const impExpValue =
         @media print {
           @page {
             size: A4;
-            margin: 5mm;
+            margin: 4mm;
           }
 
           html, body {
@@ -270,12 +270,13 @@ const impExpValue =
           }
 
           .print-page {
-            width: 100% !important;
-            min-height: 287mm !important;
+            width: 202mm !important;
+            max-width: none !important;
+            min-height: 289mm !important;
             height: auto !important;
             background: white !important;
-            margin: 0 !important;
-            padding: 5mm !important;
+            margin: 0 auto !important;
+            padding: 4mm 4mm 18mm !important;
             box-sizing: border-box;
             display: flex;
             flex-direction: column;
@@ -285,11 +286,24 @@ const impExpValue =
           .print-content {
             flex: 1 1 auto;
             min-height: 0;
+            display: flex;
+            flex-direction: column;
           }
 
-          .print-footer {
+          .invoice-signature-stamp-area {
             flex: 0 0 auto;
             margin-top: auto;
+            page-break-inside: avoid;
+            break-inside: avoid;
+          }
+
+          .print-document-footer {
+            position: fixed !important;
+            left: 4mm !important;
+            right: 4mm !important;
+            bottom: 4mm !important;
+            z-index: 100 !important;
+            background: white !important;
             page-break-inside: avoid;
             break-inside: avoid;
           }
@@ -637,7 +651,7 @@ const impExpValue =
         </div>
 
         {/* ══ SIGNATURES / STAMP ══════════════════════════════════════════ */}
-        <div className="print-footer relative">
+        <div className="invoice-signature-stamp-area relative">
         <div className="relative grid grid-cols-[1fr_0.8fr_1fr] items-end gap-8 px-12 pb-5 pt-8" style={{ zIndex: 30, direction: "ltr" }}>
           <div className="order-3 relative z-10 text-center">
             <div className="h-24 border-b-2 border-gray-400" />
@@ -697,7 +711,7 @@ const impExpValue =
           </div>
         </div>
         {/* ══ FOOTER ══════════════════════════════════════════════════════ */}
-        <div className="relative z-10">
+        <div className="print-document-footer relative z-10">
           <PrintDocumentFooter kind="invoice" reference={invNum} />
         </div>
         <div className="hidden">

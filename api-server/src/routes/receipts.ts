@@ -38,6 +38,44 @@ try {
   sqlite.exec(`ALTER TABLE receipts ADD COLUMN created_by INTEGER;`);
 } catch {}
 
+try {
+  sqlite.exec(`ALTER TABLE receipts ADD COLUMN status TEXT NOT NULL DEFAULT 'issued';`);
+} catch {}
+
+type ReceiptStatus = "draft" | "issued";
+
+function normalizeReceiptStatus(value: unknown, fallback: ReceiptStatus = "draft"): ReceiptStatus {
+  return value === "issued" ? "issued" : value === "draft" ? "draft" : fallback;
+}
+
+async function deleteReceiptLedgerEntry(receiptId: number) {
+  await db
+    .delete(customerLedgerTableSqlite)
+    .where(eq(customerLedgerTableSqlite.receiptId, receiptId));
+}
+
+async function syncIssuedReceiptLedgerEntry(receipt: typeof receiptsTable.$inferSelect) {
+  await deleteReceiptLedgerEntry(receipt.id);
+
+  if (receipt.status !== "issued") return;
+
+  await db.insert(customerLedgerTableSqlite).values({
+    clientId: receipt.clientId,
+    invoiceId: receipt.invoiceId ?? null,
+    receiptId: receipt.id,
+    entryDate: receipt.receiptDate,
+    entryType: "receipt",
+    descriptionAr: `سند قبض رقم ${receipt.receiptNumber}`,
+    descriptionEn: `Receipt ${receipt.receiptNumber}`,
+    referenceType: "receipt",
+    referenceNumber: receipt.receiptNumber,
+    debit: 0,
+    credit: Number(receipt.amount ?? 0),
+    balanceImpact: -Number(receipt.amount ?? 0),
+    createdBy: receipt.createdBy ?? null,
+  });
+}
+
 async function findActiveReceiptByInvoiceId(invoiceId: number) {
   const rows = await db
     .select()
@@ -77,6 +115,7 @@ async function getActiveReceiptTotal(
   const filters = [
     eq(receiptsTable.invoiceId, invoiceId),
     isNull(receiptsTable.deletedAt),
+    eq(receiptsTable.status, "issued"),
   ];
 
   if (excludeReceiptId !== undefined) {
@@ -198,6 +237,7 @@ async function enqueueReceiptSyncChangeIfNeeded(input: {
       amount: input.receipt.amount,
       paymentMethod: input.receipt.paymentMethod,
       receiptDate: input.receipt.receiptDate,
+      status: input.receipt.status,
     },
     userId: input.userId ?? null,
   });
@@ -368,16 +408,20 @@ router.post("/receipts", requireAuth, async (req, res) => {
       }
     }
 
-    const remainingValidation = await validateReceiptDoesNotExceedRemaining(
-      invoiceId,
-      req.body.amount,
-    );
+    const receiptStatus = normalizeReceiptStatus(req.body.status, "draft");
 
-    if (!remainingValidation.ok) {
-      return res.status(remainingValidation.status).json({
-        error: remainingValidation.error,
-        errorEn: remainingValidation.errorEn,
-      });
+    if (receiptStatus === "issued") {
+      const remainingValidation = await validateReceiptDoesNotExceedRemaining(
+        invoiceId,
+        req.body.amount,
+      );
+
+      if (!remainingValidation.ok) {
+        return res.status(remainingValidation.status).json({
+          error: remainingValidation.error,
+          errorEn: remainingValidation.errorEn,
+        });
+      }
     }
 
     const receiptNumber = await generateReceiptNumber();
@@ -402,33 +446,14 @@ router.post("/receipts", requireAuth, async (req, res) => {
         invoiceId,
         amount: String(req.body.amount),
         paymentMethod: req.body.paymentMethod,
+        status: receiptStatus,
         notes: req.body.notes || null,
         receiptDate: req.body.receiptDate || req.body.receivedAt,
         createdBy: (req as any).user?.id ?? 1,
       })
       .returning();
 
-      await db.insert(customerLedgerTableSqlite).values({
-        clientId: receipt.clientId,
-        invoiceId: receipt.invoiceId ?? null,
-        receiptId: receipt.id,
-
-        entryDate: new Date().toISOString().split("T")[0],
-        entryType: "receipt",
-
-        descriptionAr: `سند قبض رقم ${receipt.receiptNumber}`,
-        descriptionEn: `Receipt ${receipt.receiptNumber}`,
-
-        referenceType: "receipt",
-        referenceNumber: receipt.receiptNumber,
-
-        debit: 0,
-        credit: Number(receipt.amount ?? 0),
-
-        balanceImpact: -Number(receipt.amount ?? 0),
-
-        createdBy: (req as any).user?.id ?? 1,
-      });
+    await syncIssuedReceiptLedgerEntry(receipt);
 
     await refreshInvoicePaidStatus(receipt.invoiceId);
     await enqueueReceiptSyncChangeIfNeeded({
@@ -537,17 +562,24 @@ router.put("/receipts/:id", requireAuth, async (req, res) => {
       req.body.invoiceId === undefined ? oldReceipt.invoiceId ?? null : invoiceId;
     const targetAmount =
       req.body.amount === undefined ? oldReceipt.amount ?? 0 : amount ?? 0;
-    const remainingValidation = await validateReceiptDoesNotExceedRemaining(
-      targetInvoiceId,
-      targetAmount,
-      id,
+    const targetStatus = normalizeReceiptStatus(
+      req.body.status,
+      normalizeReceiptStatus(oldReceipt.status, "draft"),
     );
 
-    if (!remainingValidation.ok) {
-      return res.status(remainingValidation.status).json({
-        error: remainingValidation.error,
-        errorEn: remainingValidation.errorEn,
-      });
+    if (targetStatus === "issued") {
+      const remainingValidation = await validateReceiptDoesNotExceedRemaining(
+        targetInvoiceId,
+        targetAmount,
+        id,
+      );
+
+      if (!remainingValidation.ok) {
+        return res.status(remainingValidation.status).json({
+          error: remainingValidation.error,
+          errorEn: remainingValidation.errorEn,
+        });
+      }
     }
 
       const patchData: any = {};
@@ -556,6 +588,7 @@ router.put("/receipts/:id", requireAuth, async (req, res) => {
       if (req.body.date !== undefined) patchData.receiptDate = req.body.date;
       if (req.body.receiptDate !== undefined) patchData.receiptDate = req.body.receiptDate;
       if (req.body.paymentMethod !== undefined) patchData.paymentMethod = req.body.paymentMethod;
+      if (req.body.status !== undefined) patchData.status = targetStatus;
       if (req.body.notes !== undefined) patchData.notes = req.body.notes;
       if (req.body.invoiceId !== undefined) patchData.invoiceId = invoiceId;
       
@@ -584,6 +617,8 @@ router.put("/receipts/:id", requireAuth, async (req, res) => {
       .limit(1);
 
     if (updatedReceipt) {
+      await syncIssuedReceiptLedgerEntry(updatedReceipt);
+
       await enqueueReceiptSyncChangeIfNeeded({
         operation: "update",
         receipt: updatedReceipt,
@@ -596,6 +631,7 @@ router.put("/receipts/:id", requireAuth, async (req, res) => {
       message: "Receipt updated successfully",
       id,
       patchData,
+      ...(updatedReceipt ? formatReceipt(updatedReceipt, "", null) : {}),
     });
   } catch (err) {
     console.error(err);
@@ -619,6 +655,10 @@ router.delete("/receipts/:id", requireAuth, async (req, res) => {
       .update(receiptsTable)
       .set({ deletedAt: new Date() })
       .where(and(eq(receiptsTable.id, id), isNull(receiptsTable.deletedAt)));
+
+    if (receipt) {
+      await deleteReceiptLedgerEntry(receipt.id);
+    }
 
     await refreshInvoicePaidStatus(receipt?.invoiceId);
 
@@ -644,12 +684,84 @@ export function formatReceipt(
     invoiceNumber,
     amount: parseFloat(r.amount ?? "0"),
     paymentMethod: r.paymentMethod,
+    status: normalizeReceiptStatus(r.status, "draft"),
     notes: r.notes ?? null,
     receiptDate: r.receiptDate,
     deletedAt: r.deletedAt ?? null,
     receivedByName,
   };
 }
+
+router.post("/receipts/:id/issue", requireAuth, async (req, res) => {
+  try {
+    if (rejectClientWrite(req, res)) return;
+    const id = parseInt(req.params.id);
+
+    if (isNaN(id)) {
+      return res.status(400).json({ error: "Invalid receipt id" });
+    }
+
+    const [receipt] = await db
+      .select()
+      .from(receiptsTable)
+      .where(and(eq(receiptsTable.id, id), isNull(receiptsTable.deletedAt)))
+      .limit(1);
+
+    if (!receipt) {
+      return res.status(404).json({ error: "Receipt not found" });
+    }
+
+    if (receipt.status !== "issued") {
+      const remainingValidation = await validateReceiptDoesNotExceedRemaining(
+        receipt.invoiceId ?? null,
+        receipt.amount,
+        receipt.id,
+      );
+
+      if (!remainingValidation.ok) {
+        return res.status(remainingValidation.status).json({
+          error: remainingValidation.error,
+          errorEn: remainingValidation.errorEn,
+        });
+      }
+    }
+
+    const [issuedReceipt] = await db
+      .update(receiptsTable)
+      .set({ status: "issued" })
+      .where(eq(receiptsTable.id, id))
+      .returning();
+
+    await syncIssuedReceiptLedgerEntry(issuedReceipt);
+    await refreshInvoicePaidStatus(issuedReceipt.invoiceId);
+    await enqueueReceiptSyncChangeIfNeeded({
+      operation: "update",
+      receipt: issuedReceipt,
+      userId: req.user?.userId ?? (req as any).user?.id ?? null,
+    });
+
+    const [client] = issuedReceipt.clientId
+      ? await db
+          .select()
+          .from(clientsTable)
+          .where(eq(clientsTable.id, issuedReceipt.clientId))
+      : [];
+
+    const invoiceNumber = issuedReceipt.invoiceId
+      ? (
+          await db
+            .select()
+            .from(invoicesTable)
+            .where(eq(invoicesTable.id, issuedReceipt.invoiceId))
+        )[0]?.invoiceNumber || null
+      : null;
+
+    return res.json(formatReceipt(issuedReceipt, client?.name || "", invoiceNumber));
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
 
 router.get("/receipts/:id", requireAuth, async (req, res) => {
   try {
@@ -713,6 +825,7 @@ router.post("/receipts/import", requireAuth, async (req, res) => {
         invoiceId: row.invoiceId ? Number(row.invoiceId) : null,
         amount: String(row.amount ?? "0"),
         paymentMethod: row.paymentMethod ?? "cash",
+        status: normalizeReceiptStatus(row.status, "issued"),
         notes: row.notes ?? null,
         receiptDate: row.receiptDate
           ? String(row.receiptDate)
@@ -720,18 +833,20 @@ router.post("/receipts/import", requireAuth, async (req, res) => {
         deletedAt: null,
       };
 
-      const remainingValidation = await validateReceiptDoesNotExceedRemaining(
-        values.invoiceId,
-        values.amount,
-        existing?.id,
-      );
+      if (values.status === "issued") {
+        const remainingValidation = await validateReceiptDoesNotExceedRemaining(
+          values.invoiceId,
+          values.amount,
+          existing?.id,
+        );
 
-      if (!remainingValidation.ok) {
-        return res.status(remainingValidation.status).json({
-          error: remainingValidation.error,
-          errorEn: remainingValidation.errorEn,
-          receiptNumber: values.receiptNumber,
-        });
+        if (!remainingValidation.ok) {
+          return res.status(remainingValidation.status).json({
+            error: remainingValidation.error,
+            errorEn: remainingValidation.errorEn,
+            receiptNumber: values.receiptNumber,
+          });
+        }
       }
 
       if (existing) {
@@ -740,11 +855,22 @@ router.post("/receipts/import", requireAuth, async (req, res) => {
           .set(values)
           .where(eq(receiptsTable.id, existing.id));
 
+        const [updatedReceipt] = await db
+          .select()
+          .from(receiptsTable)
+          .where(eq(receiptsTable.id, existing.id))
+          .limit(1);
+
+        if (updatedReceipt) {
+          await syncIssuedReceiptLedgerEntry(updatedReceipt);
+        }
+
         await refreshInvoicePaidStatus(existing.invoiceId);
         await refreshInvoicePaidStatus(values.invoiceId);
         updated++;
       } else {
-        await db.insert(receiptsTable).values(values);
+        const [insertedReceipt] = await db.insert(receiptsTable).values(values).returning();
+        await syncIssuedReceiptLedgerEntry(insertedReceipt);
         await refreshInvoicePaidStatus(values.invoiceId);
         inserted++;
       }

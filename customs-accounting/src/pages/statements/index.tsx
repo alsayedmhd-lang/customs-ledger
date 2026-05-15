@@ -28,6 +28,14 @@ async function fetchInvoices() {
   return res.json();
 }
 
+async function fetchReceipts() {
+  const res = await fetch(`${API_BASE}/api/receipts`, {
+    headers: { Authorization: `Bearer ${getToken()}` },
+  });
+  if (!res.ok) throw new Error("Failed to fetch receipts");
+  return res.json();
+}
+
 function formatDateInput(date: Date) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -63,13 +71,17 @@ export default function StatementsIndex() {
     queryKey: ["invoices"],
     queryFn: fetchInvoices,
   });
+  const { data: allReceipts = [], isLoading: loadingReceipts } = useQuery<any[]>({
+    queryKey: ["receipts"],
+    queryFn: fetchReceipts,
+  });
 
   console.log("clients:", clients);
   console.log("allInvoices:", allInvoices);
   console.log("loadingClients:", loadingClients);
   console.log("loadingInvoices:", loadingInvoices);
  
-  const loading = loadingClients || loadingInvoices;
+  const loading = loadingClients || loadingInvoices || loadingReceipts;
 
   const clientSummaries = (clients?.map(client => {
     const q = search.trim().toLowerCase();
@@ -85,8 +97,21 @@ export default function StatementsIndex() {
         String(inv.billOfLading || "").toLowerCase().includes(q);
       return matchesClient && matchesSearch && (!fromDate || issueDate >= fromDate) && (!toDate || issueDate <= toDate);
     }) || [];
+    const issuedReceiptTotal = (allReceipts ?? [])
+      .filter((receipt) => {
+        const receiptDate = String(receipt.receiptDate || "").slice(0, 10);
+        return (
+          receipt.clientId === client.id &&
+          receipt.status === "issued" &&
+          (!fromDate || receiptDate >= fromDate) &&
+          (!toDate || receiptDate <= toDate)
+        );
+      })
+      .reduce((sum, receipt) => sum + Number(receipt.amount ?? 0), 0);
     const totalInvoiced = invoices.reduce((sum, inv) => sum + inv.total, 0);
-    const totalPaid = invoices.filter(i => i.status === "paid").reduce((sum, inv) => sum + inv.total, 0);
+    const totalPaid =
+      invoices.reduce((sum, inv) => sum + Number(inv.advancePayment ?? 0), 0) +
+      issuedReceiptTotal;
     const balance = totalInvoiced - totalPaid;
     const lastInvoice = invoices.sort((a, b) => new Date(b.issueDate).getTime() - new Date(a.issueDate).getTime())[0];
     return { client, totalInvoiced, totalPaid, balance, invoiceCount: invoices.length, lastInvoice };

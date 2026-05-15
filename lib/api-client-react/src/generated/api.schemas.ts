@@ -142,6 +142,13 @@ export const PaymentMethod = {
   check: "check",
 } as const;
 
+export type ReceiptStatus = (typeof ReceiptStatus)[keyof typeof ReceiptStatus];
+
+export const ReceiptStatus = {
+  draft: "draft",
+  issued: "issued",
+} as const;
+
 export interface Receipt {
   id: number;
   receiptNumber: string;
@@ -151,6 +158,7 @@ export interface Receipt {
   invoiceNumber?: string | null;
   amount: number;
   paymentMethod: PaymentMethod;
+  status: ReceiptStatus;
   notes?: string | null;
   receiptDate: string;
   createdAt: string;
@@ -161,6 +169,7 @@ export interface CreateReceiptRequest {
   invoiceId?: number | null;
   amount: number;
   paymentMethod: PaymentMethod;
+  status?: ReceiptStatus;
   notes?: string | null;
   receiptDate: string;
 }
