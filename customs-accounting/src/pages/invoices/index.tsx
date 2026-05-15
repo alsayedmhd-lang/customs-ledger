@@ -409,7 +409,7 @@ export default function InvoicesList() {
                       <div className="flex items-center justify-end gap-1">
                         <Link href={`/invoices/${inv.id}/receipt`}>
                           <button
-                            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-800 hover:text-white rounded-lg transition-colors dark:text-slate-300 dark:bg-slate-700 dark:hover:bg-slate-600"
+                            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-muted-foreground bg-muted/30 border border-border hover:bg-muted/50 hover:text-foreground rounded-lg transition-colors"
                             title={t("print")}
                           >
                             <Printer className="w-3.5 h-3.5" />
@@ -419,7 +419,7 @@ export default function InvoicesList() {
 
                         <button
                           onClick={() => setCopyId(inv.id)}
-                          className={`${isClient ? "hidden" : ""} p-1.5 text-muted-foreground hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors`}
+                          className={`${isClient ? "hidden" : ""} p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-lg transition-colors`}
                           title={t("copy")}
                         >
                           📄

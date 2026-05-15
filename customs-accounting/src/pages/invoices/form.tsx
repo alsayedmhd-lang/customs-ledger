@@ -1223,7 +1223,7 @@ export default function InvoiceForm() {
 
                 setLocation("/invoices/new");
               }}
-              className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 text-white text-sm font-medium rounded-xl hover:bg-blue-500 shadow-sm"
+              className="flex items-center gap-1.5 px-3 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-xl hover:bg-primary/90 shadow-sm"
             >
               {isAR ? "نسخ الفاتورة" : "Copy Invoice"}
             </button>
@@ -1240,7 +1240,7 @@ export default function InvoiceForm() {
                       void handleReceiptClick();
                     }}
                     disabled={receiptLookupPending}
-                    className="flex items-center gap-1.5 px-3 py-2 border border-emerald-400 rounded-xl bg-emerald-50 text-emerald-700 text-sm font-medium hover:bg-emerald-100 shadow-sm disabled:opacity-60"
+                    className="flex items-center gap-1.5 px-3 py-2 border border-border rounded-xl bg-muted/30 text-foreground text-sm font-medium hover:bg-muted/50 shadow-sm disabled:opacity-60"
                   >
                     <ReceiptText className="w-3.5 h-3.5" />
                     {isAR ? "سند قبض" : "Receipt"}
@@ -1249,14 +1249,14 @@ export default function InvoiceForm() {
               )}
 
             <Link href={`/accounting?invoice=${encodeURIComponent(existingInvoice?.invoiceNumber || "")}`}>
-              <button className="flex items-center gap-1.5 px-3 py-2 border border-emerald-400 rounded-xl bg-emerald-50 text-emerald-700 text-sm font-medium">
+              <button className="flex items-center gap-1.5 px-3 py-2 border border-border rounded-xl bg-muted/30 text-foreground text-sm font-medium hover:bg-muted/50">
                 <Calculator className="w-3.5 h-3.5" />
                 {isAR ? "الحسابات" : "Calculate"}
               </button>
             </Link>
 
             <Link href={`/invoices/${invoiceId}/receipt`}>
-              <button className="flex items-center gap-1.5 px-3 py-2 bg-slate-700 text-white text-sm font-medium rounded-xl hover:bg-slate-600">
+              <button className="flex items-center gap-1.5 px-3 py-2 border border-border rounded-xl bg-muted/30 text-foreground text-sm font-medium hover:bg-muted/50">
                 <Printer className="w-3.5 h-3.5" />
                 {isAR ? "طباعة" : "Print"}
               </button>
@@ -1267,8 +1267,8 @@ export default function InvoiceForm() {
         </div>
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <div className="bg-card rounded-2xl border border-border/50 shadow-sm overflow-visible">
-          <div className="flex items-center gap-2 px-4 py-3 border-b border-border/40 bg-primary/5">
-            <FileText className="w-4 h-4 text-primary" />
+          <div className="flex items-center gap-2 px-4 py-3 border-b border-border/40 bg-muted/30">
+            <FileText className="w-4 h-4 text-muted-foreground" />
             <h2 className="text-sm font-bold text-foreground">
               {isAR ? "البيانات الأساسية" : "Basic Details"}
             </h2>
@@ -1385,8 +1385,8 @@ export default function InvoiceForm() {
         </div>
 
         <div className="bg-card rounded-2xl border border-border/50 shadow-sm overflow-visible">
-          <div className="flex items-center gap-2 px-4 py-3 border-b border-border/40 bg-blue-500/5">
-            <Ship className="w-4 h-4 text-blue-500" />
+          <div className="flex items-center gap-2 px-4 py-3 border-b border-border/40 bg-muted/30">
+            <Ship className="w-4 h-4 text-muted-foreground" />
             <h2 className="text-sm font-bold text-foreground">
               {isAR ? "بيانات الشحنة" : "Shipment Info"}
             </h2>
@@ -1548,9 +1548,9 @@ export default function InvoiceForm() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="bg-card rounded-2xl border border-border/50 shadow-sm overflow-hidden">
-            <div className="flex items-center gap-2 px-4 py-3 border-b border-border/40 bg-amber-500/5">
-              <StickyNote className="w-4 h-4 text-amber-500" />
-              <h3 className="text-sm font-bold">
+            <div className="flex items-center gap-2 px-4 py-3 border-b border-border/40 bg-muted/30">
+              <StickyNote className="w-4 h-4 text-muted-foreground" />
+              <h3 className="text-sm font-bold text-foreground">
                 {isAR ? "ملاحظات" : "Notes"}
               </h3>
             </div>
@@ -1570,9 +1570,9 @@ export default function InvoiceForm() {
           </div>
 
           <div className="bg-card rounded-2xl border border-border/50 shadow-sm overflow-hidden">
-            <div className="flex items-center gap-2 px-4 py-3 border-b border-border/40 bg-primary/5">
-              <Calculator className="w-4 h-4 text-primary" />
-              <h3 className="text-sm font-bold">
+            <div className="flex items-center gap-2 px-4 py-3 border-b border-border/40 bg-muted/30">
+              <Calculator className="w-4 h-4 text-muted-foreground" />
+              <h3 className="text-sm font-bold text-foreground">
                 {isAR ? "الملخص المالي" : "Financial Summary"}
               </h3>
             </div>
@@ -1693,7 +1693,7 @@ export default function InvoiceForm() {
                                   <span
                                     className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${
                                       uploaded
-                                        ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                                        ? "border-border bg-muted/30 text-foreground"
                                         : "border-border bg-muted/40 text-muted-foreground"
                                     }`}
                                   >
@@ -1783,7 +1783,7 @@ export default function InvoiceForm() {
                           <span
                             className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${
                               otherAttachments.length > 0
-                                ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                                ? "border-border bg-muted/30 text-foreground"
                                 : "border-border bg-muted/40 text-muted-foreground"
                             }`}
                           >
@@ -2009,12 +2009,12 @@ export default function InvoiceForm() {
                         : log.action;
               const actionStyle =
                 log.action === "created"
-                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                  ? "bg-muted/30 text-foreground border-border"
                   : log.action === "updated"
-                    ? "bg-blue-50 text-blue-700 border-blue-200"
+                    ? "bg-muted/30 text-muted-foreground border-border"
                     : log.action === "deleted"
-                      ? "bg-red-50 text-red-700 border-red-200"
-                      : "bg-purple-50 text-purple-700 border-purple-200";
+                      ? "bg-destructive/10 text-destructive border-destructive/30"
+                      : "bg-muted/30 text-muted-foreground border-border";
 
               const summary = getAuditSummary(log);
 
