@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Link } from "wouter";
 import {
@@ -27,6 +27,19 @@ export default function Dashboard() {
   const { data: invoices, isLoading: loadingInvoices } = useListInvoices();
   const { data: clients } = useListClients();
   const [showAmounts, setShowAmounts] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(() =>
+    document.documentElement.classList.contains("dark")
+  );
+
+  useEffect(() => {
+    const root = document.documentElement;
+    const observer = new MutationObserver(() => {
+      setIsDarkMode(root.classList.contains("dark"));
+    });
+
+    observer.observe(root, { attributes: true, attributeFilter: ["class"] });
+    return () => observer.disconnect();
+  }, []);
   const hidden = <span className="tracking-widest opacity-35 font-mono">••••••</span>;
 
   const totalInvoicesAmount = invoices?.reduce((sum, inv) => sum + inv.total, 0) || 0;
@@ -64,37 +77,37 @@ export default function Dashboard() {
       title: t("totalInvoices"),
       value: formatCurrency(totalInvoicesAmount),
       icon: DollarSign,
-      color: "bg-muted/30",
-      bg: "bg-muted/30",
-      iconColor: "text-foreground",
-      border: "border-border",
+      color: "bg-emerald-50 dark:bg-muted/30",
+      bg: "bg-emerald-50 dark:bg-muted/30",
+      iconColor: "text-emerald-600 dark:text-foreground",
+      border: "border-emerald-200 dark:border-border",
     },
     {
       title: t("outstanding"),
       value: formatCurrency(totalOutstanding),
       icon: AlertCircle,
-      color: "bg-muted/30",
-      bg: "bg-muted/30",
-      iconColor: "text-foreground",
-      border: "border-border",
+      color: "bg-emerald-50 dark:bg-muted/30",
+      bg: "bg-emerald-50 dark:bg-muted/30",
+      iconColor: "text-emerald-600 dark:text-foreground",
+      border: "border-emerald-200 dark:border-border",
     },
     {
       title: t("invoiceCount"),
       value: arabicNums(invoices?.length ?? 0),
       icon: FileText,
-      color: "bg-muted/30",
-      bg: "bg-muted/30",
-      iconColor: "text-foreground",
-      border: "border-border",
+      color: "bg-emerald-50 dark:bg-muted/30",
+      bg: "bg-emerald-50 dark:bg-muted/30",
+      iconColor: "text-emerald-600 dark:text-foreground",
+      border: "border-emerald-200 dark:border-border",
     },
     {
       title: t("totalClients"),
       value: arabicNums(clients?.length ?? 0),
       icon: Users,
-      color: "bg-muted/30",
-      bg: "bg-muted/30",
-      iconColor: "text-foreground",
-      border: "border-border",
+      color: "bg-emerald-50 dark:bg-muted/30",
+      bg: "bg-emerald-50 dark:bg-muted/30",
+      iconColor: "text-emerald-600 dark:text-foreground",
+      border: "border-emerald-200 dark:border-border",
     },
   ];
 
@@ -124,7 +137,7 @@ export default function Dashboard() {
       {/* Welcome Banner */}
       <motion.div
         variants={item}
-        className="relative overflow-hidden rounded-3xl border border-white/10 bg-card shadow-sm [background:linear-gradient(135deg,var(--sb-from)_0%,var(--sb-to)_100%)] dark:border-border dark:!bg-card dark:![background:hsl(var(--card))]"
+        className="relative overflow-hidden rounded-3xl border border-white/10 bg-card shadow-sm dark:border-border" style={{ background: isDarkMode ? "hsl(var(--card))" : "linear-gradient(135deg, var(--sb-from) 0%, var(--sb-to) 100%)" }}
       >
         {/* Decorative circles */}
         <div className="absolute top-[-60px] right-[-60px] w-[220px] h-[220px] rounded-full opacity-15"
@@ -360,3 +373,5 @@ export function StatusBadge({ status }: { status: string }) {
     </span>
   );
 }
+
+
