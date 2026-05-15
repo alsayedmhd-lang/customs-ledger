@@ -183,8 +183,8 @@ export default function Dashboard() {
             onClick={() => setShowAmounts(v => !v)}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-medium transition-all ${
               showAmounts
-                ? "bg-card border-border text-muted-foreground hover:bg-muted/50"
-                : "bg-muted/30 border-border text-foreground hover:bg-muted/50"
+                ? "bg-white/90 dark:bg-white/10 border-border text-slate-700 dark:text-white hover:bg-white dark:hover:bg-white/20"
+                : "bg-amber-100 dark:bg-white/10 border-amber-200 dark:border-border text-amber-800 dark:text-white hover:bg-amber-200 dark:hover:bg-white/20"
             }`}
           >
             {showAmounts ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
@@ -373,5 +373,6 @@ export function StatusBadge({ status }: { status: string }) {
     </span>
   );
 }
+
 
 
