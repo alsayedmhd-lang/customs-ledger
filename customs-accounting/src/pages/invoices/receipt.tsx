@@ -276,7 +276,7 @@ const impExpValue =
             height: auto !important;
             background: white !important;
             margin: 0 auto !important;
-            padding: 4mm 4mm 18mm !important;
+            padding: 4mm 4mm 24mm !important;
             box-sizing: border-box;
             display: flex;
             flex-direction: column;
@@ -293,6 +293,7 @@ const impExpValue =
           .invoice-signature-stamp-area {
             flex: 0 0 auto;
             margin-top: auto;
+            padding-bottom: 5mm;
             page-break-inside: avoid;
             break-inside: avoid;
           }
@@ -569,7 +570,7 @@ const impExpValue =
         </div>
 
         {/* ══ ITEMS TABLE ═════════════════════════════════════════════════ */}
-        <div className="w-full max-w-none pt-3">
+        <div className="w-full max-w-none pt-3 pr-[2mm] pl-[4mm]">
           <table className="w-full text-sm border-collapse">
             <thead>
               <tr className="border-y border-slate-700">
@@ -612,7 +613,7 @@ const impExpValue =
         </div>
 
         {/* ══ TOTALS ══════════════════════════════════════════════════════ */}
-        <div className="w-full max-w-none pb-2">
+        <div className="w-full max-w-none pb-2 pl-[5mm]">
           <div className="border-t border-slate-700 pt-2 space-y-1">
             <TotalRow label="إجمالي الفاتورة / Invoice Amount" value={invoice.subtotal} />
             {invoice.taxRate > 0 && (
@@ -652,7 +653,7 @@ const impExpValue =
 
         {/* ══ SIGNATURES / STAMP ══════════════════════════════════════════ */}
         <div className="invoice-signature-stamp-area relative">
-        <div className="relative grid grid-cols-[1fr_0.8fr_1fr] items-end gap-8 px-12 pb-5 pt-8" style={{ zIndex: 30, direction: "ltr" }}>
+        <div className="relative grid grid-cols-[1fr_0.8fr_1fr] items-end gap-8 px-12 pb-3 pt-6" style={{ zIndex: 30, direction: "ltr" }}>
           <div className="order-3 relative z-10 text-center">
             <div className="h-24 border-b-2 border-gray-400" />
             <p className="text-xs text-gray-500 mt-1 font-bold">توقيع المستلم</p>
@@ -702,7 +703,7 @@ const impExpValue =
                   opacity: 0.55,
                   zIndex: 60,
                   left: stampOverAccountant ? "-60%" : "50%",
-                  bottom: "-18px",
+                  bottom: "-6px",
                   transform: "translateX(-50%) rotate(-8deg)",
                   mixBlendMode: "multiply",
                 }}

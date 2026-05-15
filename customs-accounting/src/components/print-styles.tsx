@@ -19,7 +19,7 @@ export function PrintStyles(_: PrintStylesProps) {
           width: 202mm !important;
           max-width: none !important;
           margin: 0 auto !important;
-          padding-bottom: 18mm !important;
+          padding-bottom: 24mm !important;
           box-sizing: border-box !important;
 
           height: auto !important;
