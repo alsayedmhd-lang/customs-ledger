@@ -124,7 +124,7 @@ export default function Dashboard() {
       {/* Welcome Banner */}
       <motion.div
         variants={item}
-        className="relative overflow-hidden rounded-3xl border border-white/10 [background:linear-gradient(135deg,var(--sb-from)_0%,var(--sb-to)_100%)] shadow-sm dark:border-border dark:[background:hsl(var(--card))]"
+        className="relative overflow-hidden rounded-3xl border border-white/10 bg-card shadow-sm [background:linear-gradient(135deg,var(--sb-from)_0%,var(--sb-to)_100%)] dark:border-border dark:!bg-card dark:![background:hsl(var(--card))]"
       >
         {/* Decorative circles */}
         <div className="absolute top-[-60px] right-[-60px] w-[220px] h-[220px] rounded-full opacity-15"

@@ -274,8 +274,16 @@ export default function AppLayout({ children }: AppLayoutProps) {
                 )}
                 title={collapsed ? label : undefined}
                 style={{
-                  background: isActive ? "var(--sb-active-bg)" : undefined,
-                  color: isActive ? "var(--sb-active-fg)" : "var(--sb-muted-foreground)",
+                  background: isActive
+                    ? collapsed
+                      ? isDarkMode ? "hsl(var(--muted) / 0.45)" : "rgba(255,255,255,0.18)"
+                      : "var(--sb-active-bg)"
+                    : undefined,
+                  color: isActive
+                    ? collapsed
+                      ? isDarkMode ? "hsl(var(--foreground))" : "#ffffff"
+                      : "var(--sb-active-fg)"
+                    : "var(--sb-muted-foreground)",
                 }}
                 onMouseEnter={(e) => {
                   if (!isActive) {
@@ -293,14 +301,14 @@ export default function AppLayout({ children }: AppLayoutProps) {
                 <div className={cn("flex items-center", collapsed ? "justify-center" : "gap-3")}>
                   <div className={cn(
                     "w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors",
-                    isActive && (isDarkMode ? "bg-muted/30" : "bg-white/20")
+                    isActive && (isDarkMode ? "bg-muted/40" : collapsed ? "bg-white/25" : "bg-primary/15")
                   )}
                     style={{ background: isActive ? undefined : "var(--sb-hover-bg)" }}
                   >
                     <item.icon className={cn(
                       "w-4 h-4",
                       isActive
-                        ? isDarkMode ? "text-foreground" : "text-white"
+                        ? isDarkMode ? "text-foreground" : collapsed ? "text-white" : "text-primary"
                         : isDarkMode ? "text-muted-foreground" : item.color
                     )} />
                   </div>
