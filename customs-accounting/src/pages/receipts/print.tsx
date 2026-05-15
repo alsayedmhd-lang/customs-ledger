@@ -160,7 +160,7 @@ export default function ReceiptPrint() {
   const { data: clients } = useListClients();
   const { currencySymbol, lang } = useLanguage();
   const isAR = lang === "ar";
-  const { settings, logoSrc, stampSrc, watermarkSrc } = useCompanySettings();
+  const { settings, logoSrc, stampSrc } = useCompanySettings();
   const { user } = useAuth();
   const isClient = user?.role === "client";
 
@@ -226,11 +226,40 @@ export default function ReceiptPrint() {
   const amountWords = numberToArabicWords(Number(receipt.amount));
   const amountWordsEn = numberToEnglishWords(Number(receipt.amount));
   const receiptNum = receipt.receiptNumber;
+  const receiptBackgroundSrc =
+    (settings as any).backgroundImage ||
+    (settings as any).backgroundImageBase64 ||
+    settings.watermarkBase64;
 
   return (
     <A4PrintShell
       dir="rtl"
+      pageClassName="receipt-print-page"
       controls={
+        <>
+        <style>{`
+          @media print {
+            .receipt-print-content {
+              flex: 0 0 auto !important;
+              min-height: 0 !important;
+              display: block !important;
+            }
+
+            .receipt-signature-stamp-area {
+              page-break-inside: avoid;
+              break-inside: avoid;
+            }
+          }
+
+          @media print and (min-resolution: 300dpi) {
+            html body .receipt-print-page {
+              padding-left: 5mm !important;
+              padding-right: 3mm !important;
+              box-sizing: border-box !important;
+            }
+          }
+        `}</style>
+
         <div className="print:hidden flex gap-3 p-4max-w-2xl  mx-auto flex-wrap" dir={isAR ? "rtl" : "ltr"}>
         <Link href="/receipts">
           <button className={`${isClient ? "hidden" : ""} flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg bg-white text-gray-700 hover:bg-gray-50 text-sm font-medium`}>
@@ -300,24 +329,17 @@ export default function ReceiptPrint() {
           </span>
         </label>}
         </div>
+        </>
       }
     >
-        <main className="print-content">
-        {settings.showWatermark && (
+        <main className="receipt-print-content">
+        {settings.showWatermark && receiptBackgroundSrc && (
           <div
-            className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none select-none"
+            className="absolute inset-x-0 top-[32mm] flex items-start justify-center pointer-events-none select-none"
             style={{ opacity: 0.06, zIndex: 0 }}
             aria-hidden="true"
           >
-            <img src={watermarkSrc} alt="" className="w-44 object-contain mb-1" />
-            <div className="text-center leading-tight">
-              <div className="text-3xl font-black text-blue-800" style={{ fontFamily: "'Cairo', sans-serif" }}>
-                {settings.nameAr}
-              </div>
-              <div className="text-xl font-black text-blue-800 mt-1">
-                {settings.nameEn.split(" ").slice(0, 3).join(" ")}
-              </div>
-            </div>
+            <img src={receiptBackgroundSrc} alt="" className="w-56 max-w-[60%] object-contain" />
           </div>
         )}
 
@@ -477,7 +499,7 @@ export default function ReceiptPrint() {
         </main>
 
         <div className="print-footer">
-          <div className="print-signature-stamp-area relative grid grid-cols-2 gap-8 px-10 pb-3 pt-4 " style={{ zIndex: 3 }}>
+          <div className="receipt-signature-stamp-area print-signature-stamp-area relative grid grid-cols-2 gap-8 px-10 pb-3 pt-1 " style={{ zIndex: 3 }}>
             <div className="text-center">
               <div className="h-12 border-b border-gray-300" />
               <p className="text-xs text-gray-500 mt-1 font-bold">توقيع المستلم</p>
@@ -536,7 +558,7 @@ export default function ReceiptPrint() {
                   alt="الختم الرسمي"
                   className="absolute w-auto object-contain select-none"
                   style={{
-                    height: "128px",
+                    height: "150px",
                     maxWidth: "200px",
                     opacity: 0.95,
                     bottom: "-8px",

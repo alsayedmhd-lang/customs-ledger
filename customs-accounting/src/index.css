@@ -253,6 +253,18 @@ input[type="number"] {
   }
 }
 
+@media print and (min-resolution: 300dpi) {
+  @page {
+    size: A4;
+    margin: 6mm;
+  }
+
+  html body .print-page {
+    width: 198mm !important;
+    min-height: 285mm !important;
+  }
+}
+
 /* ── Display Settings: No Animations ─────────────────────────────── */
 .no-animations *,
 .no-animations *::before,

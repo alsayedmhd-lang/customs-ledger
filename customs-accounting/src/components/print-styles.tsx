@@ -43,6 +43,15 @@ export function PrintStyles(_: PrintStylesProps) {
           page-break-inside: avoid;
         }
       }
+
+      @media print and (min-resolution: 300dpi) {
+        @page { size: A4 portrait; margin: 6mm; }
+
+        html body .print-page {
+          width: 198mm !important;
+          min-height: 285mm !important;
+        }
+      }
     `}</style>
   );
 }

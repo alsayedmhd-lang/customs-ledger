@@ -309,6 +309,18 @@ const impExpValue =
             break-inside: avoid;
           }
         }
+
+        @media print and (min-resolution: 300dpi) {
+          @page {
+            size: A4;
+            margin: 6mm;
+          }
+
+          html body .print-page {
+            width: 198mm !important;
+            min-height: 285mm !important;
+          }
+        }
       `}</style>
 
       {/* Controls - hidden on print */}
@@ -699,11 +711,12 @@ const impExpValue =
                 className="absolute object-contain select-none"
                 style={{
                   height: "150px",
+                  maxWidth: "200px",
                   width: "auto",
                   opacity: 0.55,
                   zIndex: 60,
-                  left: stampOverAccountant ? "-60%" : "50%",
-                  bottom: "-6px",
+                  left: stampOverAccountant ? "-80%" : "50%",
+                  bottom: "-12px",
                   transform: "translateX(-50%) rotate(-8deg)",
                   mixBlendMode: "multiply",
                 }}
