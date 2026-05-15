@@ -37,6 +37,8 @@
 }
 
 :root {
+  color-scheme: light;
+
   --background: 210 25% 97%;
   --foreground: 222 47% 11%;
   
@@ -72,9 +74,19 @@
   --radius: 0.75rem;
   --sidebar-bg: 220 40% 98%;
   --sidebar-border: 214 31% 88%;
+  --sb-from: #0f172a;
+  --sb-to: #1e293b;
+  --sb-border: rgba(255,255,255,0.07);
+  --sb-foreground: #ffffff;
+  --sb-muted-foreground: rgba(255,255,255,0.6);
+  --sb-hover-bg: rgba(255,255,255,0.08);
+  --sb-active-bg: #ffffff;
+  --sb-active-fg: #0f172a;
 }
 
 .dark {
+  color-scheme: dark;
+
   /* Medium pleasant dark — warm steel-blue, not pitch black */
   --background: 218 22% 17%;
   --foreground: 0 0% 97%;
@@ -109,6 +121,14 @@
   --ring: 221 78% 65%;
   --sidebar-bg: 218 25% 13%;
   --sidebar-border: 216 18% 20%;
+  --sb-from: #111827;
+  --sb-to: #1f2937;
+  --sb-border: rgba(148,163,184,0.16);
+  --sb-foreground: #f8fafc;
+  --sb-muted-foreground: rgba(226,232,240,0.68);
+  --sb-hover-bg: rgba(148,163,184,0.12);
+  --sb-active-bg: #e2e8f0;
+  --sb-active-fg: #0f172a;
 }
 
 @layer base {
@@ -143,6 +163,166 @@
 .stat-card:hover {
   transform: translateY(-2px);
   box-shadow: 0 8px 25px -5px rgba(0,0,0,0.08);
+}
+
+.dark .stat-card:hover {
+  box-shadow: 0 10px 28px -8px rgba(0,0,0,0.38);
+}
+
+/* Dark Mode Color Normalization
+   Keeps legacy colorful utility classes calm in dark mode without changing print output. */
+@media screen {
+  .dark :where(
+    [class~="bg-blue-50"],
+    [class~="bg-blue-50/60"],
+    [class~="bg-blue-100"],
+    [class~="bg-sky-50"],
+    [class~="bg-sky-100"],
+    [class~="bg-cyan-50"],
+    [class~="bg-cyan-100"],
+    [class~="bg-teal-50"],
+    [class~="bg-teal-100"],
+    [class~="bg-purple-50"],
+    [class~="bg-purple-100"],
+    [class~="bg-violet-50"],
+    [class~="bg-violet-100"],
+    [class~="bg-orange-50"],
+    [class~="bg-orange-50/60"],
+    [class~="bg-orange-100"],
+    [class~="bg-yellow-50"],
+    [class~="bg-yellow-100"],
+    [class~="bg-amber-50"],
+    [class~="bg-amber-100"],
+    [class~="bg-red-50"],
+    [class~="bg-red-50/60"],
+    [class~="bg-red-100"],
+    [class~="bg-rose-50"],
+    [class~="bg-rose-100"],
+    [class~="bg-green-50"],
+    [class~="bg-green-50/60"],
+    [class~="bg-green-100"],
+    [class~="bg-emerald-50"],
+    [class~="bg-emerald-100"]
+  ) {
+    background-color: hsl(var(--muted) / 0.4) !important;
+  }
+
+  .dark :where(
+    [class~="hover:bg-blue-50"]:hover,
+    [class~="hover:bg-blue-100"]:hover,
+    [class~="hover:bg-sky-50"]:hover,
+    [class~="hover:bg-sky-100"]:hover,
+    [class~="hover:bg-cyan-50"]:hover,
+    [class~="hover:bg-cyan-100"]:hover,
+    [class~="hover:bg-teal-50"]:hover,
+    [class~="hover:bg-teal-100"]:hover,
+    [class~="hover:bg-purple-50"]:hover,
+    [class~="hover:bg-purple-100"]:hover,
+    [class~="hover:bg-violet-50"]:hover,
+    [class~="hover:bg-violet-100"]:hover,
+    [class~="hover:bg-orange-50"]:hover,
+    [class~="hover:bg-orange-100"]:hover,
+    [class~="hover:bg-yellow-50"]:hover,
+    [class~="hover:bg-yellow-100"]:hover,
+    [class~="hover:bg-amber-50"]:hover,
+    [class~="hover:bg-amber-100"]:hover,
+    [class~="hover:bg-red-50"]:hover,
+    [class~="hover:bg-red-100"]:hover,
+    [class~="hover:bg-rose-50"]:hover,
+    [class~="hover:bg-rose-100"]:hover,
+    [class~="hover:bg-green-50"]:hover,
+    [class~="hover:bg-green-100"]:hover,
+    [class~="hover:bg-emerald-50"]:hover,
+    [class~="hover:bg-emerald-100"]:hover
+  ) {
+    background-color: hsl(var(--muted) / 0.6) !important;
+  }
+
+  .dark :where(
+    [class~="border-blue-100"],
+    [class~="border-blue-200"],
+    [class~="border-blue-300"],
+    [class~="border-sky-200"],
+    [class~="border-cyan-200"],
+    [class~="border-teal-200"],
+    [class~="border-purple-200"],
+    [class~="border-violet-200"],
+    [class~="border-orange-200"],
+    [class~="border-orange-300"],
+    [class~="border-yellow-200"],
+    [class~="border-yellow-300"],
+    [class~="border-amber-200"],
+    [class~="border-amber-300"],
+    [class~="border-red-200"],
+    [class~="border-red-300"],
+    [class~="border-rose-200"],
+    [class~="border-green-200"],
+    [class~="border-green-300"],
+    [class~="border-emerald-200"],
+    [class~="border-emerald-300"]
+  ) {
+    border-color: hsl(var(--border)) !important;
+  }
+
+  .dark :where(
+    [class~="text-blue-400"],
+    [class~="text-blue-500"],
+    [class~="text-blue-600"],
+    [class~="text-blue-700"],
+    [class~="text-sky-400"],
+    [class~="text-sky-500"],
+    [class~="text-sky-600"],
+    [class~="text-cyan-400"],
+    [class~="text-cyan-500"],
+    [class~="text-cyan-600"],
+    [class~="text-teal-400"],
+    [class~="text-teal-500"],
+    [class~="text-teal-600"],
+    [class~="text-purple-400"],
+    [class~="text-purple-500"],
+    [class~="text-purple-600"],
+    [class~="text-violet-400"],
+    [class~="text-violet-500"],
+    [class~="text-violet-600"],
+    [class~="text-orange-400"],
+    [class~="text-orange-500"],
+    [class~="text-orange-600"],
+    [class~="text-yellow-400"],
+    [class~="text-yellow-500"],
+    [class~="text-yellow-600"],
+    [class~="text-amber-400"],
+    [class~="text-amber-500"],
+    [class~="text-amber-600"],
+    [class~="text-amber-700"]
+  ) {
+    color: hsl(var(--muted-foreground)) !important;
+  }
+
+  .dark :where(
+    [class~="text-green-400"],
+    [class~="text-green-500"],
+    [class~="text-green-600"],
+    [class~="text-green-700"],
+    [class~="text-emerald-400"],
+    [class~="text-emerald-500"],
+    [class~="text-emerald-600"],
+    [class~="text-emerald-700"]
+  ) {
+    color: hsl(var(--success)) !important;
+  }
+
+  .dark :where(
+    [class~="text-red-400"],
+    [class~="text-red-500"],
+    [class~="text-red-600"],
+    [class~="text-red-700"],
+    [class~="text-rose-400"],
+    [class~="text-rose-500"],
+    [class~="text-rose-600"],
+    [class~="text-rose-700"]
+  ) {
+    color: hsl(var(--destructive)) !important;
+  }
 }
 
 /* Sidebar nav item active glow */

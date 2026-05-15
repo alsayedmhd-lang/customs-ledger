@@ -730,7 +730,7 @@ function DatabaseSyncPanel({
         </p>
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-sm">
+      <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
         <div className="mb-4 flex items-center gap-2 text-sm font-bold text-foreground">
           <Database className="h-4 w-4 text-primary" />
           <span>{isAR ? "نوع قاعدة البيانات" : "Database Type"}</span>
@@ -759,7 +759,7 @@ function DatabaseSyncPanel({
       </div>
 
       {databaseMode === "local" && (
-        <div className="rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-sm">
+        <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
           <div className="mb-4 flex items-center gap-2 text-sm font-bold text-foreground">
             <Database className="h-4 w-4 text-emerald-600" />
             <span>{isAR ? "قاعدة البيانات المحلية" : "Local Database"}</span>
@@ -793,7 +793,7 @@ function DatabaseSyncPanel({
       )}
 
       {databaseMode === "online" && (
-        <div className="rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-sm">
+        <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
           <div className="mb-4 flex items-center gap-2 text-sm font-bold text-foreground">
             <Cloud className="h-4 w-4 text-blue-600" />
             <span>{isAR ? "إعدادات قاعدة البيانات الأونلاين" : "Online Database Settings"}</span>
@@ -841,12 +841,12 @@ function DatabaseSyncPanel({
         </div>
       )}
 
-      <div className="rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-sm">
+      <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
         <div className="mb-4 flex flex-wrap gap-2">
-          <button type="button" className="h-9 rounded-lg border border-blue-200 bg-blue-50 px-3 text-xs font-semibold text-blue-700 hover:bg-blue-100">
+          <button type="button" className="h-9 rounded-lg border border-border bg-muted/30 px-3 text-xs font-semibold text-foreground hover:bg-muted/50">
             {isAR ? "اختبار الاتصال" : "Test Connection"}
           </button>
-          <button type="button" className="h-9 rounded-lg border border-emerald-200 bg-emerald-50 px-3 text-xs font-semibold text-emerald-700 hover:bg-emerald-100">
+          <button type="button" className="h-9 rounded-lg border border-border bg-muted/30 px-3 text-xs font-semibold text-foreground hover:bg-muted/50">
             {isAR ? "حفظ الإعدادات" : "Save Configuration"}
           </button>
           <button type="button" className="h-9 rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground hover:bg-primary/90">
@@ -964,6 +964,7 @@ const writePreviewZoom = (key: string, value: number) => {
 
 export default function SettingsPage() {
   const [, setLocation] = useLocation();
+  const openDeveloperSettings = () => setLocation("/settings/developer");
   const { user, isDeveloperSupportMode } = useAuth();
   const { lang, isRTL } = useLanguage();
   const isAR = lang === "ar";
@@ -1031,9 +1032,9 @@ export default function SettingsPage() {
   );
   useEffect(() => {
     const handleDeveloperShortcut = (event: KeyboardEvent) => {
-      if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === "d") {
+      if (event.ctrlKey && event.shiftKey && event.code === "KeyD") {
         event.preventDefault();
-        setLocation("/settings/developer");
+        openDeveloperSettings();
       }
     };
 
@@ -1050,7 +1051,7 @@ export default function SettingsPage() {
 
     if (nextCount >= 5) {
       developerVersionTapRef.current = { count: 0, lastTapAt: 0 };
-      setLocation("/settings/developer");
+      openDeveloperSettings();
     }
   };
   useEffect(() => {
@@ -1864,7 +1865,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
               <button
                 type="button"
                 onClick={() => {
-                  setLocation("/settings/developer");
+                  openDeveloperSettings();
                 }}
                 className="inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-background px-3 py-2.5 text-sm font-semibold text-muted-foreground shadow-sm transition hover:bg-muted hover:text-foreground"
               >
@@ -1905,7 +1906,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                 {canSeeDeveloperLink && (
                   <span
                     onDoubleClick={() => {
-                      setLocation("/settings/developer");
+                      openDeveloperSettings();
                     }}
                     className="mt-1 text-[10px] text-muted-foreground/40 hover:text-muted-foreground/70 select-none"
                   >
@@ -2225,11 +2226,11 @@ const decryptBackupData = async (backupFile: any, password: string) => {
 
                 {/* الإطار الكبير Big frame */}
                 <div
-                  className="rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-sm"
+                  className="rounded-2xl border border-border bg-card p-4 shadow-sm"
                   dir={isAR ? "rtl" : "ltr"}
                 >
                   {/* All Data Row "كل البيانات" */}
-                  <div className="border rounded-lg p-3 mb-3">
+                  <div className="border border-border bg-background rounded-lg p-3 mb-3">
                     <div className="flex items-center justify-between gap-3 w-full">
                       <span className="text-sm font-medium whitespace-nowrap">
                         {isAR ? "كل البيانات" : "All Data"}
@@ -2243,7 +2244,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                             value={backupPassword}
                             onChange={(e) => setBackupPassword(e.target.value)}
                             placeholder={isAR ? "كلمة مرور التصدير" : "Export password"}
-                            className={`h-8 w-32 rounded-md border px-2 text-xs ${
+                            className={`h-8 w-32 rounded-md border border-border bg-background px-2 text-xs text-foreground ${
                               isAR ? "pl-9" : "pr-9"
                             }`}
                           />
@@ -2253,7 +2254,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                             onClick={() => setShowBackupPassword(!showBackupPassword)}
                             className={`absolute top-1/2 -translate-y-1/2 ${
                               isAR ? "left-1" : "right-1"
-                            } p-1 text-gray-600 hover:text-black`}
+                            } p-1 text-muted-foreground hover:text-foreground`}
                           >
                             {showBackupPassword ? <EyeOff size={14} /> : <Eye size={14} />}
                           </button>
@@ -2302,7 +2303,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                           a.click();
                           a.remove();
                         }}
-                        className="h-8 px-3 text-xs bg-blue-50 rounded-md hover:bg-blue-100 transition"
+                        className="h-8 px-3 text-xs bg-muted/30 border border-border text-foreground rounded-md hover:bg-muted/50 transition"
                       >
                         {isAR ? "تصدير" : "Export"}
                       </button>
@@ -2313,7 +2314,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                           value={importPassword}
                           onChange={(e) => setImportPassword(e.target.value)}
                           placeholder={isAR ? "كلمة مرور الاستيراد" : "Import password"}
-                          className={`h-8 w-32 rounded-md border px-2 text-xs ${
+                          className={`h-8 w-32 rounded-md border border-border bg-background px-2 text-xs text-foreground ${
                             isAR ? "pl-9" : "pr-9"
                           }`}
                         />
@@ -2323,7 +2324,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                           onClick={() => setShowImportPassword(!showImportPassword)}
                           className={`absolute top-1/2 -translate-y-1/2 ${
                             isAR ? "left-1" : "right-1"
-                          } p-1 text-gray-600 hover:text-black`}
+                          } p-1 text-muted-foreground hover:text-foreground`}
                         >
                           {showImportPassword ? <EyeOff size={14} /> : <Eye size={14} />}
                         </button>
@@ -2332,7 +2333,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                       <button
                         type="button"
                         onClick={() => document.getElementById("full-import")?.click()}
-                        className="h-8 px-3 text-xs bg-green-50 rounded-md hover:bg-green-100 transition"
+                        className="h-8 px-3 text-xs bg-muted/30 border border-border text-foreground rounded-md hover:bg-muted/50 transition"
                       >
                         {isAR ? "استيراد" : "Import"}
                       </button>
@@ -2341,7 +2342,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                  </div>
 
                  <div
-                  className="flex items-center justify-between border rounded-lg px-3 py-2 mt-2 w-full"
+                  className="flex items-center justify-between border border-border bg-background rounded-lg px-3 py-2 mt-2 w-full"
                   dir={isAR ? "rtl" : "ltr"}
                 >
                   <span className="text-sm whitespace-nowrap">
@@ -2354,7 +2355,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                       value={form.masterPassword || ""}
                       onChange={(e) => setForm((f) => ({ ...f, masterPassword: e.target.value }))}
                       placeholder={isAR ? "اتركها فارغة لعدم التغيير" : "Leave empty to keep unchanged"}
-                      className={`h-8 w-40 rounded-md border text-xs ${
+                      className={`h-8 w-40 rounded-md border border-border bg-background text-xs text-foreground ${
                         isAR ? "pl-8 pr-2" : "pr-8 pl-2"
                       }`}
                     />
@@ -2364,7 +2365,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                       onClick={() => setShowMasterPassword((v) => !v)}
                       className={`absolute top-1/2 -translate-y-1/2 ${
                         isAR ? "left-2" : "right-2"
-                      } text-gray-600`}
+                      } text-muted-foreground hover:text-foreground`}
                     >
                       {showMasterPassword ? <EyeOff size={14} /> : <Eye size={14} />}
                     </button>
@@ -2420,52 +2421,52 @@ const decryptBackupData = async (backupFile: any, password: string) => {
 
                   <div className="grid grid-cols-2 gap-3 mt-4">
                     {/* الفواتير */}
-                    <div className="flex justify-between items-center border rounded-lg p-2">
+                    <div className="flex justify-between items-center border border-border bg-background rounded-lg p-2">
                       <span className="text-sm">{isAR ? "الفواتير" : "Invoices"}</span>
                       <div className="flex gap-2">
-                        <button type="button" onClick={exportInvoices} disabled={!canUseInvoicesBackupImport} className={cn("h-8 px-3 text-xs bg-blue-50 rounded-md hover:bg-blue-100 transition", !canUseInvoicesBackupImport && "cursor-not-allowed opacity-50 hover:bg-blue-50")}>
+                        <button type="button" onClick={exportInvoices} disabled={!canUseInvoicesBackupImport} className={cn("h-8 px-3 text-xs bg-muted/30 border border-border text-foreground rounded-md hover:bg-muted/50 transition", !canUseInvoicesBackupImport && "cursor-not-allowed opacity-50 hover:bg-muted/30")}>
                           {isAR ? "تصدير" : "Export"}
                         </button>
-                        <button type="button" disabled={!canUseInvoicesBackupImport} onClick={() => { if (!canUseInvoicesBackupImport) return; }} className={cn("h-8 px-3 text-xs bg-green-50 rounded-md hover:bg-green-100 transition", !canUseInvoicesBackupImport && "cursor-not-allowed opacity-50 hover:bg-green-50")}>
+                        <button type="button" disabled={!canUseInvoicesBackupImport} onClick={() => { if (!canUseInvoicesBackupImport) return; }} className={cn("h-8 px-3 text-xs bg-muted/30 border border-border text-foreground rounded-md hover:bg-muted/50 transition", !canUseInvoicesBackupImport && "cursor-not-allowed opacity-50 hover:bg-muted/30")}>
                           {isAR ? "استيراد" : "Import"}
                         </button>
                       </div>
                     </div>
 
                     {/* العملاء */}
-                    <div className="flex justify-between items-center border rounded-lg p-2">
+                    <div className="flex justify-between items-center border border-border bg-background rounded-lg p-2">
                       <span className="text-sm">{isAR ? "العملاء" : "Clients"}</span>
                       <div className="flex gap-2">
-                        <button type="button" onClick={exportClients} className="h-8 px-3 text-xs bg-blue-50 rounded-md hover:bg-blue-100 transition">
+                        <button type="button" onClick={exportClients} className="h-8 px-3 text-xs bg-muted/30 border border-border text-foreground rounded-md hover:bg-muted/50 transition">
                           {isAR ? "تصدير" : "Export"}
                         </button>
-                        <button type="button" className="h-8 px-3 text-xs bg-green-50 rounded-md hover:bg-green-100 transition">
+                        <button type="button" className="h-8 px-3 text-xs bg-muted/30 border border-border text-foreground rounded-md hover:bg-muted/50 transition">
                           {isAR ? "استيراد" : "Import"}
                         </button>
                       </div>
                     </div>
 
                     {/* سندات القبض */}
-                    <div className="flex justify-between items-center border rounded-lg p-2">
+                    <div className="flex justify-between items-center border border-border bg-background rounded-lg p-2">
                       <span className="text-sm">{isAR ? "سندات القبض" : "Receipts"}</span>
                       <div className="flex gap-2">
-                        <button type="button" onClick={exportReceipts} className="h-8 px-3 text-xs bg-blue-50 rounded-md hover:bg-blue-100 transition">
+                        <button type="button" onClick={exportReceipts} className="h-8 px-3 text-xs bg-muted/30 border border-border text-foreground rounded-md hover:bg-muted/50 transition">
                           {isAR ? "تصدير" : "Export"}
                         </button>
-                        <button type="button" className="h-8 px-3 text-xs bg-green-50 rounded-md hover:bg-green-100 transition">
+                        <button type="button" className="h-8 px-3 text-xs bg-muted/30 border border-border text-foreground rounded-md hover:bg-muted/50 transition">
                           {isAR ? "استيراد" : "Import"}
                         </button>
                       </div>
                     </div>
 
                     {/* البنود */}
-                    <div className="flex justify-between items-center border rounded-lg p-2">
+                    <div className="flex justify-between items-center border border-border bg-background rounded-lg p-2">
                       <span className="text-sm">{isAR ? "البنود" : "Items"}</span>
                       <div className="flex gap-2">
-                        <button type="button" onClick={exportItems} className="h-8 px-3 text-xs bg-blue-50 rounded-md hover:bg-blue-100 transition">
+                        <button type="button" onClick={exportItems} className="h-8 px-3 text-xs bg-muted/30 border border-border text-foreground rounded-md hover:bg-muted/50 transition">
                           {isAR ? "تصدير" : "Export"}
                         </button>
-                        <button type="button" className="h-8 px-3 text-xs bg-green-50 rounded-md hover:bg-green-100 transition">
+                        <button type="button" className="h-8 px-3 text-xs bg-muted/30 border border-border text-foreground rounded-md hover:bg-muted/50 transition">
                           {isAR ? "استيراد" : "Import"}
                         </button>
                       </div>
@@ -2496,7 +2497,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                   </p>
                 </div>
 
-                <div className="rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-sm">
+                <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
                   <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                     <div className="rounded-xl border border-border bg-background p-3">
                       <div className="text-xs font-semibold uppercase text-muted-foreground">
@@ -2577,7 +2578,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                           setUpdateStatus(error?.message || (isAR ? "فشل تحميل التحديث." : "Failed to download update."));
                         }
                       }}
-                      className="h-9 rounded-lg border border-blue-200 bg-blue-50 px-3 text-xs font-semibold text-blue-700 hover:bg-blue-100"
+                      className="h-9 rounded-lg border border-border bg-muted/30 px-3 text-xs font-semibold text-foreground hover:bg-muted/50"
                     >
                       {isAR ? "تحميل التحديث" : "Download Update"}
                     </button>
@@ -2594,7 +2595,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
 
                         await api.installUpdate();
                       }}
-                      className="h-9 rounded-lg border border-emerald-200 bg-emerald-50 px-3 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 disabled:opacity-50"
+                      className="h-9 rounded-lg border border-border bg-muted/30 px-3 text-xs font-semibold text-foreground hover:bg-muted/50 disabled:opacity-50"
                     >
                       {isAR ? "تثبيت التحديث" : "Install Update"}
                     </button>

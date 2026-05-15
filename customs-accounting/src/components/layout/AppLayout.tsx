@@ -52,6 +52,10 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [pageZoom, setPageZoom] = useState(1);
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    if (typeof document === "undefined") return false;
+    return document.documentElement.classList.contains("dark");
+  });
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     try {
       return localStorage.getItem("sidebar_collapsed") === "true";
@@ -104,11 +108,35 @@ export default function AppLayout({ children }: AppLayoutProps) {
       if (!localStorage.getItem("theme")) {
         document.documentElement.classList.toggle("dark", e.matches);
       }
+      setIsDarkMode(document.documentElement.classList.contains("dark"));
     };
     applySystemTheme(mq);
     mq.addEventListener("change", applySystemTheme);
-    return () => mq.removeEventListener("change", applySystemTheme);
+    const observer = new MutationObserver(() => {
+      setIsDarkMode(document.documentElement.classList.contains("dark"));
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+    return () => {
+      mq.removeEventListener("change", applySystemTheme);
+      observer.disconnect();
+    };
   }, []);
+
+  const sidebarStyle: React.CSSProperties = isDarkMode
+    ? {
+        background: "linear-gradient(180deg, hsl(var(--card)) 0%, hsl(var(--background)) 100%)",
+        borderColor: "hsl(var(--border))",
+        ["--sb-border" as string]: "hsl(var(--border))",
+        ["--sb-foreground" as string]: "hsl(var(--foreground))",
+        ["--sb-muted-foreground" as string]: "hsl(var(--muted-foreground))",
+        ["--sb-hover-bg" as string]: "hsl(var(--muted) / 0.35)",
+        ["--sb-active-bg" as string]: "hsl(var(--muted) / 0.55)",
+        ["--sb-active-fg" as string]: "hsl(var(--foreground))",
+      }
+    : {
+        background: "linear-gradient(180deg, var(--sb-from) 0%, var(--sb-to) 100%)",
+        borderColor: "var(--sb-border)",
+      };
 
   const isClient = user?.role === "client";
   const clientCanViewStatement = isClient && user?.clientViewPermissions?.canViewStatement !== false;
@@ -139,32 +167,32 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const clientAllowedHrefs = new Set(["/", "/invoices", "/receipts", "/statements", "/customer-ledger"]);
   const navItems = (isDeveloperSupportMode
     ? [
-        { name: isAR ? "إدارة المستخدمين" : "User Management", href: "/users-management", icon: UserCog, color: "text-pink-400" },
-        { name: isAR ? "إعدادات البرنامج" : "App Settings", href: "/settings", icon: Settings, color: "text-cyan-400" },
-        { name: isAR ? "المطور" : "Developer", href: "/settings/developer", icon: Settings, color: "text-violet-400" },
+        { name: isAR ? "إدارة المستخدمين" : "User Management", href: "/users-management", icon: UserCog, color: "text-muted-foreground" },
+        { name: isAR ? "إعدادات البرنامج" : "App Settings", href: "/settings", icon: Settings, color: "text-muted-foreground" },
+        { name: isAR ? "المطور" : "Developer", href: "/settings/developer", icon: Settings, color: "text-muted-foreground" },
       ]
     : [
-    { name: t("dashboard"), href: "/", icon: LayoutDashboard, color: "text-blue-400" },
-    { name: t("invoices"), href: "/invoices", icon: FileText, color: "text-sky-400" },
-    { name: t("receipts"), href: "/receipts", icon: ReceiptText, color: "text-emerald-400" },
+    { name: t("dashboard"), href: "/", icon: LayoutDashboard, color: "text-muted-foreground" },
+    { name: t("invoices"), href: "/invoices", icon: FileText, color: "text-muted-foreground" },
+    { name: t("receipts"), href: "/receipts", icon: ReceiptText, color: "text-muted-foreground" },
     ...(!isClient || clientCanViewSummary
-      ? [{ name: isClient ? (isAR ? "ملخص العميل المالي" : "Customer Financial Summary") : "customerLedger", href: "/customer-ledger", icon: FileText, color: "text-indigo-400" }]
+      ? [{ name: isClient ? (isAR ? "ملخص العميل المالي" : "Customer Financial Summary") : "customerLedger", href: "/customer-ledger", icon: FileText, color: "text-muted-foreground" }]
       : []),
     ...(!isClient || clientCanViewStatement
-      ? [{ name: isClient ? (isAR ? "كشف الحساب" : "Account Statement") : t("statements"), href: "/statements", icon: BookOpen, color: "text-teal-400" }]
+      ? [{ name: isClient ? (isAR ? "كشف الحساب" : "Account Statement") : t("statements"), href: "/statements", icon: BookOpen, color: "text-muted-foreground" }]
       : []),
-    { name: t("templates"), href: "/templates", icon: PackageSearch, color: "text-amber-400" },
-    { name: t("clients"), href: "/clients", icon: Users, color: "text-violet-400" },
+    { name: t("templates"), href: "/templates", icon: PackageSearch, color: "text-muted-foreground" },
+    { name: t("clients"), href: "/clients", icon: Users, color: "text-muted-foreground" },
     ...(user?.role === "admin" || user?.permissions?.canViewAccounting
-      ? [{ name: t("accounting"), href: "/accounting", icon: Calculator, color: "text-orange-400" }]
+      ? [{ name: t("accounting"), href: "/accounting", icon: Calculator, color: "text-muted-foreground" }]
       : []),
     ...(user?.role === "admin"
       ? [
-          { name: t("users"), href: "/users", icon: UserCog, color: "text-pink-400" },
-          { name: isAR ? "إعدادات البرنامج" : "App Settings", href: "/settings", icon: Settings, color: "text-cyan-400" },
+          { name: t("users"), href: "/users", icon: UserCog, color: "text-muted-foreground" },
+          { name: isAR ? "إعدادات البرنامج" : "App Settings", href: "/settings", icon: Settings, color: "text-muted-foreground" },
         ]
       : []),
-    { name: t("trash"), href: "/trash", icon: Trash2, color: "text-red-400" },
+    { name: t("trash"), href: "/trash", icon: Trash2, color: "text-muted-foreground" },
   ]).filter((item) => !isClient || clientAllowedHrefs.has(item.href));
 
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -190,17 +218,17 @@ export default function AppLayout({ children }: AppLayoutProps) {
           "border-b transition-all duration-200",
           collapsed ? "p-3 flex flex-col items-center gap-3" : "p-5 flex items-center gap-3"
         )}
-        style={{ borderColor: "var(--sb-border, rgba(255,255,255,0.1))" }}
+        style={{ borderColor: "var(--sb-border)" }}
       >
         {showCollapseButton && (
           <button
             type="button"
             onClick={() => setSidebarCollapsed((value) => !value)}
             className={cn(
-              "flex h-9 w-9 items-center justify-center rounded-xl font-bold transition-colors hover:bg-white/10",
+              "flex h-9 w-9 items-center justify-center rounded-xl font-bold transition-colors",
               !collapsed && (isRTL ? "me-auto" : "ms-auto")
             )}
-            style={{ color: "var(--sb-foreground, #ffffff)" }}
+            style={{ color: "var(--sb-foreground)", background: "var(--sb-hover-bg)" }}
             title={collapsed ? (isAR ? "توسيع القائمة" : "Expand sidebar") : (isAR ? "طي القائمة" : "Collapse sidebar")}
             aria-label={collapsed ? (isAR ? "توسيع القائمة" : "Expand sidebar") : (isAR ? "طي القائمة" : "Collapse sidebar")}
           >
@@ -211,19 +239,19 @@ export default function AppLayout({ children }: AppLayoutProps) {
           src={logoSrc}
           alt="شعار الشركة"
           className={cn("flex-shrink-0 object-contain transition-all duration-200", collapsed ? "w-10 h-10" : "w-12 h-12")}
-          style={{ filter: "drop-shadow(0 2px 8px rgba(59,130,246,0.5))" }}
+          style={{ filter: "drop-shadow(0 2px 8px hsl(var(--primary) / 0.35))" }}
           onError={(e) => {
             const el = e.currentTarget;
             el.style.display = "none";
           }}
         />
         {!collapsed && <div className="min-w-0">
-          <h1 className="font-black text-sm leading-tight truncate" style={{ color: "var(--sb-foreground, #ffffff)" }}>
+          <h1 className="font-black text-sm leading-tight truncate" style={{ color: "var(--sb-foreground)" }}>
             {isAR
               ? (settings.nameAr || "").split(" ").slice(0, 2).join(" ")
               : (settings.nameEn || "").split(" ").slice(0, 3).join(" ")}
           </h1>
-          <p className="text-[11px] font-medium mt-0.5 truncate" style={{ color: "var(--sb-muted-foreground, rgba(255,255,255,0.5))" }}>
+          <p className="text-[11px] font-medium mt-0.5 truncate" style={{ color: "var(--sb-muted-foreground)" }}>
             {isAR ? settings.subtitleAr : settings.subtitleEn}
           </p>
         </div>}
@@ -242,23 +270,23 @@ export default function AppLayout({ children }: AppLayoutProps) {
                 className={cn(
                   "rounded-xl font-medium transition-all duration-200 cursor-pointer group",
                   collapsed ? "flex items-center justify-center px-2 py-2.5" : "px-3 py-2.5",
-                  isActive && "shadow-lg nav-active-glow"
+                  isActive && "nav-active-glow"
                 )}
                 title={collapsed ? label : undefined}
                 style={{
-                  background: isActive ? "var(--sb-active-bg, #ffffff)" : undefined,
-                  color: isActive ? "var(--sb-active-fg, #0f172a)" : "var(--sb-muted-foreground, rgba(255,255,255,0.6))",
+                  background: isActive ? "var(--sb-active-bg)" : undefined,
+                  color: isActive ? "var(--sb-active-fg)" : "var(--sb-muted-foreground)",
                 }}
                 onMouseEnter={(e) => {
                   if (!isActive) {
-                    e.currentTarget.style.background = "var(--sb-hover-bg, rgba(255,255,255,0.1))";
-                    e.currentTarget.style.color = "var(--sb-foreground, #ffffff)";
+                    e.currentTarget.style.background = "var(--sb-hover-bg)";
+                    e.currentTarget.style.color = "var(--sb-foreground)";
                   }
                 }}
                 onMouseLeave={(e) => {
                   if (!isActive) {
                     e.currentTarget.style.background = "";
-                    e.currentTarget.style.color = "var(--sb-muted-foreground, rgba(255,255,255,0.6))";
+                    e.currentTarget.style.color = "var(--sb-muted-foreground)";
                   }
                 }}
               >
@@ -267,7 +295,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                     "w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors",
                     isActive && "bg-primary/15"
                   )}
-                    style={{ background: isActive ? undefined : "var(--sb-hover-bg, rgba(255,255,255,0.05))" }}
+                    style={{ background: isActive ? undefined : "var(--sb-hover-bg)" }}
                   >
                     <item.icon className={cn(
                       "w-4 h-4",
@@ -279,7 +307,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                     <div className="ms-auto flex items-center gap-1">
                       {trashedInvoiceCount > 0 && (
                         <span
-                          className="flex h-4 min-w-4 items-center justify-center rounded-full bg-sky-500 px-1 text-[10px] font-black leading-none text-white"
+                          className="flex h-4 min-w-4 items-center justify-center rounded-full bg-muted/30 px-1 text-[10px] font-black leading-none text-foreground"
                           title={isAR ? "فواتير محذوفة" : "Deleted invoices"}
                         >
                           {trashedInvoiceCount}
@@ -287,7 +315,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                       )}
                       {trashedReceiptCount > 0 && (
                         <span
-                          className="flex h-4 min-w-4 items-center justify-center rounded-full bg-emerald-500 px-1 text-[10px] font-black leading-none text-white"
+                          className="flex h-4 min-w-4 items-center justify-center rounded-full bg-muted/30 px-1 text-[10px] font-black leading-none text-foreground"
                           title={isAR ? "سندات قبض محذوفة" : "Deleted receipts"}
                         >
                           {trashedReceiptCount}
@@ -309,30 +337,30 @@ export default function AppLayout({ children }: AppLayoutProps) {
       </nav>
 
       {/* User + Logout */}
-      <div className={cn("border-t transition-all duration-200", collapsed ? "p-2" : "p-3")} style={{ borderColor: "var(--sb-border, rgba(255,255,255,0.1))" }}>
+      <div className={cn("border-t transition-all duration-200", collapsed ? "p-2" : "p-3")} style={{ borderColor: "var(--sb-border)" }}>
         <div
           className={cn("flex items-center rounded-xl mb-1", collapsed ? "justify-center px-2 py-2.5" : "gap-3 px-3 py-2.5")}
-          style={{ background: "var(--sb-hover-bg, rgba(255,255,255,0.05))" }}
+          style={{ background: "var(--sb-hover-bg)" }}
           title={collapsed ? (isAR ? resolvedName : user?.displayNameEn || resolvedName) : undefined}
         >
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-black text-sm flex-shrink-0 shadow-md">
+          <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-black text-sm flex-shrink-0 shadow-sm">
             {initial}
           </div>
           {!collapsed && <div className="min-w-0 flex-1">
-            <p className="text-sm font-bold truncate" style={{ color: "var(--sb-foreground, #ffffff)" }}>{isAR ? resolvedName : user?.displayNameEn || resolvedName}</p>
-            <p className="text-xs font-medium" style={{ color: "var(--sb-muted-foreground, rgba(255,255,255,0.4))" }}>{roleLabel}</p>
+            <p className="text-sm font-bold truncate" style={{ color: "var(--sb-foreground)" }}>{isAR ? resolvedName : user?.displayNameEn || resolvedName}</p>
+            <p className="text-xs font-medium" style={{ color: "var(--sb-muted-foreground)" }}>{roleLabel}</p>
           </div>}
         </div>
         <button
           onClick={logout}
           className={cn(
-            "flex w-full items-center rounded-xl font-medium hover:bg-red-500/15 hover:text-red-500 transition-all duration-200 group",
+            "flex w-full items-center rounded-xl font-medium hover:bg-muted/50 hover:text-foreground transition-all duration-200 group",
             collapsed ? "justify-center px-2 py-2.5" : "gap-3 px-3 py-2.5"
           )}
-          style={{ color: "var(--sb-muted-foreground, rgba(255,255,255,0.5))" }}
+          style={{ color: "var(--sb-muted-foreground)" }}
           title={collapsed ? t("logout") : undefined}
         >
-          <div className="w-8 h-8 rounded-lg group-hover:bg-red-500/15 flex items-center justify-center flex-shrink-0 transition-colors" style={{ background: "var(--sb-hover-bg, rgba(255,255,255,0.05))" }}>
+          <div className="w-8 h-8 rounded-lg group-hover:bg-muted/30 flex items-center justify-center flex-shrink-0 transition-colors" style={{ background: "var(--sb-hover-bg)" }}>
             <LogOut className="w-4 h-4" />
           </div>
           {!collapsed && <span className="text-sm font-semibold">{t("logout")}</span>}
@@ -353,10 +381,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
           sidebarCollapsed ? "w-20" : "w-64",
           isRTL ? "border-l" : "border-r"
         )}
-        style={{
-          background: "linear-gradient(180deg, var(--sb-from, #0f172a) 0%, var(--sb-to, #1e293b) 100%)",
-          borderColor: "var(--sb-border, rgba(255,255,255,0.07))",
-        }}
+        style={sidebarStyle}
       >
         <SidebarContent collapsed={sidebarCollapsed} showCollapseButton />
       </aside>
@@ -370,7 +395,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setMobileOpen(false)}
-              className="fixed inset-0 bg-black/60 z-40 md:hidden"
+              className="fixed inset-0 bg-background/70 z-40 md:hidden"
             />
             <motion.aside
               initial={{ x: isRTL ? "100%" : "-100%" }}
@@ -381,7 +406,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                 "fixed top-0 z-50 w-72 h-full flex flex-col md:hidden print-hidden",
                 isRTL ? "right-0" : "left-0"
               )}
-              style={{ background: "linear-gradient(180deg, var(--sb-from, #0f172a) 0%, var(--sb-to, #1e293b) 100%)" }}
+              style={sidebarStyle}
             >
               <button
                 onClick={() => setMobileOpen(false)}
@@ -389,7 +414,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                   "absolute top-4 p-2 transition-colors z-50",
                   isRTL ? "left-4" : "right-4"
                 )}
-                style={{ color: "var(--sb-muted-foreground, rgba(255,255,255,0.5))" }}
+                style={{ color: "var(--sb-muted-foreground)" }}
               >
                 <X className="w-5 h-5" />
               </button>
@@ -474,7 +499,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
             <div className="relative">
               <button
                 onClick={() => setUserMenuOpen(!userMenuOpen)}
-                className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-semibold"
+                className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-semibold"
               >
                 {initial}
               </button>
@@ -482,20 +507,20 @@ export default function AppLayout({ children }: AppLayoutProps) {
               {userMenuOpen && (
                 <div
                     className={cn(
-                      "absolute top-10 bg-white rounded-xl shadow-xl border p-4 min-w-[220px] z-[9999]",
+                      "absolute top-10 bg-card rounded-xl shadow-xl border border-border p-4 min-w-[220px] z-[9999]",
                       isRTL ? "left-2" : "right-0"
                     )}
                   >
-                  <p className="text-sm font-semibold text-slate-900">
+                  <p className="text-sm font-semibold text-foreground">
                     {isAR ? resolvedName : user?.displayNameEn || resolvedName}
                   </p>
-                  <p className="text-xs text-slate-500 mb-2">
+                  <p className="text-xs text-muted-foreground mb-2">
                     {roleLabel}
                   </p>
 
                   <button
                     onClick={logout}
-                    className="w-full flex items-center gap-2 mt-2 text-sm text-red-600 hover:text-red-700"
+                    className="w-full flex items-center gap-2 mt-2 text-sm text-muted-foreground hover:text-foreground"
                   >
                     <LogOut className="w-4 h-4" />
                     {t("logout")}

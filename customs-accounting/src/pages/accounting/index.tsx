@@ -79,6 +79,13 @@ function rowToEdit(row: AccountingRow): RowEdit {
 
 function p(v: string) { return parseFloat(v) || 0; }
 
+function formatDateInput(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 function calcIncome(row: AccountingRow, e: RowEdit) {
   return row.subtotal - p(e.payments)
   // return row.total - p(e.payments)
@@ -107,7 +114,7 @@ function PaidToggle({ checked, onChange, color }: { checked: boolean; onChange: 
     <button
       onClick={onChange}
       className={`w-6 h-6 rounded-md border-2 flex items-center justify-center mx-auto transition-all ${
-        checked ? `${color} text-white shadow-sm` : "border-border bg-background text-transparent hover:opacity-70"
+        checked ? `${color} text-foreground shadow-sm` : "border-border bg-background text-transparent hover:opacity-70"
       }`}
     >
       <Check className="w-3.5 h-3.5" />
@@ -121,7 +128,7 @@ function NumInput({ value, onChange, paid }: { value: string; onChange: (v: stri
     <input
       type="number" min="0" step="0.01" value={value}
       onChange={(e) => onChange(e.target.value)} placeholder="0"
-      className={`w-20 px-1.5 py-1 rounded-md border border-border bg-background text-xs text-right
+      className={`w-20 px-1.5 py-1 rounded-md border border-border bg-background text-foreground text-xs text-right
         focus:outline-none focus:ring-1 focus:ring-primary/40 focus:border-primary transition-opacity
         ${paid === false ? "opacity-40" : ""}`}
     />
@@ -133,7 +140,7 @@ function TxtInput({ value, onChange, placeholder }: { value: string; onChange: (
   return (
     <input
       type="text" value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder}
-      className="w-24 px-1.5 py-1 rounded-md border border-border bg-background text-xs text-right
+      className="w-24 px-1.5 py-1 rounded-md border border-border bg-background text-foreground text-xs text-right
         focus:outline-none focus:ring-1 focus:ring-primary/40 focus:border-primary"
     />
   );
@@ -159,8 +166,11 @@ export default function AccountingPage() {
   const [clientFilter, setClientFilter] = useState("");
   const [driverFilter, setDriverFilter] = useState("");
   const [locationFilter, setLocationFilter] = useState("");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  const [dateFrom, setDateFrom] = useState(() => {
+    const today = new Date();
+    return formatDateInput(new Date(today.getFullYear(), today.getMonth(), 1));
+  });
+  const [dateTo, setDateTo] = useState(() => formatDateInput(new Date()));
   const [filtersOpen, setFiltersOpen] = useState(true);
   const [showAmounts, setShowAmounts] = useState(false);
 
@@ -259,12 +269,12 @@ export default function AccountingPage() {
   const clearFilters = () => { setSearch(""); setClientFilter(""); setDriverFilter(""); setLocationFilter(""); setDateFrom(""); setDateTo(""); };
 
   const summaryCards = [
-    { label: "إجمالي الفواتير", value: totalInvoices, color: "text-foreground", bg: "bg-muted/40", icon: "📋" },
-    { label: "المدفوعات", value: totalPayments, color: "text-blue-500", bg: "bg-blue-50/60 dark:bg-blue-900/15", icon: "💳" },
-    { label: "نقليات غير مسددة", value: totalTransportation, color: "text-orange-500", bg: "bg-orange-50/60 dark:bg-orange-900/15", icon: "🚚" },
-    { label: "عمال غير مسددة", value: totalLabor, color: "text-purple-500", bg: "bg-purple-50/60 dark:bg-purple-900/15", icon: "👷" },
-    { label: "مصاريف غير مسددة", value: totalOther, color: "text-red-500", bg: "bg-red-50/60 dark:bg-red-900/15", icon: "📌" },
-    { label: "صافي الدخل", value: totalIncome, color: totalIncome >= 0 ? "text-green-600" : "text-red-500", bg: totalIncome >= 0 ? "bg-green-50/60 dark:bg-green-900/15" : "bg-red-50/60 dark:bg-red-900/15", icon: "💰" },
+    { label: "إجمالي الفواتير", value: totalInvoices, color: "text-foreground", bg: "bg-card", icon: "📋" },
+    { label: "المدفوعات", value: totalPayments, color: "text-foreground", bg: "bg-card", icon: "💳" },
+    { label: "نقليات غير مسددة", value: totalTransportation, color: "text-foreground", bg: "bg-card", icon: "🚚" },
+    { label: "عمال غير مسددة", value: totalLabor, color: "text-foreground", bg: "bg-card", icon: "👷" },
+    { label: "مصاريف غير مسددة", value: totalOther, color: "text-foreground", bg: "bg-card", icon: "📌" },
+    { label: "صافي الدخل", value: totalIncome, color: "text-foreground", bg: "bg-card", icon: "💰" },
   ];
 
   if (user?.role !== "admin" && !can("canViewAccounting")) {
@@ -278,7 +288,7 @@ export default function AccountingPage() {
   }
 
   /* ── common select style ── */
-  const selCls = "w-full px-3 py-2 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 appearance-none cursor-pointer";
+  const selCls = "w-full px-3 py-2 rounded-xl border border-border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 appearance-none cursor-pointer";
 
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-5">
@@ -300,8 +310,8 @@ export default function AccountingPage() {
             onClick={() => setShowAmounts(v => !v)}
             className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border font-medium text-sm transition-all ${
               showAmounts
-                ? "bg-card border-border text-muted-foreground hover:bg-muted/40"
-                : "bg-amber-50 dark:bg-amber-950/30 border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-400"
+                ? "bg-card border-border text-muted-foreground hover:bg-muted/50"
+                : "bg-muted/30 border-border text-foreground hover:bg-muted/50"
             }`}
           >
             {showAmounts ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -343,7 +353,7 @@ export default function AccountingPage() {
         {/* filter header */}
         <button
           onClick={() => setFiltersOpen((v) => !v)}
-          className="w-full flex items-center justify-between px-5 py-3 hover:bg-muted/30 transition-colors"
+          className="w-full flex items-center justify-between px-5 py-3 hover:bg-muted/50 transition-colors"
         >
           <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
             <Filter className="w-4 h-4 text-primary" />
@@ -386,7 +396,7 @@ export default function AccountingPage() {
                     <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
                     <input value={search} onChange={(e) => setSearch(e.target.value)}
                       placeholder="رقم الفاتورة أو اسم العميل..."
-                      className="w-full pr-9 pl-4 py-2 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
+                      className="w-full pr-9 pl-4 py-2 rounded-xl border border-border bg-background text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary/30" />
                     {search && (
                       <button onClick={() => setSearch("")} className="absolute left-3 top-1/2 -translate-y-1/2">
                         <X className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground" />
@@ -416,9 +426,9 @@ export default function AccountingPage() {
                   </label>
                   <div className="flex gap-2">
                     <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)}
-                      className="flex-1 px-3 py-2 rounded-xl border border-border bg-background text-xs focus:outline-none focus:ring-2 focus:ring-primary/30" />
+                      className="flex-1 px-3 py-2 rounded-xl border border-border bg-background text-foreground text-xs focus:outline-none focus:ring-2 focus:ring-primary/30" />
                     <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)}
-                      className="flex-1 px-3 py-2 rounded-xl border border-border bg-background text-xs focus:outline-none focus:ring-2 focus:ring-primary/30" />
+                      className="flex-1 px-3 py-2 rounded-xl border border-border bg-background text-foreground text-xs focus:outline-none focus:ring-2 focus:ring-primary/30" />
                   </div>
                 </div>
 
@@ -469,9 +479,9 @@ export default function AccountingPage() {
           <div className="overflow-x-auto overflow-y-auto max-h-[440px]">
             <table className="w-full text-xs">
               <thead className="sticky top-0 z-20">
-                <tr className="border-b-2 border-border bg-muted/50 text-[11px]">
+                <tr className="border-b-2 border-border bg-muted/30 text-[11px]">
                   {/* ─ static cols ─ */}
-                  <th className="px-3 py-2.5 text-right font-semibold text-muted-foreground whitespace-nowrap sticky right-0 top-0 bg-muted/50 z-30 shadow-[inset_-1px_0_0_0_hsl(var(--border))]">رقم الفاتورة</th>
+                  <th className="px-3 py-2.5 text-right font-semibold text-muted-foreground whitespace-nowrap sticky right-0 top-0 bg-muted/30 z-30 shadow-[inset_-1px_0_0_0_hsl(var(--border))]">رقم الفاتورة</th>
                   <th className="px-3 py-2.5 text-right font-semibold text-muted-foreground whitespace-nowrap">مبلغ الفاتورة</th>
                   <th className="px-3 py-2.5 text-right font-semibold text-muted-foreground whitespace-nowrap">العميل</th>
                   <th className="px-3 py-2.5 text-right font-semibold text-muted-foreground whitespace-nowrap">التاريخ</th>
@@ -489,7 +499,7 @@ export default function AccountingPage() {
                   <th className="px-2 py-2.5 text-right font-semibold text-red-500 whitespace-nowrap border-r border-border/40">مصاريف أخرى</th>
                   <th className="px-2 py-2.5 text-center font-semibold text-red-400 whitespace-nowrap" title="تسديد المصاريف">✓</th>
                   {/* ─ income + save ─ */}
-                  <th className="px-3 py-2.5 text-right font-semibold text-green-600 whitespace-nowrap bg-green-50/40 dark:bg-green-900/10 border-r border-border/40">الدخل</th>
+                  <th className="px-3 py-2.5 text-right font-semibold text-muted-foreground whitespace-nowrap bg-muted/30 border-r border-border/40">الدخل</th>
                   <th className="px-2 py-2.5 text-center font-semibold text-muted-foreground whitespace-nowrap">💾</th>
                 </tr>
                 {/* ─ column group labels ─ */}
@@ -517,7 +527,7 @@ export default function AccountingPage() {
                       ref={isHighlighted ? highlightRef : undefined}
                       className={`border-b border-border/40 transition-colors group ${
                         isHighlighted ? "bg-primary/10 ring-2 ring-inset ring-primary/40"
-                        : idx % 2 === 0 ? "hover:bg-muted/20" : "bg-muted/10 hover:bg-muted/25"
+                        : idx % 2 === 0 ? "hover:bg-muted/50" : "bg-muted/30 hover:bg-muted/50"
                       } ${dirty ? "ring-1 ring-inset ring-amber-400/50" : ""}`}
                     >
                       {/* رقم الفاتورة – sticky */}
@@ -543,7 +553,7 @@ export default function AccountingPage() {
                       </td>
                       <td className="px-1.5 py-1.5 text-center">
                         <PaidToggle checked={e.transportationPaid} onChange={() => setField(row.id, "transportationPaid", !e.transportationPaid)}
-                          color="bg-orange-500 border-orange-500" />
+                          color="bg-muted/30 border-border" />
                       </td>
                       <td className="px-1.5 py-1.5">
                         <TxtInput value={e.driverName} onChange={(v) => setField(row.id, "driverName", v)} placeholder="السائق" />
@@ -558,7 +568,7 @@ export default function AccountingPage() {
                       </td>
                       <td className="px-1.5 py-1.5 text-center">
                         <PaidToggle checked={e.laborPaid} onChange={() => setField(row.id, "laborPaid", !e.laborPaid)}
-                          color="bg-purple-500 border-purple-500" />
+                          color="bg-muted/30 border-border" />
                       </td>
 
                       {/* مصاريف أخرى */}
@@ -567,11 +577,11 @@ export default function AccountingPage() {
                       </td>
                       <td className="px-1.5 py-1.5 text-center">
                         <PaidToggle checked={e.otherExpensesPaid} onChange={() => setField(row.id, "otherExpensesPaid", !e.otherExpensesPaid)}
-                          color="bg-red-500 border-red-500" />
+                          color="bg-muted/30 border-border" />
                       </td>
 
                       {/* الدخل */}
-                      <td className={`px-3 py-1.5 whitespace-nowrap font-bold bg-green-50/30 dark:bg-green-900/10 border-r border-border/40 ${income >= 0 ? "text-green-600" : "text-red-500"}`}>
+                      <td className={`px-3 py-1.5 whitespace-nowrap font-bold bg-muted/30 border-r border-border/40 ${income >= 0 ? "text-green-600" : "text-red-500"}`}>
                         {formatCurrency(income)}
                       </td>
 
@@ -582,7 +592,7 @@ export default function AccountingPage() {
                           disabled={isSaving || (!dirty && !isSaved)}
                           title="حفظ"
                           className={`inline-flex items-center justify-center w-7 h-7 rounded-lg transition-all ${
-                            isSaved ? "bg-green-100 text-green-600 dark:bg-green-900/30"
+                            isSaved ? "bg-muted/30 text-foreground"
                             : dirty ? "bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm"
                             : "bg-transparent text-muted-foreground/40 cursor-not-allowed"
                           }`}
@@ -597,8 +607,8 @@ export default function AccountingPage() {
                 })}
               </tbody>
               <tfoot>
-                <tr className="border-t-2 border-border bg-muted/60 font-bold text-xs">
-                  <td className="px-3 py-2.5 text-muted-foreground sticky right-0 bg-muted/60 z-10">المجموع ({filtered.length})</td>
+                <tr className="border-t-2 border-border bg-muted/30 font-bold text-xs">
+                  <td className="px-3 py-2.5 text-muted-foreground sticky right-0 bg-muted/30 z-10">المجموع ({filtered.length})</td>
                   <td className="px-3 py-2.5 text-foreground">{formatCurrency(totalInvoices)}</td>
                   <td colSpan={2} />
                   <td className="px-2 py-2.5 text-blue-500 border-r border-border/40">{formatCurrency(totalPayments)}</td>
@@ -608,7 +618,7 @@ export default function AccountingPage() {
                   <td />
                   <td className="px-2 py-2.5 text-red-500 border-r border-border/40">{formatCurrency(totalOther)}</td>
                   <td />
-                  <td className={`px-3 py-2.5 bg-green-50/30 dark:bg-green-900/10 ${totalIncome >= 0 ? "text-green-600" : "text-red-500"}`}>{formatCurrency(totalIncome)}</td>
+                  <td className={`px-3 py-2.5 bg-muted/30 ${totalIncome >= 0 ? "text-green-600" : "text-red-500"}`}>{formatCurrency(totalIncome)}</td>
                   <td />
                 </tr>
               </tfoot>

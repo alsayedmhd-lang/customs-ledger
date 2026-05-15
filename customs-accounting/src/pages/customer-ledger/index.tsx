@@ -196,10 +196,10 @@ return (
   {/* Header */}
   <div className="order-1 flex items-start justify-between gap-4">
     <div className={isAR ? "text-right" : "text-left"}>
-      <h1 className="text-3xl font-bold text-gray-900">
+      <h1 className="text-3xl font-bold text-foreground">
         {tr("ملخص العميل المالي", "Customer Financial Summary")}
       </h1>
-      <p className="text-sm text-gray-500 mt-1">
+      <p className="text-sm text-muted-foreground mt-1">
         {tr("كشف مختصر لحركات العميل والرصيد", "A brief statement of customer transactions and balance")}
       </p>
     </div>
@@ -235,32 +235,32 @@ return (
 
       {/* Filters */}
 
-      <div className="order-3 bg-white border rounded-2xl shadow-sm overflow-hidden">
-        <div className="px-5 py-4 border-b bg-gray-50 flex items-center justify-between">
+      <div className="order-3 bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
+        <div className="px-5 py-4 border-b border-border bg-muted/30 flex items-center justify-between">
           <div>
-            <div className="font-semibold text-gray-900">{tr("البحث والتصفية", "Search and filters")}</div>
-            <div className="text-xs text-gray-500 mt-1">
+            <div className="font-semibold text-foreground">{tr("البحث والتصفية", "Search and filters")}</div>
+            <div className="text-xs text-muted-foreground mt-1">
               {tr("اختر العميل والفترة ثم اضغط بحث", "Select the client and period, then search")}
             </div>
           </div>
 
-          <div className="text-sm text-gray-500">
+          <div className="text-sm text-muted-foreground">
             {data.length} {tr("حركة", "entries")}
           </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-12 gap-3 p-4 items-end">
           <div className="md:col-span-3">
-            <label className="text-sm font-medium text-gray-700">{tr("العميل", "Client")}</label>
+            <label className="text-sm font-medium text-muted-foreground">{tr("العميل", "Client")}</label>
             {isClient ? (
-              <div className="w-full border rounded-xl px-3 py-1.5 mt-1 text-sm bg-gray-50 text-gray-900 min-h-[42px]">
+              <div className="w-full border border-border rounded-xl px-3 py-1.5 mt-1 text-sm bg-muted/30 text-foreground min-h-[42px]">
                 {selectedClient
                   ? selectedClient.nameAr || selectedClient.nameEn || selectedClient.name
                   : "â€”"}
               </div>
             ) : (
             <select
-              className="w-full h-[38px] border rounded-xl px-3 mt-1 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+              className="w-full h-[38px] border border-border rounded-xl px-3 mt-1 text-sm bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
               value={clientId}
               onChange={(e) => {
                 handleClientSelected(e.target.value ? Number(e.target.value) : "");
@@ -278,31 +278,31 @@ return (
           </div>
 
           <div className="md:col-span-2">
-            <label className="text-sm font-medium text-gray-700">
+            <label className="text-sm font-medium text-muted-foreground">
               {tr("من تاريخ", "From date")}
             </label>
             <input
               type="date"
               value={fromDate}
               onChange={(e) => setFromDate(e.target.value)}
-              className="w-full h-[38px] border rounded-xl px-3 mt-1 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+              className="w-full h-[38px] border border-border rounded-xl px-3 mt-1 text-sm bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
             />
           </div>
 
           <div className="md:col-span-2">
-            <label className="text-sm font-medium text-gray-700">
+            <label className="text-sm font-medium text-muted-foreground">
               {tr("إلى تاريخ", "To date")}
             </label>
             <input
               type="date"
               value={toDate}
               onChange={(e) => setToDate(e.target.value)}
-              className="w-full h-[38px] border rounded-xl px-3 mt-1 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+              className="w-full h-[38px] border border-border rounded-xl px-3 mt-1 text-sm bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
             />
           </div>
 
           <div className="md:col-span-4">
-            <label className="text-sm font-medium text-gray-700">
+            <label className="text-sm font-medium text-muted-foreground">
               {tr(
                 "رقم الفاتورة أو سند القبض أو البيان أو البوليصة",
                 "Invoice, receipt, declaration or BL number"
@@ -315,7 +315,7 @@ return (
                 "رقم الفاتورة أو سند القبض أو البيان أو البوليصة",
                 "Invoice, receipt, declaration or BL number"
               )}
-              className="w-full h-[38px] border rounded-xl px-3 mt-1 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+              className="w-full h-[38px] border border-border rounded-xl px-3 mt-1 text-sm bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
             />
           </div>
 
@@ -332,11 +332,11 @@ return (
 
      {/* Summary */}
       <div className="order-2 grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white border rounded-2xl p-4 shadow-sm flex items-center justify-between">
+        <div className="bg-card border border-border rounded-2xl p-4 shadow-sm flex items-center justify-between">
           <div>
-            <div className="text-sm text-gray-500">{tr("العميل", "Client")}</div>
+            <div className="text-sm text-muted-foreground">{tr("العميل", "Client")}</div>
 
-            <div className="font-bold text-gray-900 mt-1 text-lg">
+            <div className="font-bold text-foreground mt-1 text-lg">
               {selectedClient
                 ? selectedClient.nameAr || selectedClient.nameEn || selectedClient.name
                 : "—"}
@@ -348,9 +348,9 @@ return (
           </div>
         </div>
 
-        <div className="bg-white border rounded-2xl p-4 shadow-sm flex items-center justify-between">
+        <div className="bg-card border border-border rounded-2xl p-4 shadow-sm flex items-center justify-between">
           <div>
-            <div className="text-sm text-gray-500">
+            <div className="text-sm text-muted-foreground">
               {tr("إجمالي المدين", "Total debit")}
             </div>
 
@@ -364,9 +364,9 @@ return (
           </div>
         </div>
 
-        <div className="bg-white border rounded-2xl p-4 shadow-sm flex items-center justify-between">
+        <div className="bg-card border border-border rounded-2xl p-4 shadow-sm flex items-center justify-between">
           <div>
-            <div className="text-sm text-gray-500">
+            <div className="text-sm text-muted-foreground">
               {tr("إجمالي الدائن", "Total credit")}
             </div>
 
@@ -380,9 +380,9 @@ return (
           </div>
         </div>
 
-        <div className="bg-white border rounded-2xl p-4 shadow-sm flex items-center justify-between">
+        <div className="bg-card border border-border rounded-2xl p-4 shadow-sm flex items-center justify-between">
           <div>
-            <div className="text-sm text-gray-500">
+            <div className="text-sm text-muted-foreground">
               {tr("الرصيد", "Balance")}
             </div>
 
@@ -392,7 +392,7 @@ return (
                   ? "text-red-700"
                   : finalBalance < 0
                   ? "text-green-700"
-                  : "text-gray-900"
+                  : "text-foreground"
               }`}
             >
               {showAmounts ? `QR ${formatMoney(finalBalance)}` : hiddenAmount}
@@ -406,10 +406,10 @@ return (
       </div>
 
       {/* Table */}
-      <div className="order-4 bg-white border rounded-2xl shadow-sm overflow-hidden">
+      <div className="order-4 bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
         <table className="w-full text-sm">
           <thead>
-            <tr className="bg-gray-50 border-b text-gray-600">
+            <tr className="bg-muted/30 border-b border-border text-muted-foreground">
               <th className="p-3 text-right">{tr("التاريخ", "Date")}</th>
               <th className="p-3 text-right">{tr("النوع", "Type")}</th>
               <th className="p-3 text-right">{tr("مدين", "Debit")}</th>
@@ -424,8 +424,8 @@ return (
 
               return (
                 <>
-                  <tr className="border-b bg-gray-50">
-                    <td className="p-3 text-gray-400">—</td>
+                  <tr className="border-b border-border bg-muted/30">
+                    <td className="p-3 text-muted-foreground/60">—</td>
                     <td className="p-3 font-semibold">{tr("رصيد سابق", "Opening balance")}</td>
                     <td className="p-3">{showAmounts ? "QR 0.00" : hiddenAmount}</td>
                     <td className="p-3">{showAmounts ? "QR 0.00" : hiddenAmount}</td>
@@ -438,7 +438,7 @@ return (
                     balance += Number(row.balanceImpact ?? 0);
 
                     return (
-                      <tr key={row.id} className="border-b hover:bg-gray-50">
+                      <tr key={row.id} className="border-b border-border hover:bg-muted/50">
                         <td className="p-3">{row.entryDate}</td>
 
                         <td className="p-3">
@@ -468,7 +468,7 @@ return (
 
                   {filteredData.length === 0 && (
                     <tr>
-                      <td colSpan={5} className="p-8 text-center text-gray-500">
+                      <td colSpan={5} className="p-8 text-center text-muted-foreground">
                         {tr("اختر العميل ثم اضغط بحث لعرض الحركات", "Select a client, then search to view transactions")}
                       </td>
                     </tr>

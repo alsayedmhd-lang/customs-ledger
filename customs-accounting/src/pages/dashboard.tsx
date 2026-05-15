@@ -64,37 +64,37 @@ export default function Dashboard() {
       title: t("totalInvoices"),
       value: formatCurrency(totalInvoicesAmount),
       icon: DollarSign,
-      color: "from-blue-500 to-blue-600",
-      bg: "bg-blue-50 dark:bg-blue-900/20",
-      iconColor: "text-blue-600 dark:text-blue-400",
-      border: "border-blue-100 dark:border-blue-800/40",
+      color: "bg-muted/30",
+      bg: "bg-muted/30",
+      iconColor: "text-foreground",
+      border: "border-border",
     },
     {
       title: t("outstanding"),
       value: formatCurrency(totalOutstanding),
       icon: AlertCircle,
-      color: "from-amber-500 to-orange-500",
-      bg: "bg-amber-50 dark:bg-amber-900/20",
-      iconColor: "text-amber-600 dark:text-amber-400",
-      border: "border-amber-100 dark:border-amber-800/40",
+      color: "bg-muted/30",
+      bg: "bg-muted/30",
+      iconColor: "text-foreground",
+      border: "border-border",
     },
     {
       title: t("invoiceCount"),
       value: arabicNums(invoices?.length ?? 0),
       icon: FileText,
-      color: "from-emerald-500 to-teal-500",
-      bg: "bg-emerald-50 dark:bg-emerald-900/20",
-      iconColor: "text-emerald-600 dark:text-emerald-400",
-      border: "border-emerald-100 dark:border-emerald-800/40",
+      color: "bg-muted/30",
+      bg: "bg-muted/30",
+      iconColor: "text-foreground",
+      border: "border-border",
     },
     {
       title: t("totalClients"),
       value: arabicNums(clients?.length ?? 0),
       icon: Users,
-      color: "from-violet-500 to-purple-500",
-      bg: "bg-violet-50 dark:bg-violet-900/20",
-      iconColor: "text-violet-600 dark:text-violet-400",
-      border: "border-violet-100 dark:border-violet-800/40",
+      color: "bg-muted/30",
+      bg: "bg-muted/30",
+      iconColor: "text-foreground",
+      border: "border-border",
     },
   ];
 
@@ -124,14 +124,13 @@ export default function Dashboard() {
       {/* Welcome Banner */}
       <motion.div
         variants={item}
-        className="relative overflow-hidden rounded-3xl border border-border/50 shadow-sm"
-        style={{ background: "linear-gradient(135deg, var(--sb-from) 0%, var(--sb-to) 60%, var(--sb-from) 100%)" }}
+        className="relative overflow-hidden rounded-3xl border border-border bg-card shadow-sm"
       >
         {/* Decorative circles */}
         <div className="absolute top-[-60px] right-[-60px] w-[220px] h-[220px] rounded-full opacity-15"
-          style={{ background: "radial-gradient(circle, rgba(255,255,255,0.25), transparent)" }} />
+          style={{ background: "radial-gradient(circle, hsl(var(--foreground) / 0.18), transparent)" }} />
         <div className="absolute bottom-[-40px] left-[20%] w-[160px] h-[160px] rounded-full opacity-10"
-          style={{ background: "radial-gradient(circle, rgba(255,255,255,0.2), transparent)" }} />
+          style={{ background: "radial-gradient(circle, hsl(var(--foreground) / 0.14), transparent)" }} />
 
         <div className="relative z-10 flex items-center gap-5 p-6 sm:p-8">
           {/* Logo */}
@@ -139,22 +138,22 @@ export default function Dashboard() {
             src={LOGO}
             alt="شعار الشركة"
             className="w-20 h-20 sm:w-28 sm:h-28 flex-shrink-0 object-contain drop-shadow-2xl"
-            style={{ filter: "drop-shadow(0 0 20px rgba(255,255,255,0.25))" }}
+            style={{ filter: "drop-shadow(0 0 20px hsl(var(--foreground) / 0.22))" }}
             onError={(e) => {
               const el = e.currentTarget;
               el.style.display = "none";
               const fallback = document.createElement("div");
-              fallback.className = "w-20 h-20 rounded-2xl bg-white/10 flex items-center justify-center";
-              fallback.innerHTML = '<span class="text-4xl font-black text-white">ح</span>';
+              fallback.className = "w-20 h-20 rounded-2xl bg-muted/30 flex items-center justify-center";
+              fallback.innerHTML = '<span class="text-4xl font-black text-foreground">ح</span>';
               el.parentElement!.prepend(fallback);
             }}
           />
           <div>
-            <p className="text-white/60 text-sm font-semibold mb-0.5">{greeting()}{lang === "ar" ? "،" : ","}</p>
-            <h1 className="text-2xl sm:text-3xl font-black text-white leading-tight">
+            <p className="text-muted-foreground text-sm font-semibold mb-0.5">{greeting()}{lang === "ar" ? "،" : ","}</p>
+            <h1 className="text-2xl sm:text-3xl font-black text-foreground leading-tight">
               {(lang === "ar" ? user?.displayNameAr : user?.displayNameEn) || user?.displayName || (lang === "ar" ? "المستخدم" : "User")}
             </h1>
-            <p className="text-white/40 text-sm mt-1 font-medium">
+            <p className="text-muted-foreground text-sm mt-1 font-medium">
               {t("dashboardDesc")} · {lang === "ar" ? settings.nameAr : settings.nameEn}
             </p>
           </div>
@@ -171,8 +170,8 @@ export default function Dashboard() {
             onClick={() => setShowAmounts(v => !v)}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-medium transition-all ${
               showAmounts
-                ? "bg-card border-border text-muted-foreground hover:bg-muted/40"
-                : "bg-amber-50 dark:bg-amber-950/30 border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-400"
+                ? "bg-card border-border text-muted-foreground hover:bg-muted/50"
+                : "bg-muted/30 border-border text-foreground hover:bg-muted/50"
             }`}
           >
             {showAmounts ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
@@ -199,7 +198,7 @@ export default function Dashboard() {
                   <s.icon className={`w-5 h-5 ${s.iconColor}`} />
                 </div>
               </div>
-              <div className={`mt-4 h-1 rounded-full bg-gradient-to-r ${s.color} opacity-30`} />
+              <div className={`mt-4 h-1 rounded-full ${s.color}`} />
             </motion.div>
           ))}
         </div>
@@ -209,7 +208,7 @@ export default function Dashboard() {
         type="button"
         variants={item}
         onClick={handleOpenProjectGuide}
-        className="w-full bg-card border border-border/50 rounded-2xl p-5 shadow-sm text-start transition-colors hover:bg-muted/30"
+        className="w-full bg-card border border-border rounded-2xl p-5 shadow-sm text-start transition-colors hover:bg-muted/50"
       >
         <div className="flex items-center gap-3">
           <div className="p-2.5 rounded-xl bg-primary/10 flex-shrink-0">
@@ -232,7 +231,7 @@ export default function Dashboard() {
         {/* Revenue Chart */}
         <motion.div
           variants={item}
-          className="xl:col-span-2 bg-card border border-border/50 rounded-2xl p-6 shadow-sm"
+          className="xl:col-span-2 bg-card border border-border rounded-2xl p-6 shadow-sm"
         >
           <div className="flex items-center justify-between mb-6">
             <div>
@@ -264,7 +263,7 @@ export default function Dashboard() {
                     cursor={{ fill: "hsl(var(--muted)/0.4)", rx: 8 }}
                     contentStyle={{
                       borderRadius: "14px", border: "1px solid hsl(var(--border))",
-                      boxShadow: "0 10px 25px -5px rgba(0,0,0,0.12)",
+                      boxShadow: "0 10px 25px -5px hsl(var(--foreground) / 0.12)",
                       background: "hsl(var(--card))", color: "hsl(var(--foreground))",
                       fontSize: "13px", fontFamily: "Cairo", direction: lang === "ar" ? "rtl" : "ltr",
                     }}
@@ -289,7 +288,7 @@ export default function Dashboard() {
         {/* Recent Invoices */}
         <motion.div
           variants={item}
-          className="bg-card border border-border/50 rounded-2xl p-5 shadow-sm flex flex-col"
+          className="bg-card border border-border rounded-2xl p-5 shadow-sm flex flex-col"
         >
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-base font-bold text-foreground">{t("recentInvoices")}</h2>
@@ -350,10 +349,10 @@ export default function Dashboard() {
 export function StatusBadge({ status }: { status: string }) {
   const { t } = useLanguage();
   const styles: Record<string, string> = {
-    draft: "bg-muted text-muted-foreground border-border",
-    issued: "bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:border-blue-800/40",
-    paid: "bg-emerald-50 text-emerald-600 border-emerald-200 dark:bg-emerald-900/20 dark:text-emerald-400 dark:border-emerald-800/40",
-    cancelled: "bg-red-50 text-red-500 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-800/40",
+    draft: "bg-muted/30 text-muted-foreground border-border",
+    issued: "bg-muted/30 text-muted-foreground border-border",
+    paid: "bg-muted/30 text-muted-foreground border-border",
+    cancelled: "bg-muted/30 text-muted-foreground border-border",
   };
   return (
     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold border ${styles[status] || styles.draft}`}>
