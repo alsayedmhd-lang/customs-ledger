@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+﻿import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 
 export type PrimaryColor =
   | "blue"
@@ -87,21 +87,21 @@ const DEFAULT: DisplaySettings = {
 };
 
 export const COLOR_PRESETS: Record<PrimaryColor, ColorPreset> = {
-  blue:    { light: "221 83% 53%", dark: "221 78% 65%", hex: "#3b6fdb", labelAr: "أزرق",   labelEn: "Blue"    },
-  emerald: { light: "152 60% 40%", dark: "152 55% 55%", hex: "#2a9d6e", labelAr: "زمردي",  labelEn: "Emerald" },
-  violet:  { light: "263 70% 50%", dark: "263 65% 65%", hex: "#7c3aed", labelAr: "بنفسجي", labelEn: "Violet"  },
-  rose:    { light: "346 77% 49%", dark: "346 72% 62%", hex: "#e11d48", labelAr: "وردي",   labelEn: "Rose"    },
-  amber:   { light: "38 96% 46%",  dark: "38 90% 58%",  hex: "#d97706", labelAr: "عنبري",  labelEn: "Amber"   },
-  cyan:    { light: "186 100% 35%",dark: "186 85% 48%", hex: "#0891b2", labelAr: "سماوي",  labelEn: "Cyan"    },
-  teal:    { light: "170 64% 40%", dark: "170 55% 52%", hex: "#0d9488", labelAr: "زيتوني", labelEn: "Teal"    },
-  white:      { light: "0 0% 100%",    dark: "0 0% 96%",    hex: "#ffffff", labelAr: "أبيض", labelEn: "White", foreground: "222 47% 11%", border: "214 31% 82%" },
-  offWhite:   { light: "210 20% 98%",  dark: "210 18% 94%", hex: "#f8fafc", labelAr: "أبيض رمادي", labelEn: "Gray White", foreground: "222 47% 11%", border: "214 31% 82%" },
-  lightCyan:  { light: "190 100% 92%", dark: "190 86% 86%", hex: "#cffafe", labelAr: "سماوي فاتح", labelEn: "Light Cyan", foreground: "222 47% 11%", border: "190 65% 72%" },
-  paleBlue:   { light: "214 100% 94%", dark: "214 92% 88%", hex: "#dbeafe", labelAr: "أزرق فاتح جدًا", labelEn: "Pale Blue", foreground: "222 47% 11%", border: "214 72% 76%" },
-  lightGreen: { light: "140 55% 92%",  dark: "140 48% 86%", hex: "#dcfce7", labelAr: "أخضر فاتح", labelEn: "Light Green", foreground: "222 47% 11%", border: "140 42% 70%" },
-  lightBeige: { light: "42 70% 92%",   dark: "42 62% 86%",  hex: "#f5edd8", labelAr: "بيج فاتح", labelEn: "Light Beige", foreground: "222 47% 11%", border: "42 42% 72%" },
-  lightGray:  { light: "220 14% 94%",  dark: "220 12% 88%", hex: "#e5e7eb", labelAr: "رمادي فاتح", labelEn: "Light Gray", foreground: "222 47% 11%", border: "220 13% 75%" },
-  cream:      { light: "48 100% 94%",  dark: "48 88% 88%",  hex: "#fef3c7", labelAr: "كريمي", labelEn: "Cream", foreground: "222 47% 11%", border: "45 64% 72%" },
+  blue:    { light: "221 83% 40%", dark: "221 70% 62%", hex: "#1d4ed8", labelAr: "أزرق غامق",   labelEn: "Deep Blue"    },
+  emerald: { light: "160 84% 30%", dark: "158 52% 52%", hex: "#047857", labelAr: "زمردي غامق",  labelEn: "Deep Emerald" },
+  violet:  { light: "262 83% 48%", dark: "262 68% 66%", hex: "#6d28d9", labelAr: "بنفسجي غامق", labelEn: "Deep Violet"  },
+  rose:    { light: "346 77% 37%", dark: "346 70% 62%", hex: "#be123c", labelAr: "وردي غامق",   labelEn: "Deep Rose"    },
+  amber:   { light: "32 95% 32%",  dark: "36 82% 58%",  hex: "#92400e", labelAr: "عنبري غامق",  labelEn: "Deep Amber"   },
+  cyan:    { light: "192 82% 31%", dark: "190 70% 50%", hex: "#0e7490", labelAr: "سماوي غامق",  labelEn: "Deep Cyan"    },
+  teal:    { light: "175 84% 27%", dark: "172 58% 48%", hex: "#0f766e", labelAr: "فيروزي غامق", labelEn: "Deep Teal"    },
+  white:      { light: "215 20% 38%", dark: "215 18% 62%", hex: "#475569", labelAr: "كحلي رمادي", labelEn: "Slate", border: "215 18% 34%" },
+  offWhite:   { light: "25 8% 44%",   dark: "25 10% 62%",  hex: "#78716c", labelAr: "رمادي دافئ", labelEn: "Warm Gray", border: "215 18% 34%" },
+  lightCyan:  { light: "192 70% 30%", dark: "190 62% 52%", hex: "#155e75", labelAr: "سماوي غامق", labelEn: "Dark Cyan", border: "192 58% 26%" },
+  paleBlue:   { light: "224 64% 33%", dark: "221 62% 60%", hex: "#1e3a8a", labelAr: "كحلي", labelEn: "Navy Blue", border: "224 58% 28%" },
+  lightGreen: { light: "142 72% 29%", dark: "142 48% 52%", hex: "#166534", labelAr: "أخضر غامق", labelEn: "Forest Green", border: "142 58% 25%" },
+  lightBeige: { light: "42 62% 35%",  dark: "42 46% 58%",  hex: "#92712a", labelAr: "بيج غامق", labelEn: "Deep Beige", border: "42 48% 30%" },
+  lightGray:  { light: "220 9% 36%",  dark: "220 10% 60%", hex: "#4b5563", labelAr: "رمادي هادئ", labelEn: "Calm Gray", border: "220 9% 31%" },
+  cream:      { light: "32 81% 29%",  dark: "35 58% 56%",  hex: "#854d0e", labelAr: "كريمي غامق", labelEn: "Deep Cream", border: "32 62% 25%" },
 };
 
 export const SIDEBAR_COLOR_PRESETS: Record<SidebarColor, SidebarPreset> = {
@@ -113,14 +113,14 @@ export const SIDEBAR_COLOR_PRESETS: Record<SidebarColor, SidebarPreset> = {
   teal:     { from: "#042f2e", to: "#0f4040", labelAr: "فيروزي غامق",    labelEn: "Deep Teal"       },
   charcoal: { from: "#111111", to: "#1e1e1e", labelAr: "فحمي",            labelEn: "Charcoal"        },
   brown:    { from: "#1c1001", to: "#2f1f07", labelAr: "بني داكن",        labelEn: "Dark Brown"      },
-  white:      { from: "#ffffff", to: "#f8fafc", labelAr: "أبيض", labelEn: "White", foreground: "#0f172a", mutedForeground: "rgba(15,23,42,0.62)", hoverBg: "rgba(15,23,42,0.06)", activeBg: "#0f172a", activeFg: "#ffffff", border: "rgba(15,23,42,0.12)" },
-  offWhite:   { from: "#f8fafc", to: "#eef2f7", labelAr: "أبيض رمادي", labelEn: "Gray White", foreground: "#0f172a", mutedForeground: "rgba(15,23,42,0.62)", hoverBg: "rgba(15,23,42,0.06)", activeBg: "#111827", activeFg: "#ffffff", border: "rgba(15,23,42,0.12)" },
-  lightCyan:  { from: "#ecfeff", to: "#cffafe", labelAr: "سماوي فاتح", labelEn: "Light Cyan", foreground: "#083344", mutedForeground: "rgba(8,51,68,0.65)", hoverBg: "rgba(8,51,68,0.08)", activeBg: "#155e75", activeFg: "#ffffff", border: "rgba(8,51,68,0.16)" },
-  paleBlue:   { from: "#eff6ff", to: "#dbeafe", labelAr: "أزرق فاتح جدًا", labelEn: "Pale Blue", foreground: "#172554", mutedForeground: "rgba(23,37,84,0.65)", hoverBg: "rgba(23,37,84,0.08)", activeBg: "#1e3a8a", activeFg: "#ffffff", border: "rgba(23,37,84,0.16)" },
-  lightGreen: { from: "#f0fdf4", to: "#dcfce7", labelAr: "أخضر فاتح", labelEn: "Light Green", foreground: "#052e16", mutedForeground: "rgba(5,46,22,0.65)", hoverBg: "rgba(5,46,22,0.08)", activeBg: "#166534", activeFg: "#ffffff", border: "rgba(5,46,22,0.16)" },
-  lightBeige: { from: "#fffaf0", to: "#f5edd8", labelAr: "بيج فاتح", labelEn: "Light Beige", foreground: "#3f2f12", mutedForeground: "rgba(63,47,18,0.66)", hoverBg: "rgba(63,47,18,0.08)", activeBg: "#6b4f1d", activeFg: "#ffffff", border: "rgba(63,47,18,0.18)" },
-  lightGray:  { from: "#f3f4f6", to: "#e5e7eb", labelAr: "رمادي فاتح", labelEn: "Light Gray", foreground: "#111827", mutedForeground: "rgba(17,24,39,0.64)", hoverBg: "rgba(17,24,39,0.08)", activeBg: "#374151", activeFg: "#ffffff", border: "rgba(17,24,39,0.16)" },
-  cream:      { from: "#fffbea", to: "#fef3c7", labelAr: "كريمي", labelEn: "Cream", foreground: "#422006", mutedForeground: "rgba(66,32,6,0.66)", hoverBg: "rgba(66,32,6,0.08)", activeBg: "#92400e", activeFg: "#ffffff", border: "rgba(66,32,6,0.18)" },
+  white:      { from: "#475569", to: "#334155", labelAr: "كحلي رمادي", labelEn: "Slate", foreground: "#ffffff", mutedForeground: "rgba(255,255,255,0.68)", hoverBg: "rgba(255,255,255,0.10)", activeBg: "#ffffff", activeFg: "#0f172a", border: "rgba(15,23,42,0.12)" },
+  offWhite:   { from: "#78716c", to: "#57534e", labelAr: "رمادي دافئ", labelEn: "Warm Gray", foreground: "#ffffff", mutedForeground: "rgba(255,255,255,0.68)", hoverBg: "rgba(255,255,255,0.10)", activeBg: "#ffffff", activeFg: "#0f172a", border: "rgba(15,23,42,0.12)" },
+  lightCyan:  { from: "#155e75", to: "#164e63", labelAr: "سماوي غامق", labelEn: "Dark Cyan", foreground: "#ffffff", mutedForeground: "rgba(255,255,255,0.68)", hoverBg: "rgba(255,255,255,0.10)", activeBg: "#ffffff", activeFg: "#0f172a", border: "rgba(8,51,68,0.16)" },
+  paleBlue:   { from: "#1e3a8a", to: "#172554", labelAr: "كحلي", labelEn: "Navy Blue", foreground: "#ffffff", mutedForeground: "rgba(255,255,255,0.68)", hoverBg: "rgba(255,255,255,0.10)", activeBg: "#ffffff", activeFg: "#0f172a", border: "rgba(23,37,84,0.16)" },
+  lightGreen: { from: "#166534", to: "#14532d", labelAr: "أخضر غامق", labelEn: "Forest Green", foreground: "#ffffff", mutedForeground: "rgba(255,255,255,0.68)", hoverBg: "rgba(255,255,255,0.10)", activeBg: "#ffffff", activeFg: "#0f172a", border: "rgba(5,46,22,0.16)" },
+  lightBeige: { from: "#92712a", to: "#6b4f1d", labelAr: "بيج غامق", labelEn: "Deep Beige", foreground: "#ffffff", mutedForeground: "rgba(255,255,255,0.68)", hoverBg: "rgba(255,255,255,0.10)", activeBg: "#ffffff", activeFg: "#0f172a", border: "rgba(63,47,18,0.18)" },
+  lightGray:  { from: "#4b5563", to: "#374151", labelAr: "رمادي هادئ", labelEn: "Calm Gray", foreground: "#ffffff", mutedForeground: "rgba(255,255,255,0.68)", hoverBg: "rgba(255,255,255,0.10)", activeBg: "#ffffff", activeFg: "#0f172a", border: "rgba(17,24,39,0.16)" },
+  cream:      { from: "#854d0e", to: "#713f12", labelAr: "كريمي غامق", labelEn: "Deep Cream", foreground: "#ffffff", mutedForeground: "rgba(255,255,255,0.68)", hoverBg: "rgba(255,255,255,0.10)", activeBg: "#ffffff", activeFg: "#0f172a", border: "rgba(66,32,6,0.18)" },
 };
 
 const RADIUS: Record<BorderRadius, string> = {

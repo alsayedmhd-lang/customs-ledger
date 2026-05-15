@@ -167,32 +167,32 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const clientAllowedHrefs = new Set(["/", "/invoices", "/receipts", "/statements", "/customer-ledger"]);
   const navItems = (isDeveloperSupportMode
     ? [
-        { name: isAR ? "إدارة المستخدمين" : "User Management", href: "/users-management", icon: UserCog, color: "text-muted-foreground" },
-        { name: isAR ? "إعدادات البرنامج" : "App Settings", href: "/settings", icon: Settings, color: "text-muted-foreground" },
-        { name: isAR ? "المطور" : "Developer", href: "/settings/developer", icon: Settings, color: "text-muted-foreground" },
+        { name: isAR ? "إدارة المستخدمين" : "User Management", href: "/users-management", icon: UserCog, color: "text-emerald-200" },
+        { name: isAR ? "إعدادات البرنامج" : "App Settings", href: "/settings", icon: Settings, color: "text-cyan-200" },
+        { name: isAR ? "المطور" : "Developer", href: "/settings/developer", icon: Settings, color: "text-violet-200" },
       ]
     : [
-    { name: t("dashboard"), href: "/", icon: LayoutDashboard, color: "text-muted-foreground" },
-    { name: t("invoices"), href: "/invoices", icon: FileText, color: "text-muted-foreground" },
-    { name: t("receipts"), href: "/receipts", icon: ReceiptText, color: "text-muted-foreground" },
+    { name: t("dashboard"), href: "/", icon: LayoutDashboard, color: "text-blue-200" },
+    { name: t("invoices"), href: "/invoices", icon: FileText, color: "text-emerald-200" },
+    { name: t("receipts"), href: "/receipts", icon: ReceiptText, color: "text-cyan-200" },
     ...(!isClient || clientCanViewSummary
-      ? [{ name: isClient ? (isAR ? "ملخص العميل المالي" : "Customer Financial Summary") : "customerLedger", href: "/customer-ledger", icon: FileText, color: "text-muted-foreground" }]
+      ? [{ name: isClient ? (isAR ? "ملخص العميل المالي" : "Customer Financial Summary") : "customerLedger", href: "/customer-ledger", icon: FileText, color: "text-violet-200" }]
       : []),
     ...(!isClient || clientCanViewStatement
-      ? [{ name: isClient ? (isAR ? "كشف الحساب" : "Account Statement") : t("statements"), href: "/statements", icon: BookOpen, color: "text-muted-foreground" }]
+      ? [{ name: isClient ? (isAR ? "كشف الحساب" : "Account Statement") : t("statements"), href: "/statements", icon: BookOpen, color: "text-amber-200" }]
       : []),
-    { name: t("templates"), href: "/templates", icon: PackageSearch, color: "text-muted-foreground" },
-    { name: t("clients"), href: "/clients", icon: Users, color: "text-muted-foreground" },
+    { name: t("templates"), href: "/templates", icon: PackageSearch, color: "text-teal-200" },
+    { name: t("clients"), href: "/clients", icon: Users, color: "text-blue-200" },
     ...(user?.role === "admin" || user?.permissions?.canViewAccounting
-      ? [{ name: t("accounting"), href: "/accounting", icon: Calculator, color: "text-muted-foreground" }]
+      ? [{ name: t("accounting"), href: "/accounting", icon: Calculator, color: "text-emerald-200" }]
       : []),
     ...(user?.role === "admin"
       ? [
-          { name: t("users"), href: "/users", icon: UserCog, color: "text-muted-foreground" },
-          { name: isAR ? "إعدادات البرنامج" : "App Settings", href: "/settings", icon: Settings, color: "text-muted-foreground" },
+          { name: t("users"), href: "/users", icon: UserCog, color: "text-cyan-200" },
+          { name: isAR ? "إعدادات البرنامج" : "App Settings", href: "/settings", icon: Settings, color: "text-violet-200" },
         ]
       : []),
-    { name: t("trash"), href: "/trash", icon: Trash2, color: "text-muted-foreground" },
+    { name: t("trash"), href: "/trash", icon: Trash2, color: "text-rose-200" },
   ]).filter((item) => !isClient || clientAllowedHrefs.has(item.href));
 
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -293,13 +293,15 @@ export default function AppLayout({ children }: AppLayoutProps) {
                 <div className={cn("flex items-center", collapsed ? "justify-center" : "gap-3")}>
                   <div className={cn(
                     "w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors",
-                    isActive && "bg-primary/15"
+                    isActive && (isDarkMode ? "bg-muted/30" : "bg-white/20")
                   )}
                     style={{ background: isActive ? undefined : "var(--sb-hover-bg)" }}
                   >
                     <item.icon className={cn(
                       "w-4 h-4",
-                      isActive ? "text-primary" : item.color
+                      isActive
+                        ? isDarkMode ? "text-foreground" : "text-white"
+                        : isDarkMode ? "text-muted-foreground" : item.color
                     )} />
                   </div>
                   {!collapsed && <span className="text-sm font-semibold">{label}</span>}
