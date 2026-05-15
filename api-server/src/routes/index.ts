@@ -17,6 +17,7 @@ const router: IRouter = Router();
 
 router.use(healthRouter);
 router.use(authRouter);
+router.use(developerRouter);
 
 // All routes below require authentication
 router.use(requireAuth);
@@ -29,7 +30,6 @@ router.use(trashRouter);
 router.use(usersManagementRouter);
 router.use(accountingRouter);
 router.use(companySettingsRouter);
-router.use(developerRouter);
 router.use(invoiceAttachmentsRouter);
 
 export default router;

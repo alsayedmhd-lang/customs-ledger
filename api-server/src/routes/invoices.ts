@@ -278,20 +278,7 @@ router.post("/invoices", requireAuth, async (req, res) => {
       return;
     }
 
-    const shipmentBase = getShipmentBase(shipmentRef);
-
-    if (shipmentBase && shipmentBase.length >= 14) {
-      const allInvoices = await db.select().from(invoicesTable);
-
-      const existing = allInvoices.find(
-        (inv: any) => getShipmentBase(inv.shipmentRef) === shipmentBase
-      );
-
-      if (existing) {
-        res.status(400).json({ error: "تم عمل فاتورة لهذا البيان" });
-        return;
-      }
-    }
+    const resolvedShipmentRef = await generateNextDeclarationNumber(shipmentRef);
 
     const parsedTaxRate = parseFloat(taxRate ?? "0") || 0;
     const parsedAdvancePayment = parseFloat(advancePayment ?? "0") || 0;
@@ -302,13 +289,13 @@ router.post("/invoices", requireAuth, async (req, res) => {
     const total = Number((subtotal + taxAmount).toFixed(2));
     const resolvedStatus = resolveInvoiceStatus(status, parsedAdvancePayment, total);
 
-    const deletedInvoiceWithSameShipment = shipmentRef
+    const deletedInvoiceWithSameShipment = resolvedShipmentRef
       ? await db
           .select()
           .from(invoicesTable)
           .where(
             and(
-              eq(invoicesTable.shipmentRef, shipmentRef),
+              eq(invoicesTable.shipmentRef, resolvedShipmentRef),
               isNotNull(invoicesTable.deletedAt)
             )
           )
@@ -334,7 +321,7 @@ router.post("/invoices", requireAuth, async (req, res) => {
             advancePayment: parsedAdvancePayment.toFixed(2),
             total: total.toFixed(2),
             notes: notes ?? null,
-            shipmentRef: shipmentRef ?? null,
+            shipmentRef: resolvedShipmentRef,
             billOfLading: billOfLading ?? null,
             packageCount: packageCount ? parseInt(packageCount) : null,
             shipmentWeight: shipmentWeight ? parseFloat(shipmentWeight).toFixed(3) : null,
@@ -582,25 +569,12 @@ router.put("/invoices/:id", async (req, res) => {
       return;
     }
 
-    const shipmentBase = getShipmentBase(shipmentRef);
-    const shipmentFull = normalizeShipmentFullNumber(shipmentRef);
-
-    if (shipmentFull) {
-      const allInvoices = await db.select().from(invoicesTable);
-
-      const existing = allInvoices.find(
-        (inv: any) =>
-          normalizeShipmentFullNumber(inv.shipmentRef) === shipmentFull &&
-          String(inv.id) !== String(id)
-      );
-
-      if (existing) {
-        console.warn(
-          "[INVOICE WARNING] Duplicate shipment ref:",
-          shipmentRef
-        );
-      }
-    }
+    const requestedShipmentFull = normalizeShipmentFullNumber(shipmentRef);
+    const previousShipmentFull = normalizeShipmentFullNumber(beforeInvoice.shipmentRef);
+    const resolvedShipmentRef =
+      requestedShipmentFull && requestedShipmentFull !== previousShipmentFull
+        ? await generateNextDeclarationNumber(shipmentRef, id)
+        : String(shipmentRef ?? "").trim() || null;
 
     const parsedTaxRate = parseFloat(taxRate ?? "0") || 0;
     const effectiveAdvancePayment = parseFloat(advancePayment ?? "0") || 0;
@@ -670,7 +644,7 @@ router.put("/invoices/:id", async (req, res) => {
       advancePayment: effectiveAdvancePayment.toFixed(2),
       total: total.toFixed(2),
       notes: notes ?? null,
-      shipmentRef: shipmentRef ?? null,
+      shipmentRef: resolvedShipmentRef,
       billOfLading: billOfLading ?? null,
       packageCount: packageCount ? parseInt(packageCount) : null,
       shipmentWeight: shipmentWeight
@@ -914,7 +888,10 @@ export function formatItem(item: typeof invoiceItemsTable.$inferSelect) {
 }
 
 function getShipmentBase(value: unknown) {
-  return String(value ?? "").trim().slice(0, 14);
+  return String(value ?? "")
+    .replace(/[^a-zA-Z0-9]/g, "")
+    .trim()
+    .slice(0, 14);
 }
 
 function normalizeShipmentFullNumber(value: string | null | undefined) {
@@ -922,6 +899,57 @@ function normalizeShipmentFullNumber(value: string | null | undefined) {
     .trim()
     .toLowerCase()
     .replace(/\s+/g, "");
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function getDeclarationSuffixNumber(value: unknown, declarationBaseNumber: string) {
+  const normalized = String(value ?? "")
+    .trim()
+    .replace(/\//g, "")
+    .replace(/\s+/g, "");
+
+  if (normalized === declarationBaseNumber) return 0;
+
+  const match = normalized.match(
+    new RegExp(`^${escapeRegExp(declarationBaseNumber)}-(\\d+)$`)
+  );
+
+  if (!match) return null;
+
+  const suffix = Number.parseInt(match[1], 10);
+  return Number.isFinite(suffix) ? suffix : null;
+}
+
+async function generateNextDeclarationNumber(
+  requestedDeclarationNumber: unknown,
+  excludeInvoiceId?: number
+) {
+  const requested = String(requestedDeclarationNumber ?? "").trim();
+  const declarationBaseNumber = getShipmentBase(requested);
+
+  if (!requested || declarationBaseNumber.length < 14) {
+    return requested || null;
+  }
+
+  const allInvoices = await db.select().from(invoicesTable);
+  const matchingInvoices = allInvoices.filter((inv: any) => {
+    if (excludeInvoiceId && String(inv.id) === String(excludeInvoiceId)) return false;
+    return getShipmentBase(inv.shipmentRef) === declarationBaseNumber;
+  });
+
+  if (matchingInvoices.length === 0) {
+    return requested;
+  }
+
+  const maxSuffix = matchingInvoices.reduce((max, inv: any) => {
+    const suffix = getDeclarationSuffixNumber(inv.shipmentRef, declarationBaseNumber);
+    return Math.max(max, suffix ?? 0);
+  }, 0);
+
+  return `${declarationBaseNumber}-${maxSuffix + 1}`;
 }
 
 router.post("/invoices/import", requireAuth, async (req, res) => {

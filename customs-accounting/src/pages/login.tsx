@@ -231,6 +231,18 @@ export default function LoginPage() {
     setLicenseMessage("");
 
     try {
+      if (
+        !file.name.toLowerCase().endsWith(".json") &&
+        !file.name.toLowerCase().endsWith(".license") &&
+        !file.name.toLowerCase().endsWith(".lic")
+      ) {
+        throw new Error(
+          isAR
+            ? "صيغة ملف الترخيص غير مدعومة"
+            : "Unsupported license file format"
+        );
+      }
+
       const content = await file.text();
       const parsedLicense = JSON.parse(content);
       await saveClientLicense(parsedLicense);
@@ -616,7 +628,7 @@ export default function LoginPage() {
                   <input
                     ref={licenseFileInputRef}
                     type="file"
-                    accept=".json,application/json"
+                    accept=".json,.license,.lic"
                     className="hidden"
                     onChange={handleLicenseFileChange}
                   />

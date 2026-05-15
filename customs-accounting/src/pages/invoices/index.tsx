@@ -67,6 +67,10 @@ export default function InvoicesList() {
         advancePayment: invoiceToCopy.advancePayment ?? 0,
         importerExporterName: invoiceToCopy.importerExporterName ?? "",
         portOfEntry: invoiceToCopy.portOfEntry ?? "",
+        shipmentRef: invoiceToCopy.shipmentRef ?? "",
+        billOfLading: invoiceToCopy.billOfLading ?? "",
+        packageCount: invoiceToCopy.packageCount ?? undefined,
+        shipmentWeight: invoiceToCopy.shipmentWeight ?? undefined,
         notes: "",
         status: invoiceToCopy.status,
         issueDate: formatLocalDate(new Date()),
@@ -114,7 +118,8 @@ export default function InvoicesList() {
   function getDeclarationBaseNumber(value: string | null | undefined) {
     return String(value ?? "")
       .replace(/[^a-zA-Z0-9]/g, "")
-      .trim();
+      .trim()
+      .slice(0, 14);
   }
 
   const q = search.toLowerCase();

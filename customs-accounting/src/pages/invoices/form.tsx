@@ -22,7 +22,6 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import {
   useListClients,
-  useListInvoices,
   useListInvoiceItemTemplates,
   useCreateInvoice,
   useGetInvoice,
@@ -157,7 +156,8 @@ type AttachmentSelectResult = {
 function getDeclarationBaseNumber(value: string | null | undefined) {
   return String(value ?? "")
     .replace(/[^a-zA-Z0-9]/g, "")
-    .trim();
+    .trim()
+    .slice(0, 14);
 }
 
 function sanitizeStoredFileName(fileName: string) {
@@ -412,8 +412,9 @@ export default function InvoiceForm() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
   const { id } = useParams<{ id: string }>();
-  const isEdit = Boolean(id);
   const isCopyMode = window.location.href.includes("edit-copy");
+  const hasInvoiceId = Boolean(id);
+  const isEdit = hasInvoiceId && !isCopyMode;
   const invoiceId = parseInt(id || "0");
   const { lang, isRTL } = useLanguage();
   const isAR = lang === "ar";
@@ -424,13 +425,13 @@ export default function InvoiceForm() {
   const [attachmentBusy, setAttachmentBusy] = useState(false);
   const [selectedAttachmentIds, setSelectedAttachmentIds] = useState<Record<string, number>>({});
   const { data: clients } = useListClients();
-  const { data: invoices } = useListInvoices();
   const { data: templates } = useListInvoiceItemTemplates();
   const { data: existingInvoice } = useGetInvoice(invoiceId, {
-    query: { enabled: isEdit },
+    query: { enabled: hasInvoiceId },
   });
 
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const pendingShipmentRefRef = useRef("");
   const pendingSuggestionsRef = useRef({
     importerExporterName: "",
     portOfEntry: "",
@@ -476,7 +477,21 @@ export default function InvoiceForm() {
           pendingSuggestionsRef.current.portOfEntry
         );
         queryClient.invalidateQueries({ queryKey: getListInvoicesQueryKey() });
-        toast({ title: isAR ? "تم إنشاء الفاتورة بنجاح" : "Invoice created" });
+        const savedShipmentRef = String((data as any)?.shipmentRef ?? "").trim();
+        const requestedShipmentRef = pendingShipmentRefRef.current;
+        const declarationNumberChanged =
+          savedShipmentRef &&
+          normalizeDeclarationFullNumber(savedShipmentRef) !==
+            normalizeDeclarationFullNumber(requestedShipmentRef);
+        toast({
+          title: declarationNumberChanged
+            ? isAR
+              ? `تم حفظ الفاتورة برقم بيان: ${savedShipmentRef}`
+              : `Invoice saved with shipment ref: ${savedShipmentRef}`
+            : isAR
+            ? "تم إنشاء الفاتورة بنجاح"
+            : "Invoice created",
+        });
         setLocation("/invoices");
       },
       onError: (err: any) => {
@@ -495,7 +510,7 @@ export default function InvoiceForm() {
 
   const updateMut = useUpdateInvoice({
     mutation: {
-      onSuccess: async () => {
+      onSuccess: async (data) => {
         rememberSuggestion(
           IMPORTER_EXPORTER_SUGGESTIONS_KEY,
           pendingSuggestionsRef.current.importerExporterName
@@ -507,8 +522,22 @@ export default function InvoiceForm() {
         await queryClient.invalidateQueries({ queryKey: getListInvoicesQueryKey() });
         await queryClient.invalidateQueries({ queryKey: ["/api/invoices", invoiceId] });
         await fetchAuditLogs();
+        const savedShipmentRef = String((data as any)?.shipmentRef ?? "").trim();
+        const requestedShipmentRef = pendingShipmentRefRef.current;
+        const declarationNumberChanged =
+          savedShipmentRef &&
+          normalizeDeclarationFullNumber(savedShipmentRef) !==
+            normalizeDeclarationFullNumber(requestedShipmentRef);
 
-        toast({ title: isAR ? "تم تحديث الفاتورة" : "Invoice updated" });
+        toast({
+          title: declarationNumberChanged
+            ? isAR
+              ? `تم حفظ الفاتورة برقم بيان: ${savedShipmentRef}`
+              : `Invoice saved with shipment ref: ${savedShipmentRef}`
+            : isAR
+            ? "تم تحديث الفاتورة"
+            : "Invoice updated",
+        });
       },
       onError: (err: any) => {
         const msg =
@@ -533,8 +562,6 @@ export default function InvoiceForm() {
     reset,
     getValues,
     formState: { errors },
-    setError,
-    clearErrors,
   } = useForm<InvoiceFormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -633,7 +660,7 @@ export default function InvoiceForm() {
       });
     }
 
-    else if (isEdit && existingInvoice && isCopyMode) {
+    else if (hasInvoiceId && existingInvoice && isCopyMode) {
       sessionStorage.setItem(
         "copy_invoice",
         JSON.stringify({
@@ -682,7 +709,7 @@ export default function InvoiceForm() {
   }
 }
 
-  }, [isEdit, existingInvoice, isCopyMode, reset, setLocation, setValue, user?.id]);
+  }, [hasInvoiceId, isEdit, existingInvoice, isCopyMode, reset, setLocation, setValue, user?.id]);
 
   useEffect(() => {
   if (!isEdit && user?.id) {
@@ -742,38 +769,7 @@ export default function InvoiceForm() {
   }
 
   const onSubmit = async (data: InvoiceFormValues) => {
-    const cleanShipmentRef = normalizeDeclarationFullNumber(data.shipmentRef);
-
-    if (cleanShipmentRef) {
-      const token = sessionStorage.getItem("auth_token");
-
-      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/invoices`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      const cachedInvoices = await res.json();
-
-      const matchedInvoice = cachedInvoices.find((inv: any) => {
-        if (isEdit && String(inv.id) === String(invoiceId)) return false;
-
-        const oldRef = normalizeDeclarationFullNumber(inv.shipmentRef);
-
-        return oldRef && oldRef === cleanShipmentRef;
-      });
-
-      if (matchedInvoice) {
-        setError("shipmentRef", {
-          type: "manual",
-          message: isAR
-            ? `رقم البيان موجود سابقًا في الفاتورة ${matchedInvoice.invoiceNumber || ""}`
-            : `Shipment ref already exists in invoice ${matchedInvoice.invoiceNumber || ""}`,
-        });
-        return;
-      }
-    }
-
+    pendingShipmentRefRef.current = String(data.shipmentRef ?? "").trim();
     pendingSuggestionsRef.current = {
       importerExporterName: data.importerExporterName ?? "",
       portOfEntry: data.portOfEntry ?? "",
@@ -1215,7 +1211,7 @@ export default function InvoiceForm() {
                 sessionStorage.setItem(
                   "copy_invoice",
                   JSON.stringify({
-                    ...(invoiceToCopy || existingInvoice),
+                    ...(existingInvoice as any),
                     id: undefined,
                     invoiceNumber: undefined,
                     issueDate: new Date().toISOString().split("T")[0],
@@ -1402,33 +1398,7 @@ export default function InvoiceForm() {
                 {isAR ? "رقم البيان" : "Shipment Ref"}
               </label>
               <input
-                {...register("shipmentRef", {
-                  onBlur: (e) => {
-                    const value = normalizeDeclarationFullNumber(e.target.value);
-
-                    const found = invoices?.find(
-                      (inv: any) =>
-                        (!isEdit || String(inv.id) !== String(invoiceId)) &&
-                        normalizeDeclarationFullNumber(inv.shipmentRef) === value
-                    );
-
-                    if (value && found) {
-                      const sameUser = String(found.createdBy) === String(user?.id || "");
-
-                      if (sameUser) {
-                        setLocation(`/invoices/${found.id}/edit`);
-                        return;
-                      } else {
-                        toast({
-                          title: isAR ? "البيان موجود" : "Shipment exists",
-                          description: isAR
-                            ? `رقم الفاتورة: ${found.invoiceNumber || ""} | بواسطة مستخدم آخر`
-                            : `Invoice: ${found.invoiceNumber || ""} | Registered by another user`,
-                        });
-                      }
-                    }
-                  },
-                })}
+                {...register("shipmentRef")}
                 placeholder={isAR ? "مثال: 123456" : "e.g. 123456"}
                 className={inputCls}
               />
