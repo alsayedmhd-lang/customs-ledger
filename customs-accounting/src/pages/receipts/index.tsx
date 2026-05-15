@@ -94,8 +94,8 @@ const receiptStatusLabel: Record<string, string> = {
 };
 
 const receiptStatusClass: Record<string, string> = {
-  draft: "bg-slate-100 text-slate-600 border-slate-200",
-  issued: "bg-emerald-100 text-emerald-700 border-emerald-200",
+  draft: "bg-muted/30 text-muted-foreground border-border",
+  issued: "bg-emerald-500/10 text-emerald-400 border-emerald-500/30",
 };
 
 const getClientName = (receipt: { clientName?: string | null; clientId?: number | null }) => {
@@ -391,3 +391,4 @@ const getClientName = (receipt: { clientName?: string | null; clientId?: number 
     </div>
   );
 }
+
