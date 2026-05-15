@@ -964,7 +964,7 @@ const writePreviewZoom = (key: string, value: number) => {
 
 export default function SettingsPage() {
   const [, setLocation] = useLocation();
-  const { user } = useAuth();
+  const { user, isDeveloperSupportMode } = useAuth();
   const { lang, isRTL } = useLanguage();
   const isAR = lang === "ar";
   const { display, update: updateDisplay } = useDisplaySettings();
@@ -999,16 +999,21 @@ export default function SettingsPage() {
   const [lockStamp, setLockStamp] = useState(false);
   const [lockLegalInfo, setLockLegalInfo] = useState(false);
   const [lockFooterBranding, setLockFooterBranding] = useState(false);
-  const developerUnlocked = sessionStorage.getItem("developer_unlocked") === "true";
-  const roleCanEdit = user?.role === "admin";
+  const roleCanEdit = user?.role === "admin" || isDeveloperSupportMode;
+  const canViewAllSettingsTabs =
+    user?.role === "admin" || user?.role === "manager" || isDeveloperSupportMode;
   const canEditAccountantSignature = roleCanEdit || allowManagerEditAccountantSignature;
   const canEditAppearance = true;
-  const canEditBranding = (roleCanEdit || allowManagerEditBranding || allowManagerEditAppearance) && !lockCompanyIdentity;
-  const canEditCompanyName = canEditBranding && !lockCompanyName;
-  const canEditLogo = canEditBranding && !lockLogo;
-  const canEditStamp = canEditBranding && !lockStamp;
-  const canEditLegalInfo = (roleCanEdit || allowManagerEditLegalInfo) && !lockLegalInfo;
-  const canEditPrintSettings = (roleCanEdit || allowManagerEditPrintSettings) && !lockFooterBranding;
+  const canEditBranding =
+    (roleCanEdit || allowManagerEditBranding || allowManagerEditAppearance) &&
+    (!lockCompanyIdentity || isDeveloperSupportMode);
+  const canEditCompanyName = canEditBranding && (!lockCompanyName || isDeveloperSupportMode);
+  const canEditLogo = canEditBranding && (!lockLogo || isDeveloperSupportMode);
+  const canEditStamp = canEditBranding && (!lockStamp || isDeveloperSupportMode);
+  const canEditLegalInfo =
+    (roleCanEdit || allowManagerEditLegalInfo) && (!lockLegalInfo || isDeveloperSupportMode);
+  const canEditPrintSettings =
+    (roleCanEdit || allowManagerEditPrintSettings) && (!lockFooterBranding || isDeveloperSupportMode);
   const canEditBrandIdentity = canEditBranding;
   const canUseInvoicesBackupImport = roleCanEdit || allowManagerEditInvoicesBackupImport;
   const [activeTab, setActiveTab] = useState<TabId>("preview");
@@ -1566,7 +1571,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
     };
 
 
-  if (!["admin", "manager", "supervisor"].includes(user?.role || "")) {
+  if (!["admin", "manager", "supervisor"].includes(user?.role || "") && !isDeveloperSupportMode) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 text-muted-foreground">
         <Shield className="w-16 h-16 opacity-20" />
@@ -1802,6 +1807,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
   const roleLabel = getRoleLabel(user?.role, isAR);
   const canSeeDeveloperLink = user?.role === "admin" || user?.role === "manager";
   const canViewSettingsTab = (tabId: TabId) => {
+    if (canViewAllSettingsTabs) return true;
     if (tabId === "preview") return true;
     if (tabId === "display") return true;
     if (tabId === "company") return allowManagerEditLegalInfo;

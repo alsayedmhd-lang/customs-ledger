@@ -34,6 +34,11 @@ import DeveloperSettingsPage from "./pages/settings/developer";
 import CustomerLedgerPage from "./pages/customer-ledger";
 
 const queryClient = new QueryClient();
+const DEVELOPER_FRONTEND_ALLOWED_ROUTES = [
+  "/settings/developer",
+  "/settings",
+  "/users-management",
+];
 
 function RouteWrapper({ children }: { children: React.ReactNode }) {
   return <AppLayout>{children}</AppLayout>;
@@ -47,6 +52,9 @@ function ProtectedRouter() {
   const isDeveloperFrontendOnly =
     sessionStorage.getItem("developer_entry_from_login") === "true" &&
     !sessionStorage.getItem("auth_token");
+  const isDeveloperFrontendAllowedRoute = DEVELOPER_FRONTEND_ALLOWED_ROUTES.some(
+    (route) => location === route || location.startsWith(`${route}/`)
+  );
 
   if (isLoading) {
     return (
@@ -56,7 +64,7 @@ function ProtectedRouter() {
     );
   }
 
-  if (!user || (isDeveloperFrontendOnly && !location.startsWith("/settings/developer"))) {
+  if (!user || (isDeveloperFrontendOnly && !isDeveloperFrontendAllowedRoute)) {
     return <LoginPage />;
   }
 
@@ -78,6 +86,7 @@ function ProtectedRouter() {
         <Route path="/receipts/:id/print" component={ReceiptPrint} />
         <Route path="/templates" component={TemplatesList} />
         <Route path="/users" component={UsersPage} />
+        <Route path="/users-management" component={UsersPage} />
         <Route path="/accounting" component={AccountingPage} />
         <Route path="/trash" component={TrashPage} />
         <Route path="/dev" component={DeveloperSettingsPage} />

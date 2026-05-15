@@ -27,6 +27,19 @@ export const ALL_PERMISSIONS: UserPermissions = {
   canCustomizePrintContact: true,
 };
 
+const NO_PERMISSIONS: UserPermissions = {
+  canEditInvoices: false,
+  canDeleteInvoices: false,
+  canEditReceipts: false,
+  canDeleteReceipts: false,
+  canEditClients: false,
+  canDeleteClients: false,
+  canManageTemplates: false,
+  canViewStatements: false,
+  canViewAccounting: false,
+  canCustomizePrintContact: false,
+};
+
 export interface AuthUser {
   id: number;
   username: string;
@@ -59,6 +72,7 @@ interface AuthContextType {
   user: AuthUser | null;
   token: string | null;
   isLoading: boolean;
+  isDeveloperSupportMode: boolean;
   login: (username: string, password: string) => Promise<OtpPending | undefined>;
   verifyOtp: (otpToken: string, code: string) => Promise<void>;
   resendOtp: (otpToken: string) => Promise<OtpPending>;
@@ -73,6 +87,32 @@ const DEVELOPER_UNLOCK_KEY = "developer_unlocked";
 const DEVELOPER_UNLOCKED_AT_KEY = "developer_unlocked_at";
 const DEVELOPER_ENTRY_FROM_LOGIN_KEY = "developer_entry_from_login";
 const DEVELOPER_IDLE_TIMEOUT_MS = 5 * 60 * 1000;
+const DEVELOPER_FRONTEND_ALLOWED_ROUTES = [
+  "/settings/developer",
+  "/settings",
+  "/users-management",
+];
+
+function isDeveloperFrontendAllowedRoute(location: string) {
+  return DEVELOPER_FRONTEND_ALLOWED_ROUTES.some(
+    (route) => location === route || location.startsWith(`${route}/`)
+  );
+}
+
+function isDeveloperSupportSessionActive() {
+  const developerEntry = sessionStorage.getItem(DEVELOPER_ENTRY_FROM_LOGIN_KEY) === "true";
+  const developerUnlocked = sessionStorage.getItem(DEVELOPER_UNLOCK_KEY) === "true";
+  const developerUnlockedAt = Number(sessionStorage.getItem(DEVELOPER_UNLOCKED_AT_KEY) || 0);
+  const developerUnlockValid =
+    developerUnlockedAt > 0 && Date.now() - developerUnlockedAt < DEVELOPER_IDLE_TIMEOUT_MS;
+
+  return (
+    !sessionStorage.getItem("auth_token") &&
+    developerEntry &&
+    developerUnlocked &&
+    developerUnlockValid
+  );
+}
 const ONLINE_DATABASE_CONNECTED_KEY = "developer_online_database_connected";
 
 async function checkSyncConnection(token: string) {
@@ -108,13 +148,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const enterDeveloperFrontendAccess = useCallback(() => {
     const stored = sessionStorage.getItem("auth_token");
-    const developerEntry = sessionStorage.getItem(DEVELOPER_ENTRY_FROM_LOGIN_KEY) === "true";
-    const developerUnlocked = sessionStorage.getItem(DEVELOPER_UNLOCK_KEY) === "true";
-    const developerUnlockedAt = Number(sessionStorage.getItem(DEVELOPER_UNLOCKED_AT_KEY) || 0);
-    const developerUnlockValid = developerUnlockedAt > 0 && Date.now() - developerUnlockedAt < DEVELOPER_IDLE_TIMEOUT_MS;
-    const isDeveloperRoute = location.startsWith("/settings/developer");
+    const isDeveloperRoute = isDeveloperFrontendAllowedRoute(location);
 
-    if (stored || !developerEntry || !developerUnlocked || !developerUnlockValid || !isDeveloperRoute) {
+    if (stored || !isDeveloperSupportSessionActive() || !isDeveloperRoute) {
       return false;
     }
 
@@ -123,8 +159,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       id: 0,
       username: "developer",
       displayName: "Developer",
-      role: "admin",
-      permissions: ALL_PERMISSIONS,
+      role: "developer_support",
+      permissions: NO_PERMISSIONS,
     });
     return true;
   }, [location]);
@@ -201,7 +237,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (sessionStorage.getItem(DEVELOPER_ENTRY_FROM_LOGIN_KEY) !== "true") return;
-    if (location.startsWith("/settings/developer")) {
+    if (isDeveloperFrontendAllowedRoute(location)) {
       enterDeveloperFrontendAccess();
       return;
     }
@@ -271,12 +307,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const can = useCallback((permission: keyof UserPermissions): boolean => {
     if (!user) return false;
+    if (isDeveloperSupportSessionActive()) return false;
     if (user.role === "admin") return true;
     return user.permissions?.[permission] ?? false;
   }, [user]);
 
+  const isDeveloperSupportMode = isDeveloperSupportSessionActive();
+
   return (
-    <AuthContext.Provider value={{ user, token, isLoading, login, verifyOtp, resendOtp, logout, can }}>
+    <AuthContext.Provider value={{ user, token, isLoading, isDeveloperSupportMode, login, verifyOtp, resendOtp, logout, can }}>
       {children}
     </AuthContext.Provider>
   );

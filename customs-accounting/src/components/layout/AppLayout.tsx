@@ -45,7 +45,7 @@ function authFetch(url: string, options: RequestInit = {}) {
 
 export default function AppLayout({ children }: AppLayoutProps) {
   const [location] = useLocation();
-  const { user, logout } = useAuth();
+  const { user, logout, isDeveloperSupportMode } = useAuth();
   const { t, isRTL, lang, setLang } = useLanguage();
   const { settings, logoSrc } = useCompanySettings();
   const { display } = useDisplaySettings();
@@ -121,7 +121,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
       return res.json();
     },
     select: (items) => items.length,
-    enabled: Boolean(user && !isClient),
+    enabled: Boolean(user && !isClient && !isDeveloperSupportMode),
     staleTime: 30_000,
   });
   const { data: trashedReceiptCount = 0 } = useQuery<unknown[], Error, number>({
@@ -132,12 +132,18 @@ export default function AppLayout({ children }: AppLayoutProps) {
       return res.json();
     },
     select: (items) => items.length,
-    enabled: Boolean(user && !isClient),
+    enabled: Boolean(user && !isClient && !isDeveloperSupportMode),
     staleTime: 30_000,
   });
   const hasTrashCounts = trashedInvoiceCount > 0 || trashedReceiptCount > 0;
   const clientAllowedHrefs = new Set(["/", "/invoices", "/receipts", "/statements", "/customer-ledger"]);
-  const navItems = [
+  const navItems = (isDeveloperSupportMode
+    ? [
+        { name: isAR ? "إدارة المستخدمين" : "User Management", href: "/users-management", icon: UserCog, color: "text-pink-400" },
+        { name: isAR ? "إعدادات البرنامج" : "App Settings", href: "/settings", icon: Settings, color: "text-cyan-400" },
+        { name: isAR ? "المطور" : "Developer", href: "/settings/developer", icon: Settings, color: "text-violet-400" },
+      ]
+    : [
     { name: t("dashboard"), href: "/", icon: LayoutDashboard, color: "text-blue-400" },
     { name: t("invoices"), href: "/invoices", icon: FileText, color: "text-sky-400" },
     { name: t("receipts"), href: "/receipts", icon: ReceiptText, color: "text-emerald-400" },
@@ -159,7 +165,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
         ]
       : []),
     { name: t("trash"), href: "/trash", icon: Trash2, color: "text-red-400" },
-  ].filter((item) => !isClient || clientAllowedHrefs.has(item.href));
+  ]).filter((item) => !isClient || clientAllowedHrefs.has(item.href));
 
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const resolvedName = (isAR ? user?.displayNameAr : user?.displayNameEn) || user?.displayName || "";
