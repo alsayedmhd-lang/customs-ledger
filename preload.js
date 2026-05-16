@@ -2,11 +2,12 @@ const { contextBridge, ipcRenderer } = require("electron");
 
 const PRINT_AUTH_TOKEN_ARG = "--customs-print-auth-token-base64=";
 const EXTERNAL_PRINT_WINDOW_ARG = "--customs-external-print-window";
+const isExternalPrintWindow = process.argv.includes(EXTERNAL_PRINT_WINDOW_ARG);
 const printAuthTokenArg = process.argv.find((arg) =>
   arg.startsWith(PRINT_AUTH_TOKEN_ARG)
 );
 
-if (process.argv.includes(EXTERNAL_PRINT_WINDOW_ARG)) {
+if (isExternalPrintWindow) {
   window.name = "external-print-window";
 }
 
@@ -29,7 +30,10 @@ window.addEventListener(
     if (!event.ctrlKey || event.deltaY === 0) return;
 
     event.preventDefault();
-    ipcRenderer.send("app:zoom-wheel", event.deltaY < 0 ? "in" : "out");
+    ipcRenderer.send(
+      isExternalPrintWindow ? "print-preview:zoom-wheel" : "app:zoom-wheel",
+      event.deltaY < 0 ? "in" : "out"
+    );
   },
   { passive: false }
 );

@@ -164,6 +164,7 @@ export default function InvoiceReceipt() {
   const isAR = lang === "ar";
   const { user } = useAuth();
   const isClient = user?.role === "client";
+  const isExternalPrintWindow = window.name === "external-print-window";
 
   const canCustomize = user?.permissions?.canCustomizePrintContact;
   const printPhone = canCustomize && user?.phone ? user.phone : company.phone;
@@ -326,7 +327,7 @@ const impExpValue =
       {/* Controls - hidden on print */}
       <div className="print:hidden flex items-center gap-3 p-6 max-w-4xl mx-auto flex-wrap" dir={isAR ? "rtl" : "ltr"}>
         <Link href={`/invoices/${invoice.id}/edit`}>
-          <button className={`${isClient ? "hidden" : ""} flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-700 hover:bg-gray-50 font-medium`}>
+          <button className={`${isClient || isExternalPrintWindow ? "hidden" : ""} flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-700 hover:bg-gray-50 font-medium`}>
             {isAR ? <ArrowRight className="w-4 h-4" /> : <ArrowLeft className="w-4 h-4" />}
             {isAR ? "العودة للتعديل" : "Back to Edit"}
           </button>

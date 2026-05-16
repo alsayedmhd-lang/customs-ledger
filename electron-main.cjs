@@ -10,6 +10,7 @@ let backendProcess;
 let mainWindow;
 let updateInfo;
 let updateDownloaded = false;
+const printPreviewWebContentsIds = new Set();
 const MIN_ZOOM_FACTOR = 0.5;
 const MAX_ZOOM_FACTOR = 3;
 const ZOOM_STEP = 0.1;
@@ -86,6 +87,28 @@ function adjustAppZoom(direction) {
   const currentZoomFactor = mainWindow.webContents.getZoomFactor();
   const delta = direction === "in" ? ZOOM_STEP : -ZOOM_STEP;
   setAppZoomFactor(currentZoomFactor + delta);
+}
+
+function adjustPrintPreviewZoom(webContents, direction) {
+  if (!webContents || webContents.isDestroyed()) return;
+  if (direction !== "in" && direction !== "out") return;
+
+  const currentZoomFactor = webContents.getZoomFactor();
+  const delta = direction === "in" ? ZOOM_STEP : -ZOOM_STEP;
+  const nextZoomFactor = Number(clampZoomFactor(currentZoomFactor + delta).toFixed(2));
+  webContents.setZoomFactor(nextZoomFactor);
+}
+
+function adjustPrintPreviewWindowZoom(printWindow, direction) {
+  if (!printWindow || printWindow.isDestroyed()) return;
+
+  adjustPrintPreviewZoom(printWindow.webContents, direction);
+}
+
+function resetPrintPreviewWindowZoom(printWindow) {
+  if (!printWindow || printWindow.isDestroyed()) return;
+
+  printWindow.webContents.setZoomFactor(1);
 }
 
 function safeFileName(name) {
@@ -960,6 +983,170 @@ function setupDiagnosticsReportWindowMenu(reportWindow) {
   reportWindow.setMenu(menu);
 }
 
+async function getPrintPreviewDefaultPdfName(printWindow) {
+  if (!printWindow || printWindow.isDestroyed()) return "invoice-print.pdf";
+
+  try {
+    const pageTitle = await printWindow.webContents.executeJavaScript(
+      "document.title || ''",
+      true
+    );
+    const safeTitle = safeFileName(pageTitle);
+
+    if (safeTitle && safeTitle.toLowerCase() !== "print preview") {
+      return `${safeTitle}.pdf`;
+    }
+  } catch {
+    // Fall back to the generic invoice print filename.
+  }
+
+  return "invoice-print.pdf";
+}
+
+function printPrintPreviewWindow(printWindow) {
+  if (!printWindow || printWindow.isDestroyed()) return;
+
+  printWindow.webContents.print();
+}
+
+async function savePrintPreviewWindowAsPdf(printWindow) {
+  if (!printWindow || printWindow.isDestroyed()) return;
+
+  const defaultPath = await getPrintPreviewDefaultPdfName(printWindow);
+  const { canceled, filePath } = await dialog.showSaveDialog(printWindow, {
+    title: "Save Print Preview",
+    defaultPath,
+    filters: [{ name: "PDF", extensions: ["pdf"] }],
+  });
+
+  if (canceled || !filePath || printWindow.isDestroyed()) return;
+
+  try {
+    const pdf = await printWindow.webContents.printToPDF({
+      printBackground: true,
+      pageSize: "A4",
+    });
+    fs.writeFileSync(filePath, pdf);
+  } catch (error) {
+    console.error("Failed to save print preview:", error);
+    if (!printWindow.isDestroyed()) {
+      dialog.showErrorBox("Save Failed", "Failed to save the print preview.");
+    }
+  }
+}
+
+function closePrintPreviewWindow(printWindow) {
+  if (!printWindow || printWindow.isDestroyed()) return;
+
+  printWindow.close();
+}
+
+function buildPrintPreviewCommandItems(printWindow) {
+  return [
+    {
+      label: "Print",
+      accelerator: "CommandOrControl+P",
+      click: () => printPrintPreviewWindow(printWindow),
+    },
+    {
+      label: "Save As",
+      accelerator: "CommandOrControl+S",
+      click: () => void savePrintPreviewWindowAsPdf(printWindow),
+    },
+    { type: "separator" },
+    {
+      label: "Zoom In",
+      accelerator: "CommandOrControl+=",
+      click: () => adjustPrintPreviewWindowZoom(printWindow, "in"),
+    },
+    {
+      label: "Zoom Out",
+      accelerator: "CommandOrControl+-",
+      click: () => adjustPrintPreviewWindowZoom(printWindow, "out"),
+    },
+    {
+      label: "Reset Zoom",
+      accelerator: "CommandOrControl+0",
+      click: () => resetPrintPreviewWindowZoom(printWindow),
+    },
+    { type: "separator" },
+    {
+      label: "Close",
+      accelerator: "CommandOrControl+W",
+      click: () => closePrintPreviewWindow(printWindow),
+    },
+  ];
+}
+
+function setupPrintPreviewWindowMenu(printWindow) {
+  if (!printWindow || printWindow.isDestroyed()) return;
+
+  const printPreviewFileMenu = {
+    label: "File",
+    submenu: [
+      {
+        label: "Print",
+        accelerator: "CommandOrControl+P",
+        click: () => printPrintPreviewWindow(printWindow),
+      },
+      {
+        label: "Save As",
+        accelerator: "CommandOrControl+S",
+        click: () => void savePrintPreviewWindowAsPdf(printWindow),
+      },
+      { type: "separator" },
+      {
+        label: "Close",
+        accelerator: "CommandOrControl+W",
+        click: () => closePrintPreviewWindow(printWindow),
+      },
+    ],
+  };
+  const printPreviewViewMenu = {
+    label: "View",
+    submenu: [
+      {
+        label: "Reset Zoom",
+        accelerator: "CommandOrControl+0",
+        click: () => resetPrintPreviewWindowZoom(printWindow),
+      },
+      {
+        label: "Zoom In",
+        accelerator: "CommandOrControl+=",
+        click: () => adjustPrintPreviewWindowZoom(printWindow, "in"),
+      },
+      {
+        label: "Zoom Out",
+        accelerator: "CommandOrControl+-",
+        click: () => adjustPrintPreviewWindowZoom(printWindow, "out"),
+      },
+      { type: "separator" },
+      {
+        role: "togglefullscreen",
+        label: "Full Screen",
+      },
+    ],
+  };
+  const printPreviewMenuTemplate = buildApplicationMenuTemplate().map((item) =>
+    item.label === "File"
+      ? printPreviewFileMenu
+      : item.label === "View"
+      ? printPreviewViewMenu
+      : item
+  );
+  const menu = Menu.buildFromTemplate(printPreviewMenuTemplate);
+
+  printWindow.setAutoHideMenuBar(false);
+  printWindow.setMenu(menu);
+  printWindow.webContents.on("context-menu", () => {
+    if (printWindow.isDestroyed()) return;
+
+    Menu.buildFromTemplate(buildPrintPreviewCommandItems(printWindow)).popup({
+      window: printWindow,
+    });
+  });
+}
+
 function sendUpdateStatus(channel, payload = {}) {
   if (!mainWindow || mainWindow.isDestroyed()) return;
   mainWindow.webContents.send(channel, payload);
@@ -1508,6 +1695,12 @@ ipcMain.on("app:zoom-wheel", (event, direction) => {
   adjustAppZoom(direction);
 });
 
+ipcMain.on("print-preview:zoom-wheel", (event, direction) => {
+  if (!printPreviewWebContentsIds.has(event.sender.id)) return;
+
+  adjustPrintPreviewZoom(event.sender, direction);
+});
+
 function resolveFrontendIndexPath() {
   const candidates = [
     path.join(process.resourcesPath, "app.asar", "customs-accounting", "dist", "public", "index.html"),
@@ -1601,6 +1794,13 @@ ipcMain.handle("print-preview:open-external-window", async (_event, url) => {
         additionalArguments: printWindowArguments,
       },
     });
+    const printWindowWebContentsId = printWindow.webContents.id;
+    printPreviewWebContentsIds.add(printWindowWebContentsId);
+    printWindow.webContents.setZoomFactor(1);
+    printWindow.on("closed", () => {
+      printPreviewWebContentsIds.delete(printWindowWebContentsId);
+    });
+    setupPrintPreviewWindowMenu(printWindow);
 
     const indexPath = resolveFrontendIndexPath();
     const loadPrintRoute = () => printWindow.loadFile(indexPath, { hash: targetHash.slice(1) });
