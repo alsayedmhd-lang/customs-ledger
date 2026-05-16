@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Link, useLocation } from "wouter";
+import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { BookOpen, FileText, TrendingDown, TrendingUp, User, Printer, Eye, EyeOff, Search } from "lucide-react";
@@ -56,7 +56,6 @@ export default function StatementsIndex() {
   const { user } = useAuth();
   const isClient = user?.role === "client";
   const isAR = lang === "ar";
-  const [, setLocation] = useLocation();
   const [showAmounts, setShowAmounts] = useState(false);
   const [search, setSearch] = useState("");
   const [selectedClientId, setSelectedClientId] = useState("");
@@ -348,11 +347,9 @@ export default function StatementsIndex() {
                         )}
                           <button
                             onClick={() => {
-                              const query = new URLSearchParams();
-                              if (fromDate) query.set("from", fromDate);
-                              if (toDate) query.set("to", toDate);
-                              const suffix = query.toString() ? `?${query.toString()}` : "";
-                              setLocation(`/clients/${client.id}/statement${suffix}`);
+                              (window as any).electronAPI?.openExternalPrintWindow?.(
+                                `#/clients/${client.id}/statement`
+                              );
                             }}
                             className="flex items-center gap-1.5 px-3 py-1.5 bg-muted/10 text-muted-foreground hover:bg-muted/20 rounded-lg font-semibold text-xs transition-all"
                           >
