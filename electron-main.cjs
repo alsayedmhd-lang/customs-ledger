@@ -799,6 +799,32 @@ function createWindow() {
     });
   });
 
+  mainWindow.webContents.setWindowOpenHandler((details) => {
+    if (details.frameName === "customs-ledger-diagnostics-report") {
+      return {
+        action: "allow",
+        overrideBrowserWindowOptions: {
+          width: 1100,
+          height: 800,
+          title: "Diagnostics Report",
+          autoHideMenuBar: false,
+          webPreferences: {
+            nodeIntegration: false,
+            contextIsolation: true,
+          },
+        },
+      };
+    }
+
+    return { action: "allow" };
+  });
+
+  mainWindow.webContents.on("did-create-window", (childWindow, details) => {
+    if (details.frameName === "customs-ledger-diagnostics-report") {
+      setupDiagnosticsReportWindowMenu(childWindow);
+    }
+  });
+
   setTimeout(() => {
     const indexPath = path.join(
       process.resourcesPath,
@@ -865,6 +891,48 @@ function setupApplicationMenu() {
 
   const menu = Menu.buildFromTemplate(template);
   Menu.setApplicationMenu(menu);
+}
+
+function setupDiagnosticsReportWindowMenu(reportWindow) {
+  if (!reportWindow || reportWindow.isDestroyed()) return;
+
+  const menu = Menu.buildFromTemplate([
+    {
+      label: "File",
+      submenu: [
+        {
+          label: "Print",
+          accelerator: "CommandOrControl+P",
+          click: () => {
+            if (!reportWindow.isDestroyed()) {
+              reportWindow.webContents.print();
+            }
+          },
+        },
+        {
+          label: "Save As",
+          click: () => {
+            if (!reportWindow.isDestroyed()) {
+              reportWindow.webContents.print();
+            }
+          },
+        },
+        { type: "separator" },
+        {
+          label: "Close",
+          accelerator: "CommandOrControl+W",
+          click: () => {
+            if (!reportWindow.isDestroyed()) {
+              reportWindow.close();
+            }
+          },
+        },
+      ],
+    },
+  ]);
+
+  reportWindow.setAutoHideMenuBar(false);
+  reportWindow.setMenu(menu);
 }
 
 function sendUpdateStatus(channel, payload = {}) {
@@ -1141,6 +1209,95 @@ ipcMain.handle("storage:save-data-root", async (_event, targetPath) => {
     };
   } catch (error) {
     console.error("[DATA ROOT][SAVE CONFIG ERROR]", error);
+
+    return {
+      ok: false,
+      error: error?.message || String(error),
+    };
+  }
+});
+
+ipcMain.handle("storage:save-current-data-root", async (_event, expectedDataRoot) => {
+  try {
+    const currentDataRoot = path.resolve(resolveDataRoot());
+    const requestedDataRoot = expectedDataRoot ? path.resolve(String(expectedDataRoot)) : currentDataRoot;
+
+    if (requestedDataRoot !== currentDataRoot) {
+      return {
+        ok: false,
+        error: "Requested Data Root does not match the currently active Data Root",
+        dataRoot: currentDataRoot,
+      };
+    }
+
+    if (!fs.existsSync(currentDataRoot) || !fs.statSync(currentDataRoot).isDirectory()) {
+      return {
+        ok: false,
+        error: "Current Data Root does not exist",
+        dataRoot: currentDataRoot,
+      };
+    }
+
+    const databasePath = path.join(currentDataRoot, "database", "local.db");
+    if (!fs.existsSync(databasePath) || !fs.statSync(databasePath).isFile()) {
+      return {
+        ok: false,
+        error: "local.db was not found under the current Data Root",
+        dataRoot: currentDataRoot,
+        databasePath,
+      };
+    }
+
+    const normalizedCurrent = currentDataRoot.toLowerCase();
+    const bestExternalDataRoot = detectBestDataDrive();
+    if (
+      normalizedCurrent.startsWith("c:\\") &&
+      bestExternalDataRoot &&
+      !path.resolve(bestExternalDataRoot).toLowerCase().startsWith("c:\\")
+    ) {
+      return {
+        ok: false,
+        error: "Refusing to save a C: Data Root while an external Data Root candidate is available",
+        dataRoot: currentDataRoot,
+        externalDataRoot: bestExternalDataRoot,
+      };
+    }
+
+    const testFilePath = path.join(currentDataRoot, `.save-current-data-root-${Date.now()}.tmp`);
+    try {
+      fs.writeFileSync(testFilePath, "Customs Ledger Data Root Save Test", "utf8");
+    } finally {
+      try {
+        fs.rmSync(testFilePath, { force: true });
+      } catch {
+        // Ignore cleanup errors after the write permission result is known.
+      }
+    }
+
+    const storageConfig = {
+      dataRoot: currentDataRoot,
+      updatedAt: new Date().toISOString(),
+      source: "developer-save-current-data-root",
+      version: 1,
+    };
+    const configText = `${JSON.stringify(storageConfig, null, 2)}\n`;
+    const userDataConfigPath = path.join(app.getPath("userData"), "storage-config.json");
+    const dataRootConfigPath = path.join(currentDataRoot, "config", "storage-config.json");
+
+    fs.mkdirSync(path.dirname(userDataConfigPath), { recursive: true });
+    fs.writeFileSync(userDataConfigPath, configText, "utf8");
+
+    fs.mkdirSync(path.dirname(dataRootConfigPath), { recursive: true });
+    fs.writeFileSync(dataRootConfigPath, configText, "utf8");
+
+    return {
+      ok: true,
+      dataRoot: currentDataRoot,
+      configPath: userDataConfigPath,
+      mirrorConfigPath: dataRootConfigPath,
+    };
+  } catch (error) {
+    console.error("[DATA ROOT][SAVE CURRENT CONFIG ERROR]", error);
 
     return {
       ok: false,

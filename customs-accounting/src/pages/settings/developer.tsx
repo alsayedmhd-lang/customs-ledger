@@ -453,6 +453,7 @@ export default function DeveloperSettingsPage() {
   const [isSystemDiagnosticsRunning, setIsSystemDiagnosticsRunning] = useState(false);
   const [isSystemDiagnosticsExporting, setIsSystemDiagnosticsExporting] = useState(false);
   const [isSystemDiagnosticsPdfExporting, setIsSystemDiagnosticsPdfExporting] = useState(false);
+  const [isSavingCurrentDataRoot, setIsSavingCurrentDataRoot] = useState(false);
   const [isBackupReadinessAnalyzing, setIsBackupReadinessAnalyzing] = useState(false);
   const [isBackupManifestGenerating, setIsBackupManifestGenerating] = useState(false);
   const [isBackupDirectoryCreating, setIsBackupDirectoryCreating] = useState(false);
@@ -1280,6 +1281,62 @@ export default function DeveloperSettingsPage() {
     }
   }
 
+  function getCurrentDataRootPath() {
+    return (
+      storageInfo?.dataRoot ||
+      settings.sqlitePath
+        ?.replace(/\\database\\local\.db$/i, "")
+        ?.replace(/\/database\/local\.db$/i, "") ||
+      ""
+    );
+  }
+
+  async function saveCurrentDataRoot() {
+    const dataRoot = getCurrentDataRootPath();
+
+    if (!dataRoot) {
+      alert(tr("مسار البيانات الحالي غير متوفر", "Current Data Root path is not available"));
+      return;
+    }
+
+    setIsSavingCurrentDataRoot(true);
+    try {
+      const api = (window as Window & {
+        electronAPI?: {
+          saveCurrentDataRootConfig?: (expectedDataRoot: string) => Promise<{
+            ok?: boolean;
+            error?: string;
+            configPath?: string;
+            mirrorConfigPath?: string;
+            dataRoot?: string;
+          }>;
+        };
+      }).electronAPI;
+
+      if (!api?.saveCurrentDataRootConfig) {
+        alert(tr("واجهة تثبيت مسار البيانات غير متاحة", "Save Current Data Root API is unavailable"));
+        return;
+      }
+
+      const result = await api.saveCurrentDataRootConfig(dataRoot);
+
+      if (!result?.ok) {
+        alert(result?.error || tr("تعذر تثبيت مسار البيانات الحالي", "Failed to save the current Data Root"));
+        return;
+      }
+
+      alert(
+        `${tr("تم تثبيت مسار البيانات الحالي بنجاح", "Current Data Root saved successfully")}\n\n${result.dataRoot || dataRoot}`
+      );
+      await loadStorageInfo();
+      await runSystemDiagnostics();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : tr("تعذر تثبيت مسار البيانات الحالي", "Failed to save the current Data Root"));
+    } finally {
+      setIsSavingCurrentDataRoot(false);
+    }
+  }
+
   async function runSystemDiagnostics() {
     setSystemDiagnosticsError("");
     setIsSystemDiagnosticsRunning(true);
@@ -1388,6 +1445,9 @@ export default function DeveloperSettingsPage() {
       font-size: 12px;
       line-height: 1.45;
     }
+    .report-page {
+      padding: 14mm;
+    }
     .header {
       border-bottom: 2px solid #111827;
       padding-bottom: 12px;
@@ -1474,10 +1534,14 @@ export default function DeveloperSettingsPage() {
     }
     @media print {
       body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+      .report-page {
+        padding: 0;
+      }
     }
   </style>
 </head>
 <body>
+  <main class="report-page">
   <section class="header">
     <h1>Customs Ledger SQLite - System Diagnostics Report</h1>
     <div class="meta">
@@ -1506,6 +1570,7 @@ export default function DeveloperSettingsPage() {
     <tbody>${rows}</tbody>
   </table>
   <div class="footer">${escapeDiagnosticReportHtml(tr("تقرير دعم فني للقراءة فقط. لا يحتوي على إصلاحات تلقائية.", "Read-only technical support report. No repair actions are included."))}</div>
+  </main>
 </body>
 </html>`;
   }
@@ -1515,7 +1580,7 @@ export default function DeveloperSettingsPage() {
     setIsSystemDiagnosticsPdfExporting(true);
     try {
       const data = systemDiagnostics || (await fetchSystemDiagnosticsReportData());
-      const printWindow = window.open("", "_blank", "width=1100,height=800");
+      const printWindow = window.open("", "customs-ledger-diagnostics-report", "width=1100,height=800");
 
       if (!printWindow) {
         throw new Error(tr("تعذر فتح نافذة الطباعة. تحقق من إعدادات المتصفح.", "Could not open the print window. Check browser popup settings."));
@@ -2254,6 +2319,17 @@ export default function DeveloperSettingsPage() {
                 >
                   {tr("اختيار مجلد جديد", "Choose New Folder")}
                 </button>
+                <button
+                  type="button"
+                  onClick={saveCurrentDataRoot}
+                  disabled={isSavingCurrentDataRoot}
+                  className="px-4 py-2 rounded-xl border bg-background hover:bg-muted disabled:opacity-60 disabled:cursor-not-allowed transition text-sm font-medium"
+                >
+                  {isSavingCurrentDataRoot
+                    ? tr("جاري التثبيت...", "Saving...")
+                    : tr("تثبيت مسار البيانات الحالي", "Save Current Data Root")}
+                </button>
+
                 <button
                   type="button"
                   onClick={async () => {
