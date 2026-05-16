@@ -348,7 +348,7 @@ const impExpValue =
         </button>
 
         <Link href={`/accounting?invoice=${encodeURIComponent(invoice.invoiceNumber)}`}>
-          <button className={`${isClient ? "hidden" : ""} flex items-center gap-2 px-4 py-2 border border-emerald-400 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-medium`}>
+          <button className={`${isClient || isExternalPrintWindow ? "hidden" : ""} flex items-center gap-2 px-4 py-2 border border-emerald-400 rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-medium`}>
             <Calculator className="w-4 h-4" />
             {isAR ? "الحسابات" : "Calculate Invoice"}
           </button>
