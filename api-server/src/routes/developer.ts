@@ -1050,6 +1050,47 @@ async function buildSystemDiagnostics() {
         const orphanFiles = declarationFiles.filter(
           (filePath) => !activeAttachmentPaths.has(path.normalize(filePath).toLowerCase()),
         );
+        const orphanFileDetails = await Promise.all(
+          orphanFiles.map(async (filePath) => {
+            const stats = await safeStat(filePath);
+            const relativeToDeclarations = path.relative(declarationsRoot, filePath);
+            const [declarationFolder] = relativeToDeclarations.split(/[\\/]+/);
+
+            return {
+              filePath,
+              declarationBaseNumber: declarationFolder || "unknown",
+              sizeBytes: stats?.isFile() ? stats.size : 0,
+            };
+          }),
+        );
+        const orphanFilesTotalSizeBytes = orphanFileDetails.reduce((total, item) => total + item.sizeBytes, 0);
+        const orphanFilesTotalSizeMB = Number((orphanFilesTotalSizeBytes / (1024 * 1024)).toFixed(2));
+        const orphanGroupMap = new Map<string, { declarationBaseNumber: string; filesCount: number; totalSizeBytes: number; sampleFiles: string[] }>();
+
+        for (const orphanFile of orphanFileDetails) {
+          const group = orphanGroupMap.get(orphanFile.declarationBaseNumber) || {
+            declarationBaseNumber: orphanFile.declarationBaseNumber,
+            filesCount: 0,
+            totalSizeBytes: 0,
+            sampleFiles: [],
+          };
+          group.filesCount += 1;
+          group.totalSizeBytes += orphanFile.sizeBytes;
+
+          if (group.sampleFiles.length < 3) {
+            group.sampleFiles.push(path.basename(orphanFile.filePath));
+          }
+
+          orphanGroupMap.set(orphanFile.declarationBaseNumber, group);
+        }
+
+        const orphanFilesGroupedByDeclaration = Array.from(orphanGroupMap.values())
+          .sort((a, b) => b.filesCount - a.filesCount || b.totalSizeBytes - a.totalSizeBytes)
+          .slice(0, 10)
+          .map((group) => ({
+            ...group,
+            totalSizeMB: Number((group.totalSizeBytes / (1024 * 1024)).toFixed(2)),
+          }));
         const missingFilesCount = missingFiles.length;
         const unsafePathsCount = unsafePaths.length;
         const orphanFilesCount = orphanFiles.length;
@@ -1095,6 +1136,9 @@ async function buildSystemDiagnostics() {
             missingFilesCount,
             unsafePathsCount,
             orphanFilesCount,
+            orphanFilesGroupedByDeclaration,
+            orphanFilesTotalSizeBytes,
+            orphanFilesTotalSizeMB,
             missingFilesSample: missingFiles.slice(0, 10),
             unsafePathsSample: unsafePaths.slice(0, 10),
             orphanFilesSample: orphanFiles
