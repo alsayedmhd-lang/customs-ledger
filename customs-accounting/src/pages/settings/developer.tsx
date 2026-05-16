@@ -1299,11 +1299,240 @@ export default function DeveloperSettingsPage() {
     }
   }
 
+  async function fetchSystemDiagnosticsReportData() {
+    const response = await fetch(`${API_BASE}/developer/system-diagnostics`, { headers: authHeaders() });
+    const data = await response.json().catch(() => null);
+
+    if (!response.ok || !data) {
+      throw new Error(tr("تعذر تحميل بيانات تقرير الفحص", "Failed to load diagnostic report data"));
+    }
+
+    setSystemDiagnostics(data);
+    return data as SystemDiagnosticsResult;
+  }
+
   function buildDiagnosticsFileName() {
     const date = new Date();
     const pad = (value: number) => String(value).padStart(2, "0");
 
     return `customs-ledger-diagnostics-${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}-${pad(date.getHours())}-${pad(date.getMinutes())}.json`;
+  }
+
+  function maskDiagnosticReportText(value: string) {
+    return value
+      .replace(/postgres(?:ql)?:\/\/[^\s"'<>]+/gi, "[masked-postgres-connection-string]")
+      .replace(/bearer\s+[a-z0-9._~+/=-]+/gi, "Bearer [masked-token]")
+      .replace(/(password|token|secret|connectionString|connection_string)=([^;&\s"'<>]+)/gi, "$1=[masked]");
+  }
+
+  function escapeDiagnosticReportHtml(value: string | number | boolean | null | undefined) {
+    const raw = maskDiagnosticReportText(formatDisplayValue(value, isAR));
+
+    return raw
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  }
+
+  function getSystemDiagnosticsDataRoot(data: SystemDiagnosticsResult) {
+    return storageInfo?.dataRoot || data.checks.find((check) => check.id === "data-root-exists")?.location || "";
+  }
+
+  function buildSystemDiagnosticsPrintHtml(data: SystemDiagnosticsResult) {
+    const direction = isAR ? "rtl" : "ltr";
+    const align = isAR ? "right" : "left";
+    const checkedAt = formatSyncQueueDate(data.checkedAt, isAR);
+    const appVersion = settings.appVersion || import.meta.env.VITE_APP_VERSION || "";
+    const dataRoot = getSystemDiagnosticsDataRoot(data);
+    const statusClass = (status: SystemDiagnosticStatus) => {
+      if (status === "pass") return "status-pass";
+      if (status === "warning") return "status-warning";
+      return "status-critical";
+    };
+    const rows = data.checks
+      .map((check) => {
+        const message = isAR ? check.messageAr : check.messageEn;
+        const cause = isAR ? check.causeAr : check.causeEn;
+        const suggestedFix = isAR ? check.suggestedFixAr : check.suggestedFixEn;
+
+        return `
+          <tr>
+            <td><span class="status ${statusClass(check.status)}">${escapeDiagnosticReportHtml(getDiagnosticStatusLabel(check.status, isAR))}</span></td>
+            <td>${escapeDiagnosticReportHtml(check.area)}</td>
+            <td class="path">${escapeDiagnosticReportHtml(check.location)}</td>
+            <td>${escapeDiagnosticReportHtml(message)}</td>
+            <td>${escapeDiagnosticReportHtml(cause)}</td>
+            <td>${escapeDiagnosticReportHtml(suggestedFix)}</td>
+          </tr>
+        `;
+      })
+      .join("");
+
+    return `<!doctype html>
+<html lang="${isAR ? "ar" : "en"}" dir="${direction}">
+<head>
+  <meta charset="utf-8" />
+  <title>Customs Ledger SQLite - System Diagnostics Report</title>
+  <style>
+    @page { size: A4; margin: 14mm; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: #111827;
+      background: #ffffff;
+      font-family: Arial, Tahoma, sans-serif;
+      direction: ${direction};
+      text-align: ${align};
+      font-size: 12px;
+      line-height: 1.45;
+    }
+    .header {
+      border-bottom: 2px solid #111827;
+      padding-bottom: 12px;
+      margin-bottom: 16px;
+    }
+    h1 {
+      margin: 0 0 8px;
+      font-size: 22px;
+      line-height: 1.25;
+      letter-spacing: 0;
+    }
+    .meta {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px 14px;
+      color: #4b5563;
+    }
+    .meta strong { color: #111827; }
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin: 16px 0;
+    }
+    .summary-card {
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      padding: 10px;
+      background: #f9fafb;
+    }
+    .summary-label {
+      color: #6b7280;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+    .summary-value {
+      margin-top: 4px;
+      font-size: 22px;
+      font-weight: 800;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+      page-break-inside: auto;
+    }
+    thead { display: table-header-group; }
+    tr { page-break-inside: avoid; page-break-after: auto; }
+    th, td {
+      border: 1px solid #d1d5db;
+      padding: 7px;
+      vertical-align: top;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+    th {
+      background: #f3f4f6;
+      color: #374151;
+      font-size: 11px;
+      font-weight: 800;
+    }
+    .path {
+      color: #374151;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 10px;
+    }
+    .status {
+      display: inline-block;
+      border-radius: 999px;
+      padding: 2px 7px;
+      font-size: 10px;
+      font-weight: 800;
+      border: 1px solid transparent;
+      white-space: nowrap;
+    }
+    .status-pass { color: #047857; background: #ecfdf5; border-color: #a7f3d0; }
+    .status-warning { color: #b45309; background: #fffbeb; border-color: #fde68a; }
+    .status-critical { color: #b91c1c; background: #fef2f2; border-color: #fecaca; }
+    .footer {
+      margin-top: 14px;
+      color: #6b7280;
+      font-size: 10px;
+    }
+    @media print {
+      body { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+    }
+  </style>
+</head>
+<body>
+  <section class="header">
+    <h1>Customs Ledger SQLite - System Diagnostics Report</h1>
+    <div class="meta">
+      <div><strong>${escapeDiagnosticReportHtml(tr("التاريخ والوقت", "Date and time"))}:</strong> ${escapeDiagnosticReportHtml(checkedAt)}</div>
+      <div><strong>${escapeDiagnosticReportHtml(tr("إصدار التطبيق", "App Version"))}:</strong> ${escapeDiagnosticReportHtml(appVersion)}</div>
+      <div><strong>${escapeDiagnosticReportHtml("Data Root")}:</strong> ${escapeDiagnosticReportHtml(dataRoot)}</div>
+      <div><strong>${escapeDiagnosticReportHtml(tr("حالة التقرير", "Report Status"))}:</strong> ${escapeDiagnosticReportHtml(data.ok ? tr("لا توجد أخطاء حرجة", "No critical issues") : tr("توجد أخطاء حرجة", "Critical issues found"))}</div>
+    </div>
+  </section>
+  <section class="summary">
+    <div class="summary-card"><div class="summary-label">Passed</div><div class="summary-value">${escapeDiagnosticReportHtml(data.summary.passed)}</div></div>
+    <div class="summary-card"><div class="summary-label">Warnings</div><div class="summary-value">${escapeDiagnosticReportHtml(data.summary.warnings)}</div></div>
+    <div class="summary-card"><div class="summary-label">Critical</div><div class="summary-value">${escapeDiagnosticReportHtml(data.summary.critical)}</div></div>
+  </section>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 10%;">${escapeDiagnosticReportHtml(tr("الحالة", "Status"))}</th>
+        <th style="width: 10%;">${escapeDiagnosticReportHtml(tr("القسم", "Area"))}</th>
+        <th style="width: 18%;">${escapeDiagnosticReportHtml(tr("المكان", "Location"))}</th>
+        <th style="width: 20%;">${escapeDiagnosticReportHtml(tr("الرسالة", "Message"))}</th>
+        <th style="width: 20%;">${escapeDiagnosticReportHtml(tr("السبب", "Cause"))}</th>
+        <th style="width: 22%;">${escapeDiagnosticReportHtml(tr("الحل المقترح", "Suggested Fix"))}</th>
+      </tr>
+    </thead>
+    <tbody>${rows}</tbody>
+  </table>
+  <div class="footer">${escapeDiagnosticReportHtml(tr("تقرير دعم فني للقراءة فقط. لا يحتوي على إصلاحات تلقائية.", "Read-only technical support report. No repair actions are included."))}</div>
+</body>
+</html>`;
+  }
+
+  async function exportSystemDiagnosticsPdf() {
+    setSystemDiagnosticsError("");
+    setIsSystemDiagnosticsPdfExporting(true);
+    try {
+      const data = systemDiagnostics || (await fetchSystemDiagnosticsReportData());
+      const printWindow = window.open("", "_blank", "width=1100,height=800");
+
+      if (!printWindow) {
+        throw new Error(tr("تعذر فتح نافذة الطباعة. تحقق من إعدادات المتصفح.", "Could not open the print window. Check browser popup settings."));
+      }
+
+      printWindow.document.open();
+      printWindow.document.write(buildSystemDiagnosticsPrintHtml(data));
+      printWindow.document.close();
+      printWindow.focus();
+      window.setTimeout(() => {
+        printWindow.print();
+      }, 250);
+    } catch (error) {
+      setSystemDiagnosticsError(error instanceof Error ? error.message : tr("تعذر توليد ملف PDF", "Failed to generate PDF"));
+    } finally {
+      setIsSystemDiagnosticsPdfExporting(false);
+    }
   }
 
   async function exportSystemDiagnosticsReport() {
@@ -2164,6 +2393,17 @@ export default function DeveloperSettingsPage() {
                 >
                   <FileText className={cn("h-3.5 w-3.5", isSystemDiagnosticsExporting && "animate-pulse")} />
                   {isSystemDiagnosticsExporting ? tr("جاري التصدير...", "Exporting...") : tr("تصدير تقرير الفحص", "Export Diagnostic Report")}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={exportSystemDiagnosticsPdf}
+                  disabled={isSystemDiagnosticsPdfExporting}
+                  className="gap-2"
+                >
+                  <FileText className={cn("h-3.5 w-3.5", isSystemDiagnosticsPdfExporting && "animate-pulse")} />
+                  {isSystemDiagnosticsPdfExporting ? tr("جاري تجهيز PDF...", "Preparing PDF...") : tr("تصدير PDF", "Export PDF")}
                 </Button>
               </div>
             </CardHeader>
