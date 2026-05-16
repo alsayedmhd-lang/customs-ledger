@@ -173,6 +173,8 @@ const STORAGE_CONFIG_FILE = "storage-config.json";
 const SYSTEM_SUBFOLDERS = ["database", "attachments", "backups", "license", "logs", "config"] as const;
 const ONE_GB_BYTES = 1024 * 1024 * 1024;
 const FIVE_GB_BYTES = 5 * ONE_GB_BYTES;
+const DATABASE_SIZE_WARNING_BYTES = 500 * 1024 * 1024;
+const DATABASE_SIZE_CRITICAL_BYTES = 2 * ONE_GB_BYTES;
 
 function nodeErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
@@ -506,6 +508,96 @@ async function buildSystemDiagnostics() {
     });
   } catch (error) {
     addExceptionCheck("database-file-exists", "database", context.sqlitePath, error);
+  }
+
+  try {
+    const stats = await safeStat(context.sqlitePath);
+
+    if (!stats?.isFile()) {
+      addCheck({
+        id: "database-size-check",
+        status: "warning",
+        area: "database",
+        location: context.sqlitePath,
+        messageAr: "تعذر فحص حجم قاعدة البيانات.",
+        messageEn: "Database size could not be checked.",
+        causeAr: "ملف قاعدة البيانات غير موجود أو ليس ملفًا صالحًا.",
+        causeEn: "The database file does not exist or is not a valid file.",
+        suggestedFixAr: "راجع المرفقات والنسخ الاحتياطية وفكر لاحقًا في الأرشفة أو التنظيف.",
+        suggestedFixEn: "Review attachments and backups, and consider future archiving or cleanup.",
+        details: {
+          databasePath: context.sqlitePath,
+          sizeBytes: null,
+          sizeMB: null,
+          sizeGB: null,
+        },
+      });
+    } else {
+      const sizeBytes = stats.size;
+      const sizeMB = Number((sizeBytes / (1024 * 1024)).toFixed(2));
+      const sizeGB = Number((sizeBytes / ONE_GB_BYTES).toFixed(3));
+      const status: DiagnosticStatus =
+        sizeBytes > DATABASE_SIZE_CRITICAL_BYTES
+          ? "critical"
+          : sizeBytes >= DATABASE_SIZE_WARNING_BYTES
+            ? "warning"
+            : "pass";
+
+      addCheck({
+        id: "database-size-check",
+        status,
+        area: "database",
+        location: context.sqlitePath,
+        messageAr:
+          status === "critical"
+            ? "حجم قاعدة البيانات كبير جدًا وقد يؤثر على الأداء أو النسخ الاحتياطي."
+            : status === "warning"
+              ? "حجم قاعدة البيانات بدأ يزداد."
+              : "حجم قاعدة البيانات ضمن الحدود الطبيعية.",
+        messageEn:
+          status === "critical"
+            ? "Database size is very large and may affect performance or backups."
+            : status === "warning"
+              ? "Database size is growing."
+              : "Database size is within normal limits.",
+        causeAr:
+          status === "pass"
+            ? "حجم ملف local.db أقل من حد التحذير."
+            : "حجم ملف local.db تجاوز أحد حدود التنبيه.",
+        causeEn:
+          status === "pass"
+            ? "The local.db file size is below the warning threshold."
+            : "The local.db file size exceeded one of the alert thresholds.",
+        suggestedFixAr:
+          status === "pass"
+            ? "لا يلزم إجراء."
+            : "راجع المرفقات والنسخ الاحتياطية وفكر لاحقًا في الأرشفة أو التنظيف.",
+        suggestedFixEn:
+          status === "pass"
+            ? "No action required."
+            : "Review attachments and backups, and consider future archiving or cleanup.",
+        details: {
+          databasePath: context.sqlitePath,
+          sizeBytes,
+          sizeMB,
+          sizeGB,
+        },
+      });
+    }
+  } catch (error) {
+    addCheck({
+      id: "database-size-check",
+      status: "warning",
+      area: "database",
+      location: context.sqlitePath,
+      messageAr: "تعذر فحص حجم قاعدة البيانات.",
+      messageEn: "Database size could not be checked.",
+      causeAr: "حدث خطأ أثناء قراءة حجم ملف قاعدة البيانات.",
+      causeEn: "An error occurred while reading the database file size.",
+      suggestedFixAr: "راجع المرفقات والنسخ الاحتياطية وفكر لاحقًا في الأرشفة أو التنظيف.",
+      suggestedFixEn: "Review attachments and backups, and consider future archiving or cleanup.",
+      details: { error: nodeErrorMessage(error), code: getNodeErrorCode(error) },
+    });
   }
 
   try {
