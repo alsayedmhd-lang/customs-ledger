@@ -10,6 +10,7 @@ let backendProcess;
 let mainWindow;
 let updateInfo;
 let updateDownloaded = false;
+const printPreviewWindows = new Set();
 const printPreviewWebContentsIds = new Set();
 const MIN_ZOOM_FACTOR = 0.5;
 const MAX_ZOOM_FACTOR = 3;
@@ -109,6 +110,15 @@ function resetPrintPreviewWindowZoom(printWindow) {
   if (!printWindow || printWindow.isDestroyed()) return;
 
   printWindow.webContents.setZoomFactor(1);
+}
+
+function closeAllPrintPreviewWindows() {
+  for (const printWindow of Array.from(printPreviewWindows)) {
+    if (!printWindow || printWindow.isDestroyed()) continue;
+    printWindow.close();
+  }
+
+  printPreviewWindows.clear();
 }
 
 function safeFileName(name) {
@@ -795,6 +805,14 @@ function createWindow() {
 
   mainWindow.webContents.on("did-finish-load", () => {
     setAppZoomFactor(readUserPreferences().zoomFactor, { save: false });
+  });
+
+  mainWindow.on("close", () => {
+    closeAllPrintPreviewWindows();
+  });
+
+  mainWindow.on("closed", () => {
+    mainWindow = null;
   });
 
   mainWindow.webContents.on("context-menu", (event, params) => {
@@ -1795,9 +1813,11 @@ ipcMain.handle("print-preview:open-external-window", async (_event, url) => {
       },
     });
     const printWindowWebContentsId = printWindow.webContents.id;
+    printPreviewWindows.add(printWindow);
     printPreviewWebContentsIds.add(printWindowWebContentsId);
     printWindow.webContents.setZoomFactor(1);
     printWindow.on("closed", () => {
+      printPreviewWindows.delete(printWindow);
       printPreviewWebContentsIds.delete(printWindowWebContentsId);
     });
     setupPrintPreviewWindowMenu(printWindow);
@@ -2039,6 +2059,10 @@ ipcMain.handle("license:save-current", async (_event, license) => {
 app.whenReady().then(() => {
   createWindow();
   setupApplicationMenu();
+});
+
+app.on("before-quit", () => {
+  closeAllPrintPreviewWindows();
 });
 
 app.on("window-all-closed", () => {

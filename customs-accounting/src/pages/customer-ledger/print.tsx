@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { Link, useLocation } from "wouter";
+import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowRight, FileDown, Printer, Stamp } from "lucide-react";
+import { FileDown, Printer, Stamp } from "lucide-react";
 import Barcode from "react-barcode";
 import { A4PrintShell } from "@/components/a4-print-shell";
 import { PrintDocumentFooter, PrintTitleBlock, StatementPrintHeader } from "@/components/print-document-parts";
@@ -246,15 +246,6 @@ export default function CustomerLedgerPrintPage() {
 
       {/* CONTROLS */}
       <div className="print:hidden flex items-center justify-center gap-3 p-6 flex-wrap" dir={isAR ? "rtl" : "ltr"}>
-        {!isClient && (
-        <Link href="/customer-ledger">
-          <button className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-700 hover:bg-gray-50 font-medium">
-            <ArrowRight className="w-4 h-4" />
-            {isAR ? "العودة للكشوف" : "Back to Client"}
-          </button>
-        </Link>
-        )}
-
         <button
         onClick={() => {
             window.print();
