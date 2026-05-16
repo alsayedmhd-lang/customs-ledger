@@ -451,6 +451,8 @@ export default function DeveloperSettingsPage() {
   const [isReadinessLoading, setIsReadinessLoading] = useState(false);
   const [isDataStorageAnalyzing, setIsDataStorageAnalyzing] = useState(false);
   const [isSystemDiagnosticsRunning, setIsSystemDiagnosticsRunning] = useState(false);
+  const [isSystemDiagnosticsExporting, setIsSystemDiagnosticsExporting] = useState(false);
+  const [isSystemDiagnosticsPdfExporting, setIsSystemDiagnosticsPdfExporting] = useState(false);
   const [isBackupReadinessAnalyzing, setIsBackupReadinessAnalyzing] = useState(false);
   const [isBackupManifestGenerating, setIsBackupManifestGenerating] = useState(false);
   const [isBackupDirectoryCreating, setIsBackupDirectoryCreating] = useState(false);
@@ -1297,6 +1299,48 @@ export default function DeveloperSettingsPage() {
     }
   }
 
+  function buildDiagnosticsFileName() {
+    const date = new Date();
+    const pad = (value: number) => String(value).padStart(2, "0");
+
+    return `customs-ledger-diagnostics-${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}-${pad(date.getHours())}-${pad(date.getMinutes())}.json`;
+  }
+
+  async function exportSystemDiagnosticsReport() {
+    setSystemDiagnosticsError("");
+    setIsSystemDiagnosticsExporting(true);
+    try {
+      const response = await fetch(`${API_BASE}/developer/system-diagnostics/export`, { headers: authHeaders() });
+      const reportText = await response.text();
+
+      if (!response.ok) {
+        let message = tr("تعذر تصدير تقرير الفحص", "Failed to export diagnostic report");
+        try {
+          const parsed = JSON.parse(reportText);
+          message = parsed?.error || message;
+        } catch {
+          // Keep the translated fallback when the server does not return JSON.
+        }
+        throw new Error(message);
+      }
+
+      const blob = new Blob([reportText], { type: "application/json;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+
+      link.href = url;
+      link.download = buildDiagnosticsFileName();
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      setSystemDiagnosticsError(error instanceof Error ? error.message : tr("تعذر تصدير تقرير الفحص", "Failed to export diagnostic report"));
+    } finally {
+      setIsSystemDiagnosticsExporting(false);
+    }
+  }
+
   async function verifyLatestBackupDirectory() {
     setIsBackupVerifying(true);
     try {
@@ -2109,6 +2153,17 @@ export default function DeveloperSettingsPage() {
                 <Button type="button" variant="outline" size="sm" onClick={runSystemDiagnostics} disabled={isSystemDiagnosticsRunning} className="gap-2">
                   <RefreshCw className={cn("h-3.5 w-3.5", isSystemDiagnosticsRunning && "animate-spin")} />
                   {isSystemDiagnosticsRunning ? tr("جار الفحص...", "Running...") : tr("فحص صحة النظام", "Run System Diagnostics")}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={exportSystemDiagnosticsReport}
+                  disabled={isSystemDiagnosticsExporting}
+                  className="gap-2"
+                >
+                  <FileText className={cn("h-3.5 w-3.5", isSystemDiagnosticsExporting && "animate-pulse")} />
+                  {isSystemDiagnosticsExporting ? tr("جاري التصدير...", "Exporting...") : tr("تصدير تقرير الفحص", "Export Diagnostic Report")}
                 </Button>
               </div>
             </CardHeader>

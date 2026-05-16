@@ -192,6 +192,39 @@ async function safeStat(targetPath: string) {
   }
 }
 
+function maskSensitiveString(value: string) {
+  return value
+    .replace(/postgres(?:ql)?:\/\/[^\s"']+/gi, "[masked-postgres-connection-string]")
+    .replace(/bearer\s+[a-z0-9._~+/=-]+/gi, "Bearer [masked-token]")
+    .replace(/(password|token|secret|connectionString|connection_string)=([^;&\s]+)/gi, "$1=[masked]");
+}
+
+function sanitizeDiagnosticExportValue(value: unknown): unknown {
+  if (typeof value === "string") {
+    return maskSensitiveString(value);
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item) => sanitizeDiagnosticExportValue(item));
+  }
+
+  if (!value || typeof value !== "object") {
+    return value;
+  }
+
+  const sanitized: Record<string, unknown> = {};
+  for (const [key, nestedValue] of Object.entries(value)) {
+    if (/password|secret|token|connection.?string|authorization/i.test(key)) {
+      sanitized[key] = "[masked]";
+      continue;
+    }
+
+    sanitized[key] = sanitizeDiagnosticExportValue(nestedValue);
+  }
+
+  return sanitized;
+}
+
 async function resolveDiagnosticsStorageContext() {
   const cwd = process.cwd();
   const envDataRoot = process.env.APP_DATA_ROOT?.trim();
@@ -708,6 +741,34 @@ router.get("/developer/system-diagnostics", async (_req, res) => {
           details: { error: nodeErrorMessage(error), code: getNodeErrorCode(error) },
         },
       ],
+    });
+  }
+});
+
+router.get("/developer/system-diagnostics/export", async (_req, res) => {
+  try {
+    const [diagnostics, context] = await Promise.all([
+      buildSystemDiagnostics(),
+      resolveDiagnosticsStorageContext().catch(() => null),
+    ]);
+    const generatedAt = new Date().toISOString();
+    const report = sanitizeDiagnosticExportValue({
+      generatedAt,
+      appName: "Customs Ledger SQLite",
+      appVersion: `v${packageJson.version}`,
+      dataRoot: context?.dataRoot || null,
+      diagnostics,
+    });
+
+    res.setHeader("Content-Type", "application/json; charset=utf-8");
+    res.setHeader("Content-Disposition", "attachment; filename=customs-ledger-diagnostics.json");
+    return res.send(JSON.stringify(report, null, 2));
+  } catch (error) {
+    console.error("[SYSTEM_DIAGNOSTICS_EXPORT] Failed to generate report", error);
+    return res.status(500).json({
+      ok: false,
+      error: "Failed to export diagnostic report",
+      details: { message: nodeErrorMessage(error), code: getNodeErrorCode(error) },
     });
   }
 });
