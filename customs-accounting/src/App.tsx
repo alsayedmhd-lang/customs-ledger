@@ -40,8 +40,27 @@ const DEVELOPER_FRONTEND_ALLOWED_ROUTES = [
   "/users-management",
 ];
 
+function isExternalPrintRoute(location: string) {
+  return (
+    /^\/invoices\/[^/]+\/receipt$/.test(location) ||
+    /^\/receipts\/[^/]+\/print$/.test(location) ||
+    location === "/customer-ledger/print"
+  );
+}
+
 function RouteWrapper({ children }: { children: React.ReactNode }) {
   return <AppLayout>{children}</AppLayout>;
+}
+
+function PrintRoutes() {
+  return (
+    <Switch>
+      <Route path="/invoices/:id/receipt" component={InvoiceReceipt} />
+      <Route path="/receipts/:id/print" component={ReceiptPrint} />
+      <Route path="/customer-ledger/print" component={CustomerLedgerPrintPage} />
+      <Route component={NotFound} />
+    </Switch>
+  );
 }
 
 function ProtectedRouter() {
@@ -55,6 +74,8 @@ function ProtectedRouter() {
   const isDeveloperFrontendAllowedRoute = DEVELOPER_FRONTEND_ALLOWED_ROUTES.some(
     (route) => location === route || location.startsWith(`${route}/`)
   );
+  const isExternalPrintMode =
+    window.name === "external-print-window" && isExternalPrintRoute(location);
 
   if (isLoading) {
     return (
@@ -66,6 +87,10 @@ function ProtectedRouter() {
 
   if (!user || (isDeveloperFrontendOnly && !isDeveloperFrontendAllowedRoute)) {
     return <LoginPage />;
+  }
+
+  if (isExternalPrintMode) {
+    return <PrintRoutes />;
   }
 
   return (

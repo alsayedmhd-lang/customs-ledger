@@ -1577,9 +1577,12 @@ ipcMain.handle("print-preview:open-external-window", async (_event, url) => {
 
     const targetHash = normalizePrintPreviewHash(url);
     const authToken = await readMainWindowAuthToken();
-    const printWindowArguments = authToken
-      ? [`--customs-print-auth-token-base64=${Buffer.from(authToken, "utf8").toString("base64")}`]
-      : [];
+    const printWindowArguments = [
+      "--customs-external-print-window",
+      ...(authToken
+        ? [`--customs-print-auth-token-base64=${Buffer.from(authToken, "utf8").toString("base64")}`]
+        : []),
+    ];
 
     const printWindow = new BrowserWindow({
       width: 1100,

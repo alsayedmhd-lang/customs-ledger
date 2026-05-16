@@ -1,9 +1,14 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
 const PRINT_AUTH_TOKEN_ARG = "--customs-print-auth-token-base64=";
+const EXTERNAL_PRINT_WINDOW_ARG = "--customs-external-print-window";
 const printAuthTokenArg = process.argv.find((arg) =>
   arg.startsWith(PRINT_AUTH_TOKEN_ARG)
 );
+
+if (process.argv.includes(EXTERNAL_PRINT_WINDOW_ARG)) {
+  window.name = "external-print-window";
+}
 
 if (printAuthTokenArg) {
   try {
