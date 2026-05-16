@@ -407,15 +407,18 @@ export default function InvoicesList() {
 
                     <td className="px-4 py-3 text-end">
                       <div className="flex items-center justify-end gap-1">
-                        <Link href={`/invoices/${inv.id}/receipt`}>
-                          <button
-                            className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-muted-foreground bg-muted/30 border border-border hover:bg-muted/50 hover:text-foreground rounded-lg transition-colors"
-                            title={t("print")}
-                          >
-                            <Printer className="w-3.5 h-3.5" />
-                            {t("print")}
-                          </button>
-                        </Link>
+                        <button
+                          onClick={() => {
+                            (window as any).electronAPI?.openExternalPrintWindow?.(
+                              `#/invoices/${inv.id}/receipt`
+                            );
+                          }}
+                          className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-muted-foreground bg-muted/30 border border-border hover:bg-muted/50 hover:text-foreground rounded-lg transition-colors"
+                          title={t("print")}
+                        >
+                          <Printer className="w-3.5 h-3.5" />
+                          {t("print")}
+                        </button>
 
                         <button
                           onClick={() => setCopyId(inv.id)}
@@ -490,3 +493,4 @@ export default function InvoicesList() {
     </motion.div>
   );
 }
+
