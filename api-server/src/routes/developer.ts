@@ -175,6 +175,10 @@ const ONE_GB_BYTES = 1024 * 1024 * 1024;
 const FIVE_GB_BYTES = 5 * ONE_GB_BYTES;
 const DATABASE_SIZE_WARNING_BYTES = 500 * 1024 * 1024;
 const DATABASE_SIZE_CRITICAL_BYTES = 2 * ONE_GB_BYTES;
+const RECENT_LOG_FILES_LIMIT = 5;
+const LOG_TAIL_BYTES_LIMIT = 64 * 1024;
+const LOG_SAMPLE_LIMIT = 10;
+const CRASH_UNHANDLED_CRITICAL_COUNT = 3;
 
 function nodeErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
@@ -262,8 +266,30 @@ async function listFilesRecursive(rootPath: string) {
 function maskSensitiveString(value: string) {
   return value
     .replace(/postgres(?:ql)?:\/\/[^\s"']+/gi, "[masked-postgres-connection-string]")
+    .replace(/(sqlite|file):\/\/[^\s"']+/gi, "[masked-connection-string]")
+    .replace(/\b[A-Za-z0-9._%+-]+:[^@\s"']+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g, "[masked-credential]")
+    .replace(/\beyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+\b/g, "[masked-token]")
     .replace(/bearer\s+[a-z0-9._~+/=-]+/gi, "Bearer [masked-token]")
-    .replace(/(password|token|secret|connectionString|connection_string)=([^;&\s]+)/gi, "$1=[masked]");
+    .replace(/(password|token|secret|api[_-]?key|connectionString|connection_string)=([^;&\s]+)/gi, "$1=[masked]");
+}
+
+function sanitizeLogSample(value: string) {
+  return maskSensitiveString(value).replace(/\s+/g, " ").trim().slice(0, 240);
+}
+
+async function readFileTail(filePath: string, maxBytes: number) {
+  const stats = await fs.promises.stat(filePath);
+  const bytesToRead = Math.min(stats.size, maxBytes);
+  const buffer = Buffer.alloc(bytesToRead);
+  const handle = await fs.promises.open(filePath, "r");
+
+  try {
+    await handle.read(buffer, 0, bytesToRead, Math.max(0, stats.size - bytesToRead));
+  } finally {
+    await handle.close();
+  }
+
+  return buffer.toString("utf8");
 }
 
 function sanitizeDiagnosticExportValue(value: unknown): unknown {
@@ -769,6 +795,160 @@ async function buildSystemDiagnostics() {
     } catch (error) {
       addExceptionCheck(`${folderName}-folder-health`, folderName, folderPath, error);
     }
+  }
+
+  try {
+    const logsPath = path.join(context.dataRoot, "logs");
+    const logsStats = await safeStat(logsPath);
+
+    if (!logsStats?.isDirectory()) {
+      addCheck({
+        id: "recent-log-errors-check",
+        status: "warning",
+        area: "logs",
+        location: logsPath,
+        messageAr: "لا توجد ملفات logs لفحصها.",
+        messageEn: "No logs were found to inspect.",
+        causeAr: "مجلد logs غير موجود ضمن Data Root.",
+        causeEn: "The logs folder does not exist under Data Root.",
+        suggestedFixAr: "راجع إعدادات التشغيل وتأكد من تفعيل السجلات عند الحاجة.",
+        suggestedFixEn: "Review runtime settings and ensure logging is enabled when needed.",
+        details: {
+          logsPath,
+          logFilesChecked: 0,
+          recentErrorCount: 0,
+          crashUnhandledCount: 0,
+          samples: [],
+        },
+      });
+    } else {
+      const entries = await fs.promises.readdir(logsPath, { withFileTypes: true });
+      const logFiles = (
+        await Promise.all(
+          entries
+            .filter((entry) => entry.isFile())
+            .map(async (entry) => {
+              const filePath = path.join(logsPath, entry.name);
+              const stats = await safeStat(filePath);
+              return stats?.isFile() ? { fileName: entry.name, filePath, mtimeMs: stats.mtimeMs, size: stats.size } : null;
+            }),
+        )
+      )
+        .filter((item): item is { fileName: string; filePath: string; mtimeMs: number; size: number } => Boolean(item))
+        .sort((a, b) => b.mtimeMs - a.mtimeMs)
+        .slice(0, RECENT_LOG_FILES_LIMIT);
+
+      if (logFiles.length === 0) {
+        addCheck({
+          id: "recent-log-errors-check",
+          status: "warning",
+          area: "logs",
+          location: logsPath,
+          messageAr: "لا توجد ملفات logs لفحصها.",
+          messageEn: "No logs were found to inspect.",
+          causeAr: "مجلد logs موجود لكنه لا يحتوي ملفات قابلة للفحص.",
+          causeEn: "The logs folder exists but contains no files to inspect.",
+          suggestedFixAr: "راجع إعدادات التشغيل وتأكد من تفعيل السجلات عند الحاجة.",
+          suggestedFixEn: "Review runtime settings and ensure logging is enabled when needed.",
+          details: {
+            logsPath,
+            logFilesChecked: 0,
+            recentErrorCount: 0,
+            crashUnhandledCount: 0,
+            samples: [],
+          },
+        });
+      } else {
+        const keywordPattern = /\b(error|exception|failed|crash|unhandled)\b/i;
+        const crashUnhandledPattern = /\b(crash|unhandled)\b/i;
+        let recentErrorCount = 0;
+        let crashUnhandledCount = 0;
+        const samples: Array<{ fileName: string; keyword: string; line: string }> = [];
+
+        for (const logFile of logFiles) {
+          const content = await readFileTail(logFile.filePath, LOG_TAIL_BYTES_LIMIT);
+          const lines = content.split(/\r?\n/);
+
+          for (const line of lines) {
+            const keywordMatch = line.match(keywordPattern);
+            if (!keywordMatch) continue;
+
+            recentErrorCount += 1;
+            if (crashUnhandledPattern.test(line)) {
+              crashUnhandledCount += 1;
+            }
+
+            if (samples.length < LOG_SAMPLE_LIMIT) {
+              samples.push({
+                fileName: logFile.fileName,
+                keyword: keywordMatch[1].toLowerCase(),
+                line: sanitizeLogSample(line),
+              });
+            }
+          }
+        }
+
+        const status: DiagnosticStatus =
+          crashUnhandledCount >= CRASH_UNHANDLED_CRITICAL_COUNT ? "critical" : recentErrorCount > 0 ? "warning" : "pass";
+
+        addCheck({
+          id: "recent-log-errors-check",
+          status,
+          area: "logs",
+          location: logsPath,
+          messageAr:
+            status === "critical"
+              ? "توجد أخطاء حرجة متكررة في السجلات."
+              : status === "warning"
+                ? "توجد أخطاء حديثة في السجلات."
+                : "لا توجد أخطاء حديثة في السجلات.",
+          messageEn:
+            status === "critical"
+              ? "Repeated critical log errors were found."
+              : status === "warning"
+                ? "Recent log errors were found."
+                : "No recent log errors were found.",
+          causeAr:
+            status === "pass"
+              ? "لم تظهر كلمات خطأ في آخر ملفات logs التي تم فحصها."
+              : "تم العثور على كلمات خطأ مثل error أو exception أو failed أو crash أو unhandled.",
+          causeEn:
+            status === "pass"
+              ? "No error keywords were found in the latest inspected log files."
+              : "Error keywords such as error, exception, failed, crash, or unhandled were found.",
+          suggestedFixAr:
+            status === "pass"
+              ? "لا يلزم إجراء."
+              : "راجع عينات السجلات وسجل الخادم لتحديد سبب الأخطاء قبل إعادة تشغيل الفحص.",
+          suggestedFixEn:
+            status === "pass"
+              ? "No action required."
+              : "Review the log samples and server log to identify the cause before running diagnostics again.",
+          details: {
+            logsPath,
+            logFilesChecked: logFiles.length,
+            logFilesSample: logFiles.map((file) => ({ fileName: file.fileName, sizeBytes: file.size })),
+            recentErrorCount,
+            crashUnhandledCount,
+            samples,
+          },
+        });
+      }
+    }
+  } catch (error) {
+    addCheck({
+      id: "recent-log-errors-check",
+      status: "warning",
+      area: "logs",
+      location: path.join(context.dataRoot, "logs"),
+      messageAr: "تعذر فحص أخطاء logs الحديثة.",
+      messageEn: "Recent log errors could not be checked.",
+      causeAr: "حدث خطأ أثناء قراءة ملفات logs.",
+      causeEn: "An error occurred while reading log files.",
+      suggestedFixAr: "تحقق من صلاحيات قراءة مجلد logs ثم أعد تشغيل الفحص.",
+      suggestedFixEn: "Check read permissions for the logs folder, then run diagnostics again.",
+      details: { error: nodeErrorMessage(error), code: getNodeErrorCode(error) },
+    });
   }
 
   try {
