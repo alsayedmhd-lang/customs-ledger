@@ -191,6 +191,195 @@ async function createDirectClosingReceipt(input: {
   return receipt;
 }
 
+type InvoiceAuditChange = {
+  field: string;
+  labelAr: string;
+  labelEn: string;
+  before: string | number | null;
+  after: string | number | null;
+  messageAr: string;
+  messageEn: string;
+};
+
+const emptyToNull = (value: unknown) => {
+  if (value === undefined || value === null) return null;
+  const stringValue = String(value).trim();
+  return stringValue === "" ? null : stringValue;
+};
+
+const normalizeAuditString = (value: unknown) => emptyToNull(value);
+
+const normalizeAuditDate = (value: unknown) => {
+  const stringValue = emptyToNull(value);
+  if (stringValue === null) return null;
+  return String(stringValue).slice(0, 10);
+};
+
+const normalizeAuditNumber = (value: unknown, digits = 2) => {
+  const stringValue = emptyToNull(value);
+  if (stringValue === null) return null;
+  const numberValue = Number(stringValue);
+  if (!Number.isFinite(numberValue)) return null;
+  return Number(numberValue.toFixed(digits));
+};
+
+const formatAuditValue = (value: string | number | null) =>
+  value === null ? "-" : String(value);
+
+const invoiceAuditFields = [
+  { key: "clientId", labelAr: "\u0627\u0644\u0639\u0645\u064a\u0644", labelEn: "Client", type: "number", digits: 0 },
+  { key: "issueDate", labelAr: "\u062a\u0627\u0631\u064a\u062e \u0627\u0644\u0625\u0635\u062f\u0627\u0631", labelEn: "Issue date", type: "date" },
+  { key: "dueDate", labelAr: "\u062a\u0627\u0631\u064a\u062e \u0627\u0644\u0627\u0633\u062a\u062d\u0642\u0627\u0642", labelEn: "Due date", type: "date" },
+  { key: "status", labelAr: "\u0627\u0644\u062d\u0627\u0644\u0629", labelEn: "Status", type: "string" },
+  { key: "subtotal", labelAr: "\u0627\u0644\u0645\u062c\u0645\u0648\u0639 \u0627\u0644\u0641\u0631\u0639\u064a", labelEn: "Subtotal", type: "number", digits: 2 },
+  { key: "taxRate", labelAr: "\u0627\u0644\u0636\u0631\u064a\u0628\u0629", labelEn: "Tax", type: "number", digits: 2 },
+  { key: "taxAmount", labelAr: "\u0642\u064a\u0645\u0629 \u0627\u0644\u0636\u0631\u064a\u0628\u0629", labelEn: "Tax amount", type: "number", digits: 2 },
+  { key: "advancePayment", labelAr: "\u0627\u0644\u062f\u0641\u0639\u0629 \u0627\u0644\u0645\u0642\u062f\u0645\u0629", labelEn: "Advance payment", type: "number", digits: 2 },
+  { key: "total", labelAr: "\u0627\u0644\u0625\u062c\u0645\u0627\u0644\u064a", labelEn: "Total", type: "number", digits: 2 },
+  { key: "notes", labelAr: "\u0627\u0644\u0645\u0644\u0627\u062d\u0638\u0627\u062a", labelEn: "Notes", type: "string" },
+  { key: "shipmentRef", labelAr: "\u0631\u0642\u0645 \u0627\u0644\u0628\u064a\u0627\u0646", labelEn: "Shipment reference", type: "string" },
+  { key: "billOfLading", labelAr: "\u0628\u0648\u0644\u064a\u0635\u0629 \u0627\u0644\u0634\u062d\u0646", labelEn: "Bill of lading", type: "string" },
+  { key: "packageCount", labelAr: "\u0639\u062f\u062f \u0627\u0644\u0637\u0631\u0648\u062f", labelEn: "Package count", type: "number", digits: 0 },
+  { key: "shipmentWeight", labelAr: "\u0648\u0632\u0646 \u0627\u0644\u0634\u062d\u0646\u0629", labelEn: "Shipment weight", type: "number", digits: 3 },
+  { key: "portOfEntry", labelAr: "\u0645\u064a\u0646\u0627\u0621 \u0627\u0644\u062f\u062e\u0648\u0644", labelEn: "Port of entry", type: "string" },
+  { key: "importerExporterName", labelAr: "\u0627\u0644\u0645\u0633\u062a\u0648\u0631\u062f / \u0627\u0644\u0645\u0635\u062f\u0631", labelEn: "Importer / exporter", type: "string" },
+  { key: "createdBy", labelAr: "\u0627\u0644\u0645\u0646\u062f\u0648\u0628", labelEn: "Agent", type: "number", digits: 0 },
+] as const;
+
+function normalizeAuditFieldValue(value: unknown, field: (typeof invoiceAuditFields)[number]) {
+  if (field.type === "date") return normalizeAuditDate(value);
+  if (field.type === "number") return normalizeAuditNumber(value, field.digits);
+  return normalizeAuditString(value);
+}
+
+function createFieldAuditChange(
+  field: (typeof invoiceAuditFields)[number],
+  before: string | number | null,
+  after: string | number | null
+): InvoiceAuditChange {
+  return {
+    field: field.key,
+    labelAr: field.labelAr,
+    labelEn: field.labelEn,
+    before,
+    after,
+    messageAr: `\u062a\u0645 \u062a\u063a\u064a\u064a\u0631 ${field.labelAr} \u0645\u0646 ${formatAuditValue(before)} \u0625\u0644\u0649 ${formatAuditValue(after)}`,
+    messageEn: `${field.labelEn} changed from ${formatAuditValue(before)} to ${formatAuditValue(after)}`,
+  };
+}
+
+function normalizeInvoiceAuditItem(item: any) {
+  return {
+    description: String(item.description ?? "").trim(),
+    quantity: normalizeAuditNumber(item.quantity, 3) ?? 0,
+    unitPrice: normalizeAuditNumber(item.unitPrice, 2) ?? 0,
+    total: normalizeAuditNumber(item.total, 2) ?? 0,
+  };
+}
+
+function buildInvoiceAuditChanges(input: {
+  beforeInvoice: any;
+  afterInvoice: any;
+  beforeItems: any[];
+  afterItems: any[];
+}) {
+  const changes: InvoiceAuditChange[] = [];
+  const beforeInvoiceChanges: Record<string, string | number | null> = {};
+  const afterInvoiceChanges: Record<string, string | number | null> = {};
+
+  for (const field of invoiceAuditFields) {
+    const before = normalizeAuditFieldValue(input.beforeInvoice?.[field.key], field);
+    const after = normalizeAuditFieldValue(input.afterInvoice?.[field.key], field);
+
+    if (before === after) continue;
+
+    changes.push(createFieldAuditChange(field, before, after));
+    beforeInvoiceChanges[field.key] = before;
+    afterInvoiceChanges[field.key] = after;
+  }
+
+  const itemChanges: string[] = [];
+  const beforeItems = input.beforeItems.map(normalizeInvoiceAuditItem);
+  const afterItems = input.afterItems.map(normalizeInvoiceAuditItem);
+  const maxItemsLength = Math.max(beforeItems.length, afterItems.length);
+
+  for (let i = 0; i < maxItemsLength; i++) {
+    const before = beforeItems[i];
+    const after = afterItems[i];
+
+    if (!before && after) {
+      const messageAr = `\u062a\u0645\u062a \u0625\u0636\u0627\u0641\u0629 \u0635\u0646\u0641: ${after.description}`;
+      const messageEn = `Item added: ${after.description}`;
+      itemChanges.push(messageAr);
+      changes.push({
+        field: `items.${i}`,
+        labelAr: "\u0627\u0644\u0623\u0635\u0646\u0627\u0641",
+        labelEn: "Items",
+        before: null,
+        after: after.description,
+        messageAr,
+        messageEn,
+      });
+      continue;
+    }
+
+    if (before && !after) {
+      const messageAr = `\u062a\u0645 \u062d\u0630\u0641 \u0635\u0646\u0641: ${before.description}`;
+      const messageEn = `Item removed: ${before.description}`;
+      itemChanges.push(messageAr);
+      changes.push({
+        field: `items.${i}`,
+        labelAr: "\u0627\u0644\u0623\u0635\u0646\u0627\u0641",
+        labelEn: "Items",
+        before: before.description,
+        after: null,
+        messageAr,
+        messageEn,
+      });
+      continue;
+    }
+
+    if (!before || !after) continue;
+
+    const itemFields = [
+      { key: "description", labelAr: "\u0648\u0635\u0641 \u0627\u0644\u0635\u0646\u0641", labelEn: "Item description" },
+      { key: "quantity", labelAr: "\u0643\u0645\u064a\u0629 \u0627\u0644\u0635\u0646\u0641", labelEn: "Item quantity" },
+      { key: "unitPrice", labelAr: "\u0633\u0639\u0631 \u0627\u0644\u0635\u0646\u0641", labelEn: "Item unit price" },
+      { key: "total", labelAr: "\u0625\u062c\u0645\u0627\u0644\u064a \u0627\u0644\u0635\u0646\u0641", labelEn: "Item total" },
+    ] as const;
+
+    for (const itemField of itemFields) {
+      if (before[itemField.key] === after[itemField.key]) continue;
+      const itemName = after.description || before.description || `${i + 1}`;
+      const beforeValue = before[itemField.key];
+      const afterValue = after[itemField.key];
+      const messageAr = `\u062a\u0645 \u062a\u063a\u064a\u064a\u0631 ${itemField.labelAr} "${itemName}" \u0645\u0646 ${formatAuditValue(beforeValue)} \u0625\u0644\u0649 ${formatAuditValue(afterValue)}`;
+      const messageEn = `${itemField.labelEn} "${itemName}" changed from ${formatAuditValue(beforeValue)} to ${formatAuditValue(afterValue)}`;
+      itemChanges.push(messageAr);
+      changes.push({
+        field: `items.${i}.${itemField.key}`,
+        labelAr: itemField.labelAr,
+        labelEn: itemField.labelEn,
+        before: beforeValue,
+        after: afterValue,
+        messageAr,
+        messageEn,
+      });
+    }
+  }
+
+  return {
+    changes,
+    before: {
+      invoice: beforeInvoiceChanges,
+    },
+    after: {
+      invoice: afterInvoiceChanges,
+    },
+    itemChanges,
+  };
+}
+
 router.get("/invoices", requireAuth, async (req, res) => {
   try {
     const clientScope = await getClientScope(req);
@@ -677,16 +866,6 @@ router.put("/invoices/:id", async (req, res) => {
       updateData.createdBy = Number(createdBy);
     }
 
-    const [oldInvoice] = await db
-      .select()
-      .from(invoicesTable)
-      .where(eq(invoicesTable.id, id));
-
-    const oldItems = await db
-      .select()
-      .from(invoiceItemsTable)
-      .where(eq(invoiceItemsTable.invoiceId, id));
-
     const [invoice] = await db
       .update(invoicesTable)
       .set(updateData)
@@ -729,75 +908,25 @@ router.put("/invoices/:id", async (req, res) => {
       )
     );
 
-    const normalizeAuditItem = (item: any) => ({
-  description: String(item.description ?? "").trim(),
-  quantity: Number(item.quantity ?? 0),
-  unitPrice: Number(item.unitPrice ?? 0),
-  total: Number(item.total ?? 0),
-});
-
-const oldAuditItems = beforeItems.map(normalizeAuditItem);
-const newAuditItems = insertedItems.map(normalizeAuditItem);
-
-const itemAuditChanges: string[] = [];
-
-const maxItemsLength = Math.max(oldAuditItems.length, newAuditItems.length);
-
-for (let i = 0; i < maxItemsLength; i++) {
-  const before = oldAuditItems[i];
-  const after = newAuditItems[i];
-
-  if (!before && after) {
-    itemAuditChanges.push(`تمت إضافة صنف: ${after.description}`);
-    continue;
-  }
-
-  if (before && !after) {
-    itemAuditChanges.push(`تم حذف صنف: ${before.description}`);
-    continue;
-  }
-
-  if (!before || !after) continue;
-
-  if (before.description !== after.description) {
-    itemAuditChanges.push(`تم تغيير وصف الصنف من "${before.description}" إلى "${after.description}"`);
-  }
-
-  if (before.quantity !== after.quantity) {
-    itemAuditChanges.push(`تم تغيير كمية الصنف "${after.description}" من ${before.quantity} إلى ${after.quantity}`);
-  }
-
-  if (before.unitPrice !== after.unitPrice) {
-    itemAuditChanges.push(`تم تغيير سعر الصنف "${after.description}" من ${before.unitPrice} إلى ${after.unitPrice}`);
-  }
-
-  if (before.total !== after.total) {
-    itemAuditChanges.push(`تم تغيير إجمالي الصنف "${after.description}" من ${before.total} إلى ${after.total}`);
-  }
-}
-
-    const changes: any = {
-      before: {
-        invoice: oldInvoice,
-        items: oldItems,
-      },
-      after: {
-        invoice,
-        items: insertedItems,
-      },
-      itemChanges: itemAuditChanges,
-    };
-
-    await db.insert(invoiceAuditLogsTableSqlite).values({
-      invoiceId: invoice.id,
-      action: "updated",
-      userId: req.user?.userId ?? null,
-      username: req.user?.username ?? null,
-      userEmail: req.user?.email ?? null,
-      userPhone: req.user?.phone ?? null,
-      changesJson: JSON.stringify(changes),
-      createdAt: new Date(),
+    const auditChanges = buildInvoiceAuditChanges({
+      beforeInvoice,
+      afterInvoice: invoice,
+      beforeItems,
+      afterItems: insertedItems,
     });
+
+    if (auditChanges.changes.length > 0) {
+      await db.insert(invoiceAuditLogsTableSqlite).values({
+        invoiceId: invoice.id,
+        action: "updated",
+        userId: req.user?.userId ?? null,
+        username: req.user?.username ?? null,
+        userEmail: req.user?.email ?? null,
+        userPhone: req.user?.phone ?? null,
+        changesJson: JSON.stringify(auditChanges),
+        createdAt: new Date(),
+      });
+    }
 
     await enqueueSyncChange({
       entityType: "invoice",

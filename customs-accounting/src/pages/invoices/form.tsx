@@ -1064,6 +1064,30 @@ export default function InvoiceForm() {
         ];
       }
 
+      if (log.action === "attachments_updated") {
+        const summary = [isAR ? (changes.messageAr || "تم تعديل المرفقات") : (changes.messageEn || "Attachments updated")];
+        const actionText =
+          changes.attachmentAction === "added"
+            ? isAR
+              ? `إضافة: ${changes.fileName ?? "-"}${changes.category ? ` (${changes.category})` : ""}`
+              : `Added: ${changes.fileName ?? "-"}${changes.category ? ` (${changes.category})` : ""}`
+            : changes.attachmentAction === "deleted"
+              ? isAR
+                ? `حذف: ${changes.fileName ?? "-"}`
+                : `Deleted: ${changes.fileName ?? "-"}`
+              : null;
+        if (actionText) summary.push(actionText);
+        return summary;
+      }
+
+      if (Array.isArray(changes.changes) && changes.changes.length > 0) {
+        return changes.changes.map((change: any) =>
+          isAR
+            ? change.messageAr || `${change.labelAr ?? change.field} تغير من ${change.before ?? "-"} إلى ${change.after ?? "-"}`
+            : change.messageEn || `${change.labelEn ?? change.field} changed from ${change.before ?? "-"} to ${change.after ?? "-"}`
+        );
+      }
+
       if (Array.isArray(changes.itemChanges) && changes.itemChanges.length > 0) {
         return changes.itemChanges;
       }
@@ -1907,6 +1931,8 @@ export default function InvoiceForm() {
                 const actionLabel =
                   log.action === "created"
                     ? isAR ? "إنشاء الفاتورة" : "Invoice Created"
+                    : log.action === "attachments_updated"
+                      ? isAR ? "تم تعديل المرفقات" : "Attachments Updated"
                     : log.action === "updated"
                       ? isAR ? "تعديل الفاتورة" : "Invoice Updated"
                       : log.action === "deleted"
@@ -2015,6 +2041,8 @@ export default function InvoiceForm() {
               const actionStyle =
                 log.action === "created"
                   ? "bg-muted/30 text-foreground border-border"
+                  : log.action === "attachments_updated"
+                    ? "bg-muted/30 text-muted-foreground border-border"
                   : log.action === "updated"
                     ? "bg-muted/30 text-muted-foreground border-border"
                     : log.action === "deleted"
