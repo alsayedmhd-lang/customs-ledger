@@ -50,6 +50,9 @@ contextBridge.exposeInMainWorld("electronAPI", {
   saveDataRootConfig: (targetPath) => {
     return ipcRenderer.invoke("storage:save-data-root", targetPath);
   },
+  saveCurrentDataRootConfig: (expectedDataRoot) => {
+    return ipcRenderer.invoke("storage:save-current-data-root", expectedDataRoot);
+  },
 
   selectAttachmentFile: () => ipcRenderer.invoke("attachments:select-file"),
   saveAttachmentFile: ({ sourcePath, declarationBaseNumber, storedName }) =>
