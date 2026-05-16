@@ -41,11 +41,13 @@ const DEVELOPER_FRONTEND_ALLOWED_ROUTES = [
 ];
 
 function isExternalPrintRoute(location: string) {
+  const pathname = location.split("?")[0];
+
   return (
-    /^\/clients\/[^/]+\/statement$/.test(location) ||
-    /^\/invoices\/[^/]+\/receipt$/.test(location) ||
-    /^\/receipts\/[^/]+\/print$/.test(location) ||
-    location === "/customer-ledger/print"
+    /^\/clients\/[^/]+\/statement$/.test(pathname) ||
+    /^\/invoices\/[^/]+\/receipt$/.test(pathname) ||
+    /^\/receipts\/[^/]+\/print$/.test(pathname) ||
+    pathname === "/customer-ledger/print"
   );
 }
 
@@ -54,8 +56,11 @@ function RouteWrapper({ children }: { children: React.ReactNode }) {
 }
 
 function PrintRoutes() {
+  const [location] = useLocation();
+  const pathname = location.split("?")[0];
+
   return (
-    <Switch>
+    <Switch location={pathname}>
       <Route path="/clients/:id/statement" component={ClientStatement} />
       <Route path="/invoices/:id/receipt" component={InvoiceReceipt} />
       <Route path="/receipts/:id/print" component={ReceiptPrint} />

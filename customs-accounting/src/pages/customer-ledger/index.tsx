@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useLocation } from "wouter";
 import { useAuth } from "@/lib/auth-context";
 import { useLanguage } from "@/lib/language-context";
 import {
@@ -74,7 +73,6 @@ export default function CustomerLedgerPage() {
   const [referenceSearch, setReferenceSearch] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  const [, navigate] = useLocation();
   const isClient = user?.role === "client";
   const effectiveClientId = clientId;
 
@@ -185,8 +183,8 @@ export default function CustomerLedgerPage() {
   const openPrintPage = () => {
   if (!effectiveClientId) return;
 
-  navigate(
-    `/customer-ledger/print?clientId=${effectiveClientId}&from=${fromDate}&to=${toDate}&q=${encodeURIComponent(referenceSearch)}`
+  (window as any).electronAPI?.openExternalPrintWindow?.(
+    `#/customer-ledger/print?clientId=${effectiveClientId}&from=${fromDate}&to=${toDate}&q=${encodeURIComponent(referenceSearch)}`
   );
 };
 

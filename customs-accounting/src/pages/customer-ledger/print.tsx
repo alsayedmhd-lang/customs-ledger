@@ -58,6 +58,19 @@ async function fetchClients() {
   return res.json();
 }
 
+function getPrintQueryParams() {
+  if (window.location.search) {
+    return new URLSearchParams(window.location.search);
+  }
+
+  const hashQueryIndex = window.location.hash.indexOf("?");
+  if (hashQueryIndex === -1) {
+    return new URLSearchParams();
+  }
+
+  return new URLSearchParams(window.location.hash.slice(hashQueryIndex + 1));
+}
+
 export default function CustomerLedgerPrintPage() {
   const [, navigate] = useLocation();
   const { user } = useAuth();
@@ -67,7 +80,7 @@ export default function CustomerLedgerPrintPage() {
 
   const { settings, logoSrc, stampSrc, watermarkSrc } = useCompanySettings();
 
-  const params = new URLSearchParams(window.location.search);
+  const params = getPrintQueryParams();
   const clientId = isClient && user?.clientId ? String(user.clientId) : params.get("clientId");
   const from = params.get("from");
   const to = params.get("to");
