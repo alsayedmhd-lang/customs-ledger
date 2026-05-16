@@ -115,11 +115,17 @@ export default function ClientDetail() {
           >
             <Edit2 className="w-4 h-4" /> تعديل
           </button>
-          <Link href={`/clients/${client.id}/statement`}>
-            <button className="flex-1 md:flex-none px-4 py-2 bg-primary text-primary-foreground font-medium rounded-xl shadow-lg shadow-primary/25 hover:shadow-xl transition-all flex items-center justify-center gap-2">
-              <Printer className="w-4 h-4" /> كشف الحساب
-            </button>
-          </Link>
+          <button
+            type="button"
+            onClick={() => {
+              (window as any).electronAPI?.openExternalPrintWindow?.(
+                `#/clients/${client.id}/statement`
+              );
+            }}
+            className="flex-1 md:flex-none px-4 py-2 bg-primary text-primary-foreground font-medium rounded-xl shadow-lg shadow-primary/25 hover:shadow-xl transition-all flex items-center justify-center gap-2"
+          >
+            <Printer className="w-4 h-4" /> كشف الحساب
+          </button>
         </div>
       </div>
 

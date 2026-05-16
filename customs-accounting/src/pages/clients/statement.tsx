@@ -144,13 +144,6 @@ export default function ClientStatement() {
 
       {/* Controls */}
       <div className="print:hidden flex items-center gap-3 p-6 max-w-4xl mx-auto flex-wrap" dir={isAR ? "rtl" : "ltr"}>
-        {!isClient && (
-          <Link href={`/clients/${id}`}>
-            <button className="flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-700 hover:bg-gray-50 font-medium">
-              {isAR ? <ArrowRight className="w-4 h-4" /> : <ArrowLeft className="w-4 h-4" />} {isAR ? "العودة للعميل" : "Back to Client"}
-            </button>
-          </Link>
-        )}
         <button
           onClick={() => {
             window.print();
@@ -463,3 +456,4 @@ export default function ClientStatement() {
     </A4PrintShell>
   );
 }
+
