@@ -6,7 +6,6 @@ type PrintPreviewShellProps = {
   dir?: "rtl" | "ltr";
   children: ReactNode;
   onPrint?: () => void;
-  onClose?: () => void;
 };
 
 export function PrintPreviewShell({
@@ -15,7 +14,6 @@ export function PrintPreviewShell({
   dir = "rtl",
   children,
   onPrint,
-  onClose,
 }: PrintPreviewShellProps) {
   const handlePrint = () => {
     if (fileName) {
@@ -27,16 +25,11 @@ export function PrintPreviewShell({
       return;
     }
 
-    window.print();
   };
 
-  const handleClose = () => {
-    if (onClose) {
-      onClose();
       return;
     }
 
-    window.close();
   };
 
   return (
@@ -61,17 +54,13 @@ export function PrintPreviewShell({
           </button>
           <button
             type="button"
-            onClick={() => window.print()}
             className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
           >
-            Save As
           </button>
           <button
             type="button"
-            onClick={handleClose}
             className="rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
           >
-            Close
           </button>
         </div>
       </div>
