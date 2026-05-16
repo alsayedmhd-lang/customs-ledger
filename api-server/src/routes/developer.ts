@@ -213,6 +213,50 @@ async function nearestExistingPath(targetPath: string) {
   return currentPath;
 }
 
+function isPathInside(parentPath: string, childPath: string) {
+  const relative = path.relative(parentPath, childPath);
+  return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
+}
+
+function getSafeAttachmentPath(dataRoot: string, attachmentsRoot: string, relativePath: string) {
+  const normalized = path.normalize(String(relativePath || "").trim()).replace(/^([\\/])+/, "");
+
+  if (!normalized || path.isAbsolute(normalized) || normalized.startsWith("..") || normalized.includes(`..${path.sep}`)) {
+    return null;
+  }
+
+  const [rootSegment] = normalized.split(/[\\/]+/);
+  const resolvedPath =
+    String(rootSegment || "").toLowerCase() === "attachments"
+      ? path.resolve(dataRoot, normalized)
+      : path.resolve(attachmentsRoot, normalized);
+
+  return isPathInside(attachmentsRoot, resolvedPath) ? resolvedPath : null;
+}
+
+async function listFilesRecursive(rootPath: string) {
+  const files: string[] = [];
+
+  async function walk(currentPath: string) {
+    const entries = await fs.promises.readdir(currentPath, { withFileTypes: true });
+
+    for (const entry of entries) {
+      const entryPath = path.join(currentPath, entry.name);
+      if (entry.isDirectory()) {
+        await walk(entryPath);
+      } else if (entry.isFile()) {
+        files.push(entryPath);
+      }
+    }
+  }
+
+  if ((await safeStat(rootPath))?.isDirectory()) {
+    await walk(rootPath);
+  }
+
+  return files;
+}
+
 function maskSensitiveString(value: string) {
   return value
     .replace(/postgres(?:ql)?:\/\/[^\s"']+/gi, "[masked-postgres-connection-string]")
@@ -633,6 +677,176 @@ async function buildSystemDiagnostics() {
     } catch (error) {
       addExceptionCheck(`${folderName}-folder-health`, folderName, folderPath, error);
     }
+  }
+
+  try {
+    const attachmentsRoot = path.resolve(context.dataRoot, "attachments");
+    const declarationsRoot = path.resolve(attachmentsRoot, "declarations");
+
+    if (!sqlite) {
+      addCheck({
+        id: "attachments-integrity",
+        status: "warning",
+        area: "attachments",
+        location: attachmentsRoot,
+        messageAr: "تعذر فحص سلامة المرفقات.",
+        messageEn: "Attachments integrity could not be checked.",
+        causeAr: "اتصال SQLite غير متاح لقراءة سجلات المرفقات.",
+        causeEn: "SQLite connection is unavailable for reading attachment records.",
+        suggestedFixAr: "راجع المرفقات من داخل الفواتير، أو أعد رفع الملفات المفقودة، ولا تحذف ملفات يدويًا من مجلد البيانات.",
+        suggestedFixEn:
+          "Review attachments from invoices, re-upload missing files, and avoid manually deleting files from the data folder.",
+        details: {
+          totalActiveAttachments: 0,
+          missingFilesCount: 0,
+          unsafePathsCount: 0,
+          orphanFilesCount: 0,
+        },
+      });
+    } else {
+      const table = sqlite
+        .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'invoice_attachments'")
+        .get();
+
+      if (!table) {
+        addCheck({
+          id: "attachments-integrity",
+          status: "warning",
+          area: "attachments",
+          location: attachmentsRoot,
+          messageAr: "تعذر فحص سلامة المرفقات.",
+          messageEn: "Attachments integrity could not be checked.",
+          causeAr: "جدول invoice_attachments غير موجود.",
+          causeEn: "The invoice_attachments table does not exist.",
+          suggestedFixAr:
+            "راجع المرفقات من داخل الفواتير، أو أعد رفع الملفات المفقودة، ولا تحذف ملفات يدويًا من مجلد البيانات.",
+          suggestedFixEn:
+            "Review attachments from invoices, re-upload missing files, and avoid manually deleting files from the data folder.",
+          details: {
+            totalActiveAttachments: 0,
+            missingFilesCount: 0,
+            unsafePathsCount: 0,
+            orphanFilesCount: 0,
+          },
+        });
+      } else {
+        const rows = sqlite
+          .prepare(
+            `
+              SELECT
+                id,
+                declaration_base_number AS declarationBaseNumber,
+                file_name AS fileName,
+                stored_name AS storedName,
+                relative_path AS relativePath,
+                deleted_at AS deletedAt
+              FROM invoice_attachments
+              WHERE deleted_at IS NULL
+            `,
+          )
+          .all() as Array<{
+            id: number;
+            declarationBaseNumber: string | null;
+            fileName: string | null;
+            storedName: string | null;
+            relativePath: string | null;
+            deletedAt: number | null;
+          }>;
+
+        const activeAttachmentPaths = new Set<string>();
+        const missingFiles: Array<{ id: number; fileName: string | null }> = [];
+        const unsafePaths: Array<{ id: number; fileName: string | null }> = [];
+
+        for (const row of rows) {
+          const attachmentPath = getSafeAttachmentPath(context.dataRoot, attachmentsRoot, String(row.relativePath || ""));
+
+          if (!attachmentPath) {
+            unsafePaths.push({ id: row.id, fileName: row.fileName });
+            continue;
+          }
+
+          const normalizedAttachmentPath = path.normalize(attachmentPath).toLowerCase();
+          activeAttachmentPaths.add(normalizedAttachmentPath);
+
+          const stats = await safeStat(attachmentPath);
+          if (!stats?.isFile()) {
+            missingFiles.push({ id: row.id, fileName: row.fileName });
+          }
+        }
+
+        const declarationFiles = await listFilesRecursive(declarationsRoot);
+        const orphanFiles = declarationFiles.filter(
+          (filePath) => !activeAttachmentPaths.has(path.normalize(filePath).toLowerCase()),
+        );
+        const missingFilesCount = missingFiles.length;
+        const unsafePathsCount = unsafePaths.length;
+        const orphanFilesCount = orphanFiles.length;
+        const status: DiagnosticStatus =
+          missingFilesCount > 0 || unsafePathsCount > 0 || orphanFilesCount > 0 ? "warning" : "pass";
+        const onlyOrphans = missingFilesCount === 0 && unsafePathsCount === 0 && orphanFilesCount > 0;
+
+        addCheck({
+          id: "attachments-integrity",
+          status,
+          area: "attachments",
+          location: attachmentsRoot,
+          messageAr:
+            status === "pass"
+              ? "المرفقات سليمة."
+              : onlyOrphans
+                ? "توجد ملفات مرفقات غير مرتبطة بسجلات."
+                : "توجد مشاكل في بعض المرفقات.",
+          messageEn:
+            status === "pass"
+              ? "Attachments integrity check passed."
+              : onlyOrphans
+                ? "Orphan attachment files were found."
+                : "Some attachment issues were found.",
+          causeAr:
+            status === "pass"
+              ? "كل سجلات المرفقات النشطة تشير إلى ملفات موجودة ولا توجد ملفات orphan."
+              : "تم العثور على ملفات مفقودة أو مسارات غير آمنة أو ملفات غير مرتبطة بسجلات.",
+          causeEn:
+            status === "pass"
+              ? "All active attachment records point to existing files and no orphan files were found."
+              : "Missing files, unsafe paths, or files without matching records were found.",
+          suggestedFixAr:
+            status === "pass"
+              ? "لا يلزم إجراء."
+              : "راجع المرفقات من داخل الفواتير، أو أعد رفع الملفات المفقودة، ولا تحذف ملفات يدويًا من مجلد البيانات.",
+          suggestedFixEn:
+            status === "pass"
+              ? "No action required."
+              : "Review attachments from invoices, re-upload missing files, and avoid manually deleting files from the data folder.",
+          details: {
+            totalActiveAttachments: rows.length,
+            missingFilesCount,
+            unsafePathsCount,
+            orphanFilesCount,
+            missingFilesSample: missingFiles.slice(0, 10),
+            unsafePathsSample: unsafePaths.slice(0, 10),
+            orphanFilesSample: orphanFiles
+              .slice(0, 10)
+              .map((filePath) => path.relative(attachmentsRoot, filePath).replace(/\\/g, "/")),
+          },
+        });
+      }
+    }
+  } catch (error) {
+    addCheck({
+      id: "attachments-integrity",
+      status: "warning",
+      area: "attachments",
+      location: path.join(context.dataRoot, "attachments"),
+      messageAr: "تعذر فحص سلامة المرفقات.",
+      messageEn: "Attachments integrity could not be checked.",
+      causeAr: "حدث خطأ أثناء قراءة سجلات أو ملفات المرفقات.",
+      causeEn: "An error occurred while reading attachment records or files.",
+      suggestedFixAr: "راجع المرفقات من داخل الفواتير، أو أعد رفع الملفات المفقودة، ولا تحذف ملفات يدويًا من مجلد البيانات.",
+      suggestedFixEn:
+        "Review attachments from invoices, re-upload missing files, and avoid manually deleting files from the data folder.",
+      details: { error: nodeErrorMessage(error), code: getNodeErrorCode(error) },
+    });
   }
 
   try {
