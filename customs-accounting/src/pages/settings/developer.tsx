@@ -2481,6 +2481,19 @@ export default function DeveloperSettingsPage() {
                   <FileText className={cn("h-3.5 w-3.5", isSystemDiagnosticsPdfExporting && "animate-pulse")} />
                   {isSystemDiagnosticsPdfExporting ? tr("جاري تجهيز PDF...", "Preparing PDF...") : tr("تصدير PDF", "Export PDF")}
                 </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={saveCurrentDataRoot}
+                  disabled={isSavingCurrentDataRoot}
+                  className="gap-2"
+                >
+                  <Save className={cn("h-3.5 w-3.5", isSavingCurrentDataRoot && "animate-pulse")} />
+                  {isSavingCurrentDataRoot
+                    ? tr("جاري التثبيت...", "Saving...")
+                    : tr("تثبيت مسار البيانات الحالي", "Save Current Data Root")}
+                </Button>
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
