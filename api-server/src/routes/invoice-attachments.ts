@@ -131,6 +131,7 @@ function formatAttachment(attachment: typeof invoiceAttachmentsTable.$inferSelec
     createdAt: attachment.createdAt ? new Date(attachment.createdAt).toISOString() : null,
     declarationNumber: attachment.declarationNumber,
     declarationBaseNumber: attachment.declarationBaseNumber,
+    storedName: attachment.storedName,
     relativePath: attachment.relativePath,
   };
 }

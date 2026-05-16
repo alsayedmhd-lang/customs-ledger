@@ -134,6 +134,7 @@ type InvoiceAttachment = {
   createdAt?: string | null;
   declarationNumber?: string | null;
   declarationBaseNumber?: string | null;
+  storedName?: string | null;
   relativePath?: string | null;
 };
 
@@ -959,7 +960,11 @@ export default function InvoiceForm() {
       return;
     }
 
-    const result: AttachmentSaveResult = await api.openAttachmentFile(attachment.relativePath);
+    const result: AttachmentSaveResult = await api.openAttachmentFile({
+      relativePath: attachment.relativePath,
+      storedName: attachment.storedName,
+      declarationBaseNumber: attachment.declarationBaseNumber,
+    });
     if (!result.ok) {
       toast({
         title: isAR ? "تعذر فتح الملف" : "Failed to open file",

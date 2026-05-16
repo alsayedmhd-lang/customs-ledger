@@ -58,8 +58,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
       declarationBaseNumber,
       storedName,
     }),
-  openAttachmentFile: (relativePath) =>
-    ipcRenderer.invoke("attachment:open-file", relativePath),
+  openAttachmentFile: (payload) =>
+    ipcRenderer.invoke("attachment:open-file", payload),
   saveCurrentPagePDF: (fileName) =>
     ipcRenderer.invoke("save-current-page-pdf", fileName),
   checkForUpdates: () => ipcRenderer.invoke("check-for-updates"),

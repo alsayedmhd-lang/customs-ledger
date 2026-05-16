@@ -135,6 +135,86 @@ function safeStoredAttachmentName(value) {
   return name;
 }
 
+function createAttachmentOpenLogContext(input) {
+  return {
+    dataRoot: null,
+    attachmentsRoot: null,
+    savedRelativePath: typeof input === "string" ? input : input?.relativePath,
+    storedName: typeof input === "object" && input ? input.storedName : undefined,
+    declarationBaseNumber: typeof input === "object" && input ? input.declarationBaseNumber : undefined,
+    resolvedFullPath: null,
+    exists: false,
+    rejectedReason: null,
+  };
+}
+
+function logAttachmentOpen(context) {
+  console.log("[ATTACHMENT_OPEN]", context);
+}
+
+function normalizeAttachmentOpenPayload(input) {
+  if (typeof input === "string") {
+    return {
+      relativePath: input,
+      storedName: null,
+      declarationBaseNumber: null,
+    };
+  }
+
+  if (!input || typeof input !== "object") {
+    return {
+      relativePath: "",
+      storedName: null,
+      declarationBaseNumber: null,
+    };
+  }
+
+  return {
+    relativePath: String(input.relativePath || ""),
+    storedName: safeStoredAttachmentName(input.storedName),
+    declarationBaseNumber: safeDeclarationBaseNumber(input.declarationBaseNumber),
+  };
+}
+
+function buildAttachmentOpenCandidates({ dataRoot, attachmentsRoot, relativePath, storedName, declarationBaseNumber }) {
+  const candidates = [];
+  const savedPath = String(relativePath || "").trim();
+
+  if (savedPath) {
+    if (path.isAbsolute(savedPath)) {
+      candidates.push({
+        reason: "saved absolute relativePath",
+        fullPath: path.resolve(savedPath),
+      });
+    } else {
+      const safePath = safeRelativePath(savedPath);
+
+      if (safePath) {
+        const parts = safePath.split(/[\\/]+/);
+        const rootSegment = String(parts[0] || "").toLowerCase();
+
+        candidates.push({
+          reason: rootSegment === "attachments"
+            ? "saved relativePath under dataRoot"
+            : "saved relativePath under attachmentsRoot",
+          fullPath: rootSegment === "attachments"
+            ? path.resolve(dataRoot, safePath)
+            : path.resolve(attachmentsRoot, safePath),
+        });
+      }
+    }
+  }
+
+  if (storedName && declarationBaseNumber) {
+    candidates.push({
+      reason: "fallback storedName under declaration attachments",
+      fullPath: path.resolve(attachmentsRoot, "declarations", declarationBaseNumber, storedName),
+    });
+  }
+
+  return candidates;
+}
+
 function getAttachmentRelativePath(...segments) {
   return path.join("attachments", ...segments);
 }
@@ -1169,31 +1249,71 @@ ipcMain.handle("attachment:save-file", async (_event, payload = {}) => {
   }
 });
 
-ipcMain.handle("attachment:open-file", async (_event, relativePath) => {
+ipcMain.handle("attachment:open-file", async (_event, input) => {
+  const logContext = createAttachmentOpenLogContext(input);
+
   try {
-    const safePath = safeRelativePath(relativePath);
-    if (!safePath) {
+    const payload = normalizeAttachmentOpenPayload(input);
+    const dataRoot = path.resolve(resolveDataRoot());
+    const attachmentsRoot = path.resolve(dataRoot, "attachments");
+    const candidates = buildAttachmentOpenCandidates({
+      dataRoot,
+      attachmentsRoot,
+      relativePath: payload.relativePath,
+      storedName: payload.storedName,
+      declarationBaseNumber: payload.declarationBaseNumber,
+    });
+
+    logContext.dataRoot = dataRoot;
+    logContext.attachmentsRoot = attachmentsRoot;
+    logContext.savedRelativePath = payload.relativePath;
+    logContext.storedName = payload.storedName;
+    logContext.declarationBaseNumber = payload.declarationBaseNumber;
+
+    if (candidates.length === 0) {
+      logContext.rejectedReason = "No safe attachment path candidate";
+      logAttachmentOpen(logContext);
       return { ok: false, error: "Invalid attachment path" };
     }
 
-    const attachmentsRoot = getAttachmentsRoot();
-    const targetPath = path.resolve(app.getPath("userData"), safePath);
+    let outsideRootSeen = false;
 
-    if (!isPathInside(attachmentsRoot, targetPath)) {
-      return { ok: false, error: "Attachment path is outside storage root" };
+    for (const candidate of candidates) {
+      const targetPath = path.resolve(candidate.fullPath);
+      logContext.resolvedFullPath = targetPath;
+      logContext.exists = fs.existsSync(targetPath);
+
+      if (!isPathInside(attachmentsRoot, targetPath)) {
+        outsideRootSeen = true;
+        logContext.rejectedReason = `${candidate.reason}: outside attachments root`;
+        logAttachmentOpen(logContext);
+        continue;
+      }
+
+      if (!logContext.exists || !fs.statSync(targetPath).isFile()) {
+        logContext.rejectedReason = `${candidate.reason}: file not found`;
+        logAttachmentOpen(logContext);
+        continue;
+      }
+
+      logContext.rejectedReason = null;
+      logAttachmentOpen(logContext);
+
+      const errorMessage = await shell.openPath(targetPath);
+      if (errorMessage) {
+        return { ok: false, error: errorMessage };
+      }
+
+      return { ok: true, fullPath: targetPath };
     }
 
-    if (!fs.existsSync(targetPath) || !fs.statSync(targetPath).isFile()) {
-      return { ok: false, error: "Attachment file not found" };
-    }
-
-    const errorMessage = await shell.openPath(targetPath);
-    if (errorMessage) {
-      return { ok: false, error: errorMessage };
-    }
-
-    return { ok: true, fullPath: targetPath };
+    return {
+      ok: false,
+      error: outsideRootSeen ? "Attachment path is outside storage root" : "Attachment file not found",
+    };
   } catch (error) {
+    logContext.rejectedReason = error?.message || String(error);
+    logAttachmentOpen(logContext);
     console.error("Attachment open error:", error);
     return { ok: false, error: error.message };
   }
