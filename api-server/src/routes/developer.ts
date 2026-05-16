@@ -171,6 +171,8 @@ type DiagnosticCheck = {
 
 const STORAGE_CONFIG_FILE = "storage-config.json";
 const SYSTEM_SUBFOLDERS = ["database", "attachments", "backups", "license", "logs", "config"] as const;
+const ONE_GB_BYTES = 1024 * 1024 * 1024;
+const FIVE_GB_BYTES = 5 * ONE_GB_BYTES;
 
 function nodeErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
@@ -197,6 +199,18 @@ async function safeStat(targetPath: string) {
   } catch {
     return null;
   }
+}
+
+async function nearestExistingPath(targetPath: string) {
+  let currentPath = path.resolve(targetPath);
+
+  while (!(await pathExists(currentPath))) {
+    const parentPath = path.dirname(currentPath);
+    if (parentPath === currentPath) return null;
+    currentPath = parentPath;
+  }
+
+  return currentPath;
 }
 
 function maskSensitiveString(value: string) {
@@ -346,6 +360,88 @@ async function buildSystemDiagnostics() {
     });
   } catch (error) {
     addExceptionCheck("data-root-exists", "storage", context.dataRoot, error);
+  }
+
+  try {
+    const statfsPath = await nearestExistingPath(context.dataRoot);
+
+    if (!statfsPath) {
+      addCheck({
+        id: "data-root-disk-space",
+        status: "warning",
+        area: "storage",
+        location: context.dataRoot,
+        messageAr: "تعذر فحص مساحة القرص.",
+        messageEn: "Disk space could not be checked.",
+        causeAr: "تعذر العثور على مسار موجود ضمن Data Root أو أحد المسارات الأب.",
+        causeEn: "No existing Data Root path or parent path could be found for disk inspection.",
+        suggestedFixAr: "حرر مساحة على القرص أو انقل Data Root إلى قرص آخر من صفحة المطور.",
+        suggestedFixEn: "Free up disk space or move the Data Root to another drive from Developer Tools.",
+        details: { dataRoot: context.dataRoot },
+      });
+    } else {
+      const diskStats = await fs.promises.statfs(statfsPath);
+      const totalBytes = Number(diskStats.blocks) * Number(diskStats.bsize);
+      const freeBytes = Number(diskStats.bavail) * Number(diskStats.bsize);
+      const usedPercent = totalBytes > 0 ? Number((((totalBytes - freeBytes) / totalBytes) * 100).toFixed(2)) : null;
+      const status: DiagnosticStatus =
+        freeBytes < ONE_GB_BYTES ? "critical" : freeBytes < FIVE_GB_BYTES ? "warning" : "pass";
+
+      addCheck({
+        id: "data-root-disk-space",
+        status,
+        area: "storage",
+        location: context.dataRoot,
+        messageAr:
+          status === "critical"
+            ? "مساحة القرص منخفضة جدًا وقد تؤثر على قاعدة البيانات أو النسخ الاحتياطي."
+            : status === "warning"
+              ? "مساحة القرص منخفضة."
+              : "مساحة القرص كافية.",
+        messageEn:
+          status === "critical"
+            ? "Disk space is critically low and may affect the database or backups."
+            : status === "warning"
+              ? "Disk space is low."
+              : "Disk space is sufficient.",
+        causeAr:
+          status === "pass"
+            ? "المساحة المتاحة على القرص أعلى من حد التحذير."
+            : "المساحة المتاحة على القرص أقل من الحد الآمن.",
+        causeEn:
+          status === "pass"
+            ? "Available disk space is above the warning threshold."
+            : "Available disk space is below the safe threshold.",
+        suggestedFixAr:
+          status === "pass"
+            ? "لا يلزم إجراء."
+            : "حرر مساحة على القرص أو انقل Data Root إلى قرص آخر من صفحة المطور.",
+        suggestedFixEn:
+          status === "pass"
+            ? "No action required."
+            : "Free up disk space or move the Data Root to another drive from Developer Tools.",
+        details: {
+          checkedPath: statfsPath,
+          totalBytes,
+          freeBytes,
+          usedPercent,
+        },
+      });
+    }
+  } catch (error) {
+    addCheck({
+      id: "data-root-disk-space",
+      status: "warning",
+      area: "storage",
+      location: context.dataRoot,
+      messageAr: "تعذر فحص مساحة القرص.",
+      messageEn: "Disk space could not be checked.",
+      causeAr: "تعذر الحصول على معلومات مساحة القرص من النظام.",
+      causeEn: "Disk space information could not be read from the operating system.",
+      suggestedFixAr: "حرر مساحة على القرص أو انقل Data Root إلى قرص آخر من صفحة المطور.",
+      suggestedFixEn: "Free up disk space or move the Data Root to another drive from Developer Tools.",
+      details: { error: nodeErrorMessage(error), code: getNodeErrorCode(error) },
+    });
   }
 
   try {
