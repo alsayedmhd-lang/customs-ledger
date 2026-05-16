@@ -71,6 +71,16 @@ function getPrintQueryParams() {
   return new URLSearchParams(window.location.hash.slice(hashQueryIndex + 1));
 }
 
+function formatCustomerLedgerReference(clientId: string | number | null | undefined) {
+  const year = new Date().getFullYear();
+  const idText = String(clientId || "").trim();
+  const formattedId = /^\d+$/.test(idText)
+    ? idText.padStart(4, "0")
+    : idText.replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-|-$/g, "") || "0000";
+
+  return `CL-${year}-${formattedId}`;
+}
+
 export default function CustomerLedgerPrintPage() {
   const [, navigate] = useLocation();
   const { user } = useAuth();
@@ -120,6 +130,34 @@ export default function CustomerLedgerPrintPage() {
     enabled: !!clientId && (isClient || !!user?.permissions?.canViewStatements),
   });
 
+  const clientFromList = clients.find((c: any) => String(c.id) === String(clientId));
+  const client =
+    data?.client ||
+    clientFromList ||
+    {};
+
+  const clientName =
+    clientFromList?.nameAr ||
+    clientFromList?.nameEn ||
+    clientFromList?.name ||
+    data?.client?.nameAr ||
+    data?.client?.nameEn ||
+    data?.clientName ||
+    "-";
+
+  const statementRef = formatCustomerLedgerReference(clientId);
+
+  useEffect(() => {
+    if (!clientId || !data) return;
+
+    const previousTitle = document.title;
+    document.title = `${statementRef} - ${clientName}`;
+
+    return () => {
+      document.title = previousTitle;
+    };
+  }, [clientId, clientName, data, statementRef]);
+
   if (!isClient && !user?.permissions?.canViewStatements) return null;
   if (!clientId) return <div className="p-8">Missing clientId</div>;
   if (isLoading) return <div className="p-8 text-center">Loading...</div>;
@@ -135,25 +173,8 @@ export default function CustomerLedgerPrintPage() {
   });
   const openingBalance = Number(data?.openingBalance || 0);
 
-  const client =
-    data?.client ||
-    clients.find((c: any) => String(c.id) === String(clientId)) ||
-    {};
-
-  const clientFromList = clients.find((c: any) => String(c.id) === String(clientId));
-
-    const clientName =
-    clientFromList?.nameAr ||
-    clientFromList?.nameEn ||
-    clientFromList?.name ||
-    data?.client?.nameAr ||
-    data?.client?.nameEn ||
-    data?.clientName ||
-    "-";
-
   const clientAddress = client.address || client.city || "";
 
-  const statementRef = `CL-${clientId}-${new Date().getFullYear()}`;
   const today = formatDateYMD();
   const fromDateText = formatDateYMD(from);
   const toDateText = formatDateYMD(to);
