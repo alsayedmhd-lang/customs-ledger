@@ -9,6 +9,7 @@ import { useLanguage } from "@/lib/language-context";
 import { useCompanySettings } from "@/lib/company-settings-context";
 import { useAuth } from "@/lib/auth-context";
 import { useGetReceipt, useListClients } from "@workspace/api-client-react";
+import { PrintPreviewShell } from "@/components/print-preview-shell";
 
 // ── Number to English words ───────────────────────────────────────────────────
 const engOnes = [
@@ -228,6 +229,9 @@ export default function ReceiptPrint() {
   const receiptNum = receipt.receiptNumber;
 
   return (
+      <PrintPreviewShell
+    title={isAR ? "طباعة سند القبض" : "Receipt Print Preview"}
+  >
     <A4PrintShell
       dir="rtl"
       pageClassName="receipt-print-page mt-2 print:mt-0"
@@ -583,6 +587,7 @@ export default function ReceiptPrint() {
           </div> */}
         </div>
     </A4PrintShell>
-  );
+  </PrintPreviewShell>
+);
 };
 
