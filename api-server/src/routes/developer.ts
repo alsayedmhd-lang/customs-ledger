@@ -15,6 +15,13 @@ import { getStorageInfo } from "../utils/storage/get-storage-info";
 
 const router = Router();
 const require = createRequire(path.join(process.cwd(), "package.json"));
+const BetterSqliteDatabase = require("better-sqlite3") as new (
+  filename: string,
+  options?: { readonly?: boolean; fileMustExist?: boolean },
+) => {
+  prepare: (sql: string) => { all: () => Array<Record<string, unknown>> };
+  close: () => void;
+};
 const { Client: PgClient } = require("pg") as {
   Client: new (config: { connectionString: string; connectionTimeoutMillis?: number; query_timeout?: number }) => {
     connect: () => Promise<void>;
@@ -391,6 +398,49 @@ async function buildSystemDiagnostics() {
       causeEn: "The database file read test or SELECT 1 query failed.",
       suggestedFixAr: "تحقق من وجود الملف وصلاحيات القراءة وأن الملف ليس تالفًا.",
       suggestedFixEn: "Check that the file exists, read permissions are available, and the database is not corrupted.",
+      details: { error: nodeErrorMessage(error), code: getNodeErrorCode(error) },
+    });
+  }
+
+  try {
+    const integrityDb = new BetterSqliteDatabase(context.sqlitePath, { readonly: true, fileMustExist: true });
+    try {
+      const rows = integrityDb.prepare("PRAGMA integrity_check;").all();
+      const results = rows.map((row) => String(Object.values(row)[0] ?? ""));
+      const passed = results.length === 1 && results[0].toLowerCase() === "ok";
+
+      addCheck({
+        id: "sqlite-integrity-check",
+        status: passed ? "pass" : "critical",
+        area: "database",
+        location: context.sqlitePath,
+        messageAr: passed ? "قاعدة البيانات سليمة." : "توجد مشكلة في سلامة قاعدة البيانات.",
+        messageEn: passed ? "Database integrity check passed." : "Database integrity check failed.",
+        causeAr: passed ? "فحص SQLite integrity_check أعاد ok." : "فحص SQLite أعاد أخطاء.",
+        causeEn: passed ? "SQLite integrity_check returned ok." : "SQLite integrity_check returned errors.",
+        suggestedFixAr: passed
+          ? "لا يلزم إجراء."
+          : "أنشئ نسخة احتياطية فورًا ثم راجع قاعدة البيانات أو استرجع آخر نسخة سليمة.",
+        suggestedFixEn: passed
+          ? "No action required."
+          : "Create an emergency backup immediately, then inspect the database or restore the latest valid backup.",
+        details: passed ? { result: "ok" } : { errorCount: results.length },
+      });
+    } finally {
+      integrityDb.close();
+    }
+  } catch (error) {
+    addCheck({
+      id: "sqlite-integrity-check",
+      status: "critical",
+      area: "database",
+      location: context.sqlitePath,
+      messageAr: "توجد مشكلة في سلامة قاعدة البيانات.",
+      messageEn: "Database integrity check failed.",
+      causeAr: "تعذر تشغيل فحص SQLite integrity_check.",
+      causeEn: "SQLite integrity_check could not be executed.",
+      suggestedFixAr: "تحقق من وجود ملف قاعدة البيانات وصلاحيات القراءة، ثم أعد تشغيل الفحص.",
+      suggestedFixEn: "Check that the database file exists and is readable, then run diagnostics again.",
       details: { error: nodeErrorMessage(error), code: getNodeErrorCode(error) },
     });
   }
