@@ -274,7 +274,7 @@ export default function CustomerLedgerPrintPage() {
         className="flex items-center gap-2 px-5 py-2 bg-blue-700 text-white rounded-lg font-medium hover:bg-blue-800"
         >
         <Printer className="w-4 h-4" />
-        {isAR ? "طباعة PDF" : "Print Account Summary"}
+        {isAR ? "طباعة" : "Print Account Summary"}
         </button>
 
         {!isClient && (
