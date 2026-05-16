@@ -841,8 +841,8 @@ function createWindow() {
   }, 3000);
 }
 
-function setupApplicationMenu() {
-  const template = [
+function buildApplicationMenuTemplate() {
+  return [
     {
       label: "File",
       submenu: [
@@ -888,7 +888,10 @@ function setupApplicationMenu() {
       ],
     },
   ];
+}
 
+function setupApplicationMenu() {
+  const template = buildApplicationMenuTemplate();
   const menu = Menu.buildFromTemplate(template);
   Menu.setApplicationMenu(menu);
 }
@@ -896,40 +899,62 @@ function setupApplicationMenu() {
 function setupDiagnosticsReportWindowMenu(reportWindow) {
   if (!reportWindow || reportWindow.isDestroyed()) return;
 
-  const menu = Menu.buildFromTemplate([
-    {
-      label: "File",
-      submenu: [
-        {
-          label: "Print",
-          accelerator: "CommandOrControl+P",
-          click: () => {
-            if (!reportWindow.isDestroyed()) {
-              reportWindow.webContents.print();
-            }
-          },
+  const diagnosticsFileMenu = {
+    label: "File",
+    submenu: [
+      {
+        label: "Print",
+        accelerator: "CommandOrControl+P",
+        click: () => {
+          if (!reportWindow.isDestroyed()) {
+            reportWindow.webContents.print();
+          }
         },
-        {
-          label: "Save As",
-          click: () => {
+      },
+      {
+        label: "Save As",
+        accelerator: "CommandOrControl+S",
+        click: async () => {
+          if (reportWindow.isDestroyed()) return;
+
+          const { canceled, filePath } = await dialog.showSaveDialog(reportWindow, {
+            title: "Save Diagnostics Report",
+            defaultPath: "diagnostics-report.pdf",
+            filters: [{ name: "PDF", extensions: ["pdf"] }],
+          });
+
+          if (canceled || !filePath || reportWindow.isDestroyed()) return;
+
+          try {
+            const pdf = await reportWindow.webContents.printToPDF({
+              printBackground: true,
+              pageSize: "A4",
+            });
+            fs.writeFileSync(filePath, pdf);
+          } catch (error) {
+            console.error("Failed to save diagnostics report:", error);
             if (!reportWindow.isDestroyed()) {
-              reportWindow.webContents.print();
+              dialog.showErrorBox("Save Failed", "Failed to save the diagnostics report.");
             }
-          },
+          }
         },
-        { type: "separator" },
-        {
-          label: "Close",
-          accelerator: "CommandOrControl+W",
-          click: () => {
-            if (!reportWindow.isDestroyed()) {
-              reportWindow.close();
-            }
-          },
+      },
+      { type: "separator" },
+      {
+        label: "Close",
+        accelerator: "CommandOrControl+W",
+        click: () => {
+          if (!reportWindow.isDestroyed()) {
+            reportWindow.close();
+          }
         },
-      ],
-    },
-  ]);
+      },
+    ],
+  };
+  const diagnosticsMenuTemplate = buildApplicationMenuTemplate().map((item) =>
+    item.label === "File" ? diagnosticsFileMenu : item
+  );
+  const menu = Menu.buildFromTemplate(diagnosticsMenuTemplate);
 
   reportWindow.setAutoHideMenuBar(false);
   reportWindow.setMenu(menu);
