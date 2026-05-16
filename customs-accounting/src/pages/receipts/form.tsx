@@ -227,7 +227,9 @@ export default function ReceiptForm() {
         title: tr("تم الحفظ", "Saved"),
         description: isEdit ? tr("تم تحديث سند القبض بنجاح", "Receipt updated successfully") : tr("تم إنشاء سند القبض بنجاح", "Receipt created successfully"),
       });
-      setLocation(`/receipts/${saved.id}/print`);
+      (window as any).electronAPI?.openExternalPrintWindow?.(
+          `#/receipts/${saved.id}/print`
+        );
 
     } catch (err) {
       console.error("Receipt save error:", err);
@@ -522,3 +524,5 @@ export default function ReceiptForm() {
     </div>
   );
 }
+
+

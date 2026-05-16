@@ -258,12 +258,6 @@ export default function ReceiptPrint() {
         `}</style>
 
         <div className="print:hidden flex items-center gap-3 p-6 max-w-4xl mx-auto flex-wrap" dir={isAR ? "rtl" : "ltr"}>
-        <Link href="/receipts">
-          <button className={`${isClient ? "hidden" : ""} flex h-10 items-center gap-2 px-4 border border-gray-300 rounded-lg bg-white text-gray-700 hover:bg-gray-50 text-sm font-medium`}>
-            {isAR ? <ArrowRight className="w-4 h-4" /> : <ArrowLeft className="w-4 h-4" />}
-            {isAR ? "العودة" : "Back"}
-          </button>
-        </Link>
 
         <button
           onClick={() => {
@@ -586,4 +580,6 @@ export default function ReceiptPrint() {
     </A4PrintShell>
   );
 };
+
+
 

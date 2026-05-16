@@ -325,16 +325,20 @@ const getClientName = (receipt: { clientName?: string | null; clientId?: number 
 
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
-                        <Link href={`/receipts/${receipt.id}/print`}>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                            title={t("print")}
-                          >
-                            <Printer className="w-4 h-4" />
-                          </Button>
-                        </Link>
+                        <Button
+                          type="button"
+                          onClick={() => {
+                            (window as any).electronAPI?.openExternalPrintWindow?.(
+                              `#/receipts/${receipt.id}/print`
+                            );
+                          }}
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                          title={t("print")}
+                        >
+                          <Printer className="w-4 h-4" />
+                        </Button>
 
                         {!isClient && can("canEditReceipts") && (
                           <Link href={`/receipts/${receipt.id}/edit`}>
@@ -391,4 +395,5 @@ const getClientName = (receipt: { clientName?: string | null; clientId?: number 
     </div>
   );
 }
+
 
