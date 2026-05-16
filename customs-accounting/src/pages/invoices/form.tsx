@@ -1291,6 +1291,19 @@ export default function InvoiceForm() {
               </button>
             </Link>
 
+            {isEdit && invoiceId ? (
+              <button
+                type="button"
+                onClick={() => {
+                  window.electronAPI?.openExternalPrintWindow?.(`#/invoices/${invoiceId}/receipt`);
+                }}
+                className="flex items-center gap-1.5 px-3 py-2 border border-border rounded-xl bg-muted/30 text-foreground text-sm font-medium hover:bg-muted/50"
+              >
+                <Printer className="w-3.5 h-3.5" />
+                {isAR ? "طباعة خارجية" : "External Print"}
+              </button>
+            ) : null}
+
           </div>
         ) : null}
         </div>
@@ -2083,3 +2096,5 @@ export default function InvoiceForm() {
     </motion.div>
   );
 }
+
+

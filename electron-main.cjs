@@ -1508,6 +1508,123 @@ ipcMain.on("app:zoom-wheel", (event, direction) => {
   adjustAppZoom(direction);
 });
 
+function resolveFrontendIndexPath() {
+  const candidates = [
+    path.join(process.resourcesPath, "app.asar", "customs-accounting", "dist", "public", "index.html"),
+    path.join(process.resourcesPath, "customs-accounting", "dist", "public", "index.html"),
+    path.join(__dirname, "customs-accounting", "dist", "public", "index.html"),
+  ];
+
+  return candidates.find((candidate) => fs.existsSync(candidate)) || candidates[0];
+}
+
+function normalizePrintPreviewHash(url) {
+  if (typeof url !== "string" || !url.startsWith("#/")) {
+    throw new Error("Invalid print preview URL");
+  }
+
+  return url;
+}
+
+async function readMainWindowAuthToken() {
+  if (!mainWindow || mainWindow.isDestroyed()) return "";
+
+  try {
+    const token = await mainWindow.webContents.executeJavaScript(
+      'sessionStorage.getItem("auth_token") || ""',
+      true
+    );
+
+    return typeof token === "string" ? token : "";
+  } catch (error) {
+    console.warn("[PRINT PREVIEW WINDOW] Failed to read auth token:", error);
+    return "";
+  }
+}
+
+async function ensurePrintWindowRouteAndAuth(printWindow, targetHash, authToken) {
+  const result = await printWindow.webContents.executeJavaScript(
+    `(() => {
+      const targetHash = ${JSON.stringify(targetHash)};
+      const authToken = ${JSON.stringify(authToken || "")};
+      const hadTokenBefore = Boolean(sessionStorage.getItem("auth_token"));
+
+      if (authToken && !hadTokenBefore) {
+        sessionStorage.setItem("auth_token", authToken);
+      }
+
+      if (window.location.hash !== targetHash) {
+        window.location.hash = targetHash;
+      }
+
+      return {
+        hash: window.location.hash,
+        hasToken: Boolean(sessionStorage.getItem("auth_token")),
+        needsReload: Boolean(authToken) && !hadTokenBefore,
+      };
+    })()`,
+    true
+  );
+
+  return result || { hash: "", hasToken: false, needsReload: false };
+}
+
+ipcMain.handle("print-preview:open-external-window", async (_event, url) => {
+  try {
+    if (!mainWindow || mainWindow.isDestroyed()) {
+      throw new Error("Main window not found");
+    }
+
+    const targetHash = normalizePrintPreviewHash(url);
+    const authToken = await readMainWindowAuthToken();
+    const printWindowArguments = authToken
+      ? [`--customs-print-auth-token-base64=${Buffer.from(authToken, "utf8").toString("base64")}`]
+      : [];
+
+    const printWindow = new BrowserWindow({
+      width: 1100,
+      height: 900,
+      title: "Print Preview",
+      parent: mainWindow,
+      modal: false,
+      show: false,
+      backgroundColor: "#ffffff",
+      autoHideMenuBar: false,
+      webPreferences: {
+        nodeIntegration: false,
+        contextIsolation: true,
+        session: mainWindow.webContents.session,
+        preload: path.join(process.resourcesPath, "preload.js"),
+        additionalArguments: printWindowArguments,
+      },
+    });
+
+    const indexPath = resolveFrontendIndexPath();
+    const loadPrintRoute = () => printWindow.loadFile(indexPath, { hash: targetHash.slice(1) });
+
+    await loadPrintRoute();
+
+    const firstState = await ensurePrintWindowRouteAndAuth(printWindow, targetHash, authToken);
+    if (firstState.needsReload) {
+      await loadPrintRoute();
+      await ensurePrintWindowRouteAndAuth(printWindow, targetHash, authToken);
+    }
+
+    if (!printWindow.isDestroyed()) {
+      printWindow.show();
+      printWindow.focus();
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error("[PRINT PREVIEW WINDOW] Failed to open:", error);
+    return {
+      success: false,
+      error: error?.message || "Failed to open print preview window",
+    };
+  }
+});
+
 ipcMain.handle("save-current-page-pdf", async (event, fileName) => {
   try {
     if (!mainWindow) {
@@ -1727,4 +1844,6 @@ app.on("window-all-closed", () => {
   }
   app.quit();
 });
+
+
 

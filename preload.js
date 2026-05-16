@@ -1,5 +1,23 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
+const PRINT_AUTH_TOKEN_ARG = "--customs-print-auth-token-base64=";
+const printAuthTokenArg = process.argv.find((arg) =>
+  arg.startsWith(PRINT_AUTH_TOKEN_ARG)
+);
+
+if (printAuthTokenArg) {
+  try {
+    const encodedToken = printAuthTokenArg.slice(PRINT_AUTH_TOKEN_ARG.length);
+    const token = Buffer.from(encodedToken, "base64").toString("utf8");
+
+    if (token) {
+      sessionStorage.setItem("auth_token", token);
+    }
+  } catch {
+    // Ignore invalid print-preview auth bootstrap data.
+  }
+}
+
 window.addEventListener(
   "wheel",
   (event) => {
@@ -65,6 +83,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.invoke("attachment:open-file", payload),
   saveCurrentPagePDF: (fileName) =>
     ipcRenderer.invoke("save-current-page-pdf", fileName),
+  openExternalPrintWindow: (url) =>
+    ipcRenderer.invoke("print-preview:open-external-window", url),
   checkForUpdates: () => ipcRenderer.invoke("check-for-updates"),
   downloadUpdate: () => ipcRenderer.invoke("download-update"),
   installUpdate: () => ipcRenderer.invoke("install-update"),
@@ -91,4 +111,5 @@ contextBridge.exposeInMainWorld("electronAPI", {
     };
   },
 });
+
 

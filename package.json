@@ -1,6 +1,6 @@
 {
   "name": "customs-ledger-sqlite-desktop",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "type": "module",
   "private": true,
   "main": "electron-main.cjs",
@@ -191,11 +191,9 @@
       "target": "nsis",
       "icon": "build/icon.ico"
     },
-
     "linux": {
       "icon": "build/icon.png"
     },
-
     "publish": [
       {
         "provider": "github",
