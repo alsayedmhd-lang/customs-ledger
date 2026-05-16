@@ -245,7 +245,7 @@ export default function CustomerLedgerPrintPage() {
       `}</style>
 
       {/* CONTROLS */}
-      <div className="print:hidden flex items-center justify-center gap-3 p-6 flex-wrap" dir={isAR ? "rtl" : "ltr"}>
+      <div className="print:hidden flex items-center gap-3 px-4 py-4 sm:px-6 max-w-4xl mx-auto flex-wrap" dir={isAR ? "rtl" : "ltr"}>
         <button
         onClick={() => {
             window.print();
