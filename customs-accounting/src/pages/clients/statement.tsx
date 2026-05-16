@@ -123,26 +123,6 @@ export default function ClientStatement() {
         <>
       {/* Print CSS */}
       <style>{`
-        body:has(.print-page) aside,
-        body:has(.print-page) header,
-        body:has(.print-page) nav,
-        body:has(.print-page) [data-sidebar],
-        body:has(.print-page) .app-sidebar,
-        body:has(.print-page) #app-sidebar,
-        body:has(.print-page) [app-sidebar],
-        body:has(.print-page) .app-header,
-        body:has(.print-page) #app-header,
-        body:has(.print-page) [app-header] {
-          display: none !important;
-        }
-
-        body:has(.print-page) main {
-          width: 100% !important;
-          max-width: none !important;
-          margin: 0 !important;
-          padding: 0 !important;
-        }
-
         @media print {
           @page { size: A4 portrait; margin: 10mm 10mm 10mm 15mm; }
           body { margin: 0; }
