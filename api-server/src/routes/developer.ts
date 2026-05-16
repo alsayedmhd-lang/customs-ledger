@@ -146,6 +146,425 @@ function isPostgresConnectionString(value: string) {
   }
 }
 
+type DiagnosticStatus = "pass" | "warning" | "critical";
+
+type DiagnosticCheck = {
+  id: string;
+  status: DiagnosticStatus;
+  area: string;
+  location: string;
+  messageAr: string;
+  messageEn: string;
+  causeAr: string;
+  causeEn: string;
+  suggestedFixAr: string;
+  suggestedFixEn: string;
+  details?: unknown;
+};
+
+const STORAGE_CONFIG_FILE = "storage-config.json";
+const SYSTEM_SUBFOLDERS = ["database", "attachments", "backups", "license", "logs", "config"] as const;
+
+function nodeErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function getNodeErrorCode(error: unknown) {
+  return typeof error === "object" && error !== null && "code" in error
+    ? String((error as { code?: unknown }).code)
+    : null;
+}
+
+async function pathExists(targetPath: string) {
+  try {
+    await fs.promises.access(targetPath, fs.constants.F_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function safeStat(targetPath: string) {
+  try {
+    return await fs.promises.stat(targetPath);
+  } catch {
+    return null;
+  }
+}
+
+async function resolveDiagnosticsStorageContext() {
+  const cwd = process.cwd();
+  const envDataRoot = process.env.APP_DATA_ROOT?.trim();
+  const sqlitePath = process.env.SQLITE_DB_PATH ? path.resolve(process.env.SQLITE_DB_PATH) : null;
+  const configCandidates = [
+    envDataRoot ? path.join(path.resolve(envDataRoot), STORAGE_CONFIG_FILE) : null,
+    path.join(cwd, STORAGE_CONFIG_FILE),
+    envDataRoot ? path.join(path.resolve(envDataRoot), "config", STORAGE_CONFIG_FILE) : null,
+  ].filter((candidate): candidate is string => Boolean(candidate));
+
+  let storageConfigPath: string | null = null;
+  let configuredDataRoot: string | null = null;
+  let storageConfigError: string | null = null;
+
+  for (const configPath of configCandidates) {
+    if (!(await pathExists(configPath))) continue;
+
+    storageConfigPath = configPath;
+    try {
+      const parsed = JSON.parse(await fs.promises.readFile(configPath, "utf8")) as { dataRoot?: unknown };
+      if (typeof parsed.dataRoot === "string" && parsed.dataRoot.trim()) {
+        configuredDataRoot = path.resolve(parsed.dataRoot.trim());
+      } else {
+        storageConfigError = "storage-config.json does not contain a valid dataRoot string";
+      }
+    } catch (error) {
+      storageConfigError = nodeErrorMessage(error);
+    }
+    break;
+  }
+
+  let dataRootSource: "env" | "config" | "sqlite-path" | "fallback" = "fallback";
+  let dataRoot = path.resolve(cwd);
+
+  if (envDataRoot) {
+    dataRoot = path.resolve(envDataRoot);
+    dataRootSource = "env";
+  } else if (configuredDataRoot) {
+    dataRoot = configuredDataRoot;
+    dataRootSource = "config";
+  } else if (sqlitePath && path.basename(path.dirname(sqlitePath)).toLowerCase() === "database") {
+    dataRoot = path.dirname(path.dirname(sqlitePath));
+    dataRootSource = "sqlite-path";
+  }
+
+  return {
+    cwd,
+    dataRoot,
+    dataRootSource,
+    sqlitePath: sqlitePath || path.join(dataRoot, "database", "local.db"),
+    storageConfigPath,
+    configuredDataRoot,
+    storageConfigError,
+  };
+}
+
+async function buildSystemDiagnostics() {
+  const checkedAt = new Date().toISOString();
+  const checks: DiagnosticCheck[] = [];
+
+  const addCheck = (check: DiagnosticCheck) => {
+    checks.push(check);
+  };
+
+  const addExceptionCheck = (id: string, area: string, location: string, error: unknown) => {
+    addCheck({
+      id,
+      status: "critical",
+      area,
+      location,
+      messageAr: "تعذر إكمال هذا الفحص.",
+      messageEn: "This check could not be completed.",
+      causeAr: "حدث خطأ أثناء قراءة حالة النظام.",
+      causeEn: "An error occurred while reading system state.",
+      suggestedFixAr: "راجع تفاصيل الخطأ ثم أصلح صلاحيات المسار أو إعداداته.",
+      suggestedFixEn: "Review the error details, then fix the path permissions or configuration.",
+      details: { error: nodeErrorMessage(error), code: getNodeErrorCode(error) },
+    });
+  };
+
+  let context: Awaited<ReturnType<typeof resolveDiagnosticsStorageContext>>;
+  try {
+    context = await resolveDiagnosticsStorageContext();
+  } catch (error) {
+    context = {
+      cwd: process.cwd(),
+      dataRoot: process.cwd(),
+      dataRootSource: "fallback",
+      sqlitePath: process.env.SQLITE_DB_PATH ? path.resolve(process.env.SQLITE_DB_PATH) : path.join(process.cwd(), "database", "local.db"),
+      storageConfigPath: null,
+      configuredDataRoot: null,
+      storageConfigError: nodeErrorMessage(error),
+    };
+    addExceptionCheck("storage-context", "storage", process.cwd(), error);
+  }
+
+  try {
+    const stats = await safeStat(context.dataRoot);
+    const isDirectory = Boolean(stats?.isDirectory());
+    addCheck({
+      id: "data-root-exists",
+      status: isDirectory ? "pass" : "critical",
+      area: "storage",
+      location: context.dataRoot,
+      messageAr: isDirectory ? "مسار البيانات موجود." : "مسار البيانات غير موجود.",
+      messageEn: isDirectory ? "Data Root exists." : "Data Root does not exist.",
+      causeAr: isDirectory ? "تم العثور على مجلد البيانات." : "لم يتم العثور على مجلد البيانات في المسار المتوقع.",
+      causeEn: isDirectory ? "The data folder was found." : "The data folder was not found at the expected path.",
+      suggestedFixAr: isDirectory ? "لا يلزم إجراء." : "تحقق من إعدادات مسار البيانات أو أعد اختيار مجلد بيانات صحيح من أدوات التخزين.",
+      suggestedFixEn: isDirectory ? "No action required." : "Check Data Root configuration or choose a valid data folder from storage tools.",
+      details: { source: context.dataRootSource },
+    });
+  } catch (error) {
+    addExceptionCheck("data-root-exists", "storage", context.dataRoot, error);
+  }
+
+  try {
+    const stats = await safeStat(context.sqlitePath);
+    const exists = Boolean(stats?.isFile());
+    addCheck({
+      id: "database-file-exists",
+      status: exists ? "pass" : "critical",
+      area: "database",
+      location: context.sqlitePath,
+      messageAr: exists ? "ملف قاعدة البيانات local.db موجود." : "ملف قاعدة البيانات local.db غير موجود.",
+      messageEn: exists ? "The local.db database file exists." : "The local.db database file is missing.",
+      causeAr: exists ? "تم العثور على ملف قاعدة البيانات." : "لا يوجد ملف قاعدة بيانات في المسار المستخدم حاليًا.",
+      causeEn: exists ? "The database file was found." : "No database file was found at the current database path.",
+      suggestedFixAr: exists ? "لا يلزم إجراء." : "تحقق من SQLITE_DB_PATH أو مسار Data Root قبل تشغيل أي عمليات.",
+      suggestedFixEn: exists ? "No action required." : "Check SQLITE_DB_PATH or the Data Root path before running operations.",
+      details: { sizeBytes: stats?.size ?? null, sqlitePathFromEnv: Boolean(process.env.SQLITE_DB_PATH) },
+    });
+  } catch (error) {
+    addExceptionCheck("database-file-exists", "database", context.sqlitePath, error);
+  }
+
+  try {
+    await fs.promises.access(context.sqlitePath, fs.constants.R_OK);
+    if (sqlite) {
+      sqlite.prepare("SELECT 1 AS ok").get();
+    }
+    addCheck({
+      id: "database-readable",
+      status: sqlite ? "pass" : "warning",
+      area: "database",
+      location: context.sqlitePath,
+      messageAr: sqlite ? "قاعدة البيانات قابلة للقراءة." : "ملف قاعدة البيانات قابل للقراءة لكن اتصال SQLite غير متاح.",
+      messageEn: sqlite ? "The database is readable." : "The database file is readable, but the SQLite connection is unavailable.",
+      causeAr: sqlite ? "نجح اختبار القراءة." : "تمت قراءة الملف، لكن الخادم لا يملك اتصال SQLite نشطًا.",
+      causeEn: sqlite ? "The read test succeeded." : "The file can be read, but the server has no active SQLite connection.",
+      suggestedFixAr: sqlite ? "لا يلزم إجراء." : "تحقق من DB_PROVIDER و SQLITE_DB_PATH عند تشغيل الخادم.",
+      suggestedFixEn: sqlite ? "No action required." : "Check DB_PROVIDER and SQLITE_DB_PATH when starting the server.",
+      details: { sqliteConnection: Boolean(sqlite) },
+    });
+  } catch (error) {
+    addCheck({
+      id: "database-readable",
+      status: "critical",
+      area: "database",
+      location: context.sqlitePath,
+      messageAr: "قاعدة البيانات غير قابلة للقراءة.",
+      messageEn: "The database is not readable.",
+      causeAr: "فشل اختبار قراءة ملف قاعدة البيانات أو استعلام SELECT 1.",
+      causeEn: "The database file read test or SELECT 1 query failed.",
+      suggestedFixAr: "تحقق من وجود الملف وصلاحيات القراءة وأن الملف ليس تالفًا.",
+      suggestedFixEn: "Check that the file exists, read permissions are available, and the database is not corrupted.",
+      details: { error: nodeErrorMessage(error), code: getNodeErrorCode(error) },
+    });
+  }
+
+  for (const folderName of SYSTEM_SUBFOLDERS) {
+    const folderPath = path.join(context.dataRoot, folderName);
+    try {
+      const stats = await safeStat(folderPath);
+      const exists = Boolean(stats?.isDirectory());
+      addCheck({
+        id: `system-folder-${folderName}`,
+        status: exists ? "pass" : "warning",
+        area: "storage",
+        location: folderPath,
+        messageAr: exists ? `مجلد ${folderName} موجود.` : `مجلد ${folderName} غير موجود.`,
+        messageEn: exists ? `The ${folderName} folder exists.` : `The ${folderName} folder is missing.`,
+        causeAr: exists ? "تم العثور على المجلد." : "لم يتم العثور على المجلد ضمن Data Root.",
+        causeEn: exists ? "The folder was found." : "The folder was not found under Data Root.",
+        suggestedFixAr: exists ? "لا يلزم إجراء." : "اترك الإصلاح لخطوة repair لاحقة أو تحقق من إعدادات التخزين يدويًا.",
+        suggestedFixEn: exists ? "No action required." : "Leave repair to a later repair action or check storage settings manually.",
+      });
+    } catch (error) {
+      addExceptionCheck(`system-folder-${folderName}`, "storage", folderPath, error);
+    }
+  }
+
+  try {
+    const tempPath = path.join(context.dataRoot, `.customs-ledger-diagnostics-${process.pid}-${Date.now()}.tmp`);
+    await fs.promises.writeFile(tempPath, "diagnostics", { encoding: "utf8", flag: "wx" });
+    await fs.promises.rm(tempPath, { force: true });
+    addCheck({
+      id: "data-root-write-test",
+      status: "pass",
+      area: "storage",
+      location: context.dataRoot,
+      messageAr: "اختبار الكتابة داخل Data Root نجح.",
+      messageEn: "Data Root write test passed.",
+      causeAr: "تم إنشاء ملف مؤقت صغير وحذفه فورًا.",
+      causeEn: "A small temporary file was created and deleted immediately.",
+      suggestedFixAr: "لا يلزم إجراء.",
+      suggestedFixEn: "No action required.",
+    });
+  } catch (error) {
+    addCheck({
+      id: "data-root-write-test",
+      status: "critical",
+      area: "storage",
+      location: context.dataRoot,
+      messageAr: "اختبار الكتابة داخل Data Root فشل.",
+      messageEn: "Data Root write test failed.",
+      causeAr: "لا يستطيع الخادم إنشاء ملف مؤقت داخل مسار البيانات.",
+      causeEn: "The server cannot create a temporary file inside Data Root.",
+      suggestedFixAr: "تحقق من صلاحيات الكتابة أو اختر مسار بيانات قابلًا للكتابة.",
+      suggestedFixEn: "Check write permissions or choose a writable Data Root.",
+      details: { error: nodeErrorMessage(error), code: getNodeErrorCode(error) },
+    });
+  }
+
+  for (const folderName of ["attachments", "backups"] as const) {
+    const folderPath = path.join(context.dataRoot, folderName);
+    try {
+      const stats = await safeStat(folderPath);
+      if (!stats?.isDirectory()) {
+        addCheck({
+          id: `${folderName}-folder-health`,
+          status: "warning",
+          area: folderName,
+          location: folderPath,
+          messageAr: `تعذر فحص مجلد ${folderName} لأنه غير موجود.`,
+          messageEn: `The ${folderName} folder cannot be inspected because it is missing.`,
+          causeAr: "المجلد غير موجود ضمن Data Root.",
+          causeEn: "The folder is missing under Data Root.",
+          suggestedFixAr: "تحقق من إعدادات التخزين ولا تنشئ مجلدات يدويًا إلا ضمن إجراء إصلاح واضح.",
+          suggestedFixEn: "Check storage settings and avoid manually creating folders except through a clear repair action.",
+        });
+        continue;
+      }
+
+      await fs.promises.access(folderPath, fs.constants.R_OK);
+      const sample = await fs.promises.readdir(folderPath);
+      addCheck({
+        id: `${folderName}-folder-health`,
+        status: "pass",
+        area: folderName,
+        location: folderPath,
+        messageAr: `مجلد ${folderName} موجود وقابل للقراءة.`,
+        messageEn: `The ${folderName} folder exists and is readable.`,
+        causeAr: "نجح فحص الوصول للمجلد.",
+        causeEn: "Folder access check succeeded.",
+        suggestedFixAr: "لا يلزم إجراء.",
+        suggestedFixEn: "No action required.",
+        details: { sampleCount: sample.length },
+      });
+    } catch (error) {
+      addExceptionCheck(`${folderName}-folder-health`, folderName, folderPath, error);
+    }
+  }
+
+  try {
+    const hasConfig = Boolean(context.storageConfigPath && !context.storageConfigError);
+    addCheck({
+      id: "storage-config",
+      status: hasConfig || context.dataRootSource !== "fallback" ? "pass" : "warning",
+      area: "storage",
+      location: context.storageConfigPath || context.cwd,
+      messageAr: hasConfig ? "ملف storage-config.json موجود وقابل للقراءة." : "لا يوجد storage-config.json صالح؛ النظام يستخدم fallback أو إعدادات بيئية.",
+      messageEn: hasConfig ? "storage-config.json exists and is readable." : "No valid storage-config.json was found; the system is using fallback or environment settings.",
+      causeAr: hasConfig ? "تمت قراءة إعداد مسار البيانات." : "لم يتم العثور على إعداد تخزين صريح صالح.",
+      causeEn: hasConfig ? "The data root configuration was read." : "No valid explicit storage configuration was found.",
+      suggestedFixAr: hasConfig ? "لا يلزم إجراء." : "إذا كان هذا غير مقصود، احفظ مسار بيانات واضحًا من أدوات التخزين.",
+      suggestedFixEn: hasConfig ? "No action required." : "If this is unintended, save an explicit Data Root from the storage tools.",
+      details: {
+        dataRootSource: context.dataRootSource,
+        configuredDataRoot: context.configuredDataRoot,
+        storageConfigError: context.storageConfigError,
+      },
+    });
+  } catch (error) {
+    addExceptionCheck("storage-config", "storage", context.cwd, error);
+  }
+
+  try {
+    if (!sqlite) {
+      addCheck({
+        id: "sync-queue-status",
+        status: "warning",
+        area: "sync",
+        location: "sync_queue",
+        messageAr: "تعذر فحص sync_queue لأن اتصال SQLite غير متاح.",
+        messageEn: "sync_queue could not be checked because SQLite is unavailable.",
+        causeAr: "الخادم لا يملك اتصال SQLite نشطًا.",
+        causeEn: "The server has no active SQLite connection.",
+        suggestedFixAr: "تحقق من إعدادات تشغيل قاعدة البيانات.",
+        suggestedFixEn: "Check database startup settings.",
+      });
+    } else {
+      const table = sqlite.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'sync_queue'").get();
+
+      if (!table) {
+        addCheck({
+          id: "sync-queue-status",
+          status: "warning",
+          area: "sync",
+          location: "sync_queue",
+          messageAr: "جدول sync_queue غير موجود.",
+          messageEn: "The sync_queue table does not exist.",
+          causeAr: "قد لا تكون المزامنة مفعلة أو لم يتم إنشاء جدولها بعد.",
+          causeEn: "Sync may not be enabled or its table has not been created yet.",
+          suggestedFixAr: "لا تنشئ الجدول من هذا الفحص؛ اترك ذلك لمنطق المزامنة الحالي عند الحاجة.",
+          suggestedFixEn: "Do not create the table from this check; let the existing sync logic create it when needed.",
+        });
+      } else {
+        const pending = sqlite.prepare("SELECT COUNT(*) AS count FROM sync_queue WHERE status = 'pending'").get() as { count: number };
+        const failed = sqlite.prepare("SELECT COUNT(*) AS count FROM sync_queue WHERE status = 'failed'").get() as { count: number };
+        const lastError = sqlite
+          .prepare(`
+            SELECT last_error AS value
+            FROM sync_queue
+            WHERE status = 'failed' AND last_error IS NOT NULL AND last_error <> ''
+            ORDER BY COALESCE(updated_at, created_at) DESC
+            LIMIT 1
+          `)
+          .get() as { value: string | null } | undefined;
+        const failedCount = Number(failed?.count || 0);
+        const pendingCount = Number(pending?.count || 0);
+
+        addCheck({
+          id: "sync-queue-status",
+          status: failedCount > 0 ? "warning" : "pass",
+          area: "sync",
+          location: "sync_queue",
+          messageAr: failedCount > 0 ? "توجد عناصر مزامنة فاشلة." : "جدول sync_queue قابل للقراءة.",
+          messageEn: failedCount > 0 ? "There are failed sync queue items." : "The sync_queue table is readable.",
+          causeAr: failedCount > 0 ? "بعض عناصر المزامنة انتهت بحالة failed." : "نجح فحص جدول المزامنة.",
+          causeEn: failedCount > 0 ? "Some sync items are in failed status." : "The sync table check succeeded.",
+          suggestedFixAr: failedCount > 0 ? "راجع آخر خطأ ثم استخدم أدوات المزامنة الحالية لإعادة المحاولة عند الحاجة." : "لا يلزم إجراء.",
+          suggestedFixEn: failedCount > 0 ? "Review the last error, then use the existing sync tools to retry if needed." : "No action required.",
+          details: {
+            pending: pendingCount,
+            failed: failedCount,
+            lastError: lastError?.value || null,
+          },
+        });
+      }
+    }
+  } catch (error) {
+    addExceptionCheck("sync-queue-status", "sync", "sync_queue", error);
+  }
+
+  const summary = checks.reduce(
+    (acc, check) => {
+      if (check.status === "critical") acc.critical += 1;
+      if (check.status === "warning") acc.warnings += 1;
+      if (check.status === "pass") acc.passed += 1;
+      return acc;
+    },
+    { critical: 0, warnings: 0, passed: 0 },
+  );
+
+  return {
+    ok: summary.critical === 0,
+    checkedAt,
+    summary,
+    checks,
+  };
+}
+
 function mapDeveloperPermissions(settings: any) {
   const sqlitePath = process.env.SQLITE_DB_PATH || "";
   const databaseSize = sqlitePath && fs.existsSync(sqlitePath) ? fs.statSync(sqlitePath).size : null;
@@ -260,6 +679,36 @@ router.get("/developer/storage/info", async (_req, res) => {
         message: "Failed to load storage info",
         error: error instanceof Error ? error.message : String(error),
       });
+  }
+});
+
+router.get("/developer/system-diagnostics", async (_req, res) => {
+  try {
+    return res.json(await buildSystemDiagnostics());
+  } catch (error) {
+    console.error("[SYSTEM_DIAGNOSTICS] Unexpected failure", error);
+
+    const checkedAt = new Date().toISOString();
+    return res.json({
+      ok: false,
+      checkedAt,
+      summary: { critical: 1, warnings: 0, passed: 0 },
+      checks: [
+        {
+          id: "system-diagnostics-unexpected-error",
+          status: "critical",
+          area: "diagnostics",
+          location: "api-server",
+          messageAr: "فشل فحص صحة النظام بشكل غير متوقع.",
+          messageEn: "System diagnostics failed unexpectedly.",
+          causeAr: "حدث خطأ عام خارج الفحوصات الجزئية.",
+          causeEn: "A top-level error occurred outside the individual checks.",
+          suggestedFixAr: "راجع سجل الخادم ثم أعد تشغيل الفحص.",
+          suggestedFixEn: "Review the server log, then run diagnostics again.",
+          details: { error: nodeErrorMessage(error), code: getNodeErrorCode(error) },
+        },
+      ],
+    });
   }
 });
 

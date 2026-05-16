@@ -155,6 +155,30 @@ type SyncQueueStatus = {
   lastError: string | null;
   recent: SyncQueueItem[];
 };
+type SystemDiagnosticStatus = "pass" | "warning" | "critical";
+type SystemDiagnosticCheck = {
+  id: string;
+  status: SystemDiagnosticStatus;
+  area: string;
+  location: string;
+  messageAr: string;
+  messageEn: string;
+  causeAr: string;
+  causeEn: string;
+  suggestedFixAr: string;
+  suggestedFixEn: string;
+  details?: unknown;
+};
+type SystemDiagnosticsResult = {
+  ok: boolean;
+  checkedAt: string;
+  summary: {
+    critical: number;
+    warnings: number;
+    passed: number;
+  };
+  checks: SystemDiagnosticCheck[];
+};
 type ReadinessStatus = {
   apiStatus: "connected" | "error";
   onlineStatus: "online" | "offline";
@@ -351,6 +375,18 @@ function syncQueueStatusBadgeClass(status: string) {
   return "border-border bg-background text-muted-foreground";
 }
 
+function diagnosticStatusBadgeClass(status: SystemDiagnosticStatus) {
+  if (status === "pass") return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  if (status === "warning") return "border-amber-200 bg-amber-50 text-amber-700";
+  return "border-red-200 bg-red-50 text-red-700";
+}
+
+function getDiagnosticStatusLabel(status: SystemDiagnosticStatus, isAR: boolean) {
+  if (status === "pass") return isAR ? "ناجح" : "Pass";
+  if (status === "warning") return isAR ? "تحذير" : "Warning";
+  return isAR ? "حرج" : "Critical";
+}
+
 function getSyncQueueDisplayStatus(status: SyncQueueStatus, isAR: boolean) {
   if (status.failed > 0) return isAR ? "فشلت" : "Failed";
   if (status.pending > 0) return isAR ? "قيد الانتظار" : "Pending";
@@ -414,6 +450,7 @@ export default function DeveloperSettingsPage() {
   const [isRetryingFailedSync, setIsRetryingFailedSync] = useState(false);
   const [isReadinessLoading, setIsReadinessLoading] = useState(false);
   const [isDataStorageAnalyzing, setIsDataStorageAnalyzing] = useState(false);
+  const [isSystemDiagnosticsRunning, setIsSystemDiagnosticsRunning] = useState(false);
   const [isBackupReadinessAnalyzing, setIsBackupReadinessAnalyzing] = useState(false);
   const [isBackupManifestGenerating, setIsBackupManifestGenerating] = useState(false);
   const [isBackupDirectoryCreating, setIsBackupDirectoryCreating] = useState(false);
@@ -422,6 +459,8 @@ export default function DeveloperSettingsPage() {
   const [savedMessage, setSavedMessage] = useState("");
   const [databaseMessage, setDatabaseMessage] = useState("");
   const [syncWorkerMessage, setSyncWorkerMessage] = useState("");
+  const [systemDiagnostics, setSystemDiagnostics] = useState<SystemDiagnosticsResult | null>(null);
+  const [systemDiagnosticsError, setSystemDiagnosticsError] = useState("");
   const [dataStorageAnalysis, setDataStorageAnalysis] = useState<DataStorageAnalysisResult | null>(null);
   const [backupReadinessAnalysis, setBackupReadinessAnalysis] = useState<BackupReadinessResult | null>(null);
   const [backupManifestResult, setBackupManifestResult] = useState<BackupManifestResult | null>(null);
@@ -1239,6 +1278,25 @@ export default function DeveloperSettingsPage() {
     }
   }
 
+  async function runSystemDiagnostics() {
+    setSystemDiagnosticsError("");
+    setIsSystemDiagnosticsRunning(true);
+    try {
+      const response = await fetch(`${API_BASE}/developer/system-diagnostics`, { headers: authHeaders() });
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok || !data) {
+        throw new Error(tr("تعذر تشغيل فحص صحة النظام", "Failed to run system diagnostics"));
+      }
+
+      setSystemDiagnostics(data);
+    } catch (error) {
+      setSystemDiagnosticsError(error instanceof Error ? error.message : tr("تعذر تشغيل فحص صحة النظام", "Failed to run system diagnostics"));
+    } finally {
+      setIsSystemDiagnosticsRunning(false);
+    }
+  }
+
   async function verifyLatestBackupDirectory() {
     setIsBackupVerifying(true);
     try {
@@ -2041,6 +2099,73 @@ export default function DeveloperSettingsPage() {
               <InfoRow isAR={isAR} label={tr("النسخ الاحتياطية", "Backups Dir")} value={storageInfo?.backupsDir} />
               <InfoRow isAR={isAR} label={tr("المرفقات", "Attachments Dir")} value={storageInfo?.attachmentsDir} />
               <InfoRow isAR={isAR} label={tr("السجلات", "Logs Dir")} value={storageInfo?.logsDir} />
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-lg">
+            <CardHeader>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <CardTitle className="text-lg">{tr("فحص صحة النظام", "System Diagnostics")}</CardTitle>
+                <Button type="button" variant="outline" size="sm" onClick={runSystemDiagnostics} disabled={isSystemDiagnosticsRunning} className="gap-2">
+                  <RefreshCw className={cn("h-3.5 w-3.5", isSystemDiagnosticsRunning && "animate-spin")} />
+                  {isSystemDiagnosticsRunning ? tr("جار الفحص...", "Running...") : tr("فحص صحة النظام", "Run System Diagnostics")}
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {systemDiagnosticsError && (
+                <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                  {systemDiagnosticsError}
+                </div>
+              )}
+
+              {isSystemDiagnosticsRunning && !systemDiagnostics && (
+                <div className="rounded-md border border-border bg-background px-3 py-2 text-sm text-muted-foreground">
+                  {tr("يتم تشغيل فحوصات القراءة فقط الآن.", "Read-only checks are running now.")}
+                </div>
+              )}
+
+              {systemDiagnostics && (
+                <>
+                  <div className="grid gap-3 md:grid-cols-4">
+                    <InfoRow isAR={isAR} label={tr("آخر فحص", "Checked at")} value={systemDiagnostics.checkedAt} />
+                    <InfoRow isAR={isAR} label="Passed" value={systemDiagnostics.summary.passed} />
+                    <InfoRow isAR={isAR} label="Warnings" value={systemDiagnostics.summary.warnings} />
+                    <InfoRow isAR={isAR} label="Critical" value={systemDiagnostics.summary.critical} />
+                  </div>
+
+                  <div className="overflow-x-auto rounded-md border border-border">
+                    <table className="w-full min-w-[760px] text-left text-xs">
+                      <thead className="bg-muted/50 text-muted-foreground">
+                        <tr>
+                          <th className="px-3 py-2 font-semibold">{tr("الحالة", "Status")}</th>
+                          <th className="px-3 py-2 font-semibold">{tr("المكان", "Location")}</th>
+                          <th className="px-3 py-2 font-semibold">{tr("السبب", "Cause")}</th>
+                          <th className="px-3 py-2 font-semibold">{tr("الحل المقترح", "Suggested fix")}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {systemDiagnostics.checks.map((check) => (
+                          <tr key={check.id} className="border-t border-border align-top">
+                            <td className="px-3 py-2">
+                              <span className={cn("inline-flex rounded-full border px-2 py-0.5 text-[11px] font-semibold", diagnosticStatusBadgeClass(check.status))}>
+                                {getDiagnosticStatusLabel(check.status, isAR)}
+                              </span>
+                              <div className="mt-1 text-[11px] text-muted-foreground">{check.area}</div>
+                            </td>
+                            <td className="max-w-[220px] break-all px-3 py-2">
+                              <div className="font-medium">{isAR ? check.messageAr : check.messageEn}</div>
+                              <div className="mt-1 text-muted-foreground">{check.location}</div>
+                            </td>
+                            <td className="px-3 py-2">{isAR ? check.causeAr : check.causeEn}</td>
+                            <td className="px-3 py-2">{isAR ? check.suggestedFixAr : check.suggestedFixEn}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
 
