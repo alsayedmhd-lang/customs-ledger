@@ -540,6 +540,146 @@ async function buildSystemDiagnostics() {
   }
 
   try {
+    const backupsPath = path.join(context.dataRoot, "backups");
+    const backupsStats = await safeStat(backupsPath);
+
+    if (!backupsStats?.isDirectory()) {
+      addCheck({
+        id: "last-backup-health",
+        status: "warning",
+        area: "backups",
+        location: backupsPath,
+        messageAr: "لا توجد نسخة احتياطية محفوظة.",
+        messageEn: "No backup was found.",
+        causeAr: "مجلد النسخ الاحتياطية غير موجود أو غير قابل للفحص.",
+        causeEn: "The backups folder does not exist or cannot be inspected.",
+        suggestedFixAr: "أنشئ نسخة احتياطية من صفحة المطور.",
+        suggestedFixEn: "Create a backup from Developer Tools.",
+        details: { backupsPath },
+      });
+    } else {
+      const backupEntries = await fs.promises.readdir(backupsPath, { withFileTypes: true });
+      const candidates = await Promise.all(
+        backupEntries.map(async (entry) => {
+          const entryPath = path.join(backupsPath, entry.name);
+          const stats = await safeStat(entryPath);
+          const manifestPath = entry.isDirectory()
+            ? path.join(entryPath, "manifest.json")
+            : entry.name.toLowerCase() === "manifest.json"
+              ? entryPath
+              : null;
+          const manifestStats = manifestPath ? await safeStat(manifestPath) : null;
+
+          return {
+            backupPath: entry.isDirectory() ? entryPath : path.dirname(entryPath),
+            entryPath,
+            hasManifest: Boolean(manifestStats?.isFile()),
+            isBackupLike: entry.isDirectory() || /^backup[-_]/i.test(entry.name) || Boolean(manifestStats?.isFile()),
+            manifestPath,
+            updatedAtMs: Math.max(stats?.mtimeMs || 0, manifestStats?.mtimeMs || 0),
+          };
+        }),
+      );
+      const backupCandidates = candidates
+        .filter((candidate) => candidate.isBackupLike)
+        .sort((a, b) => b.updatedAtMs - a.updatedAtMs);
+      const latestBackup = backupCandidates[0] || null;
+
+      if (!latestBackup) {
+        addCheck({
+          id: "last-backup-health",
+          status: "warning",
+          area: "backups",
+          location: backupsPath,
+          messageAr: "لا توجد نسخة احتياطية محفوظة.",
+          messageEn: "No backup was found.",
+          causeAr: "لم يتم العثور على ملف أو مجلد نسخة احتياطية داخل مجلد backups.",
+          causeEn: "No backup file or folder was found inside the backups folder.",
+          suggestedFixAr: "أنشئ نسخة احتياطية من صفحة المطور.",
+          suggestedFixEn: "Create a backup from Developer Tools.",
+          details: { backupsPath, entries: backupEntries.length },
+        });
+      } else if (!latestBackup.hasManifest || !latestBackup.manifestPath) {
+        addCheck({
+          id: "last-backup-health",
+          status: "warning",
+          area: "backups",
+          location: latestBackup.backupPath,
+          messageAr: "توجد نسخة احتياطية لكن ملف manifest غير صالح.",
+          messageEn: "A backup was found but its manifest is missing or invalid.",
+          causeAr: "لم يتم العثور على manifest.json داخل أحدث نسخة احتياطية.",
+          causeEn: "manifest.json was not found in the latest backup.",
+          suggestedFixAr: "أنشئ نسخة احتياطية جديدة.",
+          suggestedFixEn: "Create a new backup.",
+          details: { backupPath: latestBackup.backupPath, manifestFound: false },
+        });
+      } else {
+        try {
+          const manifest = JSON.parse(await fs.promises.readFile(latestBackup.manifestPath, "utf8")) as {
+            createdAt?: unknown;
+            manifestVersion?: unknown;
+            formatVersion?: unknown;
+            backup?: { formatVersion?: unknown };
+          };
+          const createdAt = typeof manifest.createdAt === "string" ? manifest.createdAt : null;
+          const manifestVersion =
+            manifest.manifestVersion ?? manifest.backup?.formatVersion ?? manifest.formatVersion ?? undefined;
+          const details: Record<string, unknown> = {
+            backupPath: latestBackup.backupPath,
+            createdAt: createdAt || new Date(latestBackup.updatedAtMs).toISOString(),
+          };
+
+          if (manifestVersion !== undefined) {
+            details.manifestVersion = manifestVersion;
+          }
+
+          addCheck({
+            id: "last-backup-health",
+            status: "pass",
+            area: "backups",
+            location: latestBackup.backupPath,
+            messageAr: "تم العثور على نسخة احتياطية صالحة.",
+            messageEn: "A valid backup was found.",
+            causeAr: "تمت قراءة manifest.json بنجاح.",
+            causeEn: "manifest.json was read successfully.",
+            suggestedFixAr: "لا يلزم إجراء.",
+            suggestedFixEn: "No action required.",
+            details,
+          });
+        } catch (error) {
+          addCheck({
+            id: "last-backup-health",
+            status: "warning",
+            area: "backups",
+            location: latestBackup.backupPath,
+            messageAr: "توجد نسخة احتياطية لكن ملف manifest غير صالح.",
+            messageEn: "A backup was found but its manifest is missing or invalid.",
+            causeAr: "تعذرت قراءة manifest.json أو تحليله.",
+            causeEn: "manifest.json could not be read or parsed.",
+            suggestedFixAr: "أنشئ نسخة احتياطية جديدة.",
+            suggestedFixEn: "Create a new backup.",
+            details: { backupPath: latestBackup.backupPath, error: nodeErrorMessage(error), code: getNodeErrorCode(error) },
+          });
+        }
+      }
+    }
+  } catch (error) {
+    addCheck({
+      id: "last-backup-health",
+      status: "warning",
+      area: "backups",
+      location: path.join(context.dataRoot, "backups"),
+      messageAr: "تعذر فحص آخر نسخة احتياطية.",
+      messageEn: "Last backup health could not be checked.",
+      causeAr: "حدث خطأ أثناء قراءة مجلد النسخ الاحتياطية.",
+      causeEn: "An error occurred while reading the backups folder.",
+      suggestedFixAr: "تحقق من صلاحيات قراءة مجلد النسخ الاحتياطية ثم أعد تشغيل الفحص.",
+      suggestedFixEn: "Check read permissions for the backups folder, then run diagnostics again.",
+      details: { error: nodeErrorMessage(error), code: getNodeErrorCode(error) },
+    });
+  }
+
+  try {
     const hasConfig = Boolean(context.storageConfigPath && !context.storageConfigError);
     addCheck({
       id: "storage-config",
