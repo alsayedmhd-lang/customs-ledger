@@ -267,7 +267,7 @@ async function ensureWritable(directoryPath: string): Promise<void> {
 
   const probePath = path.join(
     directoryPath,
-    `.customs-ledger-write-test-${process.pid}-${Date.now()}`,
+    `.ledger-write-test-${process.pid}-${Date.now()}`,
   );
 
   try {
