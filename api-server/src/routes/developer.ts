@@ -1570,7 +1570,7 @@ router.get("/developer/system-diagnostics/export", async (_req, res) => {
     const generatedAt = new Date().toISOString();
     const report = sanitizeDiagnosticExportValue({
       generatedAt,
-      appName: "Customs Ledger SQLite",
+      appName: "Ledger",
       appVersion: `v${packageJson.version}`,
       dataRoot: context?.dataRoot || null,
       diagnostics,
