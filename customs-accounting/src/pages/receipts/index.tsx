@@ -273,8 +273,13 @@ const getClientName = (receipt: { clientName?: string | null; clientId?: number 
                     transition={{ delay: i * 0.04 }}
                     className="border-b border-border/50 last:border-0 hover:bg-muted/30 transition-colors"
                   >
-                    <td className="px-4 py-3 font-mono font-semibold text-primary">
-                      {receipt.receiptNumber}
+                    <td className="px-4 py-3">
+                      <Link
+                        href={`/receipts/${receipt.id}/edit`}
+                        className="font-mono font-semibold text-primary hover:underline cursor-pointer"
+                      >
+                        {receipt.receiptNumber}
+                      </Link>
                     </td>
 
                     <td className="px-4 py-3 font-medium">

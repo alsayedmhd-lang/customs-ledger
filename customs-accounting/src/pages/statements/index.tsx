@@ -1,116 +1,25 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { Link } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useListClients, useListInvoices } from "@workspace/api-client-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { BookOpen, FileText, TrendingDown, TrendingUp, User, Printer, Eye, EyeOff, Search } from "lucide-react";
+import { BookOpen, FileText, TrendingDown, TrendingUp, User, Printer, Eye, EyeOff } from "lucide-react";
 import { useLanguage } from "@/lib/language-context";
-import { useAuth } from "@/lib/auth-context";
-const API_BASE = import.meta.env.VITE_API_BASE_URL;
-
-function getToken() {
-  return sessionStorage.getItem("auth_token");
-}
-
-async function fetchClients() {
-  const res = await fetch(`${API_BASE}/api/clients`, {
-    headers: { Authorization: `Bearer ${getToken()}` },
-  });
-  if (!res.ok) throw new Error("Failed to fetch clients");
-  return res.json();
-}
-
-async function fetchInvoices() {
-  const res = await fetch(`${API_BASE}/api/invoices`, {
-    headers: { Authorization: `Bearer ${getToken()}` },
-  });
-  if (!res.ok) throw new Error("Failed to fetch invoices");
-  return res.json();
-}
-
-async function fetchReceipts() {
-  const res = await fetch(`${API_BASE}/api/receipts`, {
-    headers: { Authorization: `Bearer ${getToken()}` },
-  });
-  if (!res.ok) throw new Error("Failed to fetch receipts");
-  return res.json();
-}
-
-function formatDateInput(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function getDefaultDateRange() {
-  const today = new Date();
-  return {
-    from: formatDateInput(new Date(today.getFullYear(), today.getMonth(), 1)),
-    to: formatDateInput(today),
-  };
-}
 
 export default function StatementsIndex() {
   const { t, lang } = useLanguage();
-  const { user } = useAuth();
-  const isClient = user?.role === "client";
   const isAR = lang === "ar";
   const [showAmounts, setShowAmounts] = useState(false);
-  const [search, setSearch] = useState("");
-  const [selectedClientId, setSelectedClientId] = useState("");
-  const [fromDate, setFromDate] = useState(() => getDefaultDateRange().from);
-  const [toDate, setToDate] = useState(() => getDefaultDateRange().to);
   const hidden = <span className="tracking-widest opacity-35 font-mono">••••••</span>;
-  const { data: clients = [], isLoading: loadingClients } = useQuery<any[]>({
-    queryKey: ["clients"],
-    queryFn: fetchClients,
-  });
-  const { data: allInvoices = [], isLoading: loadingInvoices } = useQuery<any[]>({
-    queryKey: ["invoices"],
-    queryFn: fetchInvoices,
-  });
-  const { data: allReceipts = [], isLoading: loadingReceipts } = useQuery<any[]>({
-    queryKey: ["receipts"],
-    queryFn: fetchReceipts,
-  });
+  const { data: clients, isLoading: loadingClients } = useListClients();
+  const { data: allInvoices, isLoading: loadingInvoices } = useListInvoices();
 
-  console.log("clients:", clients);
-  console.log("allInvoices:", allInvoices);
-  console.log("loadingClients:", loadingClients);
-  console.log("loadingInvoices:", loadingInvoices);
- 
-  const loading = loadingClients || loadingInvoices || loadingReceipts;
+  const loading = loadingClients || loadingInvoices;
 
   const clientSummaries = (clients?.map(client => {
-    const q = search.trim().toLowerCase();
-    const invoices = allInvoices?.filter(inv => {
-      const issueDate = String(inv.issueDate || "").slice(0, 10);
-      const matchesClient =
-        (!selectedClientId || String(client.id) === selectedClientId) &&
-        inv.clientId === client.id;
-      const matchesSearch =
-        !q ||
-        String(inv.invoiceNumber || "").toLowerCase().includes(q) ||
-        String(inv.shipmentRef || "").toLowerCase().includes(q) ||
-        String(inv.billOfLading || "").toLowerCase().includes(q);
-      return matchesClient && matchesSearch && (!fromDate || issueDate >= fromDate) && (!toDate || issueDate <= toDate);
-    }) || [];
-    const issuedReceiptTotal = (allReceipts ?? [])
-      .filter((receipt) => {
-        const receiptDate = String(receipt.receiptDate || "").slice(0, 10);
-        return (
-          receipt.clientId === client.id &&
-          receipt.status === "issued" &&
-          (!fromDate || receiptDate >= fromDate) &&
-          (!toDate || receiptDate <= toDate)
-        );
-      })
-      .reduce((sum, receipt) => sum + Number(receipt.amount ?? 0), 0);
+    const invoices = allInvoices?.filter(inv => inv.clientId === client.id) || [];
     const totalInvoiced = invoices.reduce((sum, inv) => sum + inv.total, 0);
-    const totalPaid =
-      invoices.reduce((sum, inv) => sum + Number(inv.advancePayment ?? 0), 0) +
-      issuedReceiptTotal;
+    const totalPaid = invoices.filter(i => i.status === "paid").reduce((sum, inv) => sum + inv.total, 0);
     const balance = totalInvoiced - totalPaid;
     const lastInvoice = invoices.sort((a, b) => new Date(b.issueDate).getTime() - new Date(a.issueDate).getTime())[0];
     return { client, totalInvoiced, totalPaid, balance, invoiceCount: invoices.length, lastInvoice };
@@ -139,30 +48,6 @@ export default function StatementsIndex() {
           {showAmounts ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
           {showAmounts ? (isAR ? "إخفاء الأرقام" : "Hide Numbers") : (isAR ? "إظهار الأرقام" : "Show Numbers")}
         </button>
-      </div>
-
-      <div className="hidden">
-        <div className="relative">
-          <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder={isAR ? "بحث برقم الفاتورة أو البيان أو البوليصة" : "Search invoice, shipment ref, or bill of lading"}
-            className="w-full pr-9 pl-3 py-2 bg-card border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm"
-          />
-        </div>
-        <input
-          type="date"
-          value={fromDate}
-          onChange={(e) => setFromDate(e.target.value)}
-          className="w-full px-3 py-2 bg-card border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm"
-        />
-        <input
-          type="date"
-          value={toDate}
-          onChange={(e) => setToDate(e.target.value)}
-          className="w-full px-3 py-2 bg-card border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm"
-        />
       </div>
 
       {/* Summary Cards */}
@@ -196,82 +81,11 @@ export default function StatementsIndex() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
-        <div className="md:col-span-3">
-          <label className="text-sm font-medium text-muted-foreground mb-1 block">
-            {isAR ? "العميل" : "Client"}
-          </label>
-
-          <select
-            value={selectedClientId}
-            onChange={(e) => setSelectedClientId(e.target.value)}
-            className="w-full h-[38px] px-3 bg-card border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm"
-          >
-            <option value="">
-              {isAR ? "جميع العملاء" : "All clients"}
-            </option>
-
-            {clients.map((client: any) => (
-              <option key={client.id} value={client.id}>
-                {client.nameAr || client.nameEn || client.name || client.companyName || `Client #${client.id}`}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="md:col-span-5">
-          <label className="text-sm font-medium text-muted-foreground mb-1 block">
-            {isAR ? "بحث" : "Search"}
-          </label>
-
-          <div className="relative">
-            <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder={
-                isAR
-                  ? "بحث برقم الفاتورة أو البيان أو البوليصة"
-                  : "Search invoice, shipment ref, or bill of lading"
-              }
-              className="w-full h-[38px] pr-9 pl-3 bg-card border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm"
-            />
-          </div>
-        </div>
-
-        <div className="md:col-span-2">
-          <label className="text-sm font-medium text-muted-foreground mb-1 block">
-            {isAR ? "من تاريخ" : "From date"}
-          </label>
-
-          <input
-            type="date"
-            value={fromDate}
-            onChange={(e) => setFromDate(e.target.value)}
-            className="w-full h-[38px] px-3 bg-card border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm"
-          />
-        </div>
-
-        <div className="md:col-span-2">
-          <label className="text-sm font-medium text-muted-foreground mb-1 block">
-            {isAR ? "إلى تاريخ" : "To date"}
-          </label>
-
-          <input
-            type="date"
-            value={toDate}
-            onChange={(e) => setToDate(e.target.value)}
-            className="w-full h-[38px] px-3 bg-card border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm"
-          />
-        </div>
-      </div>
-
       {/* Clients Table */}
       <div className="bg-card border border-border/50 shadow-sm rounded-2xl overflow-hidden">
         <div className="p-5 border-b border-border/50 flex items-center gap-2">
           <BookOpen className="w-5 h-5 text-primary" />
-          <h2 className="font-bold text-base">{isClient ? t("statements") : t("allClientsStatement")}</h2>
+          <h2 className="font-bold text-base">{t("allClientsStatement")}</h2>
         </div>
         <div className="overflow-x-auto overflow-y-auto max-h-[360px]">
           <table className="w-full text-sm">
@@ -308,7 +122,7 @@ export default function StatementsIndex() {
                 clientSummaries.map(({ client, totalInvoiced, totalPaid, balance, invoiceCount, lastInvoice }) => (
                   <tr key={client.id} className="border-b border-border/50 last:border-0 hover:bg-muted/20 transition-colors">
                     <td className="px-5 py-4">
-                      <Link href={`/clients/${client.id}/statement`}>
+                      <Link href={`/clients/${client.id}`}>
                         <p className="font-semibold text-primary hover:underline cursor-pointer">{client.name}</p>
                       </Link>
                       {client.phone && <p className="text-xs text-muted-foreground mt-0.5">{client.phone}</p>}
@@ -337,25 +151,19 @@ export default function StatementsIndex() {
                     </td>
                     <td className="px-5 py-4">
                       <div className="flex items-center gap-2">
-                        {!isClient && (
-                          <Link href={`/clients/${client.id}`}>
-                            <button className="flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground rounded-lg font-semibold text-xs transition-all">
-                              <BookOpen className="w-3.5 h-3.5" />
-                              {t("viewStatement")}
-                            </button>
-                          </Link>
-                        )}
-                          <button
-                            onClick={() => {
-                              (window as any).electronAPI?.openExternalPrintWindow?.(
-                                `#/clients/${client.id}/statement`
-                              );
-                            }}
-                            className="flex items-center gap-1.5 px-3 py-1.5 bg-muted/10 text-muted-foreground hover:bg-muted/20 rounded-lg font-semibold text-xs transition-all"
-                          >
-                            <Printer className="w-3.5 h-3.5" />
-                            {t("print")}
+                        <Link href={`/clients/${client.id}`}>
+                          <button className="flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground rounded-lg font-semibold text-xs transition-all">
+                            <BookOpen className="w-3.5 h-3.5" />
+                            {t("viewStatement")}
                           </button>
+                        </Link>
+                      <button
+                      onClick={() => window.open(`/clients/${client.id}/statement`, "_self")}
+                      className="flex items-center gap-1.5 px-3 py-1.5 bg-muted text-muted-foreground hover:bg-foreground hover:text-background rounded-lg font-semibold text-xs transition-all"
+                    >
+                      <Printer className="w-3.5 h-3.5" />
+                      {t("print")}
+                    </button>
                       </div>
                     </td>
                   </tr>

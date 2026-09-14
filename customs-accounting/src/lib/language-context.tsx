@@ -29,6 +29,7 @@ export const translations = {
     systemMode: "مع النظام",
     // General
     save: "حفظ",
+    savedRowsSuccess: "تم حفظ",
     cancel: "إلغاء",
     delete: "حذف",
     edit: "تعديل",
@@ -140,7 +141,8 @@ export const translations = {
     // Pages
     invoicesDesc: "إدارة فواتير التخليص الجمركي",
     createInvoiceBtn: "إنشاء فاتورة",
-    searchInvoicePlaceholder: "بحث برقم الفاتورة أو العميل أو رقم البيان أو البوليصة...",
+    searchInvoicePlaceholder:
+      "بحث برقم الفاتورة أو العميل أو رقم البيان أو البوليصة...",
     issuedDate: "صدرت",
     dueDate: "الاستحقاق",
     print: "طباعة",
@@ -167,7 +169,8 @@ export const translations = {
     clientCompanyPlaceholder: "اسم الشركة أو العميل",
     saving: "جارٍ الحفظ...",
     saveClient: "حفظ العميل",
-    deleteClientConfirm: "هل أنت متأكد من حذف هذا العميل؟ لا يمكن التراجع عن هذا الإجراء.",
+    deleteClientConfirm:
+      "هل أنت متأكد من حذف هذا العميل؟ لا يمكن التراجع عن هذا الإجراء.",
     deleting: "جارٍ الحذف...",
     searchClientPlaceholder: "بحث عن عميل...",
     dashboardDesc: "نظرة عامة على أنشطة التخليص الجمركي",
@@ -214,6 +217,42 @@ export const translations = {
     viewStatement: "عرض الكشف",
     totalCollectedLabel: "إجمالي المحصّل",
     totalOutstandingLabel: "إجمالي المستحق",
+    // accountant page
+    accountingDetailedTable: "جدول الحسابات التفصيلي",
+    showing: "يُعرض",
+    payments: "المدفوعات",
+    unpaidTransportation: "نقليات غير مسددة",
+    unpaidLabor: "عمال غير مسددة",
+    unpaidOtherExpenses: "مصاريف غير مسددة",
+    netIncome: "صافي الدخل",
+    showAmounts: "إظهار الأرقام",
+    hideAmounts: "إخفاء الأرقام",
+    saveAllChanges: "حفظ جميع التغييرات",
+    searchAndFilters: "البحث والتصفية",
+    clearAll: "مسح الكل",
+    quickSearch: "بحث سريع",
+    searchInvoiceOrClient: "رقم الفاتورة أو اسم العميل...",
+    allClients: "جميع العملاء",
+    dateRange: "نطاق التاريخ",
+    driver: "السائق",
+    allDrivers: "جميع السائقين",
+    unloadLocation: "مكان التنزيل",
+    allLocations: "جميع المواقع",
+    invoiceAmount: "مبلغ الفاتورة",
+    transportation: "النقليات",
+    driverName: "اسم السائق",
+    labor: "العمال",
+    otherExpenses: "مصاريف أخرى",
+    income: "الدخل",
+    markTransportationPaid: "تسديد النقليات",
+    markLaborPaid: "تسديد العمال",
+    markOtherExpensesPaid: "تسديد المصاريف",
+    Location: "الموقع",
+    saveFailed: "فشل الحفظ",
+    tryAgain: "حاول مرة أخرى",
+    noPermission: "ليس لديك صلاحية",
+    noAccountingPermission:
+      "لا تملك صلاحية الوصول إلى صفحة الحسابات. تواصل مع المدير.",
   },
   en: {
     // Nav
@@ -239,6 +278,7 @@ export const translations = {
     systemMode: "System",
     // General
     save: "Save",
+    savedRowsSuccess: "Saved",
     cancel: "Cancel",
     delete: "Delete",
     edit: "Edit",
@@ -350,7 +390,8 @@ export const translations = {
     // Pages
     invoicesDesc: "Manage customs clearance invoices",
     createInvoiceBtn: "Create Invoice",
-    searchInvoicePlaceholder: "Search by invoice number, client, shipment ref or bill of lading...",
+    searchInvoicePlaceholder:
+      "Search by invoice number, client, shipment ref or bill of lading...",
     issuedDate: "Issued",
     dueDate: "Due",
     print: "Print",
@@ -358,14 +399,16 @@ export const translations = {
     loadingInvoices: "Loading invoices...",
     receiptsDesc: "Manage receipts and payments",
     newReceiptBtn: "New Receipt",
-    searchReceiptPlaceholder: "Search by receipt number, client name, or invoice...",
+    searchReceiptPlaceholder:
+      "Search by receipt number, client name, or invoice...",
     totalCollected: "Total Amount Collected",
     receiptCount: "Receipt Count",
     independentPayment: "Independent Payment",
     noReceipts: "No receipts found",
     noReceiptsDesc: "Start by creating a new receipt",
     deleteReceiptTitle: "Delete Receipt",
-    deleteReceiptDesc: "Are you sure you want to delete this receipt? This action cannot be undone.",
+    deleteReceiptDesc:
+      "Are you sure you want to delete this receipt? This action cannot be undone.",
     invoiceRef: "Invoice",
     clientsDesc: "Manage client database",
     contactInfo: "Contact Info",
@@ -377,7 +420,8 @@ export const translations = {
     clientCompanyPlaceholder: "Company or client name",
     saving: "Saving...",
     saveClient: "Save Client",
-    deleteClientConfirm: "Are you sure you want to delete this client? This action cannot be undone.",
+    deleteClientConfirm:
+      "Are you sure you want to delete this client? This action cannot be undone.",
     deleting: "Deleting...",
     searchClientPlaceholder: "Search for a client...",
     dashboardDesc: "Overview of customs clearance activities",
@@ -424,6 +468,42 @@ export const translations = {
     viewStatement: "View Statement",
     totalCollectedLabel: "Total Collected",
     totalOutstandingLabel: "Total Outstanding",
+    // accountant page
+    accountingDetailedTable: "Detailed Accounting Table",
+    showing: "Showing",
+    payments: "Payments",
+    unpaidTransportation: "Unpaid Transportation",
+    unpaidLabor: "Unpaid Labor",
+    unpaidOtherExpenses: "Unpaid Expenses",
+    netIncome: "Net Income",
+    showAmounts: "Show Amounts",
+    hideAmounts: "Hide Amounts",
+    saveAllChanges: "Save All Changes",
+    searchAndFilters: "Search & Filters",
+    clearAll: "Clear All",
+    quickSearch: "Quick Search",
+    searchInvoiceOrClient: "Invoice number or client name...",
+    allClients: "All Clients",
+    dateRange: "Date Range",
+    driver: "Driver",
+    allDrivers: "All Drivers",
+    unloadLocation: "Unload Location",
+    allLocations: "All Locations",
+    invoiceAmount: "Invoice Amount",
+    transportation: "Transportation",
+    driverName: "Driver Name",
+    labor: "Labor",
+    otherExpenses: "Other Expenses",
+    income: "Income",
+    markTransportationPaid: "Mark Transportation Paid",
+    markLaborPaid: "Mark Labor Paid",
+    markOtherExpensesPaid: "Mark Other Expenses Paid",
+    Location: "Location",
+    saveFailed: "Save failed",
+    tryAgain: "Please try again",
+    noPermission: "Access denied",
+    noAccountingPermission:
+      "You do not have permission to access the Accounting page. Please contact your administrator.",
   },
 };
 
@@ -454,7 +534,10 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   });
 
   const [currencySymbol, setCurrencyState] = useState<string>(() => {
-    return localStorage.getItem(CURRENCY_KEY) ?? DEFAULT_CURRENCY[(localStorage.getItem(STORAGE_KEY) as Lang) ?? "ar"];
+    return (
+      localStorage.getItem(CURRENCY_KEY) ??
+      DEFAULT_CURRENCY[(localStorage.getItem(STORAGE_KEY) as Lang) ?? "ar"]
+    );
   });
 
   useEffect(() => {
@@ -488,7 +571,16 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <LanguageContext.Provider value={{ lang, setLang, t, isRTL: lang === "ar", currencySymbol, setCurrencySymbol }}>
+    <LanguageContext.Provider
+      value={{
+        lang,
+        setLang,
+        t,
+        isRTL: lang === "ar",
+        currencySymbol,
+        setCurrencySymbol,
+      }}
+    >
       {children}
     </LanguageContext.Provider>
   );
