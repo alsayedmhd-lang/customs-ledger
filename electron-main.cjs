@@ -1351,7 +1351,7 @@ ipcMain.handle("storage:test-write", async (_event, targetPath) => {
       `.write-test-${Date.now()}.tmp`
     );
 
-    fs.writeFileSync(testFilePath, "Customs Ledger Write Test", "utf8");
+    fs.writeFileSync(testFilePath, "Ledger Write Test", "utf8");
 
     const exists = fs.existsSync(testFilePath);
 
