@@ -1431,7 +1431,7 @@ export default function DeveloperSettingsPage() {
 <html lang="${isAR ? "ar" : "en"}" dir="${direction}">
 <head>
   <meta charset="utf-8" />
-  <title>Customs Ledger SQLite - System Diagnostics Report</title>
+  <title>Ledger - System Diagnostics Report</title>
   <style>
     @page { size: A4; margin: 14mm; }
     * { box-sizing: border-box; }
@@ -1543,7 +1543,7 @@ export default function DeveloperSettingsPage() {
 <body>
   <main class="report-page">
   <section class="header">
-    <h1>Customs Ledger SQLite - System Diagnostics Report</h1>
+    <h1>Ledger - System Diagnostics Report</h1>
     <div class="meta">
       <div><strong>${escapeDiagnosticReportHtml(tr("التاريخ والوقت", "Date and time"))}:</strong> ${escapeDiagnosticReportHtml(checkedAt)}</div>
       <div><strong>${escapeDiagnosticReportHtml(tr("إصدار التطبيق", "App Version"))}:</strong> ${escapeDiagnosticReportHtml(appVersion)}</div>
