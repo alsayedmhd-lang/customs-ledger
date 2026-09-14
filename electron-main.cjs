@@ -841,7 +841,7 @@ function createWindow() {
   });
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
-    if (details.frameName === "customs-ledger-diagnostics-report") {
+    if (details.frameName === "ledger-diagnostics-report") {
       return {
         action: "allow",
         overrideBrowserWindowOptions: {
@@ -861,7 +861,7 @@ function createWindow() {
   });
 
   mainWindow.webContents.on("did-create-window", (childWindow, details) => {
-    if (details.frameName === "customs-ledger-diagnostics-report") {
+    if (details.frameName === "ledger-diagnostics-report") {
       setupDiagnosticsReportWindowMenu(childWindow);
     }
   });
