@@ -726,7 +726,7 @@ async function buildSystemDiagnostics() {
   }
 
   try {
-    const tempPath = path.join(context.dataRoot, `.customs-ledger-diagnostics-${process.pid}-${Date.now()}.tmp`);
+    const tempPath = path.join(context.dataRoot, `.ledger-diagnostics-${process.pid}-${Date.now()}.tmp`);
     await fs.promises.writeFile(tempPath, "diagnostics", { encoding: "utf8", flag: "wx" });
     await fs.promises.rm(tempPath, { force: true });
     addCheck({
@@ -1577,7 +1577,7 @@ router.get("/developer/system-diagnostics/export", async (_req, res) => {
     });
 
     res.setHeader("Content-Type", "application/json; charset=utf-8");
-    res.setHeader("Content-Disposition", "attachment; filename=customs-ledger-diagnostics.json");
+    res.setHeader("Content-Disposition", "attachment; filename=ledger-diagnostics.json");
     return res.send(JSON.stringify(report, null, 2));
   } catch (error) {
     console.error("[SYSTEM_DIAGNOSTICS_EXPORT] Failed to generate report", error);
