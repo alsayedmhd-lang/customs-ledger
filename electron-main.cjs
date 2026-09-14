@@ -423,7 +423,7 @@ function detectBestDataDrive() {
 
   for (const letter of driveLetters) {
     const driveRoot = `${letter}:\\`;
-    const probePath = path.join(driveRoot, `.customs-ledger-write-test-${process.pid}-${Date.now()}`);
+    const probePath = path.join(driveRoot, `.ledger-write-test-${process.pid}-${Date.now()}`);
 
     try {
       if (!fs.existsSync(driveRoot)) {
@@ -488,7 +488,7 @@ function analyzeDataRootMigration() {
     };
   }
 
-  const probePath = path.join(targetRoot, `.customs-ledger-migration-test-${process.pid}-${Date.now()}`);
+  const probePath = path.join(targetRoot, `.ledger-migration-test-${process.pid}-${Date.now()}`);
 
   try {
     if (!fs.existsSync(targetRoot)) {
@@ -559,7 +559,7 @@ function analyzeBackupReadiness() {
     warnings.push(`Could not create backups root: ${error?.message || error}`);
   }
 
-  const probePath = path.join(backupsRoot, `.customs-ledger-backup-test-${process.pid}-${Date.now()}`);
+  const probePath = path.join(backupsRoot, `.ledger-backup-test-${process.pid}-${Date.now()}`);
 
   try {
     if (backupsRootExists) {
