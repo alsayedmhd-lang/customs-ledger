@@ -1495,7 +1495,7 @@ ipcMain.handle("storage:save-current-data-root", async (_event, expectedDataRoot
 
     const testFilePath = path.join(currentDataRoot, `.save-current-data-root-${Date.now()}.tmp`);
     try {
-      fs.writeFileSync(testFilePath, "Customs Ledger Data Root Save Test", "utf8");
+      fs.writeFileSync(testFilePath, "Ledger Data Root Save Test", "utf8");
     } finally {
       try {
         fs.rmSync(testFilePath, { force: true });
