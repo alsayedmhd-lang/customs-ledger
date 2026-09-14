@@ -1,10 +1,10 @@
 {
-  "name": "customs-ledger-sqlite-desktop",
+  "name": "ledger",
   "version": "2.1.1",
   "type": "module",
   "private": true,
   "main": "electron-main.cjs",
-  "description": "Customs Ledger SQLite Desktop",
+  "description": "Ledger",
   "scripts": {
     "dev": "vite dev",
     "build": "vite build",
@@ -83,7 +83,7 @@
   },
   "build": {
     "appId": "com.atwcc.customsledger.sqlite",
-    "productName": "Customs Ledger SQLite",
+    "productName": "Ledger",
     "directories": {
       "output": "release"
     },
@@ -198,7 +198,7 @@
       {
         "provider": "github",
         "owner": "alsayedmhd-lang",
-        "repo": "customs-ledger"
+        "repo": "ledger"
       }
     ]
   },
