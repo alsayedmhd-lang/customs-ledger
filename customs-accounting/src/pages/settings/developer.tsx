@@ -1372,7 +1372,7 @@ export default function DeveloperSettingsPage() {
     const date = new Date();
     const pad = (value: number) => String(value).padStart(2, "0");
 
-    return `customs-ledger-diagnostics-${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}-${pad(date.getHours())}-${pad(date.getMinutes())}.json`;
+    return `ledger-diagnostics-${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}-${pad(date.getHours())}-${pad(date.getMinutes())}.json`;
   }
 
   function maskDiagnosticReportText(value: string) {
@@ -1580,7 +1580,7 @@ export default function DeveloperSettingsPage() {
     setIsSystemDiagnosticsPdfExporting(true);
     try {
       const data = systemDiagnostics || (await fetchSystemDiagnosticsReportData());
-      const printWindow = window.open("", "customs-ledger-diagnostics-report", "width=1100,height=800");
+      const printWindow = window.open("", "ledger-diagnostics-report", "width=1100,height=800");
 
       if (!printWindow) {
         throw new Error(tr("تعذر فتح نافذة الطباعة. تحقق من إعدادات المتصفح.", "Could not open the print window. Check browser popup settings."));
