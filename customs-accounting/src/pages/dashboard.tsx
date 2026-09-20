@@ -248,7 +248,7 @@ export default function Dashboard() {
   return (
     <motion.div
       variants={container} initial="hidden" animate="show"
-      className="space-y-6"
+      className="space-y-5"
     >
       {/* Welcome Banner */}
       <motion.div
@@ -337,7 +337,7 @@ export default function Dashboard() {
         type="button"
         variants={item}
         onClick={handleOpenProjectGuide}
-        className="w-full bg-card border border-border rounded-2xl p-5 shadow-sm text-start transition-colors hover:bg-muted/50"
+        className="w-full bg-card border border-border rounded-2xl p-4 shadow-sm text-start transition-colors hover:bg-muted/50"
       >
         <div className="flex items-center gap-3">
           <div className="p-2.5 rounded-xl bg-primary/10 flex-shrink-0">
@@ -371,7 +371,7 @@ export default function Dashboard() {
               <TrendingUp className="w-4 h-4 text-primary" />
             </div>
           </div>
-          <div className="h-64">
+          <div className="h-56">
             {chartData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={chartData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
@@ -417,7 +417,7 @@ export default function Dashboard() {
         {/* Recent Invoices */}
         <motion.div
           variants={item}
-          className="bg-card border border-border rounded-2xl p-5 shadow-sm flex flex-col"
+          className="bg-card border border-border rounded-2xl p-4 shadow-sm flex flex-col"
         >
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-base font-bold text-foreground">{t("recentInvoices")}</h2>
