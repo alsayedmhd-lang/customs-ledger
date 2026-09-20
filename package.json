@@ -1,6 +1,6 @@
 {
   "name": "ledger",
-  "version": "2.1.86",
+  "version": "2.1.91",
   "type": "module",
   "private": true,
   "main": "electron-main.cjs",

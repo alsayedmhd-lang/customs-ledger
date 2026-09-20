@@ -157,73 +157,73 @@ export default function Dashboard() {
       title: t("outstanding"),
       value: formatCurrency(totalOutstanding, currencySymbol, lang),
       icon: AlertCircle,
-      color: "bg-emerald-50 dark:bg-muted/30",
-      bg: "bg-emerald-50 dark:bg-muted/30",
-      iconColor: "text-emerald-600 dark:text-foreground",
-      border: "border-emerald-200 dark:border-border",
+      color: "bg-primary/70",
+      bg: "bg-primary/10 dark:bg-primary/20",
+      iconColor: "text-primary",
+      border: "border-border",
     },
     {
       title: t("payments"),
       value: formatCurrency(totalPaymentsUncollected, currencySymbol, lang),
       icon: DollarSign,
-      color: "bg-emerald-50 dark:bg-muted/30",
-      bg: "bg-emerald-50 dark:bg-muted/30",
-      iconColor: "text-emerald-600 dark:text-foreground",
-      border: "border-emerald-200 dark:border-border",
+      color: "bg-primary/70",
+      bg: "bg-blue-50 dark:bg-blue-950/30",
+      iconColor: "text-blue-600 dark:text-blue-400",
+      border: "border-border",
     },
     {
       title: t("advancePayment"),
       value: formatCurrency(totalAdvancePayment, currencySymbol, lang),
       icon: DollarSign,
-      color: "bg-emerald-50 dark:bg-muted/30",
-      bg: "bg-emerald-50 dark:bg-muted/30",
-      iconColor: "text-emerald-600 dark:text-foreground",
-      border: "border-emerald-200 dark:border-border",
+      color: "bg-primary/70",
+      bg: "bg-violet-50 dark:bg-violet-950/30",
+      iconColor: "text-violet-600 dark:text-violet-400",
+      border: "border-border",
     },
     {
       title: t("unpaidTransportation"),
       value: formatCurrency(totalUnpaidTransportation, currencySymbol, lang),
       icon: TrendingUp,
-      color: "bg-emerald-50 dark:bg-muted/30",
-      bg: "bg-emerald-50 dark:bg-muted/30",
-      iconColor: "text-emerald-600 dark:text-foreground",
-      border: "border-emerald-200 dark:border-border",
+      color: "bg-primary/70",
+      bg: "bg-amber-50 dark:bg-amber-950/30",
+      iconColor: "text-amber-600 dark:text-amber-400",
+      border: "border-border",
     },
     {
       title: t("unpaidLabor"),
       value: formatCurrency(totalUnpaidLabor, currencySymbol, lang),
       icon: Users,
-      color: "bg-emerald-50 dark:bg-muted/30",
-      bg: "bg-emerald-50 dark:bg-muted/30",
-      iconColor: "text-emerald-600 dark:text-foreground",
-      border: "border-emerald-200 dark:border-border",
+      color: "bg-primary/70",
+      bg: "bg-cyan-50 dark:bg-cyan-950/30",
+      iconColor: "text-cyan-600 dark:text-cyan-400",
+      border: "border-border",
     },
     {
       title: t("unpaidOtherExpenses"),
       value: formatCurrency(totalUnpaidOtherExpenses, currencySymbol, lang),
       icon: FileText,
-      color: "bg-emerald-50 dark:bg-muted/30",
-      bg: "bg-emerald-50 dark:bg-muted/30",
-      iconColor: "text-emerald-600 dark:text-foreground",
-      border: "border-emerald-200 dark:border-border",
+      color: "bg-primary/70",
+      bg: "bg-rose-50 dark:bg-rose-950/30",
+      iconColor: "text-rose-600 dark:text-rose-400",
+      border: "border-border",
     },
     {
       title: t("invoiceCount"),
       value: arabicNums(invoices?.length ?? 0, lang),
       icon: FileText,
-      color: "bg-emerald-50 dark:bg-muted/30",
-      bg: "bg-emerald-50 dark:bg-muted/30",
-      iconColor: "text-emerald-600 dark:text-foreground",
-      border: "border-emerald-200 dark:border-border",
+      color: "bg-primary/70",
+      bg: "bg-indigo-50 dark:bg-indigo-950/30",
+      iconColor: "text-indigo-600 dark:text-indigo-400",
+      border: "border-border",
     },
     {
       title: t("totalClients"),
       value: arabicNums(clients?.length ?? 0, lang),
       icon: Users,
-      color: "bg-emerald-50 dark:bg-muted/30",
-      bg: "bg-emerald-50 dark:bg-muted/30",
-      iconColor: "text-emerald-600 dark:text-foreground",
-      border: "border-emerald-200 dark:border-border",
+      color: "bg-primary/70",
+      bg: "bg-teal-50 dark:bg-teal-950/30",
+      iconColor: "text-teal-600 dark:text-teal-400",
+      border: "border-border",
     },
   ];
 
@@ -314,16 +314,16 @@ export default function Dashboard() {
             <motion.div
               key={s.title}
               variants={item}
-              className={`stat-card bg-card border ${s.border} rounded-2xl p-5 shadow-sm`}
+              className={`stat-card bg-card border ${s.border} rounded-2xl p-3 shadow-sm`}
             >
-              <div className="flex items-start justify-between">
+              <div className={`flex items-start justify-between ${s.bg} rounded-xl p-2`}>
                 <div className="flex-1">
-                  <p className="text-xs font-semibold text-muted-foreground mb-2 uppercase tracking-wider">{s.title}</p>
-                  <h3 className="text-2xl font-black text-foreground tracking-tight">
+                  <p className="text-xs font-medium text-muted-foreground mb-1.5 uppercase tracking-wider">{s.title}</p>
+                  <h3 className="text-xl font-semibold text-foreground tracking-tight">
                     {showAmounts ? s.value : hidden}
                   </h3>
                 </div>
-                <div className={`p-2.5 rounded-xl ${s.bg} flex-shrink-0`}>
+                <div className={`p-2 rounded-xl ${s.bg} flex-shrink-0`}>
                   <s.icon className={`w-5 h-5 ${s.iconColor}`} />
                 </div>
               </div>
@@ -396,7 +396,7 @@ export default function Dashboard() {
                       background: "hsl(var(--card))", color: "hsl(var(--foreground))",
                       fontSize: "13px", fontFamily: "Cairo", direction: lang === "ar" ? "rtl" : "ltr",
                     }}
-                    formatter={(value: number) => [formatCurrency(value), lang === "ar" ? "الإيرادات" : "Revenue"]}
+                    formatter={(value: number) => [formatCurrency(value, currencySymbol, lang), lang === "ar" ? "الإيرادات" : "Revenue"]}
                   />
                   <Bar dataKey="total" radius={[8, 8, 0, 0]} maxBarSize={48}>
                     {chartData.map((_, index) => (
