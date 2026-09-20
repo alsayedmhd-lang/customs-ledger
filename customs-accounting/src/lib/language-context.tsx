@@ -167,7 +167,6 @@ export const translations = {
     addClientTitle: "إضافة عميل جديد",
     clientCompanyName: "الشركة / الاسم",
     clientCompanyPlaceholder: "اسم الشركة أو العميل",
-    saving: "جارٍ الحفظ...",
     saveClient: "حفظ العميل",
     deleteClientConfirm:
       "هل أنت متأكد من حذف هذا العميل؟ لا يمكن التراجع عن هذا الإجراء.",

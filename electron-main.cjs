@@ -5,11 +5,12 @@ const { autoUpdater } = require("electron-updater");
 const { spawn } = require("child_process");
 const path = require("path");
 const fs = require("fs");
-
+const { execFileSync } = require("child_process");
 let backendProcess;
 let mainWindow;
 let updateInfo;
 let updateDownloaded = false;
+let updateInstallType = null;
 const printPreviewWindows = new Set();
 const printPreviewWebContentsIds = new Set();
 const MIN_ZOOM_FACTOR = 0.5;
@@ -18,6 +19,33 @@ const ZOOM_STEP = 0.1;
 const LICENSE_SECRET = "customs-ledger-sqlite-offline-license-v2-2026";
 const INVALID_LICENSE_SIGNATURE_MESSAGE =
   "ملف الترخيص غير صالح أو تم تعديله / License file is invalid or has been modified";
+
+  function getInternalUpdateHandoffPath() {
+  return path.join(resolveDataRoot(), "config", "internal-update-handoff.json");
+}
+
+
+function createInternalUpdateHandoff() {
+  const createdAt = new Date().toISOString();
+
+  const token = crypto
+    .createHash("sha256")
+    .update(`${app.getVersion()}|${createdAt}|${LICENSE_SECRET}`)
+    .digest("hex");
+
+  const handoff = {
+    token,
+    createdAt,
+    sourceVersion: app.getVersion(),
+  };
+
+  const handoffPath = getInternalUpdateHandoffPath();
+
+  fs.mkdirSync(path.dirname(handoffPath), { recursive: true });
+  fs.writeFileSync(handoffPath, JSON.stringify(handoff, null, 2), "utf8");
+  
+  return token;
+}
 
 function clampZoomFactor(value) {
   const zoomFactor = Number(value);
@@ -393,6 +421,7 @@ function resolveDataRoot() {
   }
 
   ensureDataRootFolders(dataRoot);
+  hideDataRoot(dataRoot);
 
   return dataRoot;
 }
@@ -415,6 +444,22 @@ function ensureDataRootFolders(dataRoot) {
     if (!fs.existsSync(folderPath)) {
       fs.mkdirSync(folderPath, { recursive: true });
     }
+  }
+}
+
+
+function hideDataRoot(dataRoot) {
+  if (process.platform !== "win32") {
+    return;
+  }
+
+  try {
+    execFileSync("attrib.exe", ["+h", "+s", dataRoot], {
+      windowsHide: true,
+      stdio: "pipe",
+    });
+  } catch (error) {
+    console.error("[DATA_ROOT] Failed to hide data root:", error);
   }
 }
 
@@ -756,6 +801,77 @@ function verifyBackupDirectory(backupDir) {
 
 function getAttachmentsRoot() {
   return path.join(resolveDataRoot(), "attachments");
+}
+
+function getUpdateInstallMarkerPath() {
+  return path.join(
+    app.getPath("appData"),
+    "ledger",
+    "ledger-install-marker.json"
+  );
+}
+
+function consumeUpdateInstallMarker() {
+  const markerPath = getUpdateInstallMarkerPath();
+
+  try {
+    if (!fs.existsSync(markerPath)) {
+      return null;
+    }
+
+    const marker = JSON.parse(fs.readFileSync(markerPath, "utf8"));
+
+    fs.rmSync(markerPath, { force: true });
+
+    if (!marker || typeof marker.type !== "string") {
+      return null;
+    }
+
+    if (marker.type === "external") {
+      return "external";
+    }
+
+    if (
+      marker.type === "internal" &&
+      typeof marker.token === "string" &&
+      marker.token.trim()
+    ) {
+      const handoffPath = getInternalUpdateHandoffPath();
+
+      if (!fs.existsSync(handoffPath)) {
+        return "external";
+      }
+
+      const handoff = JSON.parse(
+        fs.readFileSync(handoffPath, "utf8")
+      );
+
+      const expectedToken = crypto
+        .createHash("sha256")
+        .update(
+          `${handoff.sourceVersion}|${handoff.createdAt}|${LICENSE_SECRET}`
+        )
+        .digest("hex");
+
+      const tokenIsValid =
+        timingSafeStringEqual(marker.token, expectedToken) &&
+        timingSafeStringEqual(handoff.token, expectedToken);
+
+      fs.rmSync(handoffPath, { force: true });
+
+      return tokenIsValid ? "internal" : "external";
+    }
+
+    return "external";
+  } catch (error) {
+    console.error("[UPDATE][MARKER ERROR]", error);
+
+    try {
+      fs.rmSync(markerPath, { force: true });
+    } catch {}
+
+    return "external";
+  }
 }
 
 function createWindow() {
@@ -1206,6 +1322,8 @@ autoUpdater.on("error", (error) => {
 });
 
 ipcMain.handle("app:get-version", () => app.getVersion());
+
+console.log("Electron app.getVersion():", app.getVersion());
 
 function readPackagedEnvValue(key) {
   try {
@@ -1706,6 +1824,196 @@ ipcMain.handle("attachment:open-file", async (_event, input) => {
   }
 });
 
+ipcMain.handle("update:select-installer", async () => {
+  try {
+    const result = await dialog.showOpenDialog({
+      title: "Choose Ledger Update Installer",
+      properties: ["openFile"],
+      filters: [
+        {
+          name: "Ledger Installer",
+          extensions: ["exe"],
+        },
+      ],
+    });
+
+    if (result.canceled || !result.filePaths?.[0]) {
+      return {
+        ok: false,
+        canceled: true,
+      };
+    }
+
+    const installerPath = result.filePaths[0];
+    const installerName = path.basename(installerPath);
+
+    const versionMatch = installerName.match(
+  /^Ledger Setup\s+(\d+\.\d+\.\d+)\.exe$/i
+);
+
+if (!versionMatch) {
+  return {
+    ok: false,
+    canceled: false,
+    error: "Please select a valid Ledger Setup installer.",
+  };
+}
+
+const installerVersion = versionMatch[1];
+const currentVersion = app.getVersion();
+
+const compareVersions = (a, b) => {
+  const aParts = a.split(".").map(Number);
+  const bParts = b.split(".").map(Number);
+
+  for (let i = 0; i < 3; i += 1) {
+    if (aParts[i] !== bParts[i]) {
+      return aParts[i] - bParts[i];
+    }
+  }
+
+  return 0;
+};
+
+if (compareVersions(installerVersion, currentVersion) <= 0) {
+  return {
+    ok: false,
+    canceled: false,
+    error: `Selected installer version ${installerVersion} is not newer than the current version ${currentVersion}.`,
+  };
+}
+
+    return {
+      ok: true,
+      canceled: false,
+      path: installerPath,
+      installerName,
+      installerVersion,
+      currentVersion,
+    };
+  } catch (error) {
+    console.error("[UPDATE][SELECT INSTALLER ERROR]", error);
+
+    return {
+      ok: false,
+      canceled: false,
+      error: error?.message || String(error),
+      installerVersion: null,
+      currentVersion: null,
+    };
+  }
+});
+
+ipcMain.handle("update:run-installer", async (_event, installerPath) => {
+  try {
+    if (typeof installerPath !== "string" || !installerPath.trim()) {
+      return {
+        ok: false,
+        error: "Installer path is required.",
+      };
+    }
+
+    if (!fs.existsSync(installerPath)) {
+      return {
+        ok: false,
+        error: "Installer file was not found.",
+      };
+    }
+
+    const installerName = path.basename(installerPath);
+
+    const versionMatch = installerName.match(
+      /^Ledger Setup\s+(\d+\.\d+\.\d+)\.exe$/i
+    );
+
+    if (!versionMatch) {
+      return {
+        ok: false,
+        canceled: false,
+        error: "Please select a valid Ledger Setup installer.",
+      };
+    }
+
+    const installerVersion = versionMatch[1];
+    const currentVersion = app.getVersion();
+
+    const compareVersions = (a, b) => {
+      const aParts = a.split(".").map(Number);
+      const bParts = b.split(".").map(Number);
+
+      for (let i = 0; i < 3; i += 1) {
+        if (aParts[i] !== bParts[i]) {
+          return aParts[i] - bParts[i];
+        }
+      }
+
+      return 0;
+    };
+
+    if (compareVersions(installerVersion, currentVersion) <= 0) {
+      return {
+        ok: false,
+        canceled: false,
+        error: `Selected installer version ${installerVersion} is not newer than the current version ${currentVersion}.`,
+      };
+    }
+
+    const internalUpdateToken = createInternalUpdateHandoff();
+
+    const child = spawn(
+      installerPath,
+      [`/LEDGER_INTERNAL_UPDATE=${internalUpdateToken}`],
+      {
+        detached: true,
+        stdio: "ignore",
+        windowsHide: false,
+      }
+    );
+
+    child.unref();
+
+    setImmediate(() => {
+      app.quit();
+    });
+
+    return {
+      ok: true,
+      installerName,
+      installerVersion,
+      currentVersion,
+      internalUpdate: true,
+    };
+  } catch (error) {
+    console.error("[UPDATE][RUN INSTALLER ERROR]", error);
+
+    return {
+      ok: false,
+      error: error?.message || String(error),
+      installerVersion: null,
+      currentVersion: null,
+    };
+  }
+});
+
+ipcMain.handle("update:quit-for-installer", async () => {
+  try {
+    setImmediate(() => {
+      app.quit();
+    });
+
+    return {
+      ok: true,
+    };
+  } catch (error) {
+    console.error("[UPDATE][QUIT ERROR]", error);
+
+    return {
+      ok: false,
+      error: error?.message || String(error),
+    };
+  }
+});
+
 ipcMain.on("app:zoom-wheel", (event, direction) => {
   if (!mainWindow || mainWindow.isDestroyed()) return;
   if (event.sender !== mainWindow.webContents) return;
@@ -1812,7 +2120,33 @@ ipcMain.handle("print-preview:open-external-window", async (_event, url) => {
         additionalArguments: printWindowArguments,
       },
     });
+
+    printWindow.webContents.on("console-message", (_event, level, message, line, sourceId) => {
+      console.error("[PRINT PREVIEW][CONSOLE]", {
+        level,
+        message,
+        line,
+        sourceId,
+      });
+    });
+
+    printWindow.webContents.on("render-process-gone", (_event, details) => {
+      console.error("[PRINT PREVIEW][RENDER GONE]", details);
+    });
+
+    printWindow.webContents.on("did-fail-load", (_event, errorCode, errorDescription, validatedURL) => {
+      console.error("[PRINT PREVIEW] did-fail-load:", {
+        errorCode,
+        errorDescription,
+        validatedURL,
+      });
+    });
+
+
     const printWindowWebContentsId = printWindow.webContents.id;
+
+    console.log("[PRINT PREVIEW] Window created:", printWindowWebContentsId);
+
     printPreviewWindows.add(printWindow);
     printPreviewWebContentsIds.add(printWindowWebContentsId);
     printWindow.webContents.setZoomFactor(1);
@@ -1823,7 +2157,15 @@ ipcMain.handle("print-preview:open-external-window", async (_event, url) => {
     setupPrintPreviewWindowMenu(printWindow);
 
     const indexPath = resolveFrontendIndexPath();
-    const loadPrintRoute = () => printWindow.loadFile(indexPath, { hash: targetHash.slice(1) });
+    //const loadPrintRoute = () => printWindow.loadFile(indexPath, { hash: targetHash.slice(1) });
+    const loadPrintRoute = () => {
+      console.log("[PRINT PREVIEW] Loading:", {
+        indexPath,
+        targetHash,
+      });
+      return printWindow.loadFile(indexPath, { hash: targetHash.slice(1) });
+    };
+
 
     await loadPrintRoute();
 
@@ -1975,9 +2317,26 @@ ipcMain.handle("license:get-device-id", () => {
   return generateLicenseDeviceId();
 });
 
+function invalidateLicenseForExternalInstall() {
+  try {
+    const licensePath = path.join(
+      resolveDataRoot(),
+      "license",
+      "license.json"
+    );
+
+    if (fs.existsSync(licensePath)) {
+      fs.rmSync(licensePath, { force: true });
+      console.log("[UPDATE] External installation detected. License removed.");
+    }
+  } catch (error) {
+    console.error("[UPDATE][LICENSE INVALIDATION ERROR]", error);
+  }
+}
+
 function getLicenseStatus() {
   try {
-    const licensePath = path.join(process.cwd(), "api-server", "src", "utils", "license", "license.json");
+    const licensePath = path.join(resolveDataRoot(), "license", "license.json");
 
     if (!fs.existsSync(licensePath)) {
       return { valid: false, reason: "LICENSE_FILE_NOT_FOUND" };
@@ -2042,7 +2401,7 @@ ipcMain.handle("license:save-current", async (_event, license) => {
       };
     }
 
-    const licenseDir = path.join(process.cwd(), "api-server", "src", "utils", "license");
+    const licenseDir = path.join(resolveDataRoot(), "license");
     const licensePath = path.join(licenseDir, "license.json");
 
     fs.mkdirSync(licenseDir, { recursive: true });
@@ -2052,11 +2411,16 @@ ipcMain.handle("license:save-current", async (_event, license) => {
   } catch (error) {
     return { success: false, message: String(error) };
   }
-});
-
-
+}
+);
 
 app.whenReady().then(() => {
+  updateInstallType = consumeUpdateInstallMarker();
+
+  if (updateInstallType === "external") {
+    invalidateLicenseForExternalInstall();
+  }
+
   createWindow();
   setupApplicationMenu();
 });
@@ -2069,6 +2433,7 @@ app.on("window-all-closed", () => {
   if (backendProcess && !backendProcess.killed) {
     backendProcess.kill();
   }
+
   app.quit();
 });
 
