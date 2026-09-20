@@ -1,5 +1,8 @@
 import { X, Sun, Moon, Monitor, Coins } from "lucide-react";
-import { useLanguage } from "@/lib/language-context";
+import {
+  CURRENCIES,
+  useLanguage,
+} from "@/lib/language-context";
 import { cn } from "@/lib/utils";
 import packageJson from "../../../../package.json";
 
@@ -10,7 +13,16 @@ interface SettingsPanelProps {
 const APP_VERSION = `v${packageJson.version}`;
 
 export default function SettingsPanel({ onClose }: SettingsPanelProps) {
-  const { lang, t, isRTL, currencySymbol, setCurrencySymbol } = useLanguage();
+  const {
+  lang,
+  t,
+  isRTL,
+  currencySymbol,
+  currencyCode,
+  setCurrencyCode,
+  currencyDisplayMode,
+  setCurrencyDisplayMode,
+} = useLanguage();
 
   function toggleTheme(mode: "light" | "dark" | "system") {
     if (mode === "dark") {
@@ -29,6 +41,9 @@ export default function SettingsPanel({ onClose }: SettingsPanelProps) {
   const storedTheme = localStorage.getItem("theme");
   const currentTheme = storedTheme === "dark" ? "dark" : storedTheme === "light" ? "light" : "system";
   const isManualCurrency = !!localStorage.getItem("currency_manual");
+  const selectedCurrency =
+  CURRENCIES.find((currency) => currency.code === currencyCode) ??
+  CURRENCIES[0];
 
   return (
     <>
@@ -91,44 +106,60 @@ export default function SettingsPanel({ onClose }: SettingsPanelProps) {
               <Coins className="w-4 h-4" />
               {t("interfaceCurrency")}
             </div>
-            <div className="space-y-2">
-              {[
-                { symbol: "ر.ق", label: t("currencyAR") },
-                { symbol: "QR",  label: t("currencyEN") },
-              ].map(({ symbol, label }) => (
-                <button
-                  key={symbol}
-                  onClick={() => setCurrencySymbol(symbol)}
-                  className={cn(
-                    "w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-medium border-2 transition-all",
-                    currencySymbol === symbol && isManualCurrency
-                      ? "border-primary bg-primary/10 text-primary"
-                      : "border-border bg-background text-muted-foreground hover:border-primary/40 hover:text-foreground"
-                  )}
-                >
-                  <span className="text-xs">{label}</span>
-                  <span className="font-mono font-bold">{symbol}</span>
-                </button>
+
+            {/* Currency Selection */}
+            <select
+              value={currencyCode}
+              onChange={(e) => setCurrencyCode(e.target.value)}
+              className="w-full h-10 rounded-xl border-2 border-border bg-background px-3 text-sm font-medium outline-none focus:border-primary"
+            >
+              {CURRENCIES.map((currency) => (
+                <option key={currency.code} value={currency.code}>
+                  {lang === "ar" ? currency.arabic : currency.english} ({currency.code})
+                </option>
               ))}
+            </select>
+
+            {/* Currency Display Mode */}
+            <div className="space-y-2">
               <button
-                onClick={() => {
-                  const auto = lang === "ar" ? "ر.ق" : "QR";
-                  setCurrencySymbol(auto, false);
-                }}
+                onClick={() => setCurrencyDisplayMode("ar")}
                 className={cn(
-                  "w-full flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-medium border transition-all",
-                  !isManualCurrency
-                    ? "border-primary bg-primary/5 text-primary"
-                    : "border-border text-muted-foreground hover:border-primary/30"
+                  "w-full flex items-center justify-center px-4 py-2.5 rounded-xl text-sm font-medium border-2 transition-all",
+                  currencyDisplayMode === "ar"
+                    ? "border-primary bg-primary/10 text-primary"
+                    : "border-border bg-background text-muted-foreground hover:border-primary/40 hover:text-foreground"
                 )}
               >
-                🔄 {t("currencyAuto")}
+                {selectedCurrency.arabic}
+              </button>
+
+              <button
+                onClick={() => setCurrencyDisplayMode("en")}
+                className={cn(
+                  "w-full flex items-center justify-center px-4 py-2.5 rounded-xl text-sm font-medium border-2 transition-all",
+                  currencyDisplayMode === "en"
+                    ? "border-primary bg-primary/10 text-primary"
+                    : "border-border bg-background text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                )}
+              >
+                {selectedCurrency.english}
+              </button>
+
+              <button
+                onClick={() => setCurrencyDisplayMode("symbol")}
+                className={cn(
+                  "w-full flex items-center justify-center px-4 py-2.5 rounded-xl text-sm font-medium border-2 transition-all",
+                  currencyDisplayMode === "symbol"
+                    ? "border-primary bg-primary/10 text-primary"
+                    : "border-border bg-background text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                )}
+              >
+                {selectedCurrency.symbol ?? selectedCurrency.english}
               </button>
             </div>
+            </div>
           </div>
-
-        </div>
-
         {/* Version footer */}
         <div className="px-5 py-3 border-t border-border bg-muted/20 text-xs text-muted-foreground text-center">
           {APP_VERSION}

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { Link } from "wouter";
 import {
@@ -19,13 +20,51 @@ import { useCompanySettings } from "@/lib/company-settings-context";
 
 const LOGO = `${import.meta.env.BASE_URL}logo_nobg.png`;
 
+interface AccountingRow {
+  id: number;
+  subtotal: number;
+  payments: number;
+  transportation: number;
+  labor: number;
+  otherExpenses: number;
+  transportationPaid: boolean;
+  laborPaid: boolean;
+  otherExpensesPaid: boolean;
+}
+
+const API_BASE = (
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:3000"
+).replace(/\/$/, "");
+
+function getToken() {
+  return sessionStorage.getItem("auth_token");
+}
+
+async function fetchAccounting(): Promise<AccountingRow[]> {
+  const res = await fetch(`${API_BASE}/api/accounting`, {
+    headers: { Authorization: `Bearer ${getToken()}` },
+  });
+
+  if (!res.ok) throw new Error("Failed to fetch accounting");
+
+  return res.json();
+}
+
 export default function Dashboard() {
-  const { t, lang } = useLanguage();
+  const { t, lang, currencySymbol } = useLanguage();
   const isAR = lang === "ar";
-  const { user } = useAuth();
+  const { user, can } = useAuth();
   const { settings } = useCompanySettings();
   const { data: invoices, isLoading: loadingInvoices } = useListInvoices();
   const { data: clients } = useListClients();
+  const { data: accountingRows = [] } = useQuery({
+    queryKey: ["accounting"],
+    queryFn: fetchAccounting,
+    enabled:
+      !!user &&
+      user.role !== "client" &&
+      (user.role === "admin" || can("canViewAccounting")),
+  });
   const [showAmounts, setShowAmounts] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(() =>
     document.documentElement.classList.contains("dark")
@@ -42,15 +81,56 @@ export default function Dashboard() {
   }, []);
   const hidden = <span className="tracking-widest opacity-35 font-mono">••••••</span>;
 
-  const totalInvoicesAmount = invoices?.reduce((sum, inv) => sum + inv.total, 0) || 0;
-  const totalOutstanding = invoices?.filter(i => i.status === "issued").reduce((sum, inv) => sum + inv.total, 0) || 0;
+  const totalOutstanding =
+    invoices?.filter((i: typeof invoices[number]) => i.status === "issued").reduce((sum: number, inv: typeof invoices[number]) => sum + inv.total, 0) || 0;
+  const totalAdvancePayment =
+  invoices?.reduce<number>(
+    (sum: number, inv: typeof invoices[number]): number =>
+      sum + Number(inv.advancePayment || 0),
+    0,
+  ) || 0;
+  const totalUnpaidTransportation =
+  accountingRows.reduce(
+    (sum, row) =>
+      sum + (!row.transportationPaid ? Number(row.transportation || 0) : 0),
+    0,
+  );
+
+  const totalUnpaidLabor =
+  accountingRows.reduce(
+    (sum, row) =>
+      sum + (!row.laborPaid ? Number(row.labor || 0) : 0),
+    0,
+  );
+
+  const totalUnpaidOtherExpenses =
+  accountingRows.reduce(
+    (sum, row) =>
+      sum + (!row.otherExpensesPaid ? Number(row.otherExpenses || 0) : 0),
+    0,
+  );
+
+  const totalPaymentsUncollected = accountingRows.reduce((sum, row) => {
+    const invoice = invoices?.find((inv: typeof invoices[number]) => inv.id === row.id);
+
+    if (invoice?.status === "issued") {
+      return sum + Number(row.payments || 0);
+    }
+
+    return sum;
+  }, 0);
+
   const recentInvoices = invoices
-    ?.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      ?.sort(
+    (a: typeof invoices[number], b: typeof invoices[number]) =>
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+  )
     .slice(0, 5) || [];
 
   const chartData = invoices
-    ?.filter(i => i.status !== "cancelled")
-    .reduce((acc, inv) => {
+    ?.filter((i: typeof invoices[number]) => i.status !== "cancelled")
+    .reduce(
+  (acc: { name: string; total: number }[], inv: typeof invoices[number]) => {
       const month = new Date(inv.issueDate).toLocaleString(lang === "ar" ? "ar-EG" : "en-US", { month: "short" });
       const existing = acc.find(item => item.name === month);
       if (existing) existing.total += inv.total;
@@ -74,17 +154,8 @@ export default function Dashboard() {
 
   const stats = [
     {
-      title: t("totalInvoices"),
-      value: formatCurrency(totalInvoicesAmount),
-      icon: DollarSign,
-      color: "bg-emerald-50 dark:bg-muted/30",
-      bg: "bg-emerald-50 dark:bg-muted/30",
-      iconColor: "text-emerald-600 dark:text-foreground",
-      border: "border-emerald-200 dark:border-border",
-    },
-    {
       title: t("outstanding"),
-      value: formatCurrency(totalOutstanding),
+      value: formatCurrency(totalOutstanding, currencySymbol, lang),
       icon: AlertCircle,
       color: "bg-emerald-50 dark:bg-muted/30",
       bg: "bg-emerald-50 dark:bg-muted/30",
@@ -92,8 +163,53 @@ export default function Dashboard() {
       border: "border-emerald-200 dark:border-border",
     },
     {
+      title: t("payments"),
+      value: formatCurrency(totalPaymentsUncollected, currencySymbol, lang),
+      icon: DollarSign,
+      color: "bg-emerald-50 dark:bg-muted/30",
+      bg: "bg-emerald-50 dark:bg-muted/30",
+      iconColor: "text-emerald-600 dark:text-foreground",
+      border: "border-emerald-200 dark:border-border",
+    },
+    {
+      title: t("advancePayment"),
+      value: formatCurrency(totalAdvancePayment, currencySymbol, lang),
+      icon: DollarSign,
+      color: "bg-emerald-50 dark:bg-muted/30",
+      bg: "bg-emerald-50 dark:bg-muted/30",
+      iconColor: "text-emerald-600 dark:text-foreground",
+      border: "border-emerald-200 dark:border-border",
+    },
+    {
+      title: t("unpaidTransportation"),
+      value: formatCurrency(totalUnpaidTransportation, currencySymbol, lang),
+      icon: TrendingUp,
+      color: "bg-emerald-50 dark:bg-muted/30",
+      bg: "bg-emerald-50 dark:bg-muted/30",
+      iconColor: "text-emerald-600 dark:text-foreground",
+      border: "border-emerald-200 dark:border-border",
+    },
+    {
+      title: t("unpaidLabor"),
+      value: formatCurrency(totalUnpaidLabor, currencySymbol, lang),
+      icon: Users,
+      color: "bg-emerald-50 dark:bg-muted/30",
+      bg: "bg-emerald-50 dark:bg-muted/30",
+      iconColor: "text-emerald-600 dark:text-foreground",
+      border: "border-emerald-200 dark:border-border",
+    },
+    {
+      title: t("unpaidOtherExpenses"),
+      value: formatCurrency(totalUnpaidOtherExpenses, currencySymbol, lang),
+      icon: FileText,
+      color: "bg-emerald-50 dark:bg-muted/30",
+      bg: "bg-emerald-50 dark:bg-muted/30",
+      iconColor: "text-emerald-600 dark:text-foreground",
+      border: "border-emerald-200 dark:border-border",
+    },
+    {
       title: t("invoiceCount"),
-      value: arabicNums(invoices?.length ?? 0),
+      value: arabicNums(invoices?.length ?? 0, lang),
       icon: FileText,
       color: "bg-emerald-50 dark:bg-muted/30",
       bg: "bg-emerald-50 dark:bg-muted/30",
@@ -102,7 +218,7 @@ export default function Dashboard() {
     },
     {
       title: t("totalClients"),
-      value: arabicNums(clients?.length ?? 0),
+      value: arabicNums(clients?.length ?? 0, lang),
       icon: Users,
       color: "bg-emerald-50 dark:bg-muted/30",
       bg: "bg-emerald-50 dark:bg-muted/30",

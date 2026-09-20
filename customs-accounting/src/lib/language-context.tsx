@@ -575,13 +575,52 @@ const DEFAULT_CURRENCY: Record<Lang, string> = {
 
 type TranslationKeys = keyof typeof translations.ar;
 
+export type CurrencyDisplayMode = "ar" | "en" | "symbol";
+
+export interface CurrencyOption {
+  code: string;
+  arabic: string;
+  english: string;
+  symbol?: string;
+}
+
+export const CURRENCIES: CurrencyOption[] = [
+  { code: "QAR", arabic: "ريال قطري", english: "QR", symbol: "ر.ق" },
+  { code: "SAR", arabic: "ريال سعودي", english: "SAR", symbol: "ر.س" },
+  { code: "AED", arabic: "درهم إماراتي", english: "AED", symbol: "د.إ" },
+  { code: "KWD", arabic: "دينار كويتي", english: "KWD", symbol: "د.ك" },
+  { code: "OMR", arabic: "ريال عماني", english: "OMR", symbol: "ر.ع" },
+  { code: "BHD", arabic: "دينار بحريني", english: "BHD", symbol: "د.ب" },
+  { code: "JOD", arabic: "دينار أردني", english: "JOD", symbol: "د.أ" },
+  { code: "EGP", arabic: "جنيه مصري", english: "EGP", symbol: "ج.م" },
+  { code: "USD", arabic: "دولار أمريكي", english: "USD", symbol: "$" },
+  { code: "EUR", arabic: "يورو", english: "EUR", symbol: "€" },
+  { code: "GBP", arabic: "جنيه إسترليني", english: "GBP", symbol: "£" },
+  { code: "TRY", arabic: "ليرة تركية", english: "TRY", symbol: "₺" },
+  { code: "CHF", arabic: "فرنك سويسري", english: "CHF" },
+  { code: "JPY", arabic: "ين ياباني", english: "JPY", symbol: "¥" },
+  { code: "CNY", arabic: "يوان صيني", english: "CNY", symbol: "¥" },
+  { code: "CAD", arabic: "دولار كندي", english: "CAD", symbol: "C$" },
+  { code: "AUD", arabic: "دولار أسترالي", english: "AUD", symbol: "A$" },
+  { code: "INR", arabic: "روبية هنديّة", english: "INR", symbol: "₹" },
+  { code: "ZAR", arabic: "راند جنوبي", english: "ZAR", symbol: "R" },
+  { code: "RUB", arabic: "روبل روسي", english: "RUB", symbol: "₽" },
+];
+
 interface LanguageContextType {
   lang: Lang;
   setLang: (l: Lang) => void;
   t: (key: TranslationKeys) => string;
   isRTL: boolean;
+
   currencySymbol: string;
   setCurrencySymbol: (symbol: string, manual?: boolean) => void;
+
+  currencyCode: string;
+  setCurrencyCode: (code: string) => void;
+
+  currencyDisplayMode: "ar" | "en" | "symbol";
+  setCurrencyDisplayMode: (mode: "ar" | "en" | "symbol") => void;
 }
 
 const LanguageContext = createContext<LanguageContextType | null>(null);
@@ -591,23 +630,52 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     return (localStorage.getItem(STORAGE_KEY) as Lang) ?? "ar";
   });
 
-  const [currencySymbol, setCurrencyState] = useState<string>(() => {
-    return (
-      localStorage.getItem(CURRENCY_KEY) ??
-      DEFAULT_CURRENCY[(localStorage.getItem(STORAGE_KEY) as Lang) ?? "ar"]
-    );
+const [currencyCode, setCurrencyCodeState] = useState<string>(() => {
+  return localStorage.getItem("currency_code") ?? "QAR";
   });
+
+  const [currencyDisplayMode, setCurrencyDisplayModeState] =
+    useState<CurrencyDisplayMode>(() => {
+      const saved = localStorage.getItem("currency_display_mode");
+      return saved === "ar" || saved === "en" || saved === "symbol"
+        ? saved
+        : "symbol";
+    });
+
+  const getCurrencySymbol = (
+    code: string,
+    mode: CurrencyDisplayMode
+  ): string => {
+    const currency = CURRENCIES.find((item) => item.code === code) ?? CURRENCIES[0];
+
+    if (mode === "ar") {
+      return currency.arabic;
+    }
+
+    if (mode === "en") {
+      return currency.english;
+    }
+
+    return currency.symbol ?? currency.english;
+  };
+
+  const [currencySymbol, setCurrencyState] = useState<string>(() =>
+    getCurrencySymbol(
+      localStorage.getItem("currency_code") ?? "QAR",
+      (() => {
+        const saved = localStorage.getItem("currency_display_mode");
+        return saved === "ar" || saved === "en" || saved === "symbol"
+          ? saved
+          : "symbol";
+      })()
+    )
+  );
 
   useEffect(() => {
     document.documentElement.setAttribute("dir", lang === "ar" ? "rtl" : "ltr");
     document.documentElement.setAttribute("lang", lang);
     localStorage.setItem(STORAGE_KEY, lang);
-    // Auto-sync currency when language changes (unless manually overridden)
-    if (!localStorage.getItem(CURRENCY_MANUAL_KEY)) {
-      const auto = DEFAULT_CURRENCY[lang];
-      setCurrencyState(auto);
-      localStorage.setItem(CURRENCY_KEY, auto);
-    }
+
   }, [lang]);
 
   function setLang(l: Lang) {
@@ -617,11 +685,30 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
   function setCurrencySymbol(symbol: string, manual = true) {
     setCurrencyState(symbol);
     localStorage.setItem(CURRENCY_KEY, symbol);
+
     if (manual) {
       localStorage.setItem(CURRENCY_MANUAL_KEY, "true");
     } else {
       localStorage.removeItem(CURRENCY_MANUAL_KEY);
     }
+  }
+
+  function setCurrencyCode(code: string) {
+    setCurrencyCodeState(code);
+    localStorage.setItem("currency_code", code);
+
+    const displaySymbol = getCurrencySymbol(code, currencyDisplayMode);
+    setCurrencyState(displaySymbol);
+    localStorage.setItem(CURRENCY_KEY, displaySymbol);
+  }
+
+  function setCurrencyDisplayMode(mode: CurrencyDisplayMode) {
+    setCurrencyDisplayModeState(mode);
+    localStorage.setItem("currency_display_mode", mode);
+
+    const displaySymbol = getCurrencySymbol(currencyCode, mode);
+    setCurrencyState(displaySymbol);
+    localStorage.setItem(CURRENCY_KEY, displaySymbol);
   }
 
   function t(key: TranslationKeys): string {
@@ -637,6 +724,10 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
         isRTL: lang === "ar",
         currencySymbol,
         setCurrencySymbol,
+        currencyCode,
+        setCurrencyCode,
+        currencyDisplayMode,
+        setCurrencyDisplayMode,
       }}
     >
       {children}

@@ -19,7 +19,7 @@ interface ClientSummary {
 }
 
 export default function StatementsIndex() {
-  const { t, lang } = useLanguage();
+  const { t, lang, currencySymbol } = useLanguage();
   const isAR = lang === "ar";
   const [showAmounts, setShowAmounts] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -126,7 +126,7 @@ export default function StatementsIndex() {
           </div>
           <div>
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{t("totalCollectedLabel")}</p>
-            <p className="text-2xl font-black font-mono mt-0.5">{showAmounts ? formatCurrency(totalReceived) : hidden}</p>
+            <p className="text-2xl font-black font-mono mt-0.5">{showAmounts ? formatCurrency(totalReceived, currencySymbol, lang) : hidden}</p>
           </div>
         </div>
         <div className="bg-card border border-border/50 rounded-2xl p-5 shadow-sm flex items-center gap-4">
@@ -135,7 +135,7 @@ export default function StatementsIndex() {
           </div>
           <div>
             <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{t("totalOutstandingLabel")}</p>
-            <p className="text-2xl font-black font-mono text-destructive mt-0.5">{showAmounts ? formatCurrency(totalOutstanding) : hidden}</p>
+            <p className="text-2xl font-black font-mono text-destructive mt-0.5">{showAmounts ? formatCurrency(totalOutstanding, currencySymbol, lang) : hidden}</p>
           </div>
         </div>
       </div>
@@ -235,11 +235,11 @@ export default function StatementsIndex() {
                     <td className="px-5 py-4 text-muted-foreground text-xs">
                       {lastInvoice ? formatDate(lastInvoice.issueDate, lang) : "—"}
                     </td>
-                    <td className="px-5 py-4 font-mono font-semibold">{showAmounts ? formatCurrency(totalInvoiced, lang) : hidden}</td>
-                    <td className="px-5 py-4 font-mono font-semibold text-emerald-600 dark:text-emerald-400">{showAmounts ? formatCurrency(totalPaid, lang) : hidden}</td>
+                    <td className="px-5 py-4 font-mono font-semibold">{showAmounts ? formatCurrency(totalInvoiced, currencySymbol, lang) : hidden}</td>
+                    <td className="px-5 py-4 font-mono font-semibold text-emerald-600 dark:text-emerald-400">{showAmounts ? formatCurrency(totalPaid, currencySymbol, lang) : hidden}</td>
                     <td className="px-5 py-4">
                       <span className={`font-mono font-bold text-base ${balance > 0 ? "text-destructive" : "text-emerald-600 dark:text-emerald-400"}`}>
-                        {showAmounts ? formatCurrency(balance) : hidden}
+                        {showAmounts ? formatCurrency(balance, currencySymbol, lang) : hidden}
                       </span>
                       {balance > 0 && (
                         <p className="text-xs text-destructive/70 mt-0.5">{t("outstandingLabel")}</p>
@@ -278,13 +278,13 @@ export default function StatementsIndex() {
                 <tr>
                   <td colSpan={3} className="px-5 py-4 font-bold text-foreground">{t("grandTotal")}</td>
                   <td className="px-5 py-4 font-mono font-bold">
-                    {showAmounts ? formatCurrency(clientSummaries.reduce((s, c) => s + c.totalInvoiced, 0)) : hidden}
+                    {showAmounts ? formatCurrency(clientSummaries.reduce((s, c) => s + c.totalInvoiced, 0), currencySymbol, lang) : hidden}
                   </td>
                   <td className="px-5 py-4 font-mono font-bold text-emerald-600 dark:text-emerald-400">
-                    {showAmounts ? formatCurrency(totalReceived) : hidden}
+                    {showAmounts ? formatCurrency(totalReceived, currencySymbol, lang) : hidden}
                   </td>
                   <td className="px-5 py-4 font-mono font-bold text-destructive">
-                    {showAmounts ? formatCurrency(totalOutstanding) : hidden}
+                    {showAmounts ? formatCurrency(totalOutstanding, currencySymbol, lang) : hidden}
                   </td>
                   <td />
                 </tr>

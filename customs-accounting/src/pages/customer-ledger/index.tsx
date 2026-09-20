@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { useLanguage } from "@/lib/language-context";
+import { formatCurrency } from "@/lib/utils";
 import {
   Eye,
   EyeOff,
@@ -30,12 +31,6 @@ type LedgerRow = {
   balanceImpact?: number | string;
 };
 
-function formatMoney(value: number) {
-  return Number(value || 0).toLocaleString("en-US", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-}
 
 function formatDateInput(date: Date) {
   const year = date.getFullYear();
@@ -54,7 +49,7 @@ function getDefaultDateRange() {
 
 export default function CustomerLedgerPage() {
   const { user } = useAuth();
-  const { lang } = useLanguage();
+  const { t, lang, currencySymbol } = useLanguage();
   const isAR = lang === "ar";
   const tr = (ar: string, en: string) => (isAR ? ar : en);
   const [data, setData] = useState<LedgerRow[]>([]);
@@ -353,7 +348,7 @@ return (
             </div>
 
             <div className="font-bold text-red-600 mt-1 text-2xl">
-              {showAmounts ? `QR ${formatMoney(totalDebit)}` : hiddenAmount}
+              {showAmounts ? formatCurrency(totalDebit, currencySymbol, lang) : hiddenAmount}
             </div>
           </div>
 
@@ -369,7 +364,7 @@ return (
             </div>
 
             <div className="font-bold text-green-600 mt-1 text-2xl">
-              {showAmounts ? `QR ${formatMoney(totalCredit)}` : hiddenAmount}
+              {showAmounts ? formatCurrency(totalCredit, currencySymbol, lang) : hiddenAmount}
             </div>
           </div>
 
@@ -393,7 +388,7 @@ return (
                   : "text-foreground"
               }`}
             >
-              {showAmounts ? `QR ${formatMoney(finalBalance)}` : hiddenAmount}
+              {showAmounts ? formatCurrency(finalBalance, currencySymbol, lang) : hiddenAmount}
             </div>
           </div>
 
@@ -425,10 +420,10 @@ return (
                   <tr className="border-b border-border bg-muted/30">
                     <td className="p-3 text-muted-foreground/60">—</td>
                     <td className="p-3 font-semibold">{tr("رصيد سابق", "Opening balance")}</td>
-                    <td className="p-3">{showAmounts ? "QR 0.00" : hiddenAmount}</td>
-                    <td className="p-3">{showAmounts ? "QR 0.00" : hiddenAmount}</td>
+                    <td className="p-3">{showAmounts ? formatCurrency(0, currencySymbol, lang) : hiddenAmount}</td>
+                    <td className="p-3">{showAmounts ? formatCurrency(0, currencySymbol, lang) : hiddenAmount}</td>
                     <td className="p-3 font-bold text-blue-700">
-                      {showAmounts ? `QR ${formatMoney(openingBalance)}` : hiddenAmount}
+                      {showAmounts ? formatCurrency(openingBalance, currencySymbol, lang) : hiddenAmount}
                     </td>
                   </tr>
 
@@ -450,15 +445,15 @@ return (
                         </td>
 
                         <td className="p-3 font-medium">
-                          {showAmounts ? `QR ${formatMoney(Number(row.debit || 0))}` : hiddenAmount}
+                          {showAmounts ? formatCurrency(Number(row.debit || 0), currencySymbol, lang) : hiddenAmount}
                         </td>
 
                         <td className="p-3 font-medium text-green-700">
-                          {showAmounts ? `QR ${formatMoney(Number(row.credit || 0))}` : hiddenAmount}
+                          {showAmounts ? formatCurrency(Number(row.credit || 0), currencySymbol, lang) : hiddenAmount}
                         </td>
 
                         <td className="p-3 font-bold">
-                          {showAmounts ? `QR ${formatMoney(balance)}` : hiddenAmount}
+                          {showAmounts ? formatCurrency(balance, currencySymbol, lang) : hiddenAmount}
                         </td>
                       </tr>
                     );

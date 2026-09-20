@@ -2,7 +2,7 @@ import { useAuth } from "@/lib/auth-context";
 import { useState, useEffect } from "react";
 import { useParams, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { formatCurrency, formatDate, formatNumber, arabicNums, formatCurrency, formatCurrency } from "@/lib/utils";
+import { formatCurrency, formatDate, formatNumber, arabicNums, } from "@/lib/utils";
 import { Printer, ArrowRight, ArrowLeft, Stamp } from "lucide-react";
 import Barcode from "react-barcode";
 import { useLanguage } from "@/lib/language-context";
@@ -388,14 +388,14 @@ export default function ClientStatement() {
                 <div className="flex justify-between px-4 py-1.5">
                   <span className="text-gray-600">إجمالي الفواتير / Total Invoiced</span>
                   <span className="font-mono font-bold text-gray-800">
-                    {formatCurrency(filteredTotalDue)}
+                    {formatCurrency(filteredTotalDue, currencySymbol, lang)}
                   </span>
                 </div>
 
                 <div className="flex justify-between px-4 py-1.5">
                   <span className="text-gray-600">إجمالي المدفوع / Total Paid</span>
                   <span className="font-mono font-bold text-green-700">
-                    {formatCurrency(filteredTotalPaid)}
+                    {formatCurrency(filteredTotalPaid, currencySymbol, lang)}
                   </span>
                 </div>
 
@@ -409,7 +409,7 @@ export default function ClientStatement() {
                       filteredBalance > 0 ? "text-red-700" : "text-green-700"
                     }`}
                   >
-                    {formatCurrency(filteredBalance)}
+                    {formatCurrency(filteredBalance, currencySymbol, lang)}
                   </span>
                 </div>
               </div>
@@ -498,16 +498,16 @@ export default function ClientStatement() {
           <div className="border-t-2 border-gray-700 pt-2 space-y-1">
             <div className="flex justify-between items-center text-sm">
               <span className="text-gray-700">إجمالي الفواتير / Total Invoiced</span>
-              <span className="font-mono font-bold text-gray-800">{formatCurrency(filteredTotalDue)}</span>
+              <span className="font-mono font-bold text-gray-800">{formatCurrency(filteredTotalDue, currencySymbol, lang)}</span>
             </div>
             <div className="flex justify-between items-center text-sm">
               <span className="text-gray-700">إجمالي المدفوع / Total Paid</span>
-              <span className="font-mono font-bold text-green-700">{formatCurrency(filteredTotalPaid)}</span>
+              <span className="font-mono font-bold text-green-700">{formatCurrency(filteredTotalPaid, currencySymbol, lang)}</span>
             </div>
             <div className="flex justify-between items-center border-t-2 border-double border-gray-700 pt-2 mt-1">
               <span className="font-black text-base text-gray-800">الرصيد المستحق / Balance Due</span>
               <span className={`font-black font-mono text-base ${filteredBalance > 0 ? "text-red-700" : "text-green-700"}`}>
-                {formatCurrency(filteredBalance)}
+                {formatCurrency(filteredBalance, currencySymbol, lang)}
               </span>
             </div>
           </div>

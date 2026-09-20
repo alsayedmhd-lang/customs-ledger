@@ -42,7 +42,7 @@ function getDefaultDateRange() {
 export default function ClientDetail() {
   const { id } = useParams<{ id: string }>();
   const clientId = parseInt(id || "0");
-  const { t, lang } = useLanguage();
+  const { t, lang, currencySymbol } = useLanguage();
   const isAR = lang === "ar";
   
   const { data: client, isLoading: loadingClient } = useGetClient(clientId);
@@ -170,15 +170,15 @@ export default function ClientDetail() {
             <div className="space-y-4">
               <div className="flex justify-between items-center">
                 <span className="text-muted-foreground text-sm">{t("totalInvoicedCol")}</span>
-                <span className="font-mono font-medium">{formatCurrency(totalInvoiced)}</span>
+                <span className="font-mono font-medium">{formatCurrency(totalInvoiced, currencySymbol, lang)}</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-muted-foreground text-sm">{t("collectedCol")}</span>
-                <span className="font-mono font-medium text-success">{formatCurrency(totalPaid)}</span>
+                <span className="font-mono font-medium text-success">{formatCurrency(totalPaid, currencySymbol, lang)}</span>
               </div>
               <div className="pt-4 border-t border-border/50 flex justify-between items-center">
                 <span className="font-semibold">{t("outstandingBalance")}</span>
-                <span className={`font-mono font-bold ${balance > 0 ? 'text-destructive' : ''}`}>{formatCurrency(balance)}</span>
+                <span className={`font-mono font-bold ${balance > 0 ? 'text-destructive' : ''}`}>{formatCurrency(balance, currencySymbol, lang)}</span>
               </div>
             </div>
           </div>
@@ -239,7 +239,7 @@ export default function ClientDetail() {
                       </td>
                       <td className="px-6 py-4">{formatDate(inv.issueDate, lang)}</td>
                       <td className="px-6 py-4"><StatusBadge status={inv.status} /></td>
-                      <td className="px-6 py-4 text-end font-mono font-medium">{formatCurrency(inv.total)}</td>
+                      <td className="px-6 py-4 text-end font-mono font-medium">{formatCurrency(inv.total, currencySymbol, lang)}</td>
                     </tr>
                   ))
                 )}
