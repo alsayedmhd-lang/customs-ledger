@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useParams, Link } from "wouter";
+import { useSearch } from "wouter";
 import { motion } from "framer-motion";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -412,6 +413,8 @@ function SortableRow({
 export default function InvoiceForm() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
+  const search = useSearch();
+  const urlClientId = new URLSearchParams(search).get("clientId");
   const { id } = useParams<{ id: string }>();
   const isCopyMode = window.location.href.includes("edit-copy");
   const hasInvoiceId = Boolean(id);
@@ -588,6 +591,12 @@ export default function InvoiceForm() {
     control,
     name: "items",
   });
+
+  useEffect(() => {
+    if (isEdit || isCopyMode || !urlClientId) return;
+
+    setValue("clientId", urlClientId);
+  }, [isEdit, isCopyMode, urlClientId, setValue]);
 
   useEffect(() => {
     register("importerExporterName");

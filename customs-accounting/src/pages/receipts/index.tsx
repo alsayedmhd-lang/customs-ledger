@@ -325,7 +325,7 @@ const getClientName = (receipt: { clientName?: string | null; clientId?: number 
                       </span>
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">
-                      {formatDate((receipt as any).receiptDate || (receipt as any).receivedAt)}
+                      {formatDate((receipt as any).receiptDate || (receipt as any).receivedAt, lang)}
                     </td>
 
                     <td className="px-4 py-3">

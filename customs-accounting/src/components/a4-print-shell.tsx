@@ -12,7 +12,7 @@ type A4PrintShellProps = {
 };
 
 const pageClassName =
-  "print-page max-w-[210mm] mx-auto print:max-w-none print:w-full print:mx-0 bg-white shadow-lg print:shadow-none border border-gray-200 print:border-none relative overflow-hidden";
+  "print-page max-w-[185mm] mx-auto print:max-w-none print:w-auto print:mx-0 bg-white shadow-lg print:shadow-none border border-gray-200 print:border-none relative";
 
 const pageStyle: CSSProperties = {
   fontFamily: "'Cairo', 'Arial', sans-serif",
@@ -27,7 +27,7 @@ export function A4PrintShell({
   pageStyle: customPageStyle,
 }: A4PrintShellProps) {
   return (
-    <div className={cn("bg-gray-100 print:bg-white", className)} dir={dir}>
+    <div className={cn("bg-gray-100 print:bg-white print:h-auto print:min-h-0", className)} dir={dir}>
       <PrintStyles />
 
       {controls}

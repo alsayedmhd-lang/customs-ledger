@@ -1,7 +1,8 @@
 {
-  "customerName": "TRIAL CUSTOMER",
+  "customerName": "license -2-2026-09-10",
   "licenseType": "trial",
   "deviceId": "8E5AA4830C28B33B24A853387B25F03D",
-  "expiryDate": "2026-06-01",
-  "signature": "112e2cb74a52cae3b2097fc1089440b09b73d78960babdff22a612e57a44d436"
+  "expiryDate": "2026-12-31",
+  "issuedAt": "2026-09-10T19:18:40.628Z",
+  "signature": "3c0be081347836d4bd958a0f4cfba1c0bcb6623e060dbe5fe25e23af589295e5"
 }

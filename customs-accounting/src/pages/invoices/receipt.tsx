@@ -271,9 +271,9 @@ const impExpValue =
           }
 
           .print-page {
-            width: 202mm !important;
+            width: 185mm !important;
             max-width: none !important;
-            min-height: 289mm !important;
+            min-height: 0 !important;
             height: auto !important;
             background: white !important;
             margin: 0 auto !important;
@@ -319,7 +319,7 @@ const impExpValue =
 
           html body .print-page {
             width: 198mm !important;
-            min-height: 285mm !important;
+            min-height: 0 !important;
           }
         }
       `}</style>
@@ -740,11 +740,10 @@ const impExpValue =
 
           <div className="text-center text-xs text-gray-400 mt-1">
             طُبعت في:{" "}
-            {new Date().toLocaleDateString("ar-EG-u-nu-latn", {
-              year: "numeric",
-              month: "long",
-              day: "numeric",
-            })}
+            {new Date().toLocaleDateString(
+              lang === "ar" ? "ar-EG-u-nu-latn" : "en-US",
+              { year: "numeric", month: "long", day: "numeric" },
+            )}
             {" — "}رقم الفاتورة: {invNum}
           </div>
         </div>

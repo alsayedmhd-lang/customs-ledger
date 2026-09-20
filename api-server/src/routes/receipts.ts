@@ -57,7 +57,7 @@ async function deleteReceiptLedgerEntry(receiptId: number) {
 async function syncIssuedReceiptLedgerEntry(receipt: typeof receiptsTable.$inferSelect) {
   await deleteReceiptLedgerEntry(receipt.id);
 
-  if (receipt.status !== "issued") return;
+  if (receipt.status !== "issued" || receipt.clientId === null) return;
 
   await db.insert(customerLedgerTableSqlite).values({
     clientId: receipt.clientId,
@@ -111,6 +111,7 @@ function getOriginalInvoiceTotal(input: {
 async function getActiveReceiptTotal(
   invoiceId: number,
   excludeReceiptId?: number,
+  database: typeof db = db,
 ): Promise<number> {
   const filters = [
     eq(receiptsTable.invoiceId, invoiceId),
@@ -122,7 +123,7 @@ async function getActiveReceiptTotal(
     filters.push(ne(receiptsTable.id, excludeReceiptId));
   }
 
-  const receipts = await db
+  const receipts = await database
     .select({ amount: receiptsTable.amount })
     .from(receiptsTable)
     .where(and(...filters));
@@ -134,6 +135,7 @@ async function validateReceiptDoesNotExceedRemaining(
   invoiceId: number | null,
   amount: unknown,
   excludeReceiptId?: number,
+  database: typeof db = db,
 ) {
   if (invoiceId === null) return { ok: true as const };
 
@@ -143,7 +145,7 @@ async function validateReceiptDoesNotExceedRemaining(
     return { ok: false as const, status: 400, error: "Invalid amount" };
   }
 
-  const [invoice] = await db
+  const [invoice] = await database
     .select()
     .from(invoicesTable)
     .where(and(eq(invoicesTable.id, invoiceId), isNull(invoicesTable.deletedAt)))
@@ -156,7 +158,7 @@ async function validateReceiptDoesNotExceedRemaining(
   const originalTotal = getOriginalInvoiceTotal(invoice);
   const paidSoFar =
     Number(invoice.advancePayment ?? 0) +
-    (await getActiveReceiptTotal(invoice.id, excludeReceiptId));
+    (await getActiveReceiptTotal(invoice.id, excludeReceiptId, database));
   const remaining = originalTotal - paidSoFar;
 
   if (receiptAmount > remaining + 0.000001) {
@@ -245,8 +247,25 @@ async function enqueueReceiptSyncChangeIfNeeded(input: {
 
 async function generateReceiptNumber(): Promise<string> {
   const year = new Date().getFullYear();
-  const count = await db.$count(receiptsTable);
-  const seq = String(count + 1).padStart(4, "0");
+
+  const receipts = await db
+    .select({ receiptNumber: receiptsTable.receiptNumber })
+    .from(receiptsTable);
+
+  let maxSeq = 0;
+
+  for (const receipt of receipts) {
+    const match = String(receipt.receiptNumber ?? "").match(
+      new RegExp(`^RCP-${year}-(\\d+)$`)
+    );
+
+    if (match) {
+      maxSeq = Math.max(maxSeq, Number(match[1]));
+    }
+  }
+
+  const seq = String(maxSeq + 1).padStart(4, "0");
+
   return `RCP-${year}-${seq}`;
 }
 

@@ -334,7 +334,7 @@ export default function Dashboard() {
                       </div>
                       <div className="min-w-0">
                         <p className="font-semibold text-sm text-foreground truncate">{invoice.clientName}</p>
-                        <p className="text-xs text-muted-foreground">{invoice.invoiceNumber} · {formatDate(invoice.issueDate)}</p>
+                        <p className="text-xs text-muted-foreground">{invoice.invoiceNumber} · {formatDate(invoice.issueDate, lang)}</p>
                       </div>
                     </div>
                     <div className="text-end flex-shrink-0 ms-2">

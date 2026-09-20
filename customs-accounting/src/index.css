@@ -363,13 +363,13 @@ input[type="number"] {
   }
 
   .print-page {
-    width: 202mm !important;
+    width: 185mm !important;
     max-width: none !important;
-    min-height: 289mm !important;
+    min-height: 0 !important;
     height: auto !important;
     margin: 0 auto !important;
     background: white !important;
-    padding-bottom: 24mm !important;
+    padding-bottom: 0 !important;
     box-sizing: border-box !important;
     display: flex !important;
     flex-direction: column !important;
@@ -440,8 +440,8 @@ input[type="number"] {
   }
 
   html body .print-page {
-    width: 198mm !important;
-    min-height: 285mm !important;
+    width: 185mm !important;
+    min-height: 0 !important;
   }
 }
 

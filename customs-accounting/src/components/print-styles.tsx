@@ -16,17 +16,16 @@ export function PrintStyles(_: PrintStylesProps) {
         }
 
         .print-page {
-          width: 202mm !important;
+          width: 185mm !important;
           max-width: none !important;
           margin: 0 auto !important;
-          padding-bottom: 24mm !important;
+          padding-bottom: 0 !important;
           box-sizing: border-box !important;
 
           height: auto !important;
-          min-height: 289mm !important;
+          min-height: 0 !important;
 
-          display: flex !important;
-          flex-direction: column !important;
+          display: block !important;
           overflow: visible !important;
         }
 
@@ -48,8 +47,8 @@ export function PrintStyles(_: PrintStylesProps) {
         @page { size: A4 portrait; margin: 6mm; }
 
         html body .print-page {
-          width: 198mm !important;
-          min-height: 285mm !important;
+          width: 185mm !important;
+          min-height: 0 !important;
         }
       }
     `}</style>

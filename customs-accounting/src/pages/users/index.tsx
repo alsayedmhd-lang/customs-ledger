@@ -4,7 +4,7 @@ import { useLanguage } from "@/lib/language-context";
 import { getRoleLabel } from "@/lib/role-labels";
 import {
   Users, Plus, Trash2, Pencil, Key, ShieldCheck, User, X, Check,
-  FileText, ReceiptText, UserCog, PackageSearch, Shield, Mail, Phone, UserCheck, Clock, KeyRound
+  FileText, ReceiptText, UserCog, PackageSearch, Shield, Mail, Phone, UserCheck, Clock, KeyRound, Eye, EyeOff
 } from "lucide-react";
 
 

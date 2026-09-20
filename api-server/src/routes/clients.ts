@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db, clientsTable, invoicesTable, invoiceItemsTable, usersTable, receiptsTable } from "@workspace/db";
-import { and, eq, desc, isNull } from "drizzle-orm";
+import { and, eq, desc, isNull, gte, lte } from "drizzle-orm";
 
 const router: IRouter = Router();
 
@@ -137,22 +137,45 @@ router.get("/clients/:id/statement", async (req, res) => {
       res.status(404).json({ error: "Client not found" });
       return;
     }
+    const fromDate = typeof req.query.from === "string" ? req.query.from : "";
+    const toDate = typeof req.query.to === "string" ? req.query.to : "";
+
+    const invoiceConditions = [
+      eq(invoicesTable.clientId, id),
+    ];
+
+    if (fromDate) {
+      invoiceConditions.push(gte(invoicesTable.issueDate, fromDate));
+    }
+
+    if (toDate) {
+      invoiceConditions.push(lte(invoicesTable.issueDate, toDate));
+    }
+
     const invoices = await db
       .select()
       .from(invoicesTable)
-      .where(eq(invoicesTable.clientId, id))
+      .where(and(...invoiceConditions))
       .orderBy(desc(invoicesTable.issueDate));
+
+    const receiptConditions = [
+      eq(receiptsTable.clientId, id),
+      eq(receiptsTable.status, "issued"),
+      isNull(receiptsTable.deletedAt),
+    ];
+
+    if (fromDate) {
+      receiptConditions.push(gte(receiptsTable.receiptDate, fromDate));
+    }
+
+    if (toDate) {
+      receiptConditions.push(lte(receiptsTable.receiptDate, toDate));
+    }
 
     const issuedReceipts = await db
       .select()
       .from(receiptsTable)
-      .where(
-        and(
-          eq(receiptsTable.clientId, id),
-          eq(receiptsTable.status, "issued"),
-          isNull(receiptsTable.deletedAt),
-        ),
-      );
+      .where(and(...receiptConditions));
 
     const invoicesWithItems = await Promise.all(
       invoices.map(async (inv) => {

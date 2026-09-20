@@ -198,7 +198,7 @@ function TxtInput({
 }
 
 export default function AccountingPage() {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const { toast } = useToast();
   const { user, can } = useAuth();
   const queryClient = useQueryClient();
@@ -220,8 +220,29 @@ export default function AccountingPage() {
   const [clientFilter, setClientFilter] = useState("");
   const [driverFilter, setDriverFilter] = useState("");
   const [locationFilter, setLocationFilter] = useState("");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
+  // نطاق التاريخ الافتراضي: من اول أشهر حتى اليوم
+  const [dateFrom, setDateFrom] = useState(() => {
+    const date = new Date();
+    date.setDate(1);
+    //من 3 شهور حتى اليوم 
+    // date.setMonth(date.getMonth() - 3);
+
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+
+    return `${year}-${month}-${day}`;
+  });
+
+  const [dateTo, setDateTo] = useState(() => {
+    const date = new Date();
+
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+
+    return `${year}-${month}-${day}`;
+  });
   const [filtersOpen, setFiltersOpen] = useState(true);
   const [showAmounts, setShowAmounts] = useState(false);
 
@@ -830,7 +851,7 @@ export default function AccountingPage() {
                   </th>
                   {/* ─ income + save ─ */}
                   <th className="px-3 py-2.5 text-right font-semibold text-green-600 whitespace-nowrap bg-green-50/40 dark:bg-green-900/10 border-r border-border/40">
-                    الدخل
+                    {t("income")}
                   </th>
                   <th className="px-2 py-2.5 text-center font-semibold text-muted-foreground whitespace-nowrap">
                     💾
@@ -840,25 +861,25 @@ export default function AccountingPage() {
                 <tr className="text-[10px] bg-muted/20 border-b border-border/40 sticky top-[33px] z-20">
                   <td colSpan={4} />
                   <td className="px-2 py-1 text-blue-400 text-center border-r border-border/40">
-                    مدفوعاتي
+                    {t("myPayments")}
                   </td>
                   <td
                     colSpan={4}
                     className="px-2 py-1 text-orange-400 text-center border-r border-border/40"
                   >
-                    مجموعة النقليات
+                    {t("transportationGroup")}
                   </td>
                   <td
                     colSpan={2}
                     className="px-2 py-1 text-purple-400 text-center border-r border-border/40"
                   >
-                    مجموعة العمال
+                    {t("laborGroup")}
                   </td>
                   <td
                     colSpan={2}
                     className="px-2 py-1 text-red-400 text-center border-r border-border/40"
                   >
-                    مجموعة أخرى
+                    {t("otherExpensesGroup")}
                   </td>
                   <td colSpan={2} />
                 </tr>
@@ -903,7 +924,9 @@ export default function AccountingPage() {
                         {row.clientName}
                       </td>
                       <td className="px-3 py-1.5 whitespace-nowrap text-muted-foreground">
-                        {new Date(row.issueDate).toLocaleDateString("ar-EG")}
+                        {new Date(row.issueDate).toLocaleDateString(
+                          lang === "ar" ? "ar-EG-u-nu-latn" : "en-US",
+                        )}
                       </td>
 
                       {/* payments المدفوعات */}

@@ -215,11 +215,16 @@ export default function ReceiptForm() {
       };
 
       let saved;
+
+      console.log("Receipt before save", payload);
+
       if (isEdit) {
         saved = await updateMutation.mutateAsync({ id: receiptId, data: payload });
       } else {
         saved = await createMutation.mutateAsync({ data: payload });
       }
+
+      console.log("Receipt saved response", saved);
 
       queryClient.invalidateQueries({ queryKey: getListReceiptsQueryKey() });
       queryClient.invalidateQueries({ queryKey: getListInvoicesQueryKey() });
@@ -227,28 +232,48 @@ export default function ReceiptForm() {
         title: tr("تم الحفظ", "Saved"),
         description: isEdit ? tr("تم تحديث سند القبض بنجاح", "Receipt updated successfully") : tr("تم إنشاء سند القبض بنجاح", "Receipt created successfully"),
       });
-      (window as any).electronAPI?.openExternalPrintWindow?.(
+      try {
+        await (window as any).electronAPI?.openExternalPrintWindow?.(
           `#/receipts/${saved.id}/print`
         );
+      } catch (printError) {
+        console.error("Receipt print window error:", printError);
+      }
 
     } catch (err) {
-      console.error("Receipt save error:", err);
-      const conflictReceiptId = Number((err as any)?.data?.receiptId);
+  console.error("Receipt save error:", err);
 
-      if ((err as any)?.status === 409 && conflictReceiptId > 0) {
-        toast({
-          title: tr("سند موجود", "Receipt already exists"),
-          description: tr("يوجد سند قبض مرتبط مسبقاً بهذه الفاتورة", "A receipt is already linked to this invoice"),
-        });
-        setLocation(`/receipts/${conflictReceiptId}/edit`);
-        return;
-      }
+    const errorData = (err as any)?.data;
+    const conflictReceiptId = Number(errorData?.receiptId);
+
+    if ((err as any)?.status === 409 && conflictReceiptId > 0) {
       toast({
-        title: tr("خطأ", "Error"),
-        description: tr("فشل حفظ سند القبض", "Failed to save receipt"),
-        variant: "destructive",
+        title: tr("سند موجود", "Receipt already exists"),
+        description: tr(
+          "يوجد سند قبض مرتبط مسبقاً بهذه الفاتورة",
+          "A receipt is already linked to this invoice"
+        ),
       });
+
+      setLocation(`/receipts/${conflictReceiptId}/edit`);
+      return;
     }
+
+    const backendError =
+      errorData?.error ||
+      errorData?.errorEn ||
+      (err as any)?.message ||
+      tr(
+        "فشل حفظ سند القبض",
+        "Failed to save receipt"
+      );
+
+    toast({
+      title: tr("تعذر حفظ سند القبض", "Unable to save receipt"),
+      description: backendError,
+      variant: "destructive",
+    });
+  }
 
   };
 

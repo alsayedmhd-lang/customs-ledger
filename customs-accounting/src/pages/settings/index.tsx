@@ -1502,11 +1502,11 @@ const decryptBackupData = async (backupFile: any, password: string) => {
         body: JSON.stringify({ data }),
       });
 
-      alert("تم استيراد الفواتير بنجاح");
       if (!res.ok) {
         alert(isAR ? "فشل استيراد الفواتير" : "Failed to import invoices");
         return;
       }
+      alert(isAR ? "تم استيراد الفواتير بنجاح" : "Invoices imported successfully");
     };
 
     // Import receipts backup
@@ -1549,6 +1549,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
         alert(isAR ? "فشل استيراد العملاء" : "Failed to import clients");
         return;
       }
+      alert(isAR ? "تم استيراد العملاء بنجاح" : "Clients imported successfully");
     };
 
     // Import items backup
@@ -1569,6 +1570,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
         alert(isAR ? "فشل استيراد البنود" : "Failed to import items");
         return;
       }
+      alert(isAR ? "تم استيراد البنود بنجاح" : "Items imported successfully");
     };
 
 
@@ -1798,7 +1800,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
   { id: "company", icon: Building2, labelAr: "بيانات الشركة", labelEn: "Company", color: "text-blue-500" },
   { id: "branding", icon: Image, labelAr: "الشعارات", labelEn: "Branding", color: "text-purple-500" },
   { id: "print", icon: Printer, labelAr: "أدوات الطباعة", labelEn: "Print Tools", color: "text-rose-500" },
-  { id: "backup", icon: Shield, labelAr: "النسخ الاحتياطي", labelEn: "Backup", color: "text-emerald-500" },
+  { id: "backup", icon: Shield, labelAr: "استيراد وتصدير البيانات", labelEn: "Data Import & Export", color: "text-emerald-500" },
   { id: "update", icon: RefreshCw, labelAr: "تحديث البرنامج", labelEn: "Software Update", color: "text-cyan-500" },
 
   { id: "display", icon: Palette, labelAr: "المظهر", labelEn: "Display", color: "text-fuchsia-500" }, // آخر واحد
@@ -1969,7 +1971,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
               {activeTab === "company" && (isAR ? "بيانات الشركة" : "Company")}
               {activeTab === "branding" && (isAR ? "الشعارات" : "Branding")}
               {activeTab === "print" && (isAR ? "أدوات الطباعة" : "Print Tools")}
-              {activeTab === "backup" && (isAR ? "النسخ الاحتياطي" : "Backup")}
+              {activeTab === "backup" && (isAR ? "استيراد وتصدير البيانات" : "Data Import & Export")}
               {activeTab === "update" && (isAR ? "تحديث البرنامج" : "Software Update")}
               {activeTab === "display" && (isAR ? "المظهر" : "Display")}
             </h1>
@@ -1978,7 +1980,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
               {activeTab === "company" && (isAR ? "إدارة بيانات الشركة الأساسية ومعلومات التواصل" : "Manage company identity and contact details")}
               {activeTab === "branding" && (isAR ? "إدارة الشعار والختم والعلامة المائية والتوقيعات" : "Manage logo, stamp, watermark, and signatures")}
               {activeTab === "print" && (isAR ? "ضبط عناوين الفواتير وأدوات الطباعة" : "Configure invoice titles and print tools")}
-              {activeTab === "backup" && (isAR ? "تصدير واستيراد النسخ الاحتياطية بأمان" : "Securely export and import backups")}
+              {activeTab === "backup" && (isAR ? "تصدير واستيراد بيانات البرنامج بشكل آمن" : "Securely export and import application data")}
               {activeTab === "update" && (isAR ? "البحث عن تحديثات البرنامج وتثبيتها من داخل التطبيق" : "Check and install application updates from inside the app")}
               {activeTab === "display" && (isAR ? "ضبط ألوان ومظهر واجهة البرنامج" : "Customize application colors and appearance")}
             </p>
@@ -2180,18 +2182,18 @@ const decryptBackupData = async (backupFile: any, password: string) => {
             </div>
            )}
 
-          {/* ── Backup & Import Tab | النسخ الاحتياطي والاستيراد ── */}
+          {/* ── Export and import data Tab |التصدير والاستيراد ── */}
           {activeTab === "backup" && (
             <Section
               icon={Shield}
-              title={isAR ? "النسخ الاحتياطي والاستيراد" : "Backup & Import"}
+              title={isAR ? "إستيراد وتصدير البيانات" : "Export and import data"}
               color="bg-emerald-500/5"
             >
               <div className="space-y-4">
                 {/* Program Data - خارج الإطار */}
                 <div className="grid grid-cols-1 gap-2 rounded-xl border border-border/60 bg-muted/20 p-1" dir={isAR ? "rtl" : "ltr"}>
                   {[
-                    { id: "backup-import" as BackupView, icon: Shield, labelAr: "النسخ والاستيراد", labelEn: "Backup & Import" },
+                    { id: "backup-import" as BackupView, icon: Shield, labelAr: "التصدير والاستيراد", labelEn: "Export and import" },
                   ].map((item) => (
                     <button
                       key={item.id}
@@ -2337,6 +2339,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                       >
                         {isAR ? "استيراد" : "Import"}
                       </button>
+
                     </div>
                   </div>
                  </div>
@@ -2418,18 +2421,91 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                       alert(isAR ? "تم استيراد كامل البيانات" : "Full data imported successfully");
                     }}
                   />
+                  <input
+                    id="invoices-import"
+                    type="file"
+                    accept=".json"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+
+                      await importInvoices(file);
+
+                      e.target.value = "";
+                    }}
+                  />
+
+                  <input
+                    id="clients-import"
+                    type="file"
+                    accept=".json"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+
+                      await importClients(file);
+
+                      e.target.value = "";
+                    }}
+                  />
+
+                  <input
+                    id="receipts-import"
+                    type="file"
+                    accept=".json"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+
+                      await importReceipts(file);
+
+                      e.target.value = "";
+                    }}
+                  />
+
+                  <input
+                    id="items-import"
+                    type="file"
+                    accept=".json"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+
+                      await importItems(file);
+
+                      e.target.value = "";
+                    }}
+                  />
 
                   <div className="grid grid-cols-2 gap-3 mt-4">
                     {/* الفواتير */}
                     <div className="flex justify-between items-center border border-border bg-background rounded-lg p-2">
                       <span className="text-sm">{isAR ? "الفواتير" : "Invoices"}</span>
                       <div className="flex gap-2">
+                      
                         <button type="button" onClick={exportInvoices} disabled={!canUseInvoicesBackupImport} className={cn("h-8 px-3 text-xs bg-muted/30 border border-border text-foreground rounded-md hover:bg-muted/50 transition", !canUseInvoicesBackupImport && "cursor-not-allowed opacity-50 hover:bg-muted/30")}>
                           {isAR ? "تصدير" : "Export"}
                         </button>
-                        <button type="button" disabled={!canUseInvoicesBackupImport} onClick={() => { if (!canUseInvoicesBackupImport) return; }} className={cn("h-8 px-3 text-xs bg-muted/30 border border-border text-foreground rounded-md hover:bg-muted/50 transition", !canUseInvoicesBackupImport && "cursor-not-allowed opacity-50 hover:bg-muted/30")}>
+
+                        <button
+                          type="button"
+                          disabled={!canUseInvoicesBackupImport}
+                          onClick={() => {
+                            if (!canUseInvoicesBackupImport) return;
+                            document.getElementById("invoices-import")?.click();
+                          }}
+                          className={cn(
+                            "h-8 px-3 text-xs bg-muted/30 border border-border text-foreground rounded-md hover:bg-muted/50 transition",
+                            !canUseInvoicesBackupImport && "cursor-not-allowed opacity-50 hover:bg-muted/30"
+                          )}
+                        >
                           {isAR ? "استيراد" : "Import"}
                         </button>
+
                       </div>
                     </div>
 
@@ -2440,9 +2516,17 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                         <button type="button" onClick={exportClients} className="h-8 px-3 text-xs bg-muted/30 border border-border text-foreground rounded-md hover:bg-muted/50 transition">
                           {isAR ? "تصدير" : "Export"}
                         </button>
-                        <button type="button" className="h-8 px-3 text-xs bg-muted/30 border border-border text-foreground rounded-md hover:bg-muted/50 transition">
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            document.getElementById("clients-import")?.click();
+                          }}
+                          className="h-8 px-3 text-xs bg-muted/30 border border-border text-foreground rounded-md hover:bg-muted/50 transition"
+                        >
                           {isAR ? "استيراد" : "Import"}
                         </button>
+
                       </div>
                     </div>
 
@@ -2453,9 +2537,17 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                         <button type="button" onClick={exportReceipts} className="h-8 px-3 text-xs bg-muted/30 border border-border text-foreground rounded-md hover:bg-muted/50 transition">
                           {isAR ? "تصدير" : "Export"}
                         </button>
-                        <button type="button" className="h-8 px-3 text-xs bg-muted/30 border border-border text-foreground rounded-md hover:bg-muted/50 transition">
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            document.getElementById("receipts-import")?.click();
+                          }}
+                          className="h-8 px-3 text-xs bg-muted/30 border border-border text-foreground rounded-md hover:bg-muted/50 transition"
+                        >
                           {isAR ? "استيراد" : "Import"}
                         </button>
+                        
                       </div>
                     </div>
 
@@ -2466,9 +2558,17 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                         <button type="button" onClick={exportItems} className="h-8 px-3 text-xs bg-muted/30 border border-border text-foreground rounded-md hover:bg-muted/50 transition">
                           {isAR ? "تصدير" : "Export"}
                         </button>
-                        <button type="button" className="h-8 px-3 text-xs bg-muted/30 border border-border text-foreground rounded-md hover:bg-muted/50 transition">
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            document.getElementById("items-import")?.click();
+                          }}
+                          className="h-8 px-3 text-xs bg-muted/30 border border-border text-foreground rounded-md hover:bg-muted/50 transition"
+                        >
                           {isAR ? "استيراد" : "Import"}
                         </button>
+                        
                       </div>
                     </div>
                   </div>
@@ -2515,7 +2615,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                         }}
                         className="mt-1 font-mono text-sm font-bold text-foreground"
                       >
-                        {import.meta.env.VITE_APP_VERSION || "2.0.0"}
+                        {import.meta.env.VITE_APP_VERSION || "v2.0.0"}
                       </div>
                     </div>
 
@@ -2598,6 +2698,77 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                       className="h-9 rounded-lg border border-border bg-muted/30 px-3 text-xs font-semibold text-foreground hover:bg-muted/50 disabled:opacity-50"
                     >
                       {isAR ? "تثبيت التحديث" : "Install Update"}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const api = (window as any).electronAPI;
+
+                        if (!api?.selectUpdateInstaller || !api?.runUpdateInstaller) {
+                          setUpdateStatus(
+                            isAR
+                              ? "التحديث من ملف غير متاح داخل هذه النسخة."
+                              : "Local installer updates are not available in this version."
+                          );
+                          return;
+                        }
+
+                        try {
+                          const result = await api.selectUpdateInstaller();
+
+                          if (result?.canceled) {
+                            return;
+                          }
+
+                          if (!result?.ok) {
+                            setUpdateStatus(
+                              result?.error ||
+                                (isAR
+                                  ? "ملف التحديث غير صالح."
+                                  : "The update installer is invalid.")
+                            );
+                            return;
+                          }
+
+                          const confirmed = window.confirm(
+                            isAR
+                              ? `سيتم تحديث Ledger من الإصدار ${result.currentVersion} إلى الإصدار ${result.installerVersion}.\n\nسيتم إغلاق البرنامج وتشغيل برنامج التثبيت تلقائيًا.\n\nهل تريد المتابعة؟`
+                              : `Ledger will be updated from version ${result.currentVersion} to version ${result.installerVersion}.\n\nLedger will close and the installer will start automatically.\n\nDo you want to continue?`
+                          );
+
+                          if (!confirmed) {
+                            return;
+                          }
+
+                          setUpdateStatus(
+                            isAR
+                              ? "جاري بدء التحديث..."
+                              : "Starting update..."
+                          );
+
+                          const installResult = await api.runUpdateInstaller(result.path);
+
+                          if (!installResult?.ok) {
+                            setUpdateStatus(
+                              installResult?.error ||
+                                (isAR
+                                  ? "فشل بدء التحديث."
+                                  : "Failed to start the update.")
+                            );
+                          }
+                        } catch (error: any) {
+                          setUpdateStatus(
+                            error?.message ||
+                              (isAR
+                                ? "فشل بدء التحديث."
+                                : "Failed to start the update.")
+                          );
+                        }
+                      }}
+                      className="h-9 rounded-lg border border-border bg-muted/30 px-3 text-xs font-semibold text-foreground hover:bg-muted/50"
+                    >
+                      {isAR ? "اختيار ملف تحديث" : "Choose Update File"}
                     </button>
                   </div>
                 </div>

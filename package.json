@@ -1,6 +1,6 @@
 {
   "name": "ledger",
-  "version": "2.1.1",
+  "version": "2.1.74",
   "type": "module",
   "private": true,
   "main": "electron-main.cjs",
@@ -11,7 +11,7 @@
     "preview": "vite preview",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "electron:start": "electron .",
-    "dist": "electron-builder --win"
+    "dist": "pnpm version patch --no-git-tag-version && pnpm --dir customs-accounting build && electron-builder --win"
   },
   "devDependencies": {
     "@hookform/resolvers": "^3.10.0",
@@ -190,6 +190,10 @@
     "win": {
       "target": "nsis",
       "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "runAfterFinish": true,
+      "include": "build/installer.nsh"
     },
     "linux": {
       "icon": "build/icon.png"

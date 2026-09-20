@@ -97,6 +97,11 @@ contextBridge.exposeInMainWorld("electronAPI", {
   checkForUpdates: () => ipcRenderer.invoke("check-for-updates"),
   downloadUpdate: () => ipcRenderer.invoke("download-update"),
   installUpdate: () => ipcRenderer.invoke("install-update"),
+  selectUpdateInstaller: () => ipcRenderer.invoke("update:select-installer"),
+  runUpdateInstaller: (installerPath) =>
+    ipcRenderer.invoke("update:run-installer", installerPath),
+  quitForUpdateInstaller: () =>
+    ipcRenderer.invoke("update:quit-for-installer"),
   onUpdateStatus: (callback) => {
     const channels = [
       "update-checking",

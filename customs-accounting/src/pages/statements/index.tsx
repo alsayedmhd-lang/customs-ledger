@@ -6,23 +6,80 @@ import { formatCurrency, formatDate } from "@/lib/utils";
 import { BookOpen, FileText, TrendingDown, TrendingUp, User, Printer, Eye, EyeOff } from "lucide-react";
 import { useLanguage } from "@/lib/language-context";
 
+type Client = NonNullable<ReturnType<typeof useListClients>["data"]>[number];
+type Invoice = NonNullable<ReturnType<typeof useListInvoices>["data"]>[number];
+
+interface ClientSummary {
+  client: Client;
+  totalInvoiced: number;
+  totalPaid: number;
+  balance: number;
+  invoiceCount: number;
+  lastInvoice?: Invoice;
+}
+
 export default function StatementsIndex() {
   const { t, lang } = useLanguage();
   const isAR = lang === "ar";
   const [showAmounts, setShowAmounts] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [fromDate, setFromDate] = useState(() => {
+  const today = new Date();
+  return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-01`;
+    });
+
+    const [toDate, setToDate] = useState(() => {
+      const today = new Date();
+      return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+    });
   const hidden = <span className="tracking-widest opacity-35 font-mono">••••••</span>;
   const { data: clients, isLoading: loadingClients } = useListClients();
   const { data: allInvoices, isLoading: loadingInvoices } = useListInvoices();
 
   const loading = loadingClients || loadingInvoices;
 
-  const clientSummaries = (clients?.map(client => {
-    const invoices = allInvoices?.filter(inv => inv.clientId === client.id) || [];
+  const clientSummaries: ClientSummary[] = (clients?.map((client: Client) => {
+    const invoices = allInvoices?.filter((inv: Invoice) => {
+    if (inv.clientId !== client.id) return false;
+
+    const issueDate = String(inv.issueDate || "").slice(0, 10);
+
+    const search = searchTerm.trim().toLowerCase();
+
+    const matchesSearch =
+      !search ||
+      String(client.name || "").toLowerCase().includes(search) ||
+      String((inv as any).shipmentRef || "").toLowerCase().includes(search) ||
+      String((inv as any).blNumber || "").toLowerCase().includes(search) ||
+      String((inv as any).invoiceNumber || "").toLowerCase().includes(search);
+
+    return (
+      (!fromDate || issueDate >= fromDate) &&
+      (!toDate || issueDate <= toDate) &&
+      matchesSearch
+    );
+    }) || [];
+
     const totalInvoiced = invoices.reduce((sum, inv) => sum + inv.total, 0);
-    const totalPaid = invoices.filter(i => i.status === "paid").reduce((sum, inv) => sum + inv.total, 0);
+    const totalPaid = invoices
+      .filter(i => i.status === "paid")
+      .reduce((sum, inv) => sum + inv.total, 0);
+
     const balance = totalInvoiced - totalPaid;
-    const lastInvoice = invoices.sort((a, b) => new Date(b.issueDate).getTime() - new Date(a.issueDate).getTime())[0];
-    return { client, totalInvoiced, totalPaid, balance, invoiceCount: invoices.length, lastInvoice };
+
+    const lastInvoice = [...invoices].sort(
+      (a, b) =>
+        new Date(b.issueDate).getTime() - new Date(a.issueDate).getTime()
+    )[0];
+
+    return {
+      client,
+      totalInvoiced,
+      totalPaid,
+      balance,
+      invoiceCount: invoices.length,
+      lastInvoice,
+    };
   }) ?? [])
     .filter(c => c.invoiceCount > 0)
     .sort((a, b) => b.balance - a.balance);
@@ -32,6 +89,8 @@ export default function StatementsIndex() {
 
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+
+      
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-foreground">{t("statements")}</h1>
@@ -80,7 +139,38 @@ export default function StatementsIndex() {
           </div>
         </div>
       </div>
+      
+      {/* Unified Search and Date Range */}
+      <div className="grid grid-cols-1 md:grid-cols-[1.8fr_140px_140px] gap-3">
+        <div className="relative">
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder={
+              isAR
+                ? "بحث برقم البيان أو البوليصة أو اسم العميل أو رقم الفاتورة..."
+                : "Search declaration, B/L, client or invoice number..."
+            }
+            className="h-10 w-full rounded-xl border border-border bg-background px-3 pr-9 text-sm"
+          />
+        </div>
 
+        <input
+          type="date"
+          value={fromDate}
+          onChange={(e) => setFromDate(e.target.value)}
+          className="h-10 rounded-xl border border-border bg-background px-3 text-sm"
+        />
+
+        <input
+          type="date"
+          value={toDate}
+          onChange={(e) => setToDate(e.target.value)}
+          className="h-10 rounded-xl border border-border bg-background px-3 text-sm"
+        />
+      </div>
+  
       {/* Clients Table */}
       <div className="bg-card border border-border/50 shadow-sm rounded-2xl overflow-hidden">
         <div className="p-5 border-b border-border/50 flex items-center gap-2">
@@ -119,11 +209,20 @@ export default function StatementsIndex() {
                   </td>
                 </tr>
               ) : (
-                clientSummaries.map(({ client, totalInvoiced, totalPaid, balance, invoiceCount, lastInvoice }) => (
+                clientSummaries.map(({
+                  client,
+                  totalInvoiced,
+                  totalPaid,
+                  balance,
+                  invoiceCount,
+                  lastInvoice,
+                }: ClientSummary) => (
                   <tr key={client.id} className="border-b border-border/50 last:border-0 hover:bg-muted/20 transition-colors">
                     <td className="px-5 py-4">
                       <Link href={`/clients/${client.id}`}>
-                        <p className="font-semibold text-primary hover:underline cursor-pointer">{client.name}</p>
+                        <p className="font-semibold text-primary hover:underline cursor-pointer">
+                          {client.name}
+                        </p>
                       </Link>
                       {client.phone && <p className="text-xs text-muted-foreground mt-0.5">{client.phone}</p>}
                     </td>
@@ -134,10 +233,10 @@ export default function StatementsIndex() {
                       </span>
                     </td>
                     <td className="px-5 py-4 text-muted-foreground text-xs">
-                      {lastInvoice ? formatDate(lastInvoice.issueDate) : "—"}
+                      {lastInvoice ? formatDate(lastInvoice.issueDate, lang) : "—"}
                     </td>
-                    <td className="px-5 py-4 font-mono font-semibold">{showAmounts ? formatCurrency(totalInvoiced) : hidden}</td>
-                    <td className="px-5 py-4 font-mono font-semibold text-emerald-600 dark:text-emerald-400">{showAmounts ? formatCurrency(totalPaid) : hidden}</td>
+                    <td className="px-5 py-4 font-mono font-semibold">{showAmounts ? formatCurrency(totalInvoiced, lang) : hidden}</td>
+                    <td className="px-5 py-4 font-mono font-semibold text-emerald-600 dark:text-emerald-400">{showAmounts ? formatCurrency(totalPaid, lang) : hidden}</td>
                     <td className="px-5 py-4">
                       <span className={`font-mono font-bold text-base ${balance > 0 ? "text-destructive" : "text-emerald-600 dark:text-emerald-400"}`}>
                         {showAmounts ? formatCurrency(balance) : hidden}
@@ -158,7 +257,11 @@ export default function StatementsIndex() {
                           </button>
                         </Link>
                       <button
-                      onClick={() => window.open(`/clients/${client.id}/statement`, "_self")}
+                      onClick={() => {
+                          window.electronAPI?.openExternalPrintWindow?.(
+                            `#/clients/${client.id}/statement?from=${fromDate}&to=${toDate}`
+                          );
+                        }}
                       className="flex items-center gap-1.5 px-3 py-1.5 bg-muted text-muted-foreground hover:bg-foreground hover:text-background rounded-lg font-semibold text-xs transition-all"
                     >
                       <Printer className="w-3.5 h-3.5" />

@@ -2,7 +2,7 @@ import { useAuth } from "@/lib/auth-context";
 import { useState, useEffect } from "react";
 import { useParams, Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { formatCurrency, formatDate, formatNumber, arabicNums } from "@/lib/utils";
+import { formatCurrency, formatDate, formatNumber, arabicNums, formatCurrency, formatCurrency } from "@/lib/utils";
 import { Printer, ArrowRight, ArrowLeft, Stamp } from "lucide-react";
 import Barcode from "react-barcode";
 import { useLanguage } from "@/lib/language-context";
@@ -15,6 +15,13 @@ const STATUS_AR: Record<string, string> = {
   issued: "صادرة",
   paid: "مدفوعة",
   cancelled: "ملغاة",
+};
+
+const STATUS_EN: Record<string, string> = {
+  draft: "Draft",
+  issued: "Issued",
+  paid: "Paid",
+  cancelled: "Cancelled",
 };
 
 const STATUS_COLOR: Record<string, string> = {
@@ -100,47 +107,124 @@ export default function ClientStatement() {
   if (isLoading) return <div className="p-8 text-center">{isAR ? "جارٍ إنشاء كشف الحساب..." : "Loading statement..."}</div>;
   if (!statement) return <div className="p-8 text-center text-red-600">{isAR ? "كشف الحساب غير موجود" : "Statement not found"}</div>;
 
-  const { client, invoices, totalDue, totalPaid, balance } = statement;
+  const { client, invoices } = statement;
   const today = new Date().toISOString();
   const statementRef = `ST-${client.id}-${new Date().getFullYear()}`;
-  const params = new URLSearchParams(window.location.search);
-  const fromDateText = formatDateYMD(params.get("from"));
-  const toDateText = formatDateYMD(params.get("to"));
-  const hasDateRange = !!fromDateText && !!toDateText;
+  const params = new URLSearchParams(
+    window.location.hash.split("?")[1] || ""
+  );
+  const fromDate = params.get("from") || "";
+  const toDate = params.get("to") || "";
+
+  console.log("[STATEMENT DATE FILTER]", JSON.stringify({ fromDate, toDate }));
+
+  const fromDateText = formatDateYMD(fromDate);
+  const toDateText = formatDateYMD(toDate);
+  const hasDateRange = !!fromDate && !!toDate;
 
   // Running balance table
-  let runningBalance = 0;
-  const rows = invoices.map((inv) => {
-    runningBalance += inv.total;
-    return { ...inv, runningBalance };
+  const filteredInvoices = invoices.filter((inv) => {
+    const issueDate = String(inv.issueDate || "").slice(0, 10);
+
+    return (
+      (!fromDate || issueDate >= fromDate) &&
+      (!toDate || issueDate <= toDate)
+    );
   });
+
+  let runningBalance = 0;
+    const rows = filteredInvoices.map((inv) => {
+      runningBalance += inv.total;
+      return { ...inv, runningBalance };
+    });
+
+    const filteredTotalDue = filteredInvoices
+    .filter((inv) => inv.status !== "cancelled")
+    .reduce((sum, inv) => sum + Number(inv.total ?? 0), 0);
+
+  const filteredTotalPaid = filteredInvoices
+    .reduce((sum, inv) => sum + Number(inv.advancePayment ?? 0), 0);
+
+  const filteredBalance = filteredTotalDue - filteredTotalPaid;
 
   return (
     <A4PrintShell
       dir="rtl"
-      pageClassName="max-w-4xl shadow-xl"
+      pageClassName="max-w-4xl shadow-xl financial-statement-page"
       controls={
         <>
       {/* Print CSS */}
-      <style>{`
-        @media print {
-          @page { size: A4 portrait; margin: 10mm 10mm 10mm 15mm; }
-          body { margin: 0; }
-          .print\\:hidden { display: none !important; }
-          .print-page {
-            width: 100% !important;
-            max-width: none !important;
-            margin: 0 !important;
-            min-height: 297mm;
-            height: auto;
-            display: flex;
-            flex-direction: column;
-            overflow: visible !important;
-          }
-          .print-content { flex: 1 1 auto; min-height: 0; }
-          .print-footer { flex: 0 0 auto; margin-top: auto; page-break-inside: avoid; break-inside: avoid; }
-        }
-      `}</style>
+        <style>{`
+          @media print {
+            @page {
+              size: A4 portrait;
+              margin: 10mm 10mm 10mm 15mm;
+            }
+
+            html,
+            body {
+              margin: 0 !important;
+              padding: 0 !important;
+            }
+
+            .print\\:hidden {
+              display: none !important;
+            }
+
+            .print-page {
+              width: 185mm !important;
+              max-width: none !important;
+              min-height: 0 !important;
+              height: auto !important;
+
+              margin: 0 !important;
+              padding: 0 !important;
+
+              display: flex;
+              flex-direction: column;
+
+              overflow: visible !important;
+              box-sizing: border-box !important;
+
+              break-after: auto !important;
+              page-break-after: auto !important;
+            }
+            
+            .financial-statement-page {
+                min-height: 277mm !important;
+                height: 277mm !important;
+                display: flex !important;
+                flex-direction: column !important;
+                box-sizing: border-box !important;
+                overflow: hidden !important;
+              }
+
+            .print-content {
+              flex: 1 1 auto !important;
+              min-height: 0 !important;
+              height: auto !important;
+
+              margin-bottom: 0 !important;
+              padding-bottom: 0 !important;
+
+              break-inside: auto !important;
+              page-break-inside: auto !important;
+            }
+
+            .financial-statement-page .print-footer {
+                margin-top: auto !important;
+              }
+
+
+              }
+              .print-footer {
+                padding-top: 0 !important;
+
+                break-inside: avoid !important;
+                page-break-inside: avoid !important;
+              }
+            }
+          `}</style>
 
       {/* Controls */}
       <div className="print:hidden flex items-center gap-3 p-6 max-w-4xl mx-auto flex-wrap" dir={isAR ? "rtl" : "ltr"}>
@@ -270,6 +354,8 @@ export default function ClientStatement() {
               {client.address && <p className="text-sm text-gray-600 mt-0.5">{client.address}</p>}
               {client.taxId && <p className="text-sm text-gray-600">الرقم الضريبي: {client.taxId}</p>}
               {client.email && <p className="text-sm text-gray-500">{client.email}</p>}
+              {client.phone && <p className="text-sm text-gray-500">☎ {client.phone}</p>}
+
               {hasDateRange && (
                 <div className="mt-3 grid grid-cols-2 gap-3 text-xs" dir={isAR ? "rtl" : "ltr"}>
                   <div className="rounded border border-gray-200 bg-gray-50 px-3 py-2 text-center">
@@ -290,7 +376,6 @@ export default function ClientStatement() {
                   </div>
                 </div>
               )}
-              {client.phone && <p className="text-sm text-gray-500">☎ {client.phone}</p>}
             </div>
 
             {/* Summary box */}
@@ -298,26 +383,40 @@ export default function ClientStatement() {
               <div className="bg-gray-800 text-white text-center py-1 font-bold text-xs uppercase tracking-widest">
                 ملخص الحساب / Account Summary
               </div>
+
               <div className="divide-y divide-gray-200">
                 <div className="flex justify-between px-4 py-1.5">
                   <span className="text-gray-600">إجمالي الفواتير / Total Invoiced</span>
-                  <span className="font-mono font-bold text-gray-800">{formatCurrency(totalDue)}</span>
+                  <span className="font-mono font-bold text-gray-800">
+                    {formatCurrency(filteredTotalDue)}
+                  </span>
                 </div>
+
                 <div className="flex justify-between px-4 py-1.5">
                   <span className="text-gray-600">إجمالي المدفوع / Total Paid</span>
-                  <span className="font-mono font-bold text-green-700">{formatCurrency(totalPaid)}</span>
+                  <span className="font-mono font-bold text-green-700">
+                    {formatCurrency(filteredTotalPaid)}
+                  </span>
                 </div>
+
                 <div className="flex justify-between px-4 py-2 bg-gray-50">
-                  <span className="font-black text-gray-900">الرصيد المستحق / Balance Due</span>
-                  <span className={`font-mono font-black text-base ${balance > 0 ? "text-red-700" : "text-green-700"}`}>
-                    {formatCurrency(balance)}
+                  <span className="font-black text-gray-900">
+                    الرصيد المستحق / Balance Due
+                  </span>
+
+                  <span
+                    className={`font-mono font-black text-base ${
+                      filteredBalance > 0 ? "text-red-700" : "text-green-700"
+                    }`}
+                  >
+                    {formatCurrency(filteredBalance)}
                   </span>
                 </div>
               </div>
             </div>
-          </div>
-        </div>
-
+           </div>
+           </div>
+         
         {/* ══ TRANSACTIONS TABLE ══════════════════════════════════════════ */}
         <div className="px-6 pt-4" style={{ position: "relative", zIndex: 1 }}>
           <table className="w-full text-sm border-collapse">
@@ -346,11 +445,15 @@ export default function ClientStatement() {
                     <td className="py-2 px-2 text-gray-500 text-center font-mono text-xs">
                       {arabicNums(String(idx + 1).padStart(3, "0"))}
                     </td>
-                    <td className="py-2 px-3 font-semibold text-blue-800">{inv.invoiceNumber}</td>
-                    <td className="py-2 px-3 text-gray-600">{formatDate(inv.issueDate)}</td>
+                    <td className="py-2 px-3 text-gray-600">
+                        {(inv as any).invoiceNumber || (inv as any).invoiceNo || "—"}
+                      </td>
+                      <td className="py-2 px-3 text-gray-600">
+                        {formatDate(inv.issueDate, lang)}
+                      </td>
                     <td className="py-2 px-2 text-center">
                       <span className={`text-xs ${STATUS_COLOR[inv.status] || ""}`}>
-                        {STATUS_AR[inv.status] || inv.status}
+                        {STATUS_AR[inv.status] || inv.status} / {STATUS_EN[inv.status] || inv.status}
                       </span>
                     </td>
                     <td className="py-2 px-3 text-gray-600 text-xs max-w-[140px]">
@@ -395,16 +498,16 @@ export default function ClientStatement() {
           <div className="border-t-2 border-gray-700 pt-2 space-y-1">
             <div className="flex justify-between items-center text-sm">
               <span className="text-gray-700">إجمالي الفواتير / Total Invoiced</span>
-              <span className="font-mono font-bold text-gray-800">{formatNumber(totalDue, 2)} {currencySymbol}</span>
+              <span className="font-mono font-bold text-gray-800">{formatCurrency(filteredTotalDue)}</span>
             </div>
             <div className="flex justify-between items-center text-sm">
               <span className="text-gray-700">إجمالي المدفوع / Total Paid</span>
-              <span className="font-mono font-bold text-green-700">{formatNumber(totalPaid, 2)} {currencySymbol}</span>
+              <span className="font-mono font-bold text-green-700">{formatCurrency(filteredTotalPaid)}</span>
             </div>
             <div className="flex justify-between items-center border-t-2 border-double border-gray-700 pt-2 mt-1">
               <span className="font-black text-base text-gray-800">الرصيد المستحق / Balance Due</span>
-              <span className={`font-black font-mono text-base ${balance > 0 ? "text-red-700" : "text-green-700"}`}>
-                {formatNumber(balance, 2)} {currencySymbol}
+              <span className={`font-black font-mono text-base ${filteredBalance > 0 ? "text-red-700" : "text-green-700"}`}>
+                {formatCurrency(filteredBalance)}
               </span>
             </div>
           </div>
@@ -447,7 +550,7 @@ export default function ClientStatement() {
             <div className="text-center text-xs text-gray-500 mt-1">{settings.footerText}</div>
           )}
           <div className="text-center text-xs text-gray-400 mt-1">
-            طُبعت في: {new Date().toLocaleDateString("ar-EG-u-nu-latn", { year: "numeric", month: "long", day: "numeric" })}
+            طُبعت في: {new Date().toLocaleDateString(lang === "ar" ? "ar-EG-u-nu-latn" : "en-US", { year: "numeric", month: "long", day: "numeric" })}
             {" — "}المرجع: {statementRef}
             {" — "}عدد الفواتير: {arabicNums(invoices.length)}
           </div>

@@ -134,7 +134,7 @@ export default function InvoicesList() {
       i.invoiceNumber?.toLowerCase().includes(q) ||
       i.clientName?.toLowerCase().includes(q) ||
       (i.shipmentRef && i.shipmentRef.toLowerCase().includes(q)) ||
-      (searchBase && shipmentBase && shipmentBase.includes(searchBase)) ||
+      (searchBase && shipmentBase && shipmentBase.startsWith(searchBase)) ||
       (i.billOfLading && i.billOfLading.toLowerCase().includes(q));
 
     const matchesFrom = !fromDate || issueDate >= fromDate;
@@ -350,24 +350,25 @@ export default function InvoicesList() {
             <thead className="bg-muted/40 text-muted-foreground font-medium border-b border-border/60 sticky top-0 z-10">
               <tr>
                 <th className="px-4 py-3 text-start text-xs font-semibold tracking-wide uppercase">{t("invoiceNumber")}</th>
+                <th className="px-4 py-3 text-start text-xs font-semibold tracking-wide uppercase">{t("shipmentRef")}</th>
                 <th className="px-4 py-3 text-start text-xs font-semibold tracking-wide uppercase">{t("client")}</th>
                 <th className="px-4 py-3 text-start text-xs font-semibold tracking-wide uppercase">{t("date")}</th>
                 <th className="px-4 py-3 text-start text-xs font-semibold tracking-wide uppercase">{t("status")}</th>
-                <th className="px-4 py-3 text-end text-xs font-semibold tracking-wide uppercase">{t("total")}</th>
-                <th className="px-4 py-3 text-end text-xs font-semibold tracking-wide uppercase">{t("actions")}</th>
+                <th className="px-4 py-3 text-medium text-xs font-semibold tracking-wide uppercase">{t("total")}</th>
+                <th className="px-4 py-3 text-medium text-xs font-semibold tracking-wide uppercase">{t("actions")}</th>
               </tr>
             </thead>
 
             <tbody className="divide-y divide-border/40">
               {isLoading ? (
                 <tr>
-                  <td colSpan={6} className="text-center py-12 text-muted-foreground animate-pulse">
+                  <td colSpan={7} className="text-center py-12 text-muted-foreground animate-pulse">
                     {t("loadingInvoices")}
                   </td>
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="text-center py-12 text-muted-foreground">
+                  <td colSpan={7} className="text-center py-12 text-muted-foreground">
                     {t("noInvoices")}
                   </td>
                 </tr>
@@ -383,16 +384,27 @@ export default function InvoicesList() {
                         </Link>
                       )}
                     </td>
-
+                      <td className="px-4 py-3">
+                        {inv.shipmentRef ? (
+                          <Link
+                            href={`/invoices/${inv.id}/edit`}
+                            className="font-mono text-primary hover:underline"
+                          >
+                            {inv.shipmentRef}
+                          </Link>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </td>
                     <td className="px-4 py-3">
                       <span className="font-medium text-sm">{inv.clientName}</span>
                     </td>
 
                     <td className="px-4 py-3">
-                      <p className="text-sm">{formatDate(inv.issueDate)}</p>
+                      <p className="text-sm">{formatDate(inv.issueDate, lang)}</p>
                       {inv.dueDate && (
                         <p className="text-xs text-muted-foreground mt-0.5">
-                          {t("dueDate")}: {formatDate(inv.dueDate)}
+                          {t("dueDate")}: {formatDate(inv.dueDate, lang)}
                         </p>
                       )}
                     </td>

@@ -322,7 +322,7 @@ export default function ReceiptPrint() {
         <main className="receipt-print-content">
         {settings.showWatermark && (
           <div
-            className="absolute inset-0 -top-8 flex flex-col items-center justify-center pointer-events-none select-none"
+            className="absolute left-0 right-0 top-40 h-1/2 flex flex-col items-center justify-center pointer-events-none select-none"
             style={{ opacity: 0.1, zIndex: 0 }}
             aria-hidden="true"
           >
@@ -437,7 +437,7 @@ export default function ReceiptPrint() {
                   التاريخ
                 </td>
                 <td className="px-3 py-1.5 font-semibold text-gray-900 text-center border-l border-gray-200">
-                  {formatDate(receipt.receiptDate)}
+                  {formatDate(receipt.receiptDate, lang)}
                 </td>
                 <td className="px-3 py-1.5 font-bold text-gray-400 text-left bg-gray-50 tracking-wide">
                   Date

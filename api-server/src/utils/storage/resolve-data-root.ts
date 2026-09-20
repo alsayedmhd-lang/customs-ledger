@@ -13,7 +13,7 @@ import type {
 
 const execFileAsync = promisify(execFile);
 const STORAGE_CONFIG_FILE = "storage-config.json";
-const DATA_ROOT_FOLDER = "CustomsLedgerData";
+const DATA_ROOT_FOLDER = "ProgramLedgerData";
 const MIN_FREE_BYTES = 1 * 1024 * 1024 * 1024;
 
 const DATA_SUBFOLDERS = {
@@ -258,6 +258,10 @@ async function ensureDataRootStructure(
 
   await ensureWritable(resolvedDataRoot);
 
+  console.log("[DATA_ROOT] About to hide data root", resolvedDataRoot);
+  await hideDataRoot(resolvedDataRoot);
+  console.log("[DATA_ROOT] Hide data root completed");
+  
   console.log("[DATA_ROOT] Data root structure is ready", result);
   return result;
 }
@@ -274,6 +278,23 @@ async function ensureWritable(directoryPath: string): Promise<void> {
     await fs.writeFile(probePath, "test", "utf8");
   } finally {
     await fs.rm(probePath, { force: true });
+  }
+}
+
+async function hideDataRoot(directoryPath: string): Promise<void> {
+  if (process.platform !== "win32") {
+    return;
+  }
+
+  try {
+    await execFileAsync("attrib", ["+h", "+s", directoryPath], {
+      windowsHide: true,
+    });
+  } catch (error) {
+    console.warn("[DATA_ROOT] Failed to hide data root", {
+      directoryPath,
+      error,
+    });
   }
 }
 

@@ -29,7 +29,7 @@ const clientSchema = z.object({
 type ClientForm = z.infer<typeof clientSchema>;
 
 export default function ClientsList() {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const { data: clients = [], isLoading } = useListClients();
   const [search, setSearch] = useState("");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -88,8 +88,12 @@ export default function ClientsList() {
               filteredClients.map((client) => (
                 <tr key={client.id} className="border-b border-border/50 last:border-0 hover:bg-muted/20 transition-colors group">
                   <td className="px-6 py-4">
-                    <p className="font-semibold text-foreground">{client.name}</p>
-                    <p className="text-xs text-muted-foreground">{t("addedOn")} {formatDate(client.createdAt)}</p>
+                    <Link href={`/clients/${client.id}`}>
+                        <p className="font-semibold text-foreground hover:text-primary cursor-pointer transition-colors">
+                          {client.name}
+                        </p>
+                      </Link>
+                    <p className="text-xs text-muted-foreground">{t("addedOn")} {formatDate(client.createdAt, lang)}</p>
                   </td>
 
                   <td className="px-6 py-4">
@@ -157,7 +161,7 @@ function CreateClientModal({ isOpen, onClose }: { isOpen: boolean, onClose: () =
       onClose();
     },
     onError: (err: any) =>
-      toast({ title: "خطأ في إضافة العميل", description: err.message, variant: "destructive" }),
+      toast({ title: t("addClientError"), description: err.message, variant: "destructive" }),
   }
 });
 
@@ -252,7 +256,7 @@ function DeleteClientConfirm({ id, onClose }: { id: number, onClose: () => void 
         toast({ title: t("delete") + " " + t("client") });
         onClose();
       },
-      onError: () => toast({ title: "فشل الحذف", variant: "destructive" })
+      onError: () => toast({ title: t("saveFailed"), variant: "destructive" })
     }
   });
 

@@ -233,37 +233,80 @@ export default function CustomerLedgerPrintPage() {
   return (
     <A4PrintShell
       dir="rtl"
-      pageClassName="max-w-4xl shadow-xl"
+      pageClassName="max-w-4xl shadow-xl financial-summary-page"
       controls={
         <>
-      <style>{`
-        @media print {
-          @page { size: A4 portrait; margin: 10mm; }
-          body { margin: 0; background: white !important; }
-          .print\\:hidden { display: none !important; }
-          .print-page {
-            width: 100% !important;
-            max-width: none !important;
-            margin: 0 !important;
-            min-height: 297mm !important;
-            height: auto !important;
-            display: flex !important;
-            flex-direction: column;
-            overflow: visible !important;
-          }
-          .print-content {
-            flex: 1 1 auto;
-            min-height: 0 !important;
-            display: block !important;
-          }
-          .print-footer {
-            flex: 0 0 auto;
-            margin-top: auto !important;
-            page-break-inside: avoid;
-            break-inside: avoid;
-          }
-        }
-      `}</style>
+          <style>{`
+            @media print {
+              @page {
+                size: A4 portrait;
+                margin: 10mm 10mm 10mm 15mm;
+              }
+
+              html,
+              body {
+                margin: 0 !important;
+                padding: 0 !important;
+              }
+
+              .print\\:hidden {
+                display: none !important;
+              }
+
+              .print-page {
+                width: 185mm !important;
+                max-width: none !important;
+                min-height: 0 !important;
+                height: auto !important;
+
+                margin: 0 !important;
+                padding: 0 !important;
+
+                display: flex;
+                flex-direction: column;
+
+                overflow: visible !important;
+                box-sizing: border-box !important;
+
+                break-after: auto !important;
+                page-break-after: auto !important;
+              }
+
+              .print-content {
+                flex: 1 1 auto !important;
+                min-height: 0 !important;
+                height: auto !important;
+
+                margin-bottom: 0 !important;
+                padding-bottom: 0 !important;
+
+                break-inside: auto !important;
+                page-break-inside: auto !important;
+              }
+              
+              .financial-summary-page {
+                min-height: 277mm !important;
+                height: 277mm !important;
+                display: flex !important;
+                flex-direction: column !important;
+                box-sizing: border-box !important;
+                overflow: hidden !important;
+              }
+
+              .financial-summary-page .print-footer {
+                margin-top: auto !important;
+              }
+
+
+              }
+              .print-footer {
+                padding-top: 0 !important;
+
+                break-inside: avoid !important;
+                page-break-inside: avoid !important;
+              }
+
+          `}</style>
 
       {/* CONTROLS */}
       <div className="print:hidden flex items-center gap-3 px-4 py-4 sm:px-6 max-w-4xl mx-auto flex-wrap" dir={isAR ? "rtl" : "ltr"}>

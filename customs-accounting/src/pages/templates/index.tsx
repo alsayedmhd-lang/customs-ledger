@@ -123,7 +123,12 @@ export default function TemplatesList() {
               <div key={tmpl.id}
                 className="bg-card border border-border/50 rounded-xl p-3 shadow-sm hover:shadow-md transition-all group hover:-translate-y-0.5 flex flex-col gap-1"
               >
-                <p className="text-xs font-medium text-foreground line-clamp-2 leading-snug">{tmpl.description}</p>
+                <p
+                  onClick={() => setEditingTemplate(tmpl)}
+                  className="text-xs font-medium text-foreground line-clamp-2 leading-snug cursor-pointer hover:text-primary transition-colors"
+                >
+                  {tmpl.description}
+                </p>
                 <p className="text-sm font-mono font-black text-primary mt-auto">{formatCurrency(tmpl.defaultUnitPrice)}</p>
                 <div className="flex gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button onClick={() => setEditingTemplate(tmpl)}
@@ -184,7 +189,14 @@ export default function TemplatesList() {
                       )}
                     >
                       <td className="px-4 py-3 font-mono text-xs text-muted-foreground w-10">{i + 1}</td>
-                      <td className="px-4 py-3 font-medium text-foreground">{tmpl.description}</td>
+                      <td className="px-4 py-3 font-medium text-foreground">
+                        <span
+                          onClick={() => setEditingTemplate(tmpl)}
+                          className="cursor-pointer hover:text-primary transition-colors"
+                        >
+                          {tmpl.description}
+                        </span>
+                      </td>
                       <td className="px-4 py-3 font-mono font-bold text-primary">{formatCurrency(tmpl.defaultUnitPrice)}</td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-2">
@@ -255,7 +267,12 @@ function TemplateCard({
         <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center mb-3">
           <PackageSearch className="w-4 h-4 text-primary" />
         </div>
-        <h3 className="font-bold text-foreground line-clamp-2 text-sm leading-relaxed">{tmpl.description}</h3>
+        <h3
+          onClick={() => onEdit(tmpl)}
+          className="font-bold text-foreground line-clamp-2 text-sm leading-relaxed cursor-pointer hover:text-primary transition-colors"
+        >
+          {tmpl.description}
+        </h3>
         <p className="text-2xl font-mono font-black text-primary mt-3">{formatCurrency(tmpl.defaultUnitPrice)}</p>
       </div>
       <div className="flex justify-end gap-2 mt-4 opacity-0 group-hover:opacity-100 transition-opacity">
