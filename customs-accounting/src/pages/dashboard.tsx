@@ -213,7 +213,7 @@ export default function Dashboard() {
       icon: FileText,
       color: "bg-primary/70",
       bg: "bg-indigo-50 dark:bg-indigo-950/30",
-      iconColor: "text-indigo-600 dark:text-indigo-400",
+      iconColor: "text-violet-600 dark:text-violet-400",
       border: "border-border",
     },
     {

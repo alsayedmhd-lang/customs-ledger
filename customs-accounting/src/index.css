@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme inline {
   --font-sans: 'Cairo', sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
@@ -480,7 +482,7 @@ input[type="number"] {
   .dark select,
   .dark select option,
   .dark select optgroup {
-    background-color: hsl(var(--background));
+    background-color: hsl(var(--card));
     color: hsl(var(--foreground));
   }
 

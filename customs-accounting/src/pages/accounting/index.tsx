@@ -198,7 +198,7 @@ function TxtInput({
 }
 
 export default function AccountingPage() {
-  const { t, lang } = useLanguage();
+  const { t, lang, currencySymbol } = useLanguage();
   const { toast } = useToast();
   const { user, can } = useAuth();
   const queryClient = useQueryClient();
@@ -482,8 +482,8 @@ export default function AccountingPage() {
     {
       label: t("unpaidLabor"),
       value: totalLabor,
-      color: "text-purple-500",
-      bg: "bg-purple-50/60 dark:bg-purple-900/15",
+      color: "text-violet-500",
+      bg: "bg-violet-50/60 dark:bg-violet-900/20",
       icon: "👷",
     },
     {
@@ -594,7 +594,7 @@ export default function AccountingPage() {
               className={`text-lg font-bold ${card.color} tabular-nums transition-all`}
             >
               {showAmounts ? (
-                formatCurrency(card.value)
+                formatCurrency(card.value, currencySymbol, lang)
               ) : (
                 <span className="tracking-widest opacity-40 text-base">
                   ••••••
@@ -915,7 +915,7 @@ export default function AccountingPage() {
                         </Link>
                       </td>
                       <td className="px-3 py-1.5 whitespace-nowrap font-semibold text-foreground">
-                        {formatCurrency(row.total)}
+                        {formatCurrency(row.total, currencySymbol, lang)}
                       </td>
                       <td
                         className="px-3 py-1.5 whitespace-nowrap max-w-[120px] truncate"
@@ -1021,7 +1021,7 @@ export default function AccountingPage() {
                       <td
                         className={`px-3 py-1.5 whitespace-nowrap font-bold bg-green-50/30 dark:bg-green-900/10 border-r border-border/40 ${income >= 0 ? "text-green-600" : "text-red-500"}`}
                       >
-                        {formatCurrency(income)}
+                        {formatCurrency(income, currencySymbol, lang)}
                       </td>
 
                       {/* save  حفظ */}
@@ -1057,28 +1057,28 @@ export default function AccountingPage() {
                     {t("total")} ({filtered.length})
                   </td>
                   <td className="px-3 py-2.5 text-foreground">
-                    {formatCurrency(totalInvoices)}
+                    {formatCurrency(totalInvoices, currencySymbol, lang)}
                   </td>
                   <td colSpan={2} />
                   <td className="px-2 py-2.5 text-blue-500 border-r border-border/40">
-                    {formatCurrency(totalPayments)}
+                    {formatCurrency(totalPayments, currencySymbol, lang)}
                   </td>
                   <td className="px-2 py-2.5 text-orange-500 border-r border-border/40">
-                    {formatCurrency(totalTransportation)}
+                    {formatCurrency(totalTransportation, currencySymbol, lang)}
                   </td>
                   <td colSpan={3} />
                   <td className="px-2 py-2.5 text-purple-500 border-r border-border/40">
-                    {formatCurrency(totalLabor)}
+                    {formatCurrency(totalLabor, currencySymbol, lang)}
                   </td>
                   <td />
                   <td className="px-2 py-2.5 text-red-500 border-r border-border/40">
-                    {formatCurrency(totalOther)}
+                    {formatCurrency(totalOther, currencySymbol, lang)}
                   </td>
                   <td />
                   <td
                     className={`px-3 py-2.5 bg-green-50/30 dark:bg-green-900/10 ${totalIncome >= 0 ? "text-green-600" : "text-red-500"}`}
                   >
-                    {formatCurrency(totalIncome)}
+                    {formatCurrency(totalIncome, currencySymbol, lang)}
                   </td>
                   <td />
                 </tr>
