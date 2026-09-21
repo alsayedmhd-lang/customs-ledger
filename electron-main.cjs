@@ -342,6 +342,7 @@ function startBackend({ apiPath, serverFile, appDataDbPath }) {
       ELECTRON_RUN_AS_NODE: "1",
       NODE_ENV: "production",
       SQLITE_DB_PATH: appDataDbPath,
+      DB_PROVIDER: "sqlite",
       APP_DATA_ROOT: path.dirname(path.dirname(appDataDbPath)),
     },
     detached: false,
