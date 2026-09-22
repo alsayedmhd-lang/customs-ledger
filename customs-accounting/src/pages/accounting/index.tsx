@@ -908,7 +908,7 @@ export default function AccountingPage() {
                     >
                       {/* invoiceNumber رقم الفاتورة – sticky */}
                       <td className="px-3 py-1.5 whitespace-nowrap sticky right-0 bg-inherit z-10 shadow-[inset_-1px_0_0_0_hsl(var(--border))]">
-                        <Link href={`/invoices/${row.id}/receipt`}>
+                        <Link href={`/invoices/${row.id}/edit`}>
                           <span className="font-mono text-primary font-semibold hover:underline cursor-pointer text-xs">
                             {row.invoiceNumber}
                           </span>
