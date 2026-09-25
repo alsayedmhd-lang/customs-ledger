@@ -1050,13 +1050,14 @@ function escapeRegExp(value: string) {
 function getDeclarationSuffixNumber(value: unknown, declarationBaseNumber: string) {
   const normalized = String(value ?? "")
     .trim()
-    .replace(/\//g, "")
     .replace(/\s+/g, "");
 
   if (normalized === declarationBaseNumber) return 0;
 
   const match = normalized.match(
-    new RegExp(`^${escapeRegExp(declarationBaseNumber)}-(\\d+)$`)
+    new RegExp(
+      `^${escapeRegExp(declarationBaseNumber)}(?:[-/]\\d+)?\\((\\d+)\\)$`
+    )
   );
 
   if (!match) return null;
@@ -1091,7 +1092,7 @@ async function generateNextDeclarationNumber(
     return Math.max(max, suffix ?? 0);
   }, 0);
 
-  return `${declarationBaseNumber}-${maxSuffix + 1}`;
+  return `${requested} (${maxSuffix + 1})`;
 }
 
 router.post("/invoices/import", requireAuth, async (req, res) => {
@@ -1143,11 +1144,11 @@ router.post("/invoices/import", requireAuth, async (req, res) => {
         sameInvoiceNumber &&
         (!shipmentBase || sameInvoiceNumber.shipmentRef !== shipmentBase)
       ) {
-        const baseInvoice = String(row.invoiceNumber).replace(/-\d+$/, "");
+        const baseInvoice = String(row.invoiceNumber).replace(/\(\d+\)$/, "");
         let counter = 1;
 
         while (true) {
-          const candidate = `${baseInvoice}-${counter}`;
+          const candidate = `${baseInvoice} (${counter})`;
 
           const [existsCandidate] = await db
             .select()

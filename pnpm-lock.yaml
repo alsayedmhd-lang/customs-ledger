@@ -211,8 +211,8 @@ importers:
         specifier: ^3.6.0
         version: 3.6.0
       electron:
-        specifier: ^41.2.1
-        version: 41.2.1
+        specifier: ^41.3.0
+        version: 41.3.0
       electron-builder:
         specifier: ^26.8.1
         version: 26.8.1
@@ -3105,8 +3105,8 @@ packages:
   electron-updater@6.8.3:
     resolution: {integrity: sha512-Z6sgw3jgbikWKXei1ENdqFOxBP0WlXg3TtKfz0rgw2vIZFJUyI4pD7ZN7jrkm7EoMK+tcm/qTnPUdqfZukBlBQ==}
 
-  electron@41.2.1:
-    resolution: {integrity: sha512-teeRThiYGTPKf/2yOW7zZA1bhb91KEQ4yLBPOg7GxpmnkLFLugKgQaAKOrCgdzwsXh/5mFIfmkm+4+wACJKwaA==}
+  electron@41.3.0:
+    resolution: {integrity: sha512-2Q5aeocmFdeheZGDUTrAvSR3t+n0c3d104AJWWEnt7syJU0tE4VdibMYaPtQ47QuXSoUf0/xSsfUUvu/uSXIfg==}
     engines: {node: '>= 12.20.55'}
     hasBin: true
 
@@ -7327,7 +7327,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  electron@41.2.1:
+  electron@41.3.0:
     dependencies:
       '@electron/get': 2.0.3
       '@types/node': 24.12.2

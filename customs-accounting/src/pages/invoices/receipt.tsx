@@ -205,7 +205,7 @@ export default function InvoiceReceipt() {
   useEffect(() => {
     if (!invoice) return;
     const prev = document.title;
-    document.title = `${invoice.invoiceNumber} - ${invoice.clientName}`;
+    document.title = `${invoice.invoiceNumber} - ${invoice.shipmentRef}`;
     return () => {
       document.title = prev;
     };
