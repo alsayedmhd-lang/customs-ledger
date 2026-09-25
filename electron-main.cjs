@@ -333,7 +333,12 @@ function startBackend({ apiPath, serverFile, appDataDbPath }) {
   appendBackendLog(`Backend script: ${serverFile}`);
   appendBackendLog(`Backend cwd: ${apiPath}`);
 
-  backendProcess = spawn(process.execPath, [serverFile], {
+  backendProcess = spawn(
+  app.isPackaged
+    ? process.execPath
+    : path.join(__dirname, "node_modules", "electron", "dist", "electron.exe"),
+  [serverFile],
+  {
     cwd: apiPath,
     windowsHide: true,
     stdio: ["ignore", "pipe", "pipe"],
@@ -479,7 +484,7 @@ function detectBestDataDrive() {
       fs.writeFileSync(probePath, "test");
       fs.unlinkSync(probePath);
 
-      return path.join(driveRoot, "CustomsLedgerData");
+      return path.join(driveRoot, "ProgramLedgerData");
     } catch (error) {
       try {
         if (fs.existsSync(probePath)) {
@@ -876,7 +881,7 @@ function consumeUpdateInstallMarker() {
 }
 
 function createWindow() {
-  const basePath = process.resourcesPath;
+  const basePath = app.isPackaged ? process.resourcesPath : __dirname;
   const apiPath = path.join(basePath, "api-server");
   const serverFile = path.join(apiPath, "dist", "index.cjs");
   const starterDbPath = path.join(apiPath, "lib", "db", "local.db");
@@ -912,7 +917,10 @@ function createWindow() {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      preload: path.join(process.resourcesPath, "preload.js"),
+      preload: path.join(
+  app.isPackaged ? process.resourcesPath : __dirname,
+  "preload.js"
+),
     },
   });
 
@@ -984,16 +992,9 @@ function createWindow() {
   });
 
   setTimeout(() => {
-    const indexPath = path.join(
-      process.resourcesPath,
-      "app.asar",
-      "customs-accounting",
-      "dist",
-      "public",
-      "index.html"
-    );
+    const indexPath = resolveFrontendIndexPath();
     if (!app.isPackaged) {
-      console.log("FRONTEND INDEX PATH =", frontendPath);
+      console.log("FRONTEND INDEX PATH =", indexPath);
     }
     mainWindow.loadFile(indexPath);
   }, 3000);
@@ -1157,10 +1158,20 @@ async function savePrintPreviewWindowAsPdf(printWindow) {
   if (canceled || !filePath || printWindow.isDestroyed()) return;
 
   try {
-    const pdf = await printWindow.webContents.printToPDF({
-      printBackground: true,
-      pageSize: "A4",
-    });
+  console.log("[PRINT PREVIEW][PDF] Before printToPDF:", {
+    isDestroyed: printWindow.isDestroyed(),
+    isLoading: printWindow.webContents.isLoading(),
+    isLoadingMainFrame: printWindow.webContents.isLoadingMainFrame(),
+    url: printWindow.webContents.getURL(),
+    title: await printWindow.webContents.executeJavaScript("document.title || ''", true),
+    readyState: await printWindow.webContents.executeJavaScript("document.readyState", true),
+  });
+
+  const pdf = await printWindow.webContents.printToPDF({
+    printBackground: true,
+    pageSize: "A4",
+    marginsType: 1,
+  });
     fs.writeFileSync(filePath, pdf);
   } catch (error) {
     console.error("Failed to save print preview:", error);
@@ -2108,7 +2119,7 @@ ipcMain.handle("print-preview:open-external-window", async (_event, url) => {
       width: 1100,
       height: 900,
       title: "Print Preview",
-      parent: mainWindow,
+     parent: mainWindow,
       modal: false,
       show: false,
       backgroundColor: "#ffffff",
@@ -2117,7 +2128,10 @@ ipcMain.handle("print-preview:open-external-window", async (_event, url) => {
         nodeIntegration: false,
         contextIsolation: true,
         session: mainWindow.webContents.session,
-        preload: path.join(process.resourcesPath, "preload.js"),
+        preload: path.join(
+          app.isPackaged ? process.resourcesPath : __dirname,
+          "preload.js"
+        ),
         additionalArguments: printWindowArguments,
       },
     });
@@ -2437,6 +2451,7 @@ app.on("window-all-closed", () => {
 
   app.quit();
 });
+
 
 
 
