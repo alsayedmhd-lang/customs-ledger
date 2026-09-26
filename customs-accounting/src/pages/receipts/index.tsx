@@ -1,3 +1,4 @@
+import ResizableScrollArea from "@/components/layout/ResizableScrollArea";
 import { useState } from "react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
@@ -230,7 +231,7 @@ const getClientName = (receipt: { clientName?: string | null; clientId?: number 
         </div>
       ) : (
         <div className="bg-card rounded-2xl border border-border overflow-hidden">
-          <div className="overflow-x-auto overflow-y-auto max-h-[490px]">
+          <ResizableScrollArea storageKey="receipts-index" maxHeight={490}>
             <table className="w-full text-sm">
               <thead className="sticky top-0 z-10">
                 <tr className="border-b border-border bg-muted/40">
@@ -375,7 +376,7 @@ const getClientName = (receipt: { clientName?: string | null; clientId?: number 
                 ))}
               </tbody>
             </table>
-          </div>
+          </ResizableScrollArea>
         </div>
       )}
 

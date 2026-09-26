@@ -1,3 +1,4 @@
+import ResizableScrollArea from "@/components/layout/ResizableScrollArea";
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { motion } from "framer-motion";
@@ -345,7 +346,7 @@ export default function InvoicesList() {
           </div>
         </div>
 
-        <div className="overflow-x-auto overflow-y-auto max-h-[580px]">
+        <ResizableScrollArea storageKey="invoices-index" maxHeight={580}>
           <table className="w-full text-sm">
             <thead className="bg-muted/40 text-muted-foreground font-medium border-b border-border/60 sticky top-0 z-10">
               <tr>
@@ -466,7 +467,7 @@ export default function InvoicesList() {
               )}
             </tbody>
           </table>
-        </div>
+        </ResizableScrollArea>
 
         {!isLoading && filtered.length > 0 && (
           <div className="px-4 py-2.5 border-t border-border/40 bg-muted/20 text-center">

@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+﻿import type { ReactNode } from "react";
 
 type PrintPreviewShellProps = {
   title: string;
@@ -25,11 +25,7 @@ export function PrintPreviewShell({
       return;
     }
 
-  };
-
-      return;
-    }
-
+    window.print();
   };
 
   return (

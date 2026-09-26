@@ -1,3 +1,4 @@
+import ResizableScrollArea from "@/components/layout/ResizableScrollArea";
 import { useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { Shield, Users, Database, Activity, PackageCheck, Copy, FileText, RefreshCw, Save, Cloud } from "lucide-react";
@@ -1966,7 +1967,7 @@ export default function DeveloperSettingsPage() {
                     {tr("لا توجد عناصر في القائمة بعد", "No queue items yet")}
                   </div>
                 ) : (
-                  <div className="max-h-[250px] overflow-x-auto overflow-y-auto rounded-md border border-border">
+                  <ResizableScrollArea storageKey="settings-developer" maxHeight={250} className="rounded-md border border-border">
                     <table className="w-full min-w-[760px] text-left text-xs">
                       <thead className="bg-muted/50 text-muted-foreground">
                         <tr>
@@ -2000,7 +2001,7 @@ export default function DeveloperSettingsPage() {
                         ))}
                       </tbody>
                     </table>
-                  </div>
+                  </ResizableScrollArea>
                 )}
               </div>
             </div>

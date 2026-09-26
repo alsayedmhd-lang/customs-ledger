@@ -1,3 +1,4 @@
+import ResizableScrollArea from "@/components/layout/ResizableScrollArea";
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { useForm } from "react-hook-form";
@@ -163,7 +164,7 @@ export default function TemplatesList() {
               <p className="text-sm font-medium">{t("noTemplates")}</p>
             </div>
           ) : (
-            <div className="overflow-x-auto overflow-y-auto max-h-[520px]">
+            <ResizableScrollArea storageKey="templates-index" maxHeight={520}>
               <table className="w-full text-sm">
                 <thead className="sticky top-0 z-10">
                   <tr className="border-b border-border bg-muted/40">
@@ -227,7 +228,7 @@ export default function TemplatesList() {
                   </tr>
                 </tfoot>
               </table>
-            </div>
+            </ResizableScrollArea>
           )}
         </div>
       )}

@@ -1,3 +1,4 @@
+import ResizableScrollArea from "@/components/layout/ResizableScrollArea";
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Trash2, RotateCcw, Trash, FileText, ReceiptText, AlertTriangle } from "lucide-react";
@@ -276,7 +277,7 @@ export default function TrashPage() {
             <EmptyState icon={<FileText className="w-10 h-10" />} label={t("noDeletedInvoices")} />
           ) : (
             <div className="rounded-2xl border border-border overflow-hidden bg-card shadow-sm">
-              <div className="overflow-x-auto overflow-y-auto max-h-[660px]">
+              <ResizableScrollArea storageKey="trash-index-1" maxHeight={660}>
               <table className="w-full text-sm">
                 <thead className="sticky top-0 z-10">
                   <tr className="bg-muted/40 text-start border-b border-border/60">
@@ -325,7 +326,7 @@ export default function TrashPage() {
                   ))}
                 </tbody>
               </table>
-              </div>
+              </ResizableScrollArea>
             </div>
           )}
         </div>
@@ -340,7 +341,7 @@ export default function TrashPage() {
             <EmptyState icon={<ReceiptText className="w-10 h-10" />} label={t("noDeletedReceipts")} />
           ) : (
             <div className="rounded-2xl border border-border overflow-hidden bg-card shadow-sm">
-              <div className="overflow-x-auto overflow-y-auto max-h-[660px]">
+              <ResizableScrollArea storageKey="trash-index-2" maxHeight={660}>
               <table className="w-full text-sm">
                 <thead className="sticky top-0 z-10">
                   <tr className="bg-muted/40 text-start border-b border-border/60">
@@ -385,7 +386,7 @@ export default function TrashPage() {
                   ))}
                 </tbody>
               </table>
-              </div>
+              </ResizableScrollArea>
             </div>
           )}
         </div>

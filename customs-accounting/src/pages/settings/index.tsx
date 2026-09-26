@@ -1,3 +1,4 @@
+import ResizableScrollArea from "@/components/layout/ResizableScrollArea";
 import InvoicePrintHeader from "@/components/invoice-print-header";
 import {
   PrintDocumentFooter,
@@ -50,13 +51,15 @@ function Section({ icon: Icon, title, color, children, contentClassName }: {
   icon: React.ElementType; title: string; color: string; children: React.ReactNode; contentClassName?: string;
 }) {
   return (
-    <div className="w-full bg-card rounded-2xl border border-border/50 shadow-sm overflow-hidden">
-      <div className={`flex items-center gap-2 px-5 py-3.5 border-b border-border/40 ${color}`}>
-        <Icon className="w-3.5 h-3.5" />
-        <h2 className="text-sm font-bold">{title}</h2>
+    <ResizableScrollArea storageKey={`settings-section:${title}`} maxHeight={10000} maxDragHeight={5000} minHeight={120}>
+      <div className="w-full bg-card rounded-2xl border border-border/50 shadow-sm overflow-hidden">
+        <div className={`flex items-center gap-2 px-5 py-3.5 border-b border-border/40 ${color}`}>
+          <Icon className="w-3.5 h-3.5" />
+          <h2 className="text-sm font-bold">{title}</h2>
+        </div>
+        <div className={cn("w-full p-5", contentClassName)}>{children}</div>
       </div>
-      <div className={cn("w-full p-5", contentClassName)}>{children}</div>
-    </div>
+    </ResizableScrollArea>
   );
 }
 
@@ -171,60 +174,79 @@ function TitleOptionsGrid({
 function PreviewShell({
   id,
   title,
+  fitLabel,
   size,
   scale,
   activePreview,
-  mainSize,
+  savedWidth,
+  savedHeight,
   onSelect,
-  onMainSizeChange,
+  onWidthChange,
+  onHeightChange,
+  onFitHeight,
   children,
 }: {
   id?: string;
   title: string;
+  fitLabel: string;
   size: "large" | "medium" | "small";
   scale: number;
   activePreview?: string;
-  mainSize?: { width: number; height: number };
+  savedWidth?: number;
+  savedHeight?: number;
   onSelect?: (id: string) => void;
-  onMainSizeChange?: (size: { width: number; height: number }) => void;
+  onWidthChange?: (id: string, width: number) => void;
+  onHeightChange?: (id: string, height: number) => void;
+  onFitHeight?: (id: string) => void;
   children: React.ReactNode;
 }) {
   const shellRef = useRef<HTMLDivElement>(null);
+  const documentRef = useRef<HTMLDivElement>(null);
+  const startSizeRef = useRef<{ width: number; height: number } | null>(null);
   const isInteractive = !!id && !!activePreview;
   const isMain = isInteractive ? id === activePreview : size === "large";
   const preview = {
     large: {
       sourceWidth: 1120,
       sourceHeight: 900,
-      initialHeight: 700,
-      minHeight: 420,
     },
     medium: {
       sourceWidth: 840,
       sourceHeight: 700,
-      initialHeight: 560,
-      minHeight: 320,
     },
     small: {
       sourceWidth: 840,
       sourceHeight: 720,
-      initialHeight: 560,
-      minHeight: 320,
     },
   }[size];
   const scaledWidth = Math.ceil(preview.sourceWidth * scale);
-  const scaledHeight = Math.ceil(preview.sourceHeight * scale);
+  const [contentHeight, setContentHeight] = useState(preview.sourceHeight);
+  useEffect(() => {
+    const document = documentRef.current;
+    if (!document) return;
+    const measure = () => setContentHeight(document.scrollHeight || preview.sourceHeight);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(document);
+    return () => observer.disconnect();
+  }, [preview.sourceHeight]);
+  const scaledHeight = Math.ceil(contentHeight * scale);
+  const fittedHeight = Math.min(1200, Math.max(isMain ? 360 : 260, scaledHeight + 47));
   const handleSaveSize = () => {
-    if (!isMain || !shellRef.current || !onMainSizeChange) return;
-    onMainSizeChange({
-      width: Math.round(shellRef.current.offsetWidth),
-      height: Math.round(shellRef.current.offsetHeight),
-    });
+    if (!shellRef.current || !id) return;
+    const width = Math.round(shellRef.current.offsetWidth);
+    const height = Math.round(shellRef.current.offsetHeight);
+    const start = startSizeRef.current;
+    startSizeRef.current = null;
+    if (!start || (width === start.width && height === start.height)) return;
+    if (width !== start.width) onWidthChange?.(id, width);
+    if (height !== start.height) onHeightChange?.(id, height);
   };
 
   return (
     <div
       ref={shellRef}
+      title="Drag the bottom corner to resize the preview"
       draggable={isInteractive && !isMain}
       onClick={() => id && !isMain && onSelect?.(id)}
       onDragStart={(e) => id && e.dataTransfer.setData("text/plain", id)}
@@ -236,32 +258,49 @@ function PreviewShell({
       }}
       onMouseUp={handleSaveSize}
       onTouchEnd={handleSaveSize}
+      onPointerDown={() => {
+        if (shellRef.current) {
+          startSizeRef.current = {
+            width: Math.round(shellRef.current.offsetWidth),
+            height: Math.round(shellRef.current.offsetHeight),
+          };
+        }
+      }}
       className={cn(
-        "min-w-0 w-full rounded-xl border border-border bg-muted/20 overflow-hidden",
-        (size === "large" || isMain) && "lg:col-span-2",
+        "min-w-[320px] min-h-[260px] rounded-xl border border-border bg-muted/20 overflow-hidden",
         isInteractive && !isMain && "cursor-pointer transition hover:border-primary/60 hover:shadow-md",
         isMain && "shadow-sm"
       )}
       style={{
         order: isMain ? 0 : 1,
-        ...(isMain && mainSize ? {
-          width: "100%",
-          height: mainSize.height,
-          minWidth: 0,
-          minHeight: 360,
-          resize: "vertical" as const,
-        } : {}),
+        flex: "0 0 auto",
+        width: savedWidth ? savedWidth : isMain ? "100%" : "min(100%, 420px)",
+        maxWidth: "none",
+        resize: "both",
+        height: savedHeight ?? fittedHeight,
+        minHeight: isMain ? 360 : 260,
       }}
     >
       <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-card">
         <h3 className="text-sm font-bold text-foreground">{title}</h3>
-        <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Print Preview</span>
+        <div className="flex items-center gap-2 text-[11px] font-semibold text-muted-foreground">
+          {savedHeight && id && (
+            <button
+              type="button"
+              className="rounded border border-border px-2 py-0.5 hover:text-foreground"
+              onClick={(event) => { event.stopPropagation(); onFitHeight?.(id); }}
+            >
+              {fitLabel}
+            </button>
+          )}
+          <span>↔ ↕ {savedWidth ? `${Math.round(savedWidth)} px` : "Resize"}</span>
+        </div>
       </div>
       <div
         className="overflow-auto bg-slate-100 p-1"
         style={{
-          height: isMain && mainSize ? "calc(100% - 37px)" : isInteractive ? 260 : preview.initialHeight,
-          minHeight: isMain ? preview.minHeight : isInteractive ? 220 : preview.minHeight,
+          height: "calc(100% - 37px)",
+          minHeight: 0,
           maxHeight: "none",
         }}
       >
@@ -274,6 +313,7 @@ function PreviewShell({
           }}
         >
           <div
+            ref={documentRef}
             className="absolute top-0"
             style={{
               left: (scaledWidth - preview.sourceWidth) / 2,
@@ -315,7 +355,8 @@ function SettingsPrintPreviews({
   const receiverSignature = settings.receiverSignatureBase64;
   const today = formatDateYMD();
   const previewStorageKey = "settings_preview_active";
-  const previewSizeStorageKey = "settings_preview_main_size";
+  const previewWidthsStorageKey = "settings_preview_document_widths";
+  const previewHeightsStorageKey = "settings_preview_document_heights";
   const [activePreview, setActivePreviewState] = useState(() => {
     try {
       return localStorage.getItem(previewStorageKey) || "invoice";
@@ -323,40 +364,77 @@ function SettingsPrintPreviews({
       return "invoice";
     }
   });
-  const [mainSize, setMainSizeState] = useState(() => {
+  const [documentWidths, setDocumentWidths] = useState<Record<string, number>>(() => {
     try {
-      const saved = JSON.parse(localStorage.getItem(previewSizeStorageKey) || "{}");
-      return {
-        width: Number(saved.width) || 1120,
-        height: Number(saved.height) || 740,
-      };
+      const saved = JSON.parse(localStorage.getItem(previewWidthsStorageKey) || "{}");
+      return Object.fromEntries(
+        ["invoice", "receipt", "statement", "summary"]
+          .filter((id) => Number.isFinite(Number(saved[id])) && Number(saved[id]) >= 320)
+          .map((id) => [id, Math.min(1800, Number(saved[id]))]),
+      );
     } catch {
-      return { width: 1120, height: 740 };
+      return {};
     }
   });
+  const [documentHeights, setDocumentHeights] = useState<Record<string, number>>(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(previewHeightsStorageKey) || "{}");
+      return Object.fromEntries(
+        ["invoice", "receipt", "statement", "summary"]
+          .filter((id) => Number.isFinite(Number(saved[id])) && Number(saved[id]) >= 260)
+          .map((id) => [id, Math.min(1200, Number(saved[id]))]),
+      );
+    } catch {
+      return {};
+    }
+  });
+  const setDocumentWidth = (id: string, width: number) => {
+    if (!Number.isFinite(width)) return;
+    setDocumentWidths((previous) => {
+      const nextWidth = Math.min(1800, Math.max(320, width));
+      if (previous[id] === nextWidth) return previous;
+      const next = { ...previous, [id]: nextWidth };
+      try { localStorage.setItem(previewWidthsStorageKey, JSON.stringify(next)); } catch {}
+      return next;
+    });
+  };
+  const setDocumentHeight = (id: string, height: number) => {
+    if (!Number.isFinite(height)) return;
+    setDocumentHeights((previous) => {
+      const nextHeight = Math.min(1200, Math.max(260, height));
+      if (previous[id] === nextHeight) return previous;
+      const next = { ...previous, [id]: nextHeight };
+      try { localStorage.setItem(previewHeightsStorageKey, JSON.stringify(next)); } catch {}
+      return next;
+    });
+  };
+  const fitDocumentHeight = (id: string) => {
+    setDocumentHeights((previous) => {
+      const next = { ...previous };
+      delete next[id];
+      try { localStorage.setItem(previewHeightsStorageKey, JSON.stringify(next)); } catch {}
+      return next;
+    });
+  };
   const setActivePreview = (id: string) => {
     setActivePreviewState(id);
     try { localStorage.setItem(previewStorageKey, id); } catch {}
   };
-  const setMainSize = (size: { width: number; height: number }) => {
-    const next = {
-      width: Math.min(1400, Math.max(360, size.width)),
-      height: Math.min(1200, Math.max(360, size.height)),
-    };
-    setMainSizeState(next);
-    try { localStorage.setItem(previewSizeStorageKey, JSON.stringify(next)); } catch {}
-  };
   const previewShellProps = (id: string) => ({
     id,
+    fitLabel: isAR ? "ملاءمة الارتفاع" : "Fit height",
     activePreview,
-    mainSize,
+    savedWidth: documentWidths[id],
+    savedHeight: documentHeights[id],
     onSelect: setActivePreview,
-    onMainSizeChange: setMainSize,
+    onWidthChange: setDocumentWidth,
+    onHeightChange: setDocumentHeight,
+    onFitHeight: fitDocumentHeight,
   });
 
   return (
     <div className="w-full max-w-none space-y-4">
-      <div className="grid w-full grid-cols-[repeat(auto-fit,minmax(320px,1fr))] gap-4">
+      <div className="flex w-full flex-wrap items-start gap-4 overflow-x-auto pb-2">
       <PreviewShell {...previewShellProps("invoice")} title={isAR ? "معاينة الفاتورة" : "Invoice Preview"} size="large" scale={invoicePreviewScale}>
         <div
           className="bg-white shadow-xl border border-gray-200 relative overflow-hidden"
@@ -2797,17 +2875,19 @@ const decryptBackupData = async (backupFile: any, password: string) => {
           );
 
           const SectionCard = ({ icon: Icon, title, color, children }: { icon: React.ElementType; title: string; color: string; children: React.ReactNode }) => (
-            <div className="bg-card rounded-2xl border border-border/50 shadow-sm overflow-hidden">
-              <div className={`flex items-center gap-2 px-5 py-3.5 border-b border-border/40 ${color}`}>
-                <Icon className="w-3.5 h-3.5" /><h2 className="text-sm font-bold">{title}</h2>
+            <ResizableScrollArea storageKey={`settings-display:${title}`} maxHeight={10000} maxDragHeight={5000} minHeight={120}>
+              <div className="bg-card rounded-2xl border border-border/50 shadow-sm overflow-hidden">
+                <div className={`flex items-center gap-2 px-5 py-3.5 border-b border-border/40 ${color}`}>
+                  <Icon className="w-3.5 h-3.5" /><h2 className="text-sm font-bold">{title}</h2>
+                </div>
+                <div className="p-5">{children}</div>
               </div>
-              <div className="p-5">{children}</div>
-            </div>
+            </ResizableScrollArea>
           );
 
           return (
             <>
-            <div className="space-y-4 max-h-[520px] overflow-y-auto pr-2">
+            <ResizableScrollArea storageKey="settings-index" maxHeight={520} className="space-y-4 pr-2">
 
               {/* ─ Theme ─ */}
               <SectionCard icon={Sun} title={isAR ? "مظهر الواجهة" : "Interface Theme"} color="bg-yellow-500/5">
@@ -3128,7 +3208,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                   ))}
                 </div>
               </SectionCard>
-            </div>
+            </ResizableScrollArea>
             </>
           );
         })()}

@@ -1,3 +1,4 @@
+import ResizableScrollArea from "@/components/layout/ResizableScrollArea";
 import { useState } from "react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
@@ -69,7 +70,7 @@ export default function ClientsList() {
           </div>
         </div>
 
-        <div className="overflow-x-auto overflow-y-auto max-h-[660px]">
+        <ResizableScrollArea storageKey="clients-index" maxHeight={660}>
           <table className="w-full text-sm">
             <thead className="bg-muted/30 text-muted-foreground font-medium border-b border-border/50 sticky top-0 z-10">
               <tr>
@@ -136,7 +137,7 @@ export default function ClientsList() {
               )}
             </tbody>
           </table>
-        </div>
+        </ResizableScrollArea>
       </div>
 
       <CreateClientModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} />

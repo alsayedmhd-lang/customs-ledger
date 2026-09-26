@@ -1,3 +1,4 @@
+import ResizableScrollArea from "@/components/layout/ResizableScrollArea";
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { Link } from "wouter";
@@ -177,7 +178,7 @@ export default function StatementsIndex() {
           <BookOpen className="w-5 h-5 text-primary" />
           <h2 className="font-bold text-base">{t("allClientsStatement")}</h2>
         </div>
-        <div className="overflow-x-auto overflow-y-auto max-h-[360px]">
+        <ResizableScrollArea storageKey="statements-index" maxHeight={360}>
           <table className="w-full text-sm">
             <thead className="bg-muted/40 text-muted-foreground font-semibold border-b border-border/50 text-xs uppercase tracking-wider sticky top-0 z-10">
               <tr>
@@ -291,7 +292,7 @@ export default function StatementsIndex() {
               </tfoot>
             )}
           </table>
-        </div>
+        </ResizableScrollArea>
       </div>
     </motion.div>
   );

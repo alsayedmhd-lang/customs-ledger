@@ -1,3 +1,4 @@
+import ResizableScrollArea from "@/components/layout/ResizableScrollArea";
 import { useEffect, useState } from "react";
 import { useAuth, type UserPermissions } from "@/lib/auth-context";
 import { useLanguage } from "@/lib/language-context";
@@ -357,7 +358,7 @@ export default function UsersPage() {
 
       {/* Users Table */}
       <div className="bg-card border border-border/50 rounded-2xl overflow-hidden">
-        <div className="overflow-x-auto overflow-y-auto max-h-[660px]">
+        <ResizableScrollArea storageKey="users-index" maxHeight={660}>
         <table className="w-full text-sm">
           <thead className="bg-muted/50 border-b border-border/50 sticky top-0 z-10">
             <tr>
@@ -492,7 +493,7 @@ export default function UsersPage() {
             )}
           </tbody>
         </table>
-        </div>
+        </ResizableScrollArea>
       </div>
 
       {/* Add Modal */}

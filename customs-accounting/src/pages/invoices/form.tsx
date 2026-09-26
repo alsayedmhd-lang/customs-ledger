@@ -1,3 +1,4 @@
+import ResizableScrollArea from "@/components/layout/ResizableScrollArea";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useParams, Link } from "wouter";
 import { useSearch } from "wouter";
@@ -1933,7 +1934,7 @@ export default function InvoiceForm() {
               </span>
             </div>
 
-            <div className="divide-y divide-border/40 max-h-[520px] overflow-y-auto">
+            <ResizableScrollArea storageKey="invoices-form" maxHeight={520} className="divide-y divide-border/40">
               {auditLogs.map((log, i) => {
                 const rawDate =
                   log.createdAt ??
@@ -1978,7 +1979,7 @@ export default function InvoiceForm() {
                   </div>
                 );
               })}
-            </div>
+            </ResizableScrollArea>
           </div>
         )}
         </div>

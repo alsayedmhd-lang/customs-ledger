@@ -1,3 +1,4 @@
+import ResizableScrollArea from "@/components/layout/ResizableScrollArea";
 import { useState, useRef, useMemo, useEffect, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
@@ -792,7 +793,7 @@ export default function AccountingPage() {
             {t("noData")}
           </div>
         ) : (
-          <div className="overflow-x-auto overflow-y-auto max-h-[440px]">
+          <ResizableScrollArea storageKey="accounting-index" maxHeight={440}>
             <table className="w-full text-xs">
               <thead className="sticky top-0 z-20">
                 <tr className="border-b-2 border-border bg-muted/50 text-[11px]">
@@ -1084,7 +1085,7 @@ export default function AccountingPage() {
                 </tr>
               </tfoot>
             </table>
-          </div>
+          </ResizableScrollArea>
         )}
       </div>
     </motion.div>
