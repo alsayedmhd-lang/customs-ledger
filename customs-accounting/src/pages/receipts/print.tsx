@@ -1,3 +1,4 @@
+import { printFromPreview } from "@/lib/print-from-preview";
 import { useEffect, useState } from "react";
 import { useParams, Link } from "wouter";
 import { Printer, ArrowRight, ArrowLeft, Stamp } from "lucide-react";
@@ -265,7 +266,7 @@ export default function ReceiptPrint() {
             const fileName = `${receipt.receiptNumber} - ${getClientName(receipt)}`.replace(/[\/\\:*?"<>|]/g, "-");
             void navigator.clipboard.writeText(fileName).catch(() => {});
             document.title = fileName;
-            window.print();
+            printFromPreview();
             setTimeout(() => {
               document.title = previousTitle;
             }, 1000);

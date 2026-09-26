@@ -94,6 +94,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.invoke("save-current-page-pdf", fileName),
   openExternalPrintWindow: (url) =>
     ipcRenderer.invoke("print-preview:open-external-window", url),
+  printExternalPreview: () =>
+    isExternalPrintWindow ? ipcRenderer.invoke("print-preview:print") : Promise.resolve(false),
   checkForUpdates: () => ipcRenderer.invoke("check-for-updates"),
   downloadUpdate: () => ipcRenderer.invoke("download-update"),
   installUpdate: () => ipcRenderer.invoke("install-update"),

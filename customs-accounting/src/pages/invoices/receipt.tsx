@@ -1,3 +1,4 @@
+import { printFromPreview } from "@/lib/print-from-preview";
 import { useState, useEffect } from "react";
 import { useParams, Link } from "wouter";
 import { useGetInvoice } from "@workspace/api-client-react";
@@ -338,7 +339,7 @@ const impExpValue =
               const fileName = `${invoice.invoiceNumber || "invoice"} - ${invoice.clientName || "client"}`.replace(/[\/\\:*?"<>|]/g, "-");
               void navigator.clipboard.writeText(fileName).catch(() => {});
               setTimeout(() => {
-                window.print();
+                printFromPreview();
               }, 300);
             }}
             className="flex items-center gap-2 px-5 py-2 bg-blue-700 text-white rounded-lg font-medium hover:bg-blue-800"

@@ -1,3 +1,4 @@
+import { printFromPreview } from "@/lib/print-from-preview";
 import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
@@ -312,7 +313,7 @@ export default function CustomerLedgerPrintPage() {
       <div className="print:hidden flex items-center gap-3 px-4 py-4 sm:px-6 max-w-4xl mx-auto flex-wrap" dir={isAR ? "rtl" : "ltr"}>
         <button
         onClick={() => {
-            window.print();
+            printFromPreview();
         }}
         className="flex items-center gap-2 px-5 py-2 bg-blue-700 text-white rounded-lg font-medium hover:bg-blue-800"
         >

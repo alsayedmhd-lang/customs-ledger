@@ -8,11 +8,14 @@ const fs = require("fs");
 const { execFileSync } = require("child_process");
 let backendProcess;
 let mainWindow;
+let mainCloseAfterPrinting = false;
 let updateInfo;
 let updateDownloaded = false;
 let updateInstallType = null;
 const printPreviewWindows = new Set();
 const printPreviewWebContentsIds = new Set();
+const printPreviewJobs = new Map();
+const PRINT_PREVIEW_IDLE_MS = 30_000;
 const MIN_ZOOM_FACTOR = 0.5;
 const MAX_ZOOM_FACTOR = 3;
 const ZOOM_STEP = 0.1;
@@ -143,10 +146,72 @@ function resetPrintPreviewWindowZoom(printWindow) {
 function closeAllPrintPreviewWindows() {
   for (const printWindow of Array.from(printPreviewWindows)) {
     if (!printWindow || printWindow.isDestroyed()) continue;
-    printWindow.close();
+    const state = printPreviewJobs.get(printWindow);
+    if (state?.timer) clearTimeout(state.timer);
+    printWindow.destroy();
   }
 
   printPreviewWindows.clear();
+}
+
+function getPrintPreviewJob(printWindow) {
+  let state = printPreviewJobs.get(printWindow);
+  if (!state) {
+    state = { pending: 0, printDialog: false, saveDialog: false, closeRequested: false, hasPrinted: false, timer: null };
+    printPreviewJobs.set(printWindow, state);
+  }
+  return state;
+}
+
+function cancelPrintPreviewIdleClose(printWindow) {
+  const state = printPreviewJobs.get(printWindow);
+  if (state?.timer) clearTimeout(state.timer);
+  if (state) state.timer = null;
+}
+
+function schedulePrintPreviewIdleClose(printWindow) {
+  const state = printPreviewJobs.get(printWindow);
+  if (!state || !state.hasPrinted || state.pending > 0 || state.closeRequested || printWindow.isDestroyed()) return;
+  cancelPrintPreviewIdleClose(printWindow);
+  state.timer = setTimeout(() => {
+    state.timer = null;
+    if (!printWindow.isDestroyed() && state.pending === 0) printWindow.close();
+  }, PRINT_PREVIEW_IDLE_MS);
+}
+
+function focusMainWindowAfterPrinting() {
+  if (mainCloseAfterPrinting || !mainWindow || mainWindow.isDestroyed()) return;
+  mainWindow.show();
+  mainWindow.focus();
+}
+
+function finishPrintPreviewJob(printWindow) {
+  const state = printPreviewJobs.get(printWindow);
+  if (!state) return;
+  state.pending = Math.max(0, state.pending - 1);
+  if (state.pending !== 0 || printWindow.isDestroyed()) return;
+  if (state.closeRequested) {
+    printWindow.close();
+  } else {
+    schedulePrintPreviewIdleClose(printWindow);
+  }
+}
+
+function keepPrintPreviewOpenUntilFinished(printWindow) {
+  printWindow.on("close", (event) => {
+    const state = printPreviewJobs.get(printWindow);
+    if (!state || state.pending === 0 || app.isQuittingForPrint) return;
+    event.preventDefault();
+    state.closeRequested = true;
+    // Hiding while a native dialog is open can hide the dialog on Windows.
+    if (!state.printDialog && !state.saveDialog) printWindow.hide();
+  });
+  printWindow.on("focus", () => cancelPrintPreviewIdleClose(printWindow));
+  printWindow.on("blur", () => schedulePrintPreviewIdleClose(printWindow));
+  printWindow.on("closed", () => {
+    cancelPrintPreviewIdleClose(printWindow);
+    printPreviewJobs.delete(printWindow);
+  });
 }
 
 function safeFileName(name) {
@@ -932,7 +997,17 @@ function createWindow() {
     setAppZoomFactor(readUserPreferences().zoomFactor, { save: false });
   });
 
-  mainWindow.on("close", () => {
+  mainWindow.on("close", (event) => {
+    if (!app.isQuittingForPrint && Array.from(printPreviewWindows).some((win) =>
+      !win.isDestroyed() && (printPreviewJobs.get(win)?.pending ?? 0) > 0)) {
+      event.preventDefault();
+      mainCloseAfterPrinting = true;
+      mainWindow.hide();
+      for (const win of printPreviewWindows) {
+        if (!win.isDestroyed()) win.close();
+      }
+      return;
+    }
     closeAllPrintPreviewWindows();
   });
 
@@ -1141,23 +1216,44 @@ async function getPrintPreviewDefaultPdfName(printWindow) {
 
 function printPrintPreviewWindow(printWindow) {
   if (!printWindow || printWindow.isDestroyed()) return;
-
-  printWindow.webContents.print();
+  const state = getPrintPreviewJob(printWindow);
+  if (state.pending > 0) return;
+  cancelPrintPreviewIdleClose(printWindow);
+  state.pending++;
+  state.printDialog = true;
+  try {
+    printWindow.webContents.print({}, (success, failureReason) => {
+      state.printDialog = false;
+      if (!success && failureReason) console.log("[PRINT PREVIEW] Print ended:", failureReason);
+      state.hasPrinted = true;
+      focusMainWindowAfterPrinting();
+      finishPrintPreviewJob(printWindow);
+    });
+  } catch (error) {
+    state.printDialog = false;
+    finishPrintPreviewJob(printWindow);
+    console.error("[PRINT PREVIEW] Print failed:", error);
+  }
 }
 
 async function savePrintPreviewWindowAsPdf(printWindow) {
   if (!printWindow || printWindow.isDestroyed()) return;
-
-  const defaultPath = await getPrintPreviewDefaultPdfName(printWindow);
-  const { canceled, filePath } = await dialog.showSaveDialog(printWindow, {
-    title: "Save Print Preview",
-    defaultPath,
-    filters: [{ name: "PDF", extensions: ["pdf"] }],
-  });
-
-  if (canceled || !filePath || printWindow.isDestroyed()) return;
-
+  const state = getPrintPreviewJob(printWindow);
+  if (state.pending > 0) return;
+  cancelPrintPreviewIdleClose(printWindow);
+  state.pending++;
+  state.saveDialog = true;
   try {
+    const defaultPath = await getPrintPreviewDefaultPdfName(printWindow);
+    const { canceled, filePath } = await dialog.showSaveDialog(printWindow, {
+      title: "Save Print Preview",
+      defaultPath,
+      filters: [{ name: "PDF", extensions: ["pdf"] }],
+    });
+    state.saveDialog = false;
+    if (canceled || !filePath || printWindow.isDestroyed()) return;
+    if (state.closeRequested) printWindow.hide();
+    focusMainWindowAfterPrinting();
   console.log("[PRINT PREVIEW][PDF] Before printToPDF:", {
     isDestroyed: printWindow.isDestroyed(),
     isLoading: printWindow.webContents.isLoading(),
@@ -1175,9 +1271,14 @@ async function savePrintPreviewWindowAsPdf(printWindow) {
     fs.writeFileSync(filePath, pdf);
   } catch (error) {
     console.error("Failed to save print preview:", error);
-    if (!printWindow.isDestroyed()) {
+    if (!printWindow.isDestroyed() && !state.closeRequested) {
       dialog.showErrorBox("Save Failed", "Failed to save the print preview.");
     }
+  } finally {
+    state.saveDialog = false;
+    state.hasPrinted = true;
+    focusMainWindowAfterPrinting();
+    finishPrintPreviewJob(printWindow);
   }
 }
 
@@ -2039,6 +2140,14 @@ ipcMain.on("print-preview:zoom-wheel", (event, direction) => {
   adjustPrintPreviewZoom(event.sender, direction);
 });
 
+ipcMain.handle("print-preview:print", (event) => {
+  if (!printPreviewWebContentsIds.has(event.sender.id)) return false;
+  const printWindow = BrowserWindow.fromWebContents(event.sender);
+  if (!printWindow || printWindow.isDestroyed()) return false;
+  printPrintPreviewWindow(printWindow);
+  return true;
+});
+
 function resolveFrontendIndexPath() {
   const candidates = [
     path.join(process.resourcesPath, "app.asar", "customs-accounting", "dist", "public", "index.html"),
@@ -2119,7 +2228,6 @@ ipcMain.handle("print-preview:open-external-window", async (_event, url) => {
       width: 1100,
       height: 900,
       title: "Print Preview",
-     parent: mainWindow,
       modal: false,
       show: false,
       backgroundColor: "#ffffff",
@@ -2164,10 +2272,15 @@ ipcMain.handle("print-preview:open-external-window", async (_event, url) => {
 
     printPreviewWindows.add(printWindow);
     printPreviewWebContentsIds.add(printWindowWebContentsId);
+    keepPrintPreviewOpenUntilFinished(printWindow);
     printWindow.webContents.setZoomFactor(1);
     printWindow.on("closed", () => {
       printPreviewWindows.delete(printWindow);
       printPreviewWebContentsIds.delete(printWindowWebContentsId);
+      if (mainCloseAfterPrinting && printPreviewWindows.size === 0 && mainWindow && !mainWindow.isDestroyed()) {
+        mainCloseAfterPrinting = false;
+        mainWindow.close();
+      }
     });
     setupPrintPreviewWindowMenu(printWindow);
 
@@ -2440,7 +2553,14 @@ app.whenReady().then(() => {
   setupApplicationMenu();
 });
 
-app.on("before-quit", () => {
+app.on("before-quit", (event) => {
+  if (Array.from(printPreviewWindows).some((win) =>
+    !win.isDestroyed() && (printPreviewJobs.get(win)?.pending ?? 0) > 0)) {
+    event.preventDefault();
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.close();
+    return;
+  }
+  app.isQuittingForPrint = true;
   closeAllPrintPreviewWindows();
 });
 
@@ -2451,7 +2571,3 @@ app.on("window-all-closed", () => {
 
   app.quit();
 });
-
-
-
-

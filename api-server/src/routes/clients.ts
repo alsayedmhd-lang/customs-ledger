@@ -268,6 +268,7 @@ router.post("/clients/import", async (req: any, res: any) => {
 
     let inserted = 0;
     let updated = 0;
+    const clientIdMap: Record<string, number> = {};
 
     for (const row of rows) {
       const [existing] = await db
@@ -293,17 +294,19 @@ router.post("/clients/import", async (req: any, res: any) => {
           .where(eq(clientsTable.id, existing.id));
 
         updated++;
+        if (row.id != null) clientIdMap[String(row.id)] = existing.id;
       } else {
-        await db.insert(clientsTable).values({
+        const [created] = await db.insert(clientsTable).values({
           ...values,
           createdAt: new Date(),
-        });
+        }).returning();
 
         inserted++;
+        if (row.id != null) clientIdMap[String(row.id)] = created.id;
       }
     }
 
-    res.json({ ok: true, inserted, updated });
+    res.json({ ok: true, inserted, updated, clientIdMap });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Import failed" });

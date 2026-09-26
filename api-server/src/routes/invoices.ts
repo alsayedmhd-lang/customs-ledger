@@ -1106,23 +1106,28 @@ router.post("/invoices/import", requireAuth, async (req, res) => {
 
     let inserted = 0;
     let updated = 0;
+    const invoiceIdMap: Record<string, number> = {};
+    const clientIdMap = req.body.clientIdMap as Record<string, number> | undefined;
+    let skipped = 0;
+    const errors: Array<{ invoiceNumber: string; reason: string }> = [];
 
     for (const row of rows) {
 
-      const shipmentBase =
-        row.shipmentRef && getShipmentBase(row.shipmentRef).length >= 14
-          ? getShipmentBase(row.shipmentRef)
-          : null;
+      // A suffix is part of the declaration identity during backup import.
+      // Do not collapse 123...-1, 123.../1 or 123...(1) into the base declaration.
+      const shipmentRef = String(row.shipmentRef ?? "").trim() || null;
       const [existing] = await db
         .select()
         .from(invoicesTable)
         .where(
-          shipmentBase
-            ? eq(invoicesTable.shipmentRef, shipmentBase)
+          shipmentRef
+            ? eq(invoicesTable.shipmentRef, shipmentRef)
             : eq(invoicesTable.invoiceNumber, "__never_match__")
         )
         .limit(1);
-      const requestedClientId = Number(row.clientId);
+      const requestedClientId = clientIdMap
+        ? Number(clientIdMap[String(row.clientId)])
+        : Number(row.clientId);
 
       const [clientExists] = await db
         .select()
@@ -1130,9 +1135,15 @@ router.post("/invoices/import", requireAuth, async (req, res) => {
         .where(eq(clientsTable.id, requestedClientId))
         .limit(1);
 
-      const safeClientId = clientExists ? requestedClientId : 1;
+      if (!clientExists) {
+        skipped++;
+        errors.push({ invoiceNumber: String(row.invoiceNumber ?? ""), reason: "Client not found" });
+        continue;
+      }
+      const safeClientId = requestedClientId;
 
-      let finalInvoiceNumber = String(row.invoiceNumber);
+      // Keep an existing invoice's number stable; ledger and receipts may refer to it.
+      let finalInvoiceNumber = existing?.invoiceNumber ?? String(row.invoiceNumber);
 
       const [sameInvoiceNumber] = await db
         .select()
@@ -1142,7 +1153,7 @@ router.post("/invoices/import", requireAuth, async (req, res) => {
 
       if (
         sameInvoiceNumber &&
-        (!shipmentBase || sameInvoiceNumber.shipmentRef !== shipmentBase)
+        sameInvoiceNumber.id !== existing?.id
       ) {
         const baseInvoice = String(row.invoiceNumber).replace(/\(\d+\)$/, "");
         let counter = 1;
@@ -1166,7 +1177,7 @@ router.post("/invoices/import", requireAuth, async (req, res) => {
       }
 
       const values = {
-        shipmentRef: shipmentBase,
+        shipmentRef,
         invoiceNumber: finalInvoiceNumber,
         clientId: safeClientId,
         issueDate: row.issueDate ? String(row.issueDate) : new Date().toISOString().slice(0, 10),
@@ -1187,7 +1198,7 @@ router.post("/invoices/import", requireAuth, async (req, res) => {
 
       let invoiceId: number;
 
-      if (existing && shipmentBase) {
+      if (existing && shipmentRef) {
       
         await db
           .update(invoicesTable)
@@ -1279,9 +1290,12 @@ router.post("/invoices/import", requireAuth, async (req, res) => {
           }))
         );
       }
+      if (row.id !== null && row.id !== undefined) {
+        invoiceIdMap[String(row.id)] = invoiceId;
+      }
     }
 
-    return res.json({ ok: true, inserted, updated });
+    return res.json({ ok: true, inserted, updated, skipped, errors, invoiceIdMap });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: "Import failed" });

@@ -830,18 +830,89 @@ router.post("/receipts/import", requireAuth, async (req, res) => {
 
     let inserted = 0;
     let updated = 0;
+    let skipped = 0;
+    let duplicates = 0;
+    let drafted = 0;
+    const errors: Array<{ receiptNumber: string; reason: string }> = [];
+    const invoiceIdMap = req.body.invoiceIdMap as Record<string, number> | undefined;
+    const clientIdMap = req.body.clientIdMap as Record<string, number> | undefined;
 
     for (const row of rows) {
-      const [existing] = await db
+      const receiptNumber = String(row.receiptNumber ?? "").trim();
+      if (!receiptNumber) {
+        skipped++;
+        errors.push({ receiptNumber, reason: "Missing receipt number" });
+        continue;
+      }
+      const clientId = clientIdMap ? Number(clientIdMap[String(row.clientId)]) : Number(row.clientId);
+      const [client] = await db.select({ id: clientsTable.id }).from(clientsTable)
+        .where(eq(clientsTable.id, clientId)).limit(1);
+      if (!client) {
+        skipped++;
+        errors.push({ receiptNumber, reason: "Client not found" });
+        continue;
+      }
+      const sourceInvoiceId = row.invoiceId ? String(row.invoiceId) : null;
+      const mappedInvoiceId = sourceInvoiceId && invoiceIdMap
+        ? Number(invoiceIdMap[sourceInvoiceId])
+        : null;
+      const invoiceNumber = String(row.invoiceNumber ?? "").trim();
+      let invoice: typeof invoicesTable.$inferSelect | null = null;
+      if (sourceInvoiceId && invoiceIdMap) {
+        // A full restore must use the ID returned by the invoice import.
+        if (Number.isInteger(mappedInvoiceId) && mappedInvoiceId! > 0) {
+          [invoice] = await db.select().from(invoicesTable)
+            .where(and(eq(invoicesTable.id, mappedInvoiceId!), isNull(invoicesTable.deletedAt))).limit(1);
+        }
+      } else if (invoiceNumber) {
+        [invoice] = await db.select().from(invoicesTable)
+          .where(and(eq(invoicesTable.invoiceNumber, invoiceNumber), isNull(invoicesTable.deletedAt))).limit(1);
+      } else if (sourceInvoiceId) {
+        // Legacy backups without an invoice number can only use an ID when
+        // the matching invoice really belongs to the same client.
+        [invoice] = await db.select().from(invoicesTable)
+          .where(and(eq(invoicesTable.id, Number(sourceInvoiceId)), isNull(invoicesTable.deletedAt))).limit(1);
+      }
+      if (sourceInvoiceId && (!invoice || invoice.clientId !== clientId)) {
+        skipped++;
+        errors.push({ receiptNumber, reason: "Invoice not found or client does not match" });
+        continue;
+      }
+      const [numberMatch] = await db
         .select()
         .from(receiptsTable)
-        .where(eq(receiptsTable.receiptNumber, String(row.receiptNumber)))
+        .where(eq(receiptsTable.receiptNumber, receiptNumber))
         .limit(1);
+      const targetInvoiceId = invoice?.id ?? null;
+      const sameDocument = (receipt: typeof receiptsTable.$inferSelect) =>
+        receipt.clientId === clientId && receipt.invoiceId === targetInvoiceId;
+      let existing = numberMatch && sameDocument(numberMatch) ? numberMatch : undefined;
+      let finalReceiptNumber = receiptNumber;
+
+      // A receipt number already used by another invoice/client belongs to
+      // that receipt. Assign a numbered copy instead of overwriting it.
+      if (numberMatch && !existing) {
+        const base = receiptNumber.replace(/\s*\(\d+\)$/, "");
+        for (let counter = 1; ; counter++) {
+          const candidate = `${base} (${counter})`;
+          const [used] = await db.select().from(receiptsTable)
+            .where(eq(receiptsTable.receiptNumber, candidate)).limit(1);
+          if (!used) {
+            finalReceiptNumber = candidate;
+            break;
+          }
+          if (sameDocument(used)) {
+            finalReceiptNumber = candidate;
+            existing = used;
+            break;
+          }
+        }
+      }
 
       const values = {
-        receiptNumber: String(row.receiptNumber),
-        clientId: Number(row.clientId) || 1,
-        invoiceId: row.invoiceId ? Number(row.invoiceId) : null,
+        receiptNumber: finalReceiptNumber,
+        clientId,
+        invoiceId: targetInvoiceId,
         amount: String(row.amount ?? "0"),
         paymentMethod: row.paymentMethod ?? "cash",
         status: normalizeReceiptStatus(row.status, "issued"),
@@ -852,6 +923,24 @@ router.post("/receipts/import", requireAuth, async (req, res) => {
         deletedAt: null,
       };
 
+      if (targetInvoiceId !== null) {
+        const invoiceReceipts = await db.select().from(receiptsTable).where(and(
+          eq(receiptsTable.invoiceId, targetInvoiceId),
+          isNull(receiptsTable.deletedAt),
+        ));
+        const duplicate = invoiceReceipts.some((receipt) =>
+          receipt.id !== existing?.id &&
+          receipt.clientId === clientId &&
+          receipt.status === values.status &&
+          Math.abs(Number(receipt.amount) - Number(values.amount)) < 0.000001
+        );
+        if (duplicate) {
+          duplicates++;
+          continue;
+        }
+      }
+
+      let convertedToDraft = false;
       if (values.status === "issued") {
         const remainingValidation = await validateReceiptDoesNotExceedRemaining(
           values.invoiceId,
@@ -860,12 +949,33 @@ router.post("/receipts/import", requireAuth, async (req, res) => {
         );
 
         if (!remainingValidation.ok) {
-          return res.status(remainingValidation.status).json({
-            error: remainingValidation.error,
-            errorEn: remainingValidation.errorEn,
-            receiptNumber: values.receiptNumber,
-          });
+          if (remainingValidation.error === "قيمة سند القبض أكبر من المتبقي على الفاتورة") {
+            values.status = "draft";
+            convertedToDraft = true;
+          } else {
+            skipped++;
+            errors.push({
+              receiptNumber,
+              reason: "errorEn" in remainingValidation
+                ? remainingValidation.errorEn ?? remainingValidation.error
+                : remainingValidation.error,
+            });
+            continue;
+          }
         }
+      }
+
+      if (existing &&
+        existing.deletedAt === null &&
+        existing.receiptNumber === values.receiptNumber &&
+        existing.invoiceId === values.invoiceId &&
+        Number(existing.amount) === Number(values.amount) &&
+        existing.status === values.status &&
+        existing.paymentMethod === values.paymentMethod &&
+        existing.receiptDate === values.receiptDate &&
+        (existing.notes ?? null) === values.notes) {
+        duplicates++;
+        continue;
       }
 
       if (existing) {
@@ -887,15 +997,17 @@ router.post("/receipts/import", requireAuth, async (req, res) => {
         await refreshInvoicePaidStatus(existing.invoiceId);
         await refreshInvoicePaidStatus(values.invoiceId);
         updated++;
+        if (convertedToDraft) drafted++;
       } else {
         const [insertedReceipt] = await db.insert(receiptsTable).values(values).returning();
         await syncIssuedReceiptLedgerEntry(insertedReceipt);
         await refreshInvoicePaidStatus(values.invoiceId);
         inserted++;
+        if (convertedToDraft) drafted++;
       }
     }
 
-    return res.json({ ok: true, inserted, updated });
+    return res.json({ ok: true, inserted, updated, duplicates, drafted, skipped, errors });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: "Import failed" });

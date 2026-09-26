@@ -1606,7 +1606,18 @@ const decryptBackupData = async (backupFile: any, password: string) => {
         return;
       }
 
-      alert(isAR ? "تم استيراد السندات بنجاح" : "Receipts imported successfully");
+      const result = await res.json();
+      const duplicates = Number(result.duplicates ?? 0);
+      const drafted = Number(result.drafted ?? 0);
+      if (Number(result.skipped ?? 0) > 0) {
+        const details = (result.errors ?? []).slice(0, 5).map((entry: { receiptNumber: string; reason: string }) =>
+          `${entry.receiptNumber}: ${entry.reason}`).join("\n");
+        alert(isAR
+          ? `استُوردت ${result.inserted ?? 0} سندات وحُدّثت ${result.updated ?? 0}؛ حُوّل ${drafted} إلى مسودة، وتجاوزنا ${duplicates} مكررًا، وتعذّر استيراد ${result.skipped}.\n${details}`
+          : `${result.inserted ?? 0} receipts imported, ${result.updated ?? 0} updated, ${drafted} saved as drafts, ${duplicates} duplicates ignored, ${result.skipped} failed.\n${details}`);
+        return;
+      }
+      alert(isAR ? `تم استيراد السندات؛ حُوّل ${drafted} إلى مسودة وتجاوزنا ${duplicates} مكررًا.` : `Receipts imported; ${drafted} saved as drafts, ${duplicates} duplicates ignored.`);
           };
 
     // Import clients backup
@@ -2354,22 +2365,36 @@ const decryptBackupData = async (backupFile: any, password: string) => {
 
                           const token = sessionStorage.getItem("auth_token");
 
-                          const [invoices, receipts, clients, items] = await Promise.all([
-                            fetch("http://127.0.0.1:3000/api/invoices", {
-                              headers: { Authorization: `Bearer ${token}` },
-                            }).then((r) => r.json()),
-                            fetch("http://127.0.0.1:3000/api/receipts", {
-                              headers: { Authorization: `Bearer ${token}` },
-                            }).then((r) => r.json()),
-                            fetch("http://127.0.0.1:3000/api/clients", {
-                              headers: { Authorization: `Bearer ${token}` },
-                            }).then((r) => r.json()),
-                            fetch("http://127.0.0.1:3000/api/invoice-item-templates", {
-                              headers: { Authorization: `Bearer ${token}` },
-                            }).then((r) => r.json()),
-                          ]);
-
-                          const rawData = { invoices, receipts, clients, items };
+                          // Fetch each section in the same order used when restoring the backup.
+                          const sections = [
+                            ["items", "/api/invoice-item-templates"],
+                            ["clients", "/api/clients"],
+                            ["invoices", "/api/invoices"],
+                            ["receipts", "/api/receipts"],
+                          ] as const;
+                          const rawData: Record<(typeof sections)[number][0], unknown> & { receiptsUnavailable?: boolean } = {
+                            items: [], clients: [], invoices: [], receipts: [],
+                          };
+                          for (const [key, endpoint] of sections) {
+                            try {
+                              const response = await fetch(`http://127.0.0.1:3000${endpoint}`, {
+                                headers: { Authorization: `Bearer ${token}` },
+                              });
+                              if (!response.ok) throw new Error(`Export ${key}: HTTP ${response.status}`);
+                              const rows = await response.json();
+                              if (!Array.isArray(rows)) throw new Error(`Export ${key}: invalid data`);
+                              rawData[key] = rows;
+                            } catch (error) {
+                              console.error(error);
+                              if (key === "receipts") {
+                                rawData.receipts = null;
+                                rawData.receiptsUnavailable = true;
+                                break;
+                              }
+                              alert(isAR ? "فشل تصدير البيانات الأساسية؛ لم يُحفظ ملف ناقص" : "Core backup export failed; no incomplete file was saved");
+                              return;
+                            }
+                          }
 
                           const fullData = await encryptBackupData(rawData, password);
 
@@ -2383,6 +2408,9 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                           document.body.appendChild(a);
                           a.click();
                           a.remove();
+                          if (rawData.receiptsUnavailable) {
+                            alert(isAR ? "حُفظت البنود والعملاء والفواتير؛ تعذّر تصدير سندات القبض. احتفظ بنسخة منفصلة منها لاحقًا." : "Items, clients and invoices were saved; receipts could not be exported. Export them separately later.");
+                          }
                         }}
                         className="h-8 px-3 text-xs bg-muted/30 border border-border text-foreground rounded-md hover:bg-muted/50 transition"
                       >
@@ -2484,20 +2512,77 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                         fullData = backupFile;
                       }
 
-                      if (fullData.clients) {
-                        await importClients(new File([new Blob([JSON.stringify(fullData.clients)])], "clients.json"));
+                      const sections = [
+                        ["items", "/api/invoice-item-templates/import"],
+                        ["clients", "/api/clients/import"],
+                        ["invoices", "/api/invoices/import"],
+                        ["receipts", "/api/receipts/import"],
+                      ] as const;
+                      const receiptsUnavailable = fullData.receiptsUnavailable === true && fullData.receipts === null;
+                      for (const [key] of sections) {
+                        if (key === "receipts" && receiptsUnavailable) continue;
+                        if (!Array.isArray(fullData[key])) {
+                          alert(isAR ? `النسخة الكاملة لا تحتوي بيانات صالحة: ${key}` : `Invalid full backup section: ${key}`);
+                          return;
+                        }
                       }
-                      if (fullData.items) {
-                        await importItems(new File([new Blob([JSON.stringify(fullData.items)])], "items.json"));
+                      const token = sessionStorage.getItem("auth_token");
+                      let clientIdMap: Record<string, number> | undefined;
+                      let invoiceIdMap: Record<string, number> | undefined;
+                      let skippedInvoices = 0;
+                      let skippedReceipts = 0;
+                      let duplicateReceipts = 0;
+                      let draftedReceipts = 0;
+                      let receiptErrors: Array<{ receiptNumber: string; reason: string }> = [];
+                      for (const [key, endpoint] of sections) {
+                        if (key === "receipts" && receiptsUnavailable) continue;
+                        try {
+                          const response = await fetch(`http://127.0.0.1:3000${endpoint}`, {
+                            method: "POST",
+                            headers: {
+                              "Content-Type": "application/json",
+                              Authorization: `Bearer ${token}`,
+                            },
+                            body: JSON.stringify({ data: fullData[key], clientIdMap, invoiceIdMap }),
+                          });
+                          if (!response.ok) throw new Error(`Import ${key}: HTTP ${response.status}`);
+                          const result = await response.json();
+                          if (key === "clients") clientIdMap = result.clientIdMap;
+                          if (key === "invoices") {
+                            invoiceIdMap = result.invoiceIdMap;
+                            skippedInvoices = Number(result.skipped ?? 0);
+                          }
+                          if (key === "receipts") {
+                            skippedReceipts = Number(result.skipped ?? 0);
+                            duplicateReceipts = Number(result.duplicates ?? 0);
+                            draftedReceipts = Number(result.drafted ?? 0);
+                            receiptErrors = result.errors ?? [];
+                          }
+                        } catch (error) {
+                          console.error(error);
+                          if (key === "receipts") {
+                            alert(isAR ? "استُوردت البنود والعملاء والفواتير؛ تعذّر استيراد سندات القبض. أعد استيرادها لاحقًا." : "Items, clients and invoices were imported; receipts failed. Import them separately later.");
+                            return;
+                          }
+                          alert(isAR ? `توقف الاستيراد عند: ${key}. لم تُستورد المراحل التالية.` : `Import stopped at ${key}; later sections were not imported.`);
+                          return;
+                        }
                       }
-                      if (fullData.invoices) {
-                        await importInvoices(new File([new Blob([JSON.stringify(fullData.invoices)])], "invoices.json"), { bypassDeveloperPermission: true });
+                      if (receiptsUnavailable) {
+                        alert(isAR ? "استُوردت البنود والعملاء والفواتير؛ لم تكن سندات القبض متاحة في ملف النسخة." : "Items, clients and invoices were imported; receipts were unavailable in this backup.");
+                        return;
                       }
-                      if (fullData.receipts) {
-                        await importReceipts(new File([new Blob([JSON.stringify(fullData.receipts)])], "receipts.json"));
+                      if (skippedInvoices || skippedReceipts) {
+                        const details = receiptErrors.slice(0, 5).map((entry) =>
+                          `${entry.receiptNumber}: ${entry.reason}`).join("\n");
+                        alert(isAR
+                          ? `اكتمل الاستيراد جزئيًا: تعذّر استيراد ${skippedInvoices} فاتورة و${skippedReceipts} سند قبض؛ حُوّل ${draftedReceipts} إلى مسودة وتجاوزنا ${duplicateReceipts} مكررًا.\n${details}`
+                          : `Import partially completed: ${skippedInvoices} invoices and ${skippedReceipts} receipts failed; ${draftedReceipts} saved as drafts, ${duplicateReceipts} duplicates ignored.\n${details}`);
+                        return;
                       }
-
-                      alert(isAR ? "تم استيراد كامل البيانات" : "Full data imported successfully");
+                      alert(isAR
+                        ? `تم الاستيراد؛ حُوّل ${draftedReceipts} سند قبض إلى مسودة وتجاوزنا ${duplicateReceipts} مكررًا.`
+                        : `Import completed; ${draftedReceipts} receipts saved as drafts, ${duplicateReceipts} duplicates ignored.`);
                     }}
                   />
                   <input
