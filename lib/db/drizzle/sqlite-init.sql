@@ -31,12 +31,12 @@ CREATE TABLE IF NOT EXISTS clients (
 
 CREATE TABLE IF NOT EXISTS company_settings (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  name_ar TEXT NOT NULL DEFAULT 'اسم الشركة للتخليص الجمركي',
-  name_en TEXT NOT NULL DEFAULT 'Company Name Customs Clearance',
-  subtitle_ar TEXT DEFAULT 'للتخليص الجمركي',
-  subtitle_en TEXT DEFAULT 'Customs Clearance',
-  tagline_ar TEXT DEFAULT 'خدمات التخليص الجمركي والشحن',
-  tagline_en TEXT DEFAULT 'Customs Clearance & Shipping Services',
+  name_ar TEXT NOT NULL DEFAULT 'اسم الشركة',
+  name_en TEXT NOT NULL DEFAULT 'Company Name',
+  subtitle_ar TEXT DEFAULT ' نشاط الشركة',
+  subtitle_en TEXT DEFAULT 'Company Activity',
+  tagline_ar TEXT DEFAULT 'تفاصيل نشاط الشركة',
+  tagline_en TEXT DEFAULT 'Company Activity Details',
   email TEXT DEFAULT 'your email',
   phone TEXT DEFAULT 'your phone',
   address TEXT DEFAULT 'your address',

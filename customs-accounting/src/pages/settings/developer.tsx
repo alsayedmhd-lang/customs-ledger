@@ -1713,7 +1713,6 @@ export default function DeveloperSettingsPage() {
   return (
     <SettingsShell
       dir={isRTL ? "rtl" : "ltr"}
-      width="default"
       title={isAR ? "إعدادات المطوّر" : "Developer Settings"}
       description={isAR ? "إعدادات حماية وتشخيص لا تعرض أسرار النظام أو كلمات المرور." : "System protection, diagnostics, database, and release controls."}
       tabs={developerTabs}
@@ -2798,4 +2797,3 @@ export default function DeveloperSettingsPage() {
     </SettingsShell>
   );
 }
-

@@ -18,8 +18,6 @@ import { useLanguage } from "@/lib/language-context";
 import { useAuth } from "@/lib/auth-context";
 import { useCompanySettings } from "@/lib/company-settings-context";
 
-const LOGO = `${import.meta.env.BASE_URL}logo_nobg.png`;
-
 interface AccountingRow {
   id: number;
   subtotal: number;
@@ -54,7 +52,7 @@ export default function Dashboard() {
   const { t, lang, currencySymbol } = useLanguage();
   const isAR = lang === "ar";
   const { user, can } = useAuth();
-  const { settings } = useCompanySettings();
+  const { settings, logoSrc } = useCompanySettings();
   const { data: invoices, isLoading: loadingInvoices } = useListInvoices();
   const { data: clients } = useListClients();
   const { data: accountingRows = [] } = useQuery({
@@ -264,7 +262,7 @@ export default function Dashboard() {
         <div className="relative z-10 flex items-center gap-5 p-6 sm:p-8">
           {/* Logo */}
           <img
-            src={LOGO}
+            src={logoSrc}
             alt="شعار الشركة"
             className="w-20 h-20 sm:w-28 sm:h-28 flex-shrink-0 object-contain drop-shadow-2xl"
             style={{ filter: "drop-shadow(0 0 20px rgba(255,255,255,0.24))" }}

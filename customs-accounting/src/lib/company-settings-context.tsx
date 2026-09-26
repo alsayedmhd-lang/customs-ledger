@@ -69,10 +69,10 @@ export interface CompanySettings {
 export const DEFAULT_SETTINGS: CompanySettings = {
   nameAr: "اسم الشركة",
   nameEn: "Company Name",
-  subtitleAr: "للتخليص الجمركي",
-  subtitleEn: "Customs Clearance",
-  taglineAr: "خدمات التخليص الجمركي والشحن",
-  taglineEn: "Customs Clearance & Shipping Services",
+  subtitleAr: "نشاط الشركة",
+  subtitleEn: "Company Activity",
+  taglineAr: "تفاصيل نشاط الشركة",
+  taglineEn: "Company Activity Details",
   email: "*********@gmail.com",
   phone: "*********",
   address: "****, ****",
@@ -82,6 +82,7 @@ export const DEFAULT_SETTINGS: CompanySettings = {
   taxNumber: "",
   logoBase64: null,
   logoSize: 80,
+  logoHeight: 80,
   stampBase64: null,
   watermarkBase64: null,
   showWatermark: true,
@@ -136,8 +137,8 @@ interface CompanySettingsCtx {
   watermarkSrc: string;
 }
 
-const defaultLogoSrc = `${import.meta.env.BASE_URL}logo_nobg.png`;
-const defaultStampSrc = `${import.meta.env.BASE_URL}stamp_nobg.png`;
+export const defaultLogoSrc = `${import.meta.env.BASE_URL}Logo.png`;
+const defaultStampSrc = `${import.meta.env.BASE_URL}Stamp.png`;
 
 const Ctx = createContext<CompanySettingsCtx>({
   settings: DEFAULT_SETTINGS,
@@ -225,3 +226,4 @@ export function CompanySettingsProvider({ children }: { children: ReactNode }) {
 export function useCompanySettings() {
   return useContext(Ctx);
 }
+

@@ -2,21 +2,22 @@ import { sqliteTable, integer, text } from "drizzle-orm/sqlite-core";
 
 export const companySettingsTableSqlite = sqliteTable("company_settings", {
   id: integer("id").primaryKey({ autoIncrement: true }),
-  nameAr: text("name_ar").notNull().default("اسم الشركة للتخليص الجمركي"),
-  nameEn: text("name_en").notNull().default("Company Name Customs Clearance"),
-  subtitleAr: text("subtitle_ar").default("للتخليص الجمركي"),
-  subtitleEn: text("subtitle_en").default("Customs Clearance"),
-  taglineAr: text("tagline_ar").default("خدمات التخليص الجمركي والشحن"),
-  taglineEn: text("tagline_en").default("Customs Clearance & Shipping Services"),
-  email: text("email").default("atwcc1246@gmail.com"),
-  phone: text("phone").default("55251595"),
-  address: text("address").default("Doha, Qatar"),
-  poBox: text("po_box").default("P.O BOX 8180"),
+  nameAr: text("name_ar").notNull().default("اسم الشركة"),
+  nameEn: text("name_en").notNull().default("Company Name"),
+  subtitleAr: text("subtitle_ar").default(" نشاط الشركة"),
+  subtitleEn: text("subtitle_en").default("Company Activity"),
+  taglineAr: text("tagline_ar").default("تفاصيل نشاط الشركة"),
+  taglineEn: text("tagline_en").default("Company Activity Details"),
+  email: text("email").default("**********@gmail.com"),
+  phone: text("phone").default("*********"),
+  address: text("address").default("*****, *****"),
+  poBox: text("po_box").default("P.O BOX *****"),
   website: text("website"),
   crNumber: text("cr_number"),
   taxNumber: text("tax_number"),
   logoBase64: text("logo_base64"),
   logoSize: integer("logo_size").default(80),
+  logoHeight: integer("logo_height").default(80),
   stampBase64: text("stamp_base64"),
   watermarkBase64: text("watermark_base64"),
   showWatermark: integer("show_watermark", { mode: "boolean" }).default(true),
@@ -104,3 +105,5 @@ export const companySettingsTableSqlite = sqliteTable("company_settings", {
 
 export type CompanySettingsSqlite = typeof companySettingsTableSqlite.$inferSelect;
 export type InsertCompanySettingsSqlite = typeof companySettingsTableSqlite.$inferInsert;
+
+

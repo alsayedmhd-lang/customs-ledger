@@ -164,7 +164,7 @@ export const translations = {
     confirmPassword: "تأكيد كلمة السر",
     passwordMismatch: "كلمتا السر غير متطابقتين",
     // Pages
-    invoicesDesc: "إدارة فواتير التخليص الجمركي",
+    invoicesDesc: "إدارة الفواتير  ",
     createInvoiceBtn: "إنشاء فاتورة",
     searchInvoicePlaceholder:
       "بحث برقم الفاتورة أو العميل أو رقم البيان أو البوليصة...",
@@ -212,7 +212,7 @@ export const translations = {
     currencyEN: "QR — Qatari Riyal",
     currencyAuto: "تلقائي مع اللغة",
     // Templates page
-    templatesDesc: "خدمات محفوظة لتسريع إنشاء الفواتير",
+    templatesDesc: "بنود الفواتير المحفوظة والسعر الافتراضي",
     addTemplate: "إضافة نموذج",
     noTemplates: "لا توجد نماذج. أضف أول نموذج خدمة.",
     templateDeleted: "تم حذف النموذج",
@@ -442,7 +442,7 @@ export const translations = {
     confirmPassword: "Confirm Password",
     passwordMismatch: "Passwords do not match",
     // Pages
-    invoicesDesc: "Manage customs clearance invoices",
+    invoicesDesc: "Manage invoices",
     createInvoiceBtn: "Create Invoice",
     searchInvoicePlaceholder:
       "Search by invoice number, client, shipment ref or bill of lading...",

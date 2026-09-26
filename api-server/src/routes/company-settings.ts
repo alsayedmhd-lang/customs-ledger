@@ -15,6 +15,7 @@ function ensureCompanySettingsPrintTitleColumns() {
   const columns = sqlite.prepare("PRAGMA table_info(company_settings)").all() as Array<{ name: string }>;
   const existing = new Set(columns.map((column) => column.name));
   const statements = [
+    ["logo_height", "ALTER TABLE company_settings ADD COLUMN logo_height INTEGER DEFAULT 80"],
     ["invoice_title_visible", "ALTER TABLE company_settings ADD COLUMN invoice_title_visible INTEGER DEFAULT 1"],
     ["invoice_title_align", "ALTER TABLE company_settings ADD COLUMN invoice_title_align TEXT DEFAULT 'center'"],
     ["invoice_title_bold", "ALTER TABLE company_settings ADD COLUMN invoice_title_bold INTEGER DEFAULT 1"],
@@ -134,6 +135,7 @@ router.put("/company-settings", requireAdmin, async (req, res) => {
       taxNumber: body.taxNumber,
       logoBase64: body.logoBase64 ?? null,
       logoSize: Number(body.logoSize ?? 80),
+      logoHeight: Number(body.logoHeight ?? 80),
       stampBase64: body.stampBase64 ?? null,
       watermarkBase64: body.watermarkBase64 ?? null,
       showWatermark: body.showWatermark ?? false,
@@ -235,3 +237,6 @@ router.put("/company-settings", requireAdmin, async (req, res) => {
 });
 
 export default router;
+
+
+

@@ -40,7 +40,7 @@ export default function InvoicePrintHeader({
             <img
               src={logoSrc}
               alt={company.nameAr}
-              style={{ height: `${company.logoSize || 45}px` }}
+              style={{ height: `${company.logoSize || 45}px`, transform: `translateY(${company.logoHeight || 0}px)` }}
               className="w-auto object-contain opacity-95"
             />
           </div>
@@ -93,3 +93,5 @@ export default function InvoicePrintHeader({
     </>
   );
 }
+
+

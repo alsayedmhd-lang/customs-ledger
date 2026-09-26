@@ -22,7 +22,6 @@ type SettingsShellProps<T extends string> = {
   className?: string;
   contentClassName?: string;
   dir?: "ltr" | "rtl";
-  width?: "normal" | "default" | "wide" | "full";
   tabsSticky?: boolean;
 };
 
@@ -38,13 +37,12 @@ export default function SettingsShell<T extends string>({
   className,
   contentClassName,
   dir,
-  width = "default",
   tabsSticky = true,
 }: SettingsShellProps<T>) {
   const resolvedDir = dir ?? "ltr";
 
   return (
-    <PageContainer width={width} dir={resolvedDir} className={className}>
+    <PageContainer dir={resolvedDir} className={className}>
       <div className="space-y-5" dir={resolvedDir} data-settings-shell={resolvedDir}>
         <div className="rounded-2xl border border-border/60 bg-card/95 p-4 shadow-sm sm:p-5">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">

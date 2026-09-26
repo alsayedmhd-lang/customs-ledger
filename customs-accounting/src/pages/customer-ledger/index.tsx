@@ -184,7 +184,7 @@ export default function CustomerLedgerPage() {
 };
 
 return (
-  <div className="p-6 flex flex-col gap-6 max-w-7xl mx-auto" dir={isAR ? "rtl" : "ltr"}>
+  <div className="flex w-full min-w-0 flex-col gap-6" dir={isAR ? "rtl" : "ltr"}>
 
   {/* Header */}
   <div className="order-1 flex items-start justify-between gap-4">

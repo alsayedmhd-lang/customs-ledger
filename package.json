@@ -1,6 +1,6 @@
 {
   "name": "ledger",
-  "version": "2.1.112",
+  "version": "2.2.23",
   "type": "module",
   "private": true,
   "main": "electron-main.cjs",
@@ -11,7 +11,7 @@
     "preview": "vite preview",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "electron:start": "electron .",
-    "dist": "pnpm version patch --no-git-tag-version && pnpm --dir customs-accounting build && electron-builder --win"
+    "dist": "node bump-version.cjs && pnpm --dir customs-accounting build && electron-builder --win"
   },
   "devDependencies": {
     "@hookform/resolvers": "^3.10.0",

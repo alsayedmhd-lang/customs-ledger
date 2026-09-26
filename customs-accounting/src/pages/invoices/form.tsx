@@ -1204,7 +1204,7 @@ export default function InvoiceForm() {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25 }}
       dir={isRTL ? "rtl" : "ltr"}
-      className="max-w-4xl mx-auto space-y-4 pb-24"
+      className="w-full min-w-0 space-y-4 pb-24"
     >
       <div className="flex items-start gap-4 w-full">
         <div className="flex items-center gap-3 self-start">

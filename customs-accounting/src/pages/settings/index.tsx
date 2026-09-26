@@ -1603,7 +1603,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
       maxWidth: field === "watermarkBase64" ? 1600 : 1200,
       maxHeight: field === "watermarkBase64" ? 1600 : 1200,
       quality: field === "watermarkBase64" ? 0.75 : 0.82,
-      outputType: "image/jpeg",
+      outputType: "image/png",
     })
       .then((compressedBase64) => {
         if (!compressedBase64) throw new Error("empty");
@@ -1705,6 +1705,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
           taxNumber: rawPayload.taxNumber ?? "",
           footerText: rawPayload.footerText ?? "",
           logoSize: Number(rawPayload.logoSize ?? 80),
+          logoHeight: Number(rawPayload.logoHeight ?? 0),
           invoiceCashTitleAr: rawPayload.invoiceCashTitleAr ?? "",
           invoiceCashTitleEn: rawPayload.invoiceCashTitleEn ?? "",
           invoiceCreditTitleAr: rawPayload.invoiceCreditTitleAr ?? "",
@@ -1732,6 +1733,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
             nameEn: settings.nameEn ?? "",
             logoBase64: settings.logoBase64 ?? null,
             logoSize: Number(settings.logoSize ?? 80),
+            logoHeight: Number((settings as CompanySettings & { logoHeight?: number }).logoHeight ?? 0),
             stampBase64: settings.stampBase64 ?? null,
             watermarkBase64: settings.watermarkBase64 ?? null,
             showWatermark: settings.showWatermark ?? true,
@@ -1850,7 +1852,6 @@ const decryptBackupData = async (backupFile: any, password: string) => {
     >
       <SettingsShell
         dir={isRTL ? "rtl" : "ltr"}
-        width={activeTab === "preview" ? "wide" : "default"}
         title={isAR ? "إعدادات البرنامج" : "Settings"}
         description={isAR ? "إدارة إعدادات الشركة والطباعة والنسخ الاحتياطي ومظهر التطبيق" : "Manage company, print, backup, and appearance settings"}
         tabs={visibleTabs.map((tab) => ({
@@ -2112,9 +2113,9 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                           </div>
 
                           <div className="text-center">
-                            {form.showStampOnInvoices && form.stampBase64 && (
+                            {form.showStampOnInvoices && currentStampSrc && (
                               <img
-                                src={form.stampBase64}
+                                src={currentStampSrc}
                                 alt="stamp"
                                 className="h-12 mx-auto object-contain opacity-90"
                               />
@@ -2809,7 +2810,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
             <div className="space-y-4 max-h-[520px] overflow-y-auto pr-2">
 
               {/* ─ Theme ─ */}
-              <SectionCard icon={Sun} title={isAR ? "ثيم الواجهة" : "Interface Theme"} color="bg-yellow-500/5">
+              <SectionCard icon={Sun} title={isAR ? "مظهر الواجهة" : "Interface Theme"} color="bg-yellow-500/5">
                 <div className="grid grid-cols-3 gap-2">
                   {([["light", Sun, isAR ? "فاتح" : "Light"], ["dark", Moon, isAR ? "داكن" : "Dark"], ["system", Monitor, isAR ? "تلقائي" : "System"]] as const).map(([mode, Icon, label]) => (
                     <button key={mode} onClick={() => { toggleTheme(mode); }}
@@ -3256,6 +3257,21 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                     }
                     className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm"
                   />
+                </div>
+                                <div className="space-y-2">
+                  <label className="text-xs font-medium text-muted-foreground">
+                    {isAR ? "موضع الشعار (أعلى / أسفل)" : "Logo Position (Up / Down)"}
+                  </label>
+                  <input
+                    type="number"
+                    min="-50"
+                    max="50"
+                    value={form.logoHeight ?? 0}
+                    onChange={(e) =>
+                      setForm((p) => ({ ...p, logoHeight: Number(e.target.value) }))
+                    }
+                    className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm"
+                  />
                 </div>   
               
               </div>}
@@ -3390,10 +3406,10 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                   )}
 
                   {/* Stamp preview */}
-                  {form.showStampOnInvoices && form.stampBase64 && (
+                  {form.showStampOnInvoices && currentStampSrc && (
                     <div className="flex justify-center pt-3">
                       <img
-                        src={form.stampBase64}
+                        src={currentStampSrc}
                         alt="stamp"
                         className="h-16 opacity-90 object-contain drop-shadow-sm"
                       />

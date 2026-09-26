@@ -7,7 +7,6 @@ import { useLanguage } from "@/lib/language-context";
 import { Eye, EyeOff, ShieldCheck, RefreshCw, ArrowRight, ArrowLeft, LogIn, UserPlus, CheckCircle, KeyRound } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
-const LOGO = `${import.meta.env.BASE_URL}logo_nobg.png`;
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || "").replace(/\/$/, "");
 const LOGIN_FOOTER_TEXT_AR = "نظام المحاسبة الداخلي للشركات - alsayed.mhd@gmail.com - تلفون  - 00201009697521 - 0097460020446 ";
 const LOGIN_FOOTER_TEXT_EN = "Internal Accounting System For Companes - alsayed.mhd@gmail.com - Phone - 00201009697521 - 0097460020446";
@@ -74,7 +73,7 @@ export default function LoginPage() {
   const { lang, setLang } = useLanguage();
   const isAR = lang === "ar";
   const isDark = true; // حاليا ثابت
-  const { settings } = useCompanySettings();
+  const { settings, logoSrc } = useCompanySettings();
   const { display } = useDisplaySettings();
   const displayPrimary = COLOR_PRESETS[display.primaryColor] ?? COLOR_PRESETS.blue;
   const primaryColor = "hsl(var(--primary))";
@@ -548,9 +547,9 @@ export default function LoginPage() {
         <div className="text-center mb-6">
           <div className="inline-flex flex-col items-center gap-3">
             <img
-              src={settings.logoBase64 || LOGO}
+              src={logoSrc}
               alt="اسم الشركة "
-              className="w-36 h-36 object-contain drop-shadow-2xl"
+              className="w-36 h-36 sm:w-40 sm:h-40 scale-[1.05] -mb-2 object-contain drop-shadow-2xl"
               style={{ filter: logoShadow }}
               onError={(e) => { e.currentTarget.style.display = "none"; }}
             />
