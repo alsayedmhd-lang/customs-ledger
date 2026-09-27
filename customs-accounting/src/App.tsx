@@ -1,3 +1,4 @@
+import { Suspense, lazy } from "react";
 import { Switch, Route, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -6,32 +7,32 @@ import { AuthProvider, useAuth } from "@/lib/auth-context";
 import { LanguageProvider, useLanguage } from "@/lib/language-context";
 import { CompanySettingsProvider } from "@/lib/company-settings-context";
 import { DisplaySettingsProvider } from "@/lib/display-settings-context";
-import CustomerLedgerPrintPage from "@/pages/customer-ledger/print";
-import NotFound from "@/pages/not-found";
+const CustomerLedgerPrintPage = lazy(() => import("@/pages/customer-ledger/print"));
+const NotFound = lazy(() => import("@/pages/not-found"));
 
 // Layout
 import AppLayout from "./components/layout/AppLayout";
 
 // Pages
-import LoginPage from "./pages/login";
-import Dashboard from "./pages/dashboard";
-import ClientsList from "./pages/clients/index";
-import ClientDetail from "./pages/clients/detail";
-import ClientStatement from "./pages/clients/statement";
-import InvoicesList from "./pages/invoices/index";
-import InvoiceForm from "./pages/invoices/form";
-import InvoiceReceipt from "./pages/invoices/receipt";
-import TemplatesList from "./pages/templates/index";
-import StatementsIndex from "./pages/statements/index";
-import ReceiptsList from "./pages/receipts/index";
-import ReceiptForm from "./pages/receipts/form";
-import ReceiptPrint from "./pages/receipts/print";
-import UsersPage from "./pages/users/index";
-import TrashPage from "./pages/trash/index";
-import AccountingPage from "./pages/accounting/index";
-import SettingsPage from "./pages/settings/index";
-import DeveloperSettingsPage from "./pages/settings/developer";
-import CustomerLedgerPage from "./pages/customer-ledger";
+const LoginPage = lazy(() => import("./pages/login"));
+const Dashboard = lazy(() => import("./pages/dashboard"));
+const ClientsList = lazy(() => import("./pages/clients/index"));
+const ClientDetail = lazy(() => import("./pages/clients/detail"));
+const ClientStatement = lazy(() => import("./pages/clients/statement"));
+const InvoicesList = lazy(() => import("./pages/invoices/index"));
+const InvoiceForm = lazy(() => import("./pages/invoices/form"));
+const InvoiceReceipt = lazy(() => import("./pages/invoices/receipt"));
+const TemplatesList = lazy(() => import("./pages/templates/index"));
+const StatementsIndex = lazy(() => import("./pages/statements/index"));
+const ReceiptsList = lazy(() => import("./pages/receipts/index"));
+const ReceiptForm = lazy(() => import("./pages/receipts/form"));
+const ReceiptPrint = lazy(() => import("./pages/receipts/print"));
+const UsersPage = lazy(() => import("./pages/users/index"));
+const TrashPage = lazy(() => import("./pages/trash/index"));
+const AccountingPage = lazy(() => import("./pages/accounting/index"));
+const SettingsPage = lazy(() => import("./pages/settings/index"));
+const DeveloperSettingsPage = lazy(() => import("./pages/settings/developer"));
+const CustomerLedgerPage = lazy(() => import("./pages/customer-ledger"));
 
 const queryClient = new QueryClient();
 const DEVELOPER_FRONTEND_ALLOWED_ROUTES = [
@@ -140,7 +141,9 @@ function App() {
           <AuthProvider>
             <CompanySettingsProvider>
               <DisplaySettingsProvider>
-                <ProtectedRouter />
+                <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-background text-muted-foreground">جارٍ التحميل...</div>}>
+                  <ProtectedRouter />
+                </Suspense>
               </DisplaySettingsProvider>
             </CompanySettingsProvider>
           </AuthProvider>
