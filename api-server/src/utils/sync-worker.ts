@@ -1128,7 +1128,7 @@ async function pullInvoicesFromOnline(
             port_of_entry = ?,
             importer_exporter_name = ?,
             advance_payment = ?,
-            created_by = ?,
+            created_by = COALESCE(?, created_by),
             deleted_at = ?,
             created_at = COALESCE(?, created_at),
             updated_at = COALESCE(?, updated_at)
@@ -2079,6 +2079,7 @@ function logReceiptSync(operation: string, receipt: LocalReceiptRow) {
     operation,
     receiptId: receipt.id,
     receiptNumber: receipt.receiptNumber,
+    createdBy: receipt.createdBy,
   });
 }
 
