@@ -150,21 +150,54 @@ async function createDirectClosingReceipt(input: {
   receiptDate: string;
   createdBy: number | null;
 }) {
-  const receiptNumber = await generateReceiptNumber();
-  const [receipt] = await db
-    .insert(receiptsTable)
-    .values({
-      receiptNumber,
-      clientId: input.clientId,
-      invoiceId: input.invoiceId,
-      amount: input.amount.toFixed(2),
-      paymentMethod: "cash",
-      status: "issued",
-      notes: directClosingPaymentDescriptionEn,
-      receiptDate: input.receiptDate,
-      createdBy: input.createdBy,
-    })
-    .returning();
+  const drafts = await db
+    .select()
+    .from(receiptsTable)
+    .where(and(
+      eq(receiptsTable.invoiceId, input.invoiceId),
+      eq(receiptsTable.clientId, input.clientId),
+      eq(receiptsTable.status, "draft"),
+      isNull(receiptsTable.deletedAt),
+    ));
+
+  if (drafts.length > 1) {
+    throw new Error("DRAFT_RECEIPT_CONFLICT: Multiple draft receipts for this invoice");
+  }
+  if (drafts.length === 1 && Math.abs(Number(drafts[0].amount) - input.amount) > 0.005) {
+    throw new Error("DRAFT_RECEIPT_CONFLICT: Draft receipt amount differs from the invoice balance");
+  }
+
+  let receipt: typeof receiptsTable.$inferSelect;
+  if (drafts.length === 1) {
+    [receipt] = await db
+      .update(receiptsTable)
+      .set({ status: "issued" })
+      .where(and(
+        eq(receiptsTable.id, drafts[0].id),
+        eq(receiptsTable.status, "draft"),
+        isNull(receiptsTable.deletedAt),
+      ))
+      .returning();
+    if (!receipt) throw new Error("DRAFT_RECEIPT_CONFLICT: Draft receipt changed during issue");
+    await db.delete(customerLedgerTableSqlite)
+      .where(eq(customerLedgerTableSqlite.receiptId, receipt.id));
+  } else {
+    const receiptNumber = await generateReceiptNumber();
+    [receipt] = await db
+      .insert(receiptsTable)
+      .values({
+        receiptNumber,
+        clientId: input.clientId,
+        invoiceId: input.invoiceId,
+        amount: input.amount.toFixed(2),
+        paymentMethod: "cash",
+        status: "issued",
+        notes: directClosingPaymentDescriptionEn,
+        receiptDate: input.receiptDate,
+        createdBy: input.createdBy,
+      })
+      .returning();
+  }
 
   await db.insert(customerLedgerTableSqlite).values({
     clientId: receipt.clientId,
@@ -186,6 +219,23 @@ async function createDirectClosingReceipt(input: {
     balanceImpact: -Number(receipt.amount ?? 0),
 
     createdBy: input.createdBy,
+  });
+
+  await enqueueSyncChange({
+    entityType: "receipt",
+    entityId: receipt.id,
+    action: drafts.length === 1 ? "update" : "create",
+    payload: {
+      receiptId: receipt.id,
+      receiptNumber: receipt.receiptNumber,
+      invoiceId: receipt.invoiceId ?? null,
+      clientId: receipt.clientId,
+      amount: receipt.amount,
+      paymentMethod: receipt.paymentMethod,
+      receiptDate: receipt.receiptDate,
+      status: receipt.status,
+    },
+    userId: input.createdBy,
   });
 
   return receipt;
@@ -949,6 +999,9 @@ router.put("/invoices/:id", async (req, res) => {
       items: insertedItems,
     });
   } catch (err) {
+    if (err instanceof Error && err.message.startsWith("DRAFT_RECEIPT_CONFLICT:")) {
+      return res.status(409).json({ error: err.message });
+    }
     console.error(err);
     res.status(500).json({ error: "Internal server error" });
   }

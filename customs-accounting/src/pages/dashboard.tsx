@@ -118,12 +118,10 @@ export default function Dashboard() {
     return sum;
   }, 0);
 
-  const recentInvoices = invoices
-      ?.sort(
-    (a: typeof invoices[number], b: typeof invoices[number]) =>
-      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
-  )
-    .slice(0, 5) || [];
+  // The invoice list uses descending local IDs; createdAt can be empty after imports.
+  const recentInvoices = [...(invoices ?? [])]
+    .sort((a, b) => Number(b.id) - Number(a.id))
+    .slice(0, 5);
 
   const chartData = invoices
     ?.filter((i: typeof invoices[number]) => i.status !== "cancelled")
@@ -246,8 +244,14 @@ export default function Dashboard() {
   return (
     <motion.div
       variants={container} initial="hidden" animate="show"
-      className="space-y-5"
+      className="space-y-5 [container-type:inline-size]"
     >
+      <style>{`
+        .dashboard-detail-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.5rem; }
+        @container (min-width: 850px) {
+          .dashboard-detail-grid { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
+        }
+      `}</style>
       {/* Welcome Banner */}
       <motion.div
         variants={item}
@@ -307,7 +311,7 @@ export default function Dashboard() {
               : (isAR ? "إظهار الأرقام" : "Show Numbers")}
           </button>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 215px), 1fr))" }}>
           {stats.map((s) => (
             <motion.div
               key={s.title}
@@ -354,11 +358,11 @@ export default function Dashboard() {
         </div>
       </motion.button>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+      <div className="dashboard-detail-grid">
         {/* Revenue Chart */}
         <motion.div
           variants={item}
-          className="xl:col-span-2 bg-card border border-border rounded-2xl p-6 shadow-sm"
+          className="min-w-0 bg-card border border-border rounded-2xl p-4 sm:p-6 shadow-sm"
         >
           <div className="flex items-center justify-between mb-6">
             <div>
@@ -415,7 +419,7 @@ export default function Dashboard() {
         {/* Recent Invoices */}
         <motion.div
           variants={item}
-          className="bg-card border border-border rounded-2xl p-4 shadow-sm flex flex-col"
+          className="min-w-0 bg-card border border-border rounded-2xl p-4 shadow-sm flex flex-col"
         >
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-base font-bold text-foreground">{t("recentInvoices")}</h2>

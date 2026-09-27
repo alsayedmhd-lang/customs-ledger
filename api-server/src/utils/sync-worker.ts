@@ -95,7 +95,18 @@ type LocalClientRow = {
   name: string;
   email: string | null;
   phone: string | null;
+  address: string | null;
   taxId: string | null;
+  notes: string | null;
+  createdAt: number | null;
+  updatedAt: number | null;
+};
+
+type LocalTemplateRow = {
+  id: number;
+  description: string;
+  defaultUnitPrice: number | null;
+  createdAt: number | null;
 };
 
 function getOnlineConnectionString() {
@@ -223,12 +234,32 @@ function getLocalClient(clientId: number) {
         name,
         email,
         phone,
-        tax_id AS taxId
+        address,
+        tax_id AS taxId,
+        notes,
+        created_at AS createdAt,
+        updated_at AS updatedAt
       FROM clients
       WHERE id = ?
       LIMIT 1
     `)
     .get(Number(clientId)) as LocalClientRow | undefined;
+}
+
+function getLocalClients() {
+  return sqlite?.prepare(`
+    SELECT id, name, email, phone, address, tax_id AS taxId, notes,
+           created_at AS createdAt, updated_at AS updatedAt
+    FROM clients ORDER BY id ASC
+  `).all() as LocalClientRow[] | undefined;
+}
+
+function getLocalTemplates() {
+  return sqlite?.prepare(`
+    SELECT id, description, default_unit_price AS defaultUnitPrice,
+           created_at AS createdAt
+    FROM invoice_item_templates ORDER BY id ASC
+  `).all() as LocalTemplateRow[] | undefined;
 }
 
 function toPgTimestamp(value: number | null | undefined) {
@@ -367,7 +398,6 @@ async function findOnlineClientId(client: any, localClient: LocalClientRow) {
   const attempts: Array<{ column: string; value: string; normalized?: boolean }> = [];
   const taxValue = String(localClient.taxId || "").trim();
   const emailValue = String(localClient.email || "").trim();
-  const phoneValue = String(localClient.phone || "").trim();
   const nameValue = normalizeText(localClient.name);
 
   for (const column of ["tax_number", "tax_id"]) {
@@ -379,7 +409,8 @@ async function findOnlineClientId(client: any, localClient: LocalClientRow) {
   }
 
   if (emailValue && columns.has("email")) attempts.push({ column: "email", value: emailValue });
-  if (phoneValue && columns.has("phone")) attempts.push({ column: "phone", value: phoneValue });
+  // A phone number may belong to several clients (or contain a placeholder).
+  // Do not use it by itself to link two unrelated accounting records.
 
   for (const column of ["name_ar", "name_en", "name"]) {
     if (nameValue && columns.has(column)) attempts.push({ column, value: nameValue, normalized: true });
@@ -388,8 +419,8 @@ async function findOnlineClientId(client: any, localClient: LocalClientRow) {
   for (const attempt of attempts) {
     const result = await client.query(
       attempt.normalized
-        ? `SELECT id FROM clients WHERE lower(trim(${attempt.column})) = $1 LIMIT 1`
-        : `SELECT id FROM clients WHERE ${attempt.column} = $1 LIMIT 1`,
+        ? `SELECT id FROM clients WHERE lower(trim(${attempt.column})) = $1 LIMIT 2`
+        : `SELECT id FROM clients WHERE ${attempt.column} = $1 LIMIT 2`,
       [attempt.value]
     ) as { rows?: Array<{ id: number }> };
 
@@ -405,6 +436,45 @@ async function findOnlineClientId(client: any, localClient: LocalClientRow) {
   }
 
   return null;
+}
+
+// A template has no invoice dependency. Copy missing templates before clients.
+// Match on description because local numeric IDs are not shared across devices.
+async function syncTemplatesBeforeQueue(client: any) {
+  for (const template of getLocalTemplates() || []) {
+    const description = String(template.description || "").trim();
+    if (!description) throw new Error(`Local template ${template.id} has no description`);
+    const existing = await client.query(
+      "SELECT id FROM invoice_item_templates WHERE lower(trim(description)) = $1 LIMIT 1",
+      [normalizeText(description)]
+    ) as { rows?: Array<{ id: number }> };
+
+    if (existing.rows?.length) continue;
+    await client.query(
+      `INSERT INTO invoice_item_templates (description, default_unit_price, created_at)
+       VALUES ($1, $2, $3)`,
+      [description, Number(template.defaultUnitPrice ?? 0), toPgTimestamp(template.createdAt) ?? new Date()]
+    );
+  }
+}
+
+// Every invoice and receipt refers to a client, so create missing clients first.
+// PostgreSQL IDENTITY generates the online ID; later references resolve it by
+// the same business-field matching already used by this worker.
+async function syncClientsBeforeQueue(client: any) {
+  for (const localClient of getLocalClients() || []) {
+    const name = String(localClient.name || "").trim();
+    if (!name) throw new Error(`Local client ${localClient.id} has no name`);
+    if (await findOnlineClientId(client, localClient)) continue;
+    await client.query(
+      `INSERT INTO clients (name, email, phone, address, tax_id, notes, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [name, localClient.email, localClient.phone, localClient.address,
+       localClient.taxId, localClient.notes,
+       toPgTimestamp(localClient.createdAt) ?? new Date(),
+       toPgTimestamp(localClient.updatedAt) ?? new Date()]
+    );
+  }
 }
 
 async function resolveOnlineClientId(client: any, invoice: LocalInvoiceRow) {
@@ -632,17 +702,24 @@ async function hasOnlineInvoice(client: any, invoiceNumber: string) {
   return Boolean(await getOnlineInvoiceMapping(client, invoiceNumber));
 }
 
-async function getOnlineReceiptId(client: any, receiptNumber: string) {
-  const result = await client.query(
-    `
-      SELECT id
-      FROM receipts
-      WHERE receipt_number = $1
-      LIMIT 1
-    `,
-    [String(receiptNumber || "")]
-  ) as { rows?: Array<{ id: number }> };
-
+async function getOnlineReceiptId(client: any, receiptNumber: string, localReceipt?: LocalReceiptRow | null) {
+  let result: { rows?: Array<{ id: number }> };
+  if (localReceipt) {
+    const mapping = await resolveReceiptOnlineMapping(client, localReceipt);
+    result = await client.query(
+      `SELECT id FROM receipts WHERE client_id = $1
+         AND invoice_id IS NOT DISTINCT FROM $2 AND amount = $3 LIMIT 2`,
+      [mapping.onlineClientId, mapping.onlineInvoiceId, Number(localReceipt.amount ?? 0)]
+    );
+  } else {
+    result = await client.query(
+      `SELECT id FROM receipts WHERE receipt_number = $1 LIMIT 2`,
+      [String(receiptNumber || "")]
+    );
+  }
+  if ((result.rows?.length ?? 0) > 1) {
+    throw new Error(`Ambiguous online receipt for accounting: ${receiptNumber}`);
+  }
   const onlineReceiptId = result.rows?.[0]?.id;
   return onlineReceiptId ? Number(onlineReceiptId) : null;
 }
@@ -735,73 +812,42 @@ async function resolveReceiptOnlineMapping(client: any, receipt: LocalReceiptRow
 async function pushReceipt(client: any, receipt: LocalReceiptRow, operation: string, stats: SyncRunStats) {
   logReceiptSync(operation, receipt);
   const mapping = await resolveReceiptOnlineMapping(client, receipt);
+  const amount = Number(receipt.amount ?? 0);
+  // A receipt number can repeat. The accounting identity requested here is
+  // client + invoice (including a null invoice) + amount.
   const existing = await client.query(
-    `
-      SELECT id, receipt_number, deleted_at
-      FROM receipts
-      WHERE receipt_number = $1
-      LIMIT 1
-    `,
-    [String(receipt.receiptNumber || "")]
-  ) as { rowCount?: number; rows?: Array<{ id: number; receipt_number: string; deleted_at: unknown }> };
-
-  if (existing.rowCount && existing.rows?.[0]) {
-    await autoRestoreOnlineReceiptIfNeeded(client, existing.rows[0], receipt, stats);
+    `SELECT id, receipt_number, deleted_at FROM receipts
+     WHERE client_id = $1 AND invoice_id IS NOT DISTINCT FROM $2
+       AND amount = $3
+     ORDER BY id LIMIT 2`,
+    [mapping.onlineClientId, mapping.onlineInvoiceId, amount]
+  ) as { rows?: Array<{ id: number; receipt_number: string; deleted_at: unknown }> };
+  if ((existing.rows?.length ?? 0) > 1) {
+    throw new Error(`Ambiguous online receipt match for local receiptId: ${receipt.id}`);
+  }
+  const row = existing.rows?.[0];
+  if (row) {
+    await autoRestoreOnlineReceiptIfNeeded(client, row, receipt, stats);
     await client.query(
-      `
-        UPDATE receipts
-        SET client_id = $1,
-            invoice_id = $2,
-            amount = $3,
-            payment_method = $4,
-            notes = $5,
-            receipt_date = $6
-        WHERE id = $7
-      `,
-      [
-        mapping.onlineClientId,
-        mapping.onlineInvoiceId,
-        Number(receipt.amount ?? 0),
-        String(receipt.paymentMethod || "cash"),
-        receipt.notes ?? null,
-        String(receipt.receiptDate || todayIsoDate()),
-        Number(existing.rows[0].id),
-      ]
+      `UPDATE receipts SET receipt_number = $1, client_id = $2,
+         invoice_id = $3, amount = $4, payment_method = $5,
+         notes = $6, receipt_date = $7 WHERE id = $8`,
+      [String(receipt.receiptNumber || ""), mapping.onlineClientId,
+       mapping.onlineInvoiceId, amount, String(receipt.paymentMethod || "cash"),
+       receipt.notes ?? null, String(receipt.receiptDate || todayIsoDate()),
+       Number(row.id)]
     );
     return;
   }
-
-  if (operation === "update") {
-    console.log("[SYNC][RECEIPT][FALLBACK_CREATE]", {
-      receiptId: receipt.id,
-      receiptNumber: receipt.receiptNumber,
-    });
-  }
-
   await client.query(
-    `
-      INSERT INTO receipts (
-        receipt_number,
-        client_id,
-        invoice_id,
-        amount,
-        payment_method,
-        notes,
-        receipt_date,
-        created_at
-      )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-    `,
-    [
-      String(receipt.receiptNumber || ""),
-      mapping.onlineClientId,
-      mapping.onlineInvoiceId,
-      Number(receipt.amount ?? 0),
-      String(receipt.paymentMethod || "cash"),
-      receipt.notes ?? null,
-      String(receipt.receiptDate || todayIsoDate()),
-      toPgTimestamp(receipt.createdAt) ?? new Date(),
-    ]
+    `INSERT INTO receipts (
+      receipt_number, client_id, invoice_id, amount, payment_method,
+      notes, receipt_date, created_at
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+    [String(receipt.receiptNumber || ""), mapping.onlineClientId,
+     mapping.onlineInvoiceId, amount, String(receipt.paymentMethod || "cash"),
+     receipt.notes ?? null, String(receipt.receiptDate || todayIsoDate()),
+     toPgTimestamp(receipt.createdAt) ?? new Date()]
   );
 }
 
@@ -840,7 +886,7 @@ async function resolveAccountingOnlineMapping(client: any, entry: LocalAccountin
   if (entry.referenceType === "receipt" || entry.receiptId) {
     const localReceipt = entry.receiptId ? getLocalReceipt(String(entry.receiptId)) : null;
     const receiptNumber = localReceipt?.receiptNumber || entry.referenceNumber || "";
-    onlineReceiptId = await getOnlineReceiptId(client, receiptNumber);
+    onlineReceiptId = await getOnlineReceiptId(client, receiptNumber, localReceipt);
 
     if (!onlineReceiptId) {
       throw new Error(`Online receipt mapping not found for accountingId: ${entry.id}`);
@@ -998,7 +1044,12 @@ export async function runSyncWorkerOnce(): Promise<{
         FROM sync_queue
         WHERE status = 'pending'
            OR (status = 'failed' AND retry_count < 5)
-        ORDER BY created_at ASC, id ASC
+        ORDER BY CASE entity_type
+          WHEN 'invoice' THEN 0
+          WHEN 'receipt' THEN 1
+          WHEN 'accounting' THEN 2
+          WHEN 'customer_ledger' THEN 2
+          ELSE 3 END, created_at ASC, id ASC
         LIMIT 10
       `)
       .all() as SyncQueueRow[];
@@ -1030,6 +1081,16 @@ export async function runSyncWorkerOnce(): Promise<{
     }
 
     try {
+      try {
+        // A failed prerequisite keeps the queue untouched so it can be retried.
+        await syncTemplatesBeforeQueue(client);
+        await syncClientsBeforeQueue(client);
+      } catch (err) {
+        lastError = errorMessage(err);
+        console.error("[SYNC][PREREQUISITES][ERROR]", err);
+        return { pendingCount: pending.length, processedCount: 0, onlineConnected: true,
+          lastError, autoRestoredCount: stats.autoRestoredCount };
+      }
       for (const row of pending) {
         if (!isSupportedSyncRow(row)) {
           continue;
