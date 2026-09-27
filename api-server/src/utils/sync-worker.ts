@@ -2036,24 +2036,38 @@ async function pushReceipt(client: any, receipt: LocalReceiptRow, operation: str
     await autoRestoreOnlineReceiptIfNeeded(client, row, receipt, stats);
     await client.query(
       `UPDATE receipts SET receipt_number = $1, client_id = $2,
-         invoice_id = $3, amount = $4, payment_method = $5,
-         notes = $6, receipt_date = $7 WHERE id = $8`,
-      [String(receipt.receiptNumber || ""), mapping.onlineClientId,
-       mapping.onlineInvoiceId, amount, String(receipt.paymentMethod || "cash"),
-       receipt.notes ?? null, String(receipt.receiptDate || todayIsoDate()),
-       Number(row.id)]
+        invoice_id = $3, amount = $4, payment_method = $5,
+        status = $6, notes = $7, receipt_date = $8 WHERE id = $9`,
+      [
+        String(receipt.receiptNumber || ""),
+        mapping.onlineClientId,
+        mapping.onlineInvoiceId,
+        amount,
+        String(receipt.paymentMethod || "cash"),
+        String(receipt.status || "draft"),
+        receipt.notes ?? null,
+        String(receipt.receiptDate || todayIsoDate()),
+        Number(row.id),
+      ]
     );
     return;
   }
   await client.query(
     `INSERT INTO receipts (
-      receipt_number, client_id, invoice_id, amount, payment_method,
-      notes, receipt_date, created_at
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-    [String(receipt.receiptNumber || ""), mapping.onlineClientId,
-     mapping.onlineInvoiceId, amount, String(receipt.paymentMethod || "cash"),
-     receipt.notes ?? null, String(receipt.receiptDate || todayIsoDate()),
-     toPgTimestamp(receipt.createdAt) ?? new Date()]
+      receipt_number, client_id, invoice_id, amount,
+      payment_method, status, notes, receipt_date, created_at
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+    [
+      String(receipt.receiptNumber || ""),
+      mapping.onlineClientId,
+      mapping.onlineInvoiceId,
+      amount,
+      String(receipt.paymentMethod || "cash"),
+      String(receipt.status || "draft"),
+      receipt.notes ?? null,
+      String(receipt.receiptDate || todayIsoDate()),
+      toPgTimestamp(receipt.createdAt) ?? new Date()
+    ]
   );
 }
 
