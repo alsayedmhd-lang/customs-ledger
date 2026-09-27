@@ -124,6 +124,17 @@ router.post("/clients", async (req, res) => {
       res.status(400).json({ error: "name is required" });
       return;
     }
+    const hasIdentity =
+      normalizeClientIdentity(taxId) ||
+      normalizeClientIdentity(email) ||
+      normalizeClientPhone(phone);
+
+    if (!hasIdentity) {
+      return res.status(400).json({
+        error: "CLIENT_IDENTITY_REQUIRED",
+        message: "Phone, email, or tax ID is required",
+      });
+    }
 
       const existingClient = await findClientByIdentity({
     taxId,
@@ -176,6 +187,17 @@ router.put("/clients/:id", async (req, res) => {
     if (!name) {
       res.status(400).json({ error: "name is required" });
       return;
+    }
+    const hasIdentity =
+      normalizeClientIdentity(taxId) ||
+      normalizeClientIdentity(email) ||
+      normalizeClientPhone(phone);
+
+    if (!hasIdentity) {
+      return res.status(400).json({
+        error: "CLIENT_IDENTITY_REQUIRED",
+        message: "Phone, email, or tax ID is required",
+      });
     }
 
       const conflictingClient = await findClientByIdentity({
