@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { db, clientsTable, invoicesTable, invoiceItemsTable, usersTable, receiptsTable } from "@workspace/db";
-import { and, eq, desc, isNull, gte, lte } from "drizzle-orm";
+import { and, eq, desc, gte, lte, sql, isNull } from "drizzle-orm";
 
 const router: IRouter = Router();
 
@@ -9,7 +9,7 @@ async function getClientScope(req: any) {
   const [user] = await db
     .select({ clientId: usersTable.clientId, clientViewPermissions: usersTable.clientViewPermissions })
     .from(usersTable)
-    .where(eq(usersTable.id, req.user.userId))
+    .where(sql`${usersTable.id} = ${req.user.userId}`)
     .limit(1);
   return user?.clientId ? { clientId: Number(user.clientId), permissions: user.clientViewPermissions as any } : { clientId: null, permissions: null };
 }
@@ -18,6 +18,70 @@ function rejectClientWrite(req: any, res: any) {
   if (req.user?.role !== "client") return false;
   res.status(403).json({ error: "Client users have read-only access" });
   return true;
+}
+
+function normalizeClientIdentity(value: unknown) {
+  return String(value ?? "").trim().toLowerCase();
+}
+
+function normalizeClientPhone(value: unknown) {
+  return String(value ?? "").replace(/[^\d+]/g, "").trim();
+}
+
+async function findClientByIdentity(input: {
+  taxId?: unknown;
+  email?: unknown;
+  phone?: unknown;
+  excludeId?: number;
+}) {
+  const taxId = normalizeClientIdentity(input.taxId);
+  const email = normalizeClientIdentity(input.email);
+  const phone = normalizeClientPhone(input.phone);
+
+  const matchedClients = new Map<number, typeof clientsTable.$inferSelect>();
+
+  if (taxId) {
+    const rows = await db.select().from(clientsTable);
+    for (const client of rows) {
+      if (normalizeClientIdentity(client.taxId) === taxId) {
+        if (client.id !== input.excludeId) {
+          matchedClients.set(client.id, client);
+        }
+      }
+    }
+  }
+
+  if (email) {
+    const rows = await db.select().from(clientsTable);
+    for (const client of rows) {
+      if (normalizeClientIdentity(client.email) === email) {
+        if (client.id !== input.excludeId) {
+          matchedClients.set(client.id, client);
+        }
+      }
+    }
+  }
+
+  if (phone) {
+    const rows = await db.select().from(clientsTable);
+    for (const client of rows) {
+      if (normalizeClientPhone(client.phone) === phone) {
+        if (client.id !== input.excludeId) {
+          matchedClients.set(client.id, client);
+        }
+      }
+    }
+  }
+
+  const matches = Array.from(matchedClients.values());
+
+  if (matches.length > 1) {
+    throw new Error(
+      "CLIENT_IDENTITY_CONFLICT: tax ID, email, or phone match different clients"
+    );
+  }
+
+  return matches[0] ?? null;
 }
 
 function getOriginalInvoiceTotal(input: {
@@ -41,9 +105,9 @@ router.get("/clients", async (req, res) => {
     const query = db
       .select()
       .from(clientsTable)
-      .orderBy(desc(clientsTable.createdAt));
+      .orderBy(sql`created_at DESC`);
     const clients = clientScope
-      ? await db.select().from(clientsTable).where(eq(clientsTable.id, clientScope.clientId))
+      ? await db.select().from(clientsTable).where(sql`${clientsTable.id} = ${clientScope.clientId}`)
       : await query;
     res.json(clients.map(formatClient));
   } catch (err) {
@@ -60,6 +124,22 @@ router.post("/clients", async (req, res) => {
       res.status(400).json({ error: "name is required" });
       return;
     }
+
+      const existingClient = await findClientByIdentity({
+    taxId,
+    email,
+    phone,
+  });
+
+  if (existingClient) {
+    return res.status(409).json({
+      error: "CLIENT_ALREADY_EXISTS",
+      message: "A client with the same tax ID, email, or phone already exists",
+      clientId: existingClient.id,
+      clientName: existingClient.name,
+    });
+  }
+
     const [client] = await db
       .insert(clientsTable)
       .values({ name, email: email ?? null, phone: phone ?? null, address: address ?? null, taxId: taxId ?? null, notes: notes ?? null })
@@ -97,6 +177,23 @@ router.put("/clients/:id", async (req, res) => {
       res.status(400).json({ error: "name is required" });
       return;
     }
+
+      const conflictingClient = await findClientByIdentity({
+    taxId,
+    email,
+    phone,
+    excludeId: id,
+  });
+
+  if (conflictingClient) {
+    return res.status(409).json({
+      error: "CLIENT_IDENTITY_CONFLICT",
+      message: "The tax ID, email, or phone is already used by another client",
+      clientId: conflictingClient.id,
+      clientName: conflictingClient.name,
+    });
+  }
+
     const [client] = await db
       .update(clientsTable)
       .set({ name, email: email ?? null, phone: phone ?? null, address: address ?? null, taxId: taxId ?? null, notes: notes ?? null, updatedAt: new Date() })
@@ -141,35 +238,35 @@ router.get("/clients/:id/statement", async (req, res) => {
     const toDate = typeof req.query.to === "string" ? req.query.to : "";
 
     const invoiceConditions = [
-      eq(invoicesTable.clientId, id),
+      sql`${invoicesTable.clientId} = ${id}`,
     ];
 
     if (fromDate) {
-      invoiceConditions.push(gte(invoicesTable.issueDate, fromDate));
+      invoiceConditions.push(sql`${invoicesTable.issueDate} >= ${fromDate}`);
     }
 
     if (toDate) {
-      invoiceConditions.push(lte(invoicesTable.issueDate, toDate));
+      invoiceConditions.push(sql`${invoicesTable.issueDate} <= ${toDate}`);
     }
 
     const invoices = await db
       .select()
       .from(invoicesTable)
       .where(and(...invoiceConditions))
-      .orderBy(desc(invoicesTable.issueDate));
+      .orderBy(sql`${invoicesTable.issueDate} desc`);
 
     const receiptConditions = [
-      eq(receiptsTable.clientId, id),
-      eq(receiptsTable.status, "issued"),
+      sql`${receiptsTable.clientId} = ${id}`,
+      sql`${receiptsTable.status} = ${"issued"}`,
       isNull(receiptsTable.deletedAt),
     ];
 
     if (fromDate) {
-      receiptConditions.push(gte(receiptsTable.receiptDate, fromDate));
+      receiptConditions.push(sql`${receiptsTable.receiptDate} >= ${fromDate}`);
     }
 
     if (toDate) {
-      receiptConditions.push(lte(receiptsTable.receiptDate, toDate));
+      receiptConditions.push(sql`${receiptsTable.receiptDate} <= ${toDate}`);
     }
 
     const issuedReceipts = await db
@@ -182,7 +279,7 @@ router.get("/clients/:id/statement", async (req, res) => {
         const items = await db
           .select()
           .from(invoiceItemsTable)
-          .where(eq(invoiceItemsTable.invoiceId, inv.id));
+          .where(sql`${invoiceItemsTable.invoiceId} = ${inv.id}`);
         return {
           ...formatInvoice(inv, client.name),
           items: items.map(formatItem),
@@ -271,11 +368,11 @@ router.post("/clients/import", async (req: any, res: any) => {
     const clientIdMap: Record<string, number> = {};
 
     for (const row of rows) {
-      const [existing] = await db
-        .select()
-        .from(clientsTable)
-        .where(eq(clientsTable.name, row.name))
-        .limit(1);
+      const existing = await findClientByIdentity({
+          taxId: row.taxId,
+          email: row.email,
+          phone: row.phone,
+        });
 
       const values = {
         name: String(row.name),
@@ -291,7 +388,7 @@ router.post("/clients/import", async (req: any, res: any) => {
         await db
           .update(clientsTable)
           .set(values)
-          .where(eq(clientsTable.id, existing.id));
+          .where(sql`${clientsTable.id} = ${existing.id}`);
 
         updated++;
         if (row.id != null) clientIdMap[String(row.id)] = existing.id;

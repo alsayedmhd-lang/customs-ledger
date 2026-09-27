@@ -65,6 +65,7 @@ type LocalReceiptRow = {
   invoiceId: number | null;
   amount: number;
   paymentMethod: string | null;
+  status: string | null;
   notes: string | null;
   receiptDate: string;
   createdBy: number | null;
@@ -107,6 +108,67 @@ type LocalTemplateRow = {
   description: string;
   defaultUnitPrice: number | null;
   createdAt: number | null;
+};
+
+type OnlineClientRow = {
+  id: number;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  address: string | null;
+  tax_id: string | null;
+  notes: string | null;
+  created_at: string | Date | null;
+  updated_at: string | Date | null;
+};
+
+type OnlineInvoiceRow = {
+  id: number;
+  invoice_number: string;
+  client_id: number;
+  issue_date: string;
+  due_date: string | null;
+  status: string | null;
+  subtotal: number | string | null;
+  tax_rate: number | string | null;
+  tax_amount: number | string | null;
+  total: number | string | null;
+  notes: string | null;
+  shipment_ref: string | null;
+  bill_of_lading: string | null;
+  package_count: number | string | null;
+  shipment_weight: number | string | null;
+  port_of_entry: string | null;
+  importer_exporter_name: string | null;
+  advance_payment: number | string | null;
+  created_by: number | null;
+  deleted_at: string | Date | null;
+  created_at: string | Date | null;
+  updated_at: string | Date | null;
+};
+
+type OnlineInvoiceItemRow = {
+  id: number;
+  invoice_id: number;
+  description: string;
+  quantity: number | string;
+  unit_price: number | string;
+  total: number | string;
+};
+
+type OnlineReceiptRow = {
+  id: number;
+  receipt_number: string;
+  client_id: number;
+  invoice_id: number | null;
+  amount: number | string;
+  payment_method: string | null;
+  status: string | null;
+  notes: string | null;
+  receipt_date: string;
+  created_by: number | null;
+  deleted_at: string | Date | null;
+  created_at: string | Date | null;
 };
 
 function getOnlineConnectionString() {
@@ -161,6 +223,83 @@ function getLocalInvoice(entityId: string) {
     .get(Number(entityId)) as LocalInvoiceRow | undefined;
 }
 
+function findLocalInvoiceIdByShipmentRef(
+  shipmentRef: string | null | undefined
+) {
+  if (!sqlite) return null;
+
+  const normalizedShipmentRef = String(shipmentRef ?? "").trim();
+
+  if (!normalizedShipmentRef) {
+    return null;
+  }
+
+  const rows = sqlite
+    .prepare(`
+      SELECT id
+      FROM invoices
+      WHERE trim(COALESCE(shipment_ref, '')) = ?
+      LIMIT 2
+    `)
+    .all(normalizedShipmentRef) as Array<{ id: number }>;
+
+  if (rows.length > 1) {
+    throw new Error(
+      `Ambiguous local invoice match for shipment_ref ${normalizedShipmentRef}`
+    );
+  }
+
+  return rows[0]?.id ? Number(rows[0].id) : null;
+}
+
+function getAvailableLocalInvoiceNumber(
+  requestedInvoiceNumber: string | null | undefined
+) {
+  if (!sqlite) {
+    throw new Error("SQLite database is not available");
+  }
+
+  const requested = String(requestedInvoiceNumber ?? "").trim();
+
+  if (!requested) {
+    throw new Error("Online invoice has no invoice number");
+  }
+
+  const exactMatch = sqlite
+    .prepare(`
+      SELECT id
+      FROM invoices
+      WHERE trim(COALESCE(invoice_number, '')) = ?
+      LIMIT 1
+    `)
+    .get(requested) as { id: number } | undefined;
+
+  if (!exactMatch) {
+    return requested;
+  }
+
+  let suffix = 1;
+
+  while (true) {
+    const candidate = `${requested} (${suffix})`;
+
+    const existing = sqlite
+      .prepare(`
+        SELECT id
+        FROM invoices
+        WHERE trim(COALESCE(invoice_number, '')) = ?
+        LIMIT 1
+      `)
+      .get(candidate) as { id: number } | undefined;
+
+    if (!existing) {
+      return candidate;
+    }
+
+    suffix += 1;
+  }
+}
+
 function getLocalInvoiceItems(localInvoiceId: number) {
   return sqlite
     ?.prepare(`
@@ -188,6 +327,7 @@ function getLocalReceipt(entityId: string) {
         invoice_id AS invoiceId,
         amount,
         payment_method AS paymentMethod,
+        status,
         notes,
         receipt_date AS receiptDate,
         created_by AS createdBy,
@@ -198,6 +338,42 @@ function getLocalReceipt(entityId: string) {
       LIMIT 1
     `)
     .get(Number(entityId)) as LocalReceiptRow | undefined;
+}
+
+function findLocalReceiptIdForOnlineReceipt(
+  localClientId: number,
+  localInvoiceId: number | null,
+  amount: number
+) {
+  if (!sqlite) {
+    throw new Error("SQLite database is not available");
+  }
+
+  const rows = sqlite
+    .prepare(`
+      SELECT id
+      FROM receipts
+      WHERE client_id = ?
+        AND invoice_id IS ?
+        AND amount = ?
+      ORDER BY id
+      LIMIT 2
+    `)
+    .all(
+      localClientId,
+      localInvoiceId,
+      amount
+    ) as Array<{ id: number }>;
+
+  if (rows.length > 1) {
+    throw new Error(
+      `Ambiguous local receipt match: clientId=${localClientId}, invoiceId=${localInvoiceId}, amount=${amount}`
+    );
+  }
+
+  return rows[0]?.id
+    ? Number(rows[0].id)
+    : null;
 }
 
 function getLocalAccountingEntry(entityId: string) {
@@ -264,6 +440,16 @@ function getLocalTemplates() {
 
 function toPgTimestamp(value: number | null | undefined) {
   return value ? new Date(Number(value)) : null;
+}
+
+function toSqliteTimestamp(value: string | Date | null | undefined) {
+  if (!value) return null;
+
+  const timestamp = value instanceof Date
+    ? value.getTime()
+    : new Date(value).getTime();
+
+  return Number.isFinite(timestamp) ? timestamp : null;
 }
 
 function todayIsoDate() {
@@ -394,48 +580,1068 @@ async function getOnlineClientColumns(client: any) {
 }
 
 async function findOnlineClientId(client: any, localClient: LocalClientRow) {
-  const columns = await getOnlineClientColumns(client);
-  const attempts: Array<{ column: string; value: string; normalized?: boolean }> = [];
-  const taxValue = String(localClient.taxId || "").trim();
-  const emailValue = String(localClient.email || "").trim();
-  const nameValue = normalizeText(localClient.name);
+  const taxId = String(localClient.taxId || "").trim();
+  const email = String(localClient.email || "").trim().toLowerCase();
+  const phone = String(localClient.phone || "")
+    .replace(/[^\d+]/g, "")
+    .trim();
 
-  for (const column of ["tax_number", "tax_id"]) {
-    if (taxValue && columns.has(column)) attempts.push({ column, value: taxValue });
-  }
+  const matchedIds = new Set<number>();
 
-  for (const column of ["cr_number"]) {
-    if (taxValue && columns.has(column)) attempts.push({ column, value: taxValue });
-  }
-
-  if (emailValue && columns.has("email")) attempts.push({ column: "email", value: emailValue });
-  // A phone number may belong to several clients (or contain a placeholder).
-  // Do not use it by itself to link two unrelated accounting records.
-
-  for (const column of ["name_ar", "name_en", "name"]) {
-    if (nameValue && columns.has(column)) attempts.push({ column, value: nameValue, normalized: true });
-  }
-
-  for (const attempt of attempts) {
+  if (taxId) {
     const result = await client.query(
-      attempt.normalized
-        ? `SELECT id FROM clients WHERE lower(trim(${attempt.column})) = $1 LIMIT 2`
-        : `SELECT id FROM clients WHERE ${attempt.column} = $1 LIMIT 2`,
-      [attempt.value]
+      `
+        SELECT id
+        FROM clients
+        WHERE trim(COALESCE(tax_id, '')) = $1
+        LIMIT 2
+      `,
+      [taxId]
     ) as { rows?: Array<{ id: number }> };
 
-    const id = result.rows?.[0]?.id;
-    if (id) {
-      console.log("[SYNC][CLIENT_MAPPING]", {
-        localClientId: localClient.id,
-        onlineClientId: id,
-        matchedBy: attempt.column,
-      });
-      return Number(id);
+    if ((result.rows?.length || 0) > 1) {
+      throw new Error(
+        `Ambiguous online client match by tax_id for local client ${localClient.id}`
+      );
+    }
+
+    if (result.rows?.[0]?.id) {
+      matchedIds.add(Number(result.rows[0].id));
     }
   }
 
-  return null;
+  if (email) {
+    const result = await client.query(
+      `
+        SELECT id
+        FROM clients
+        WHERE lower(trim(COALESCE(email, ''))) = $1
+        LIMIT 2
+      `,
+      [email]
+    ) as { rows?: Array<{ id: number }> };
+
+    if ((result.rows?.length || 0) > 1) {
+      throw new Error(
+        `Ambiguous online client match by email for local client ${localClient.id}`
+      );
+    }
+
+    if (result.rows?.[0]?.id) {
+      matchedIds.add(Number(result.rows[0].id));
+    }
+  }
+
+  if (phone) {
+    const result = await client.query(
+      `
+        SELECT id
+        FROM clients
+        WHERE regexp_replace(COALESCE(phone, ''), '[^0-9+]', '', 'g') = $1
+        LIMIT 2
+      `,
+      [phone]
+    ) as { rows?: Array<{ id: number }> };
+
+    if ((result.rows?.length || 0) > 1) {
+      throw new Error(
+        `Ambiguous online client match by phone for local client ${localClient.id}`
+      );
+    }
+
+    if (result.rows?.[0]?.id) {
+      matchedIds.add(Number(result.rows[0].id));
+    }
+  }
+
+  if (matchedIds.size > 1) {
+    throw new Error(
+      `CLIENT_IDENTITY_CONFLICT: tax ID, email, or phone for local client ${localClient.id} match different online clients`
+    );
+  }
+
+  const onlineClientId = Array.from(matchedIds)[0] ?? null;
+
+  if (onlineClientId) {
+    console.log("[SYNC][CLIENT_MAPPING]", {
+      localClientId: localClient.id,
+      onlineClientId,
+      matchedBy: "tax_id/email/phone",
+    });
+  }
+
+  return onlineClientId;
+}
+
+function findLocalClientIdForOnlineClient(onlineClient: OnlineClientRow) {
+  if (!sqlite) return null;
+
+  const taxId = String(onlineClient.tax_id || "").trim();
+  const email = String(onlineClient.email || "").trim().toLowerCase();
+  const phone = String(onlineClient.phone || "")
+    .replace(/[^\d+]/g, "")
+    .trim();
+
+  const matchedIds = new Set<number>();
+
+  if (taxId) {
+    const rows = sqlite
+      .prepare(`
+        SELECT id
+        FROM clients
+        WHERE trim(COALESCE(tax_id, '')) = ?
+        LIMIT 2
+      `)
+      .all(taxId) as Array<{ id: number }>;
+
+    if (rows.length > 1) {
+      throw new Error(
+        `Ambiguous local client match by tax_id for online client ${onlineClient.id}`
+      );
+    }
+
+    if (rows[0]?.id) {
+      matchedIds.add(Number(rows[0].id));
+    }
+  }
+
+  if (email) {
+    const rows = sqlite
+      .prepare(`
+        SELECT id
+        FROM clients
+        WHERE lower(trim(COALESCE(email, ''))) = ?
+        LIMIT 2
+      `)
+      .all(email) as Array<{ id: number }>;
+
+    if (rows.length > 1) {
+      throw new Error(
+        `Ambiguous local client match by email for online client ${onlineClient.id}`
+      );
+    }
+
+    if (rows[0]?.id) {
+      matchedIds.add(Number(rows[0].id));
+    }
+  }
+
+  if (phone) {
+    const rows = sqlite
+      .prepare(`
+        SELECT id
+        FROM clients
+        WHERE replace(
+                replace(
+                  replace(
+                    replace(
+                      replace(COALESCE(phone, ''), ' ', ''),
+                    '-', ''),
+                  '(', ''),
+                ')', ''),
+              '.', '') = ?
+        LIMIT 2
+      `)
+      .all(phone) as Array<{ id: number }>;
+
+    if (rows.length > 1) {
+      throw new Error(
+        `Ambiguous local client match by phone for online client ${onlineClient.id}`
+      );
+    }
+
+    if (rows[0]?.id) {
+      matchedIds.add(Number(rows[0].id));
+    }
+  }
+
+  if (matchedIds.size > 1) {
+    throw new Error(
+      `CLIENT_IDENTITY_CONFLICT: tax ID, email, or phone for online client ${onlineClient.id} match different local clients`
+    );
+  }
+
+  const localClientId = Array.from(matchedIds)[0] ?? null;
+
+  if (localClientId) {
+    console.log("[SYNC][CLIENT_MAPPING][ONLINE_TO_LOCAL]", {
+      onlineClientId: onlineClient.id,
+      localClientId,
+      matchedBy: "tax_id/email/phone",
+    });
+  }
+
+  return localClientId;
+}
+
+async function pullClientsFromOnline(client: any) {
+  if (!sqlite) {
+    throw new Error("SQLite database is not available");
+  }
+
+  const result = await client.query(`
+    SELECT
+      id,
+      name,
+      email,
+      phone,
+      address,
+      tax_id,
+      notes,
+      created_at,
+      updated_at
+    FROM clients
+    ORDER BY id ASC
+  `) as { rows?: OnlineClientRow[] };
+
+  const onlineClients = result.rows || [];
+  const clientIdMap = new Map<number, number>();
+
+  let inserted = 0;
+  let updated = 0;
+
+  for (const onlineClient of onlineClients) {
+    const name = String(onlineClient.name || "").trim();
+
+    if (!name) {
+      throw new Error(
+        `Online client ${onlineClient.id} has no name`
+      );
+    }
+
+    const existingLocalId =
+      findLocalClientIdForOnlineClient(onlineClient);
+
+    if (existingLocalId) {
+      const existing = sqlite
+        .prepare(`
+          SELECT
+            id,
+            name,
+            email,
+            phone,
+            address,
+            tax_id AS taxId,
+            notes,
+            created_at AS createdAt,
+            updated_at AS updatedAt
+          FROM clients
+          WHERE id = ?
+          LIMIT 1
+        `)
+        .get(existingLocalId) as
+        | {
+            id: number;
+            name: string;
+            email: string | null;
+            phone: string | null;
+            address: string | null;
+            taxId: string | null;
+            notes: string | null;
+            createdAt: number | null;
+            updatedAt: number | null;
+          }
+        | undefined;
+
+      if (!existing) {
+        throw new Error(
+          `Mapped local client ${existingLocalId} was not found`
+        );
+      }
+
+      sqlite
+        .prepare(`
+          UPDATE clients
+          SET
+            name = ?,
+            email = ?,
+            phone = ?,
+            address = ?,
+            tax_id = ?,
+            notes = ?,
+            created_at = ?,
+            updated_at = ?
+          WHERE id = ?
+        `)
+        .run(
+          name,
+          onlineClient.email ?? existing.email,
+          onlineClient.phone ?? existing.phone,
+          onlineClient.address ?? existing.address,
+          onlineClient.tax_id ?? existing.taxId,
+          onlineClient.notes ?? existing.notes,
+          toSqliteTimestamp(onlineClient.created_at) ?? existing.createdAt,
+          toSqliteTimestamp(onlineClient.updated_at) ??
+            existing.updatedAt ??
+            Date.now(),
+          existingLocalId
+        );
+
+      clientIdMap.set(Number(onlineClient.id), existingLocalId);
+      updated += 1;
+
+      console.log("[SYNC][PULL][CLIENT][UPDATE]", {
+        onlineClientId: onlineClient.id,
+        localClientId: existingLocalId,
+      });
+
+      continue;
+    }
+
+    const insertResult = sqlite
+      .prepare(`
+        INSERT INTO clients (
+          name,
+          email,
+          phone,
+          address,
+          tax_id,
+          notes,
+          created_at,
+          updated_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `)
+      .run(
+        name,
+        onlineClient.email ?? null,
+        onlineClient.phone ?? null,
+        onlineClient.address ?? null,
+        onlineClient.tax_id ?? null,
+        onlineClient.notes ?? null,
+        toSqliteTimestamp(onlineClient.created_at) ?? Date.now(),
+        toSqliteTimestamp(onlineClient.updated_at) ?? Date.now()
+      );
+
+    const localClientId = Number(insertResult.lastInsertRowid);
+
+    clientIdMap.set(Number(onlineClient.id), localClientId);
+    inserted += 1;
+
+    console.log("[SYNC][PULL][CLIENT][INSERT]", {
+      onlineClientId: onlineClient.id,
+      localClientId,
+    });
+  }
+
+  console.log("[SYNC][PULL][CLIENTS][DONE]", {
+    online: onlineClients.length,
+    inserted,
+    updated,
+  });
+
+  return {
+    clientIdMap,
+    total: onlineClients.length,
+    inserted,
+    updated,
+  };
+}
+
+async function pullInvoicesFromOnline(
+  client: any,
+  clientIdMap: Map<number, number>
+) {
+  if (!sqlite) {
+    throw new Error("SQLite database is not available");
+  }
+
+  const result = await client.query(`
+    SELECT
+      id,
+      invoice_number,
+      client_id,
+      issue_date,
+      due_date,
+      status,
+      subtotal,
+      tax_rate,
+      tax_amount,
+      total,
+      notes,
+      shipment_ref,
+      bill_of_lading,
+      package_count,
+      shipment_weight,
+      port_of_entry,
+      importer_exporter_name,
+      advance_payment,
+      created_by,
+      deleted_at,
+      created_at,
+      updated_at
+    FROM invoices
+    ORDER BY id ASC
+  `) as { rows?: OnlineInvoiceRow[] };
+
+  const onlineInvoices = result.rows || [];
+  const invoiceIdMap = new Map<number, number>();
+  const invoiceIdsAllowedForItemPull = new Set<number>();
+
+  let inserted = 0;
+  let updated = 0;
+  let skipped = 0;
+
+  for (const onlineInvoice of onlineInvoices) {
+    const localClientId =
+      clientIdMap.get(Number(onlineInvoice.client_id));
+
+    if (!localClientId) {
+      console.warn("[SYNC][PULL][INVOICE][SKIP_CLIENT]", {
+        onlineInvoiceId: onlineInvoice.id,
+        onlineClientId: onlineInvoice.client_id,
+      });
+
+      skipped += 1;
+      continue;
+    }
+
+    const shipmentRef =
+      String(onlineInvoice.shipment_ref ?? "").trim() || null;
+
+    const existingLocalId =
+      findLocalInvoiceIdByShipmentRef(shipmentRef);
+
+    if (existingLocalId) {
+      const localInvoice = getLocalInvoice(String(existingLocalId));
+
+      const localUpdatedAt = localInvoice?.updatedAt
+        ? new Date(localInvoice.updatedAt).getTime()
+        : 0;
+
+      const onlineUpdatedAt = onlineInvoice.updated_at
+        ? new Date(onlineInvoice.updated_at).getTime()
+        : 0;
+
+      if (localUpdatedAt > onlineUpdatedAt) {
+        console.log("[SYNC][PULL][INVOICE][SKIP_OLDER_ONLINE]", {
+          onlineInvoiceId: onlineInvoice.id,
+          localInvoiceId: existingLocalId,
+          shipmentRef,
+          localUpdatedAt,
+          onlineUpdatedAt,
+        });
+
+        invoiceIdMap.set(
+          Number(onlineInvoice.id),
+          existingLocalId
+        );
+
+        skipped += 1;
+        continue;
+      }
+
+      if (
+        localUpdatedAt > 0 &&
+        onlineUpdatedAt > 0 &&
+        localUpdatedAt === onlineUpdatedAt
+      ) {
+        invoiceIdMap.set(
+          Number(onlineInvoice.id),
+          existingLocalId
+        );
+
+
+
+        skipped += 1;
+        continue;
+      }
+
+      sqlite
+        .prepare(`
+          UPDATE invoices
+          SET
+            client_id = ?,
+            issue_date = ?,
+            due_date = ?,
+            status = ?,
+            subtotal = ?,
+            tax_rate = ?,
+            tax_amount = ?,
+            total = ?,
+            notes = ?,
+            shipment_ref = ?,
+            bill_of_lading = ?,
+            package_count = ?,
+            shipment_weight = ?,
+            port_of_entry = ?,
+            importer_exporter_name = ?,
+            advance_payment = ?,
+            created_by = ?,
+            deleted_at = ?,
+            created_at = COALESCE(?, created_at),
+            updated_at = COALESCE(?, updated_at)
+          WHERE id = ?
+        `)
+        .run(
+          localClientId,
+          String(onlineInvoice.issue_date || todayIsoDate()),
+          onlineInvoice.due_date
+            ? String(onlineInvoice.due_date)
+            : null,
+          onlineInvoice.status ?? "draft",
+          Number(onlineInvoice.subtotal ?? 0),
+          Number(onlineInvoice.tax_rate ?? 0),
+          Number(onlineInvoice.tax_amount ?? 0),
+          Number(onlineInvoice.total ?? 0),
+          onlineInvoice.notes ?? null,
+          shipmentRef,
+          onlineInvoice.bill_of_lading ?? null,
+          onlineInvoice.package_count === null
+            ? null
+            : Number(onlineInvoice.package_count),
+          onlineInvoice.shipment_weight === null
+            ? null
+            : Number(onlineInvoice.shipment_weight),
+          onlineInvoice.port_of_entry ?? null,
+          onlineInvoice.importer_exporter_name ?? null,
+          Number(onlineInvoice.advance_payment ?? 0),
+          onlineInvoice.created_by ?? null,
+          toSqliteTimestamp(onlineInvoice.deleted_at),
+          toSqliteTimestamp(onlineInvoice.created_at),
+          toSqliteTimestamp(onlineInvoice.updated_at),
+          existingLocalId
+        );
+
+      invoiceIdMap.set(
+        Number(onlineInvoice.id),
+        existingLocalId
+      );
+
+      invoiceIdsAllowedForItemPull.add(Number(onlineInvoice.id));
+
+      updated += 1;
+
+      console.log("[SYNC][PULL][INVOICE][UPDATE]", {
+        onlineInvoiceId: onlineInvoice.id,
+        localInvoiceId: existingLocalId,
+        shipmentRef,
+        localUpdatedAt,
+        onlineUpdatedAt,
+      });
+
+      continue;
+    }
+
+  const localInvoiceNumber =
+    getAvailableLocalInvoiceNumber(onlineInvoice.invoice_number);
+
+    const insertResult = sqlite
+      .prepare(`
+        INSERT INTO invoices (
+          invoice_number,
+          client_id,
+          issue_date,
+          due_date,
+          status,
+          subtotal,
+          tax_rate,
+          tax_amount,
+          total,
+          notes,
+          shipment_ref,
+          bill_of_lading,
+          package_count,
+          shipment_weight,
+          port_of_entry,
+          importer_exporter_name,
+          advance_payment,
+          created_by,
+          deleted_at,
+          created_at,
+          updated_at
+        )
+        VALUES (
+          ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+          ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+        )
+      `)
+      .run(
+        localInvoiceNumber,
+        localClientId,
+        String(onlineInvoice.issue_date || todayIsoDate()),
+        onlineInvoice.due_date
+          ? String(onlineInvoice.due_date)
+          : null,
+        onlineInvoice.status ?? "draft",
+        Number(onlineInvoice.subtotal ?? 0),
+        Number(onlineInvoice.tax_rate ?? 0),
+        Number(onlineInvoice.tax_amount ?? 0),
+        Number(onlineInvoice.total ?? 0),
+        onlineInvoice.notes ?? null,
+        shipmentRef,
+        onlineInvoice.bill_of_lading ?? null,
+        onlineInvoice.package_count === null
+          ? null
+          : Number(onlineInvoice.package_count),
+        onlineInvoice.shipment_weight === null
+          ? null
+          : Number(onlineInvoice.shipment_weight),
+        onlineInvoice.port_of_entry ?? null,
+        onlineInvoice.importer_exporter_name ?? null,
+        Number(onlineInvoice.advance_payment ?? 0),
+        onlineInvoice.created_by ?? null,
+        toSqliteTimestamp(onlineInvoice.deleted_at),
+        toSqliteTimestamp(onlineInvoice.created_at) ?? Date.now(),
+        toSqliteTimestamp(onlineInvoice.updated_at) ?? Date.now()
+      );
+
+    const localInvoiceId =
+      Number(insertResult.lastInsertRowid);
+
+    invoiceIdMap.set(
+      Number(onlineInvoice.id),
+      localInvoiceId
+    );
+
+    invoiceIdsAllowedForItemPull.add(Number(onlineInvoice.id));
+
+    inserted += 1;
+
+    console.log("[SYNC][PULL][INVOICE][INSERT]", {
+      onlineInvoiceId: onlineInvoice.id,
+      localInvoiceId,
+      shipmentRef,
+    });
+  }
+
+  console.log("[SYNC][PULL][INVOICES][DONE]", {
+    online: onlineInvoices.length,
+    inserted,
+    updated,
+    skipped,
+  });
+
+  return {
+    invoiceIdMap,
+    invoiceIdsAllowedForItemPull,
+    total: onlineInvoices.length,
+    inserted,
+    updated,
+    skipped,
+  };
+}
+
+async function pullInvoiceItemsFromOnline(
+  client: any,
+  invoiceIdMap: Map<number, number>,
+  invoiceIdsAllowedForItemPull: Set<number>
+) {
+  if (!sqlite) {
+    throw new Error("SQLite database is not available");
+  }
+
+  const result = await client.query(`
+    SELECT
+      id,
+      invoice_id,
+      description,
+      quantity,
+      unit_price,
+      total
+    FROM invoice_items
+    ORDER BY invoice_id ASC, id ASC
+  `) as { rows?: OnlineInvoiceItemRow[] };
+
+  const onlineItems = result.rows || [];
+
+  const itemsByOnlineInvoiceId =
+    new Map<number, OnlineInvoiceItemRow[]>();
+
+  for (const onlineItem of onlineItems) {
+    const onlineInvoiceId = Number(onlineItem.invoice_id);
+
+    const currentItems =
+      itemsByOnlineInvoiceId.get(onlineInvoiceId) || [];
+
+    currentItems.push(onlineItem);
+    itemsByOnlineInvoiceId.set(onlineInvoiceId, currentItems);
+  }
+
+  let invoicesProcessed = 0;
+  let inserted = 0;
+  let skipped = 0;
+
+  for (const onlineInvoiceId of invoiceIdsAllowedForItemPull) {
+    const localInvoiceId =
+      invoiceIdMap.get(Number(onlineInvoiceId));
+
+    if (!localInvoiceId) {
+      console.warn("[SYNC][PULL][INVOICE_ITEMS][SKIP_MAPPING]", {
+        onlineInvoiceId,
+      });
+
+      skipped += 1;
+      continue;
+    }
+
+    const invoiceItems =
+      itemsByOnlineInvoiceId.get(Number(onlineInvoiceId)) || [];
+
+    // Online هو المصدر المقبول لهذه الفاتورة في هذه الدورة.
+    // نحذف الأصناف المحلية أولًا حتى يتم أيضًا تمثيل حالة
+    // أن الفاتورة Online لا تحتوي على أي أصناف.
+    sqlite
+      .prepare(`
+        DELETE FROM invoice_items
+        WHERE invoice_id = ?
+      `)
+      .run(localInvoiceId);
+
+    const insertItem = sqlite.prepare(`
+      INSERT INTO invoice_items (
+        invoice_id,
+        description,
+        quantity,
+        unit_price,
+        total
+      )
+      VALUES (?, ?, ?, ?, ?)
+    `);
+
+    for (const onlineItem of invoiceItems) {
+      insertItem.run(
+        localInvoiceId,
+        String(onlineItem.description || ""),
+        Number(onlineItem.quantity ?? 0),
+        Number(onlineItem.unit_price ?? 0),
+        Number(onlineItem.total ?? 0)
+      );
+
+      inserted += 1;
+    }
+
+    invoicesProcessed += 1;
+
+    console.log("[SYNC][PULL][INVOICE_ITEMS][INVOICE_DONE]", {
+      onlineInvoiceId,
+      localInvoiceId,
+      items: invoiceItems.length,
+    });
+  }
+
+  console.log("[SYNC][PULL][INVOICE_ITEMS][DONE]", {
+    onlineItems: onlineItems.length,
+    invoicesProcessed,
+    inserted,
+    skipped,
+  });
+
+  return {
+    total: onlineItems.length,
+    invoicesProcessed,
+    inserted,
+    skipped,
+  };
+}
+
+async function pullReceiptsFromOnline(
+  client: any,
+  clientIdMap: Map<number, number>,
+  invoiceIdMap: Map<number, number>
+) {
+  if (!sqlite) {
+    throw new Error("SQLite database is not available");
+  }
+
+  const result = await client.query(`
+    SELECT
+      id,
+      receipt_number,
+      client_id,
+      invoice_id,
+      amount,
+      payment_method,
+      status,
+      notes,
+      receipt_date,
+      created_by,
+      deleted_at,
+      created_at
+    FROM receipts
+    ORDER BY id ASC
+  `) as { rows?: OnlineReceiptRow[] };
+
+  const onlineReceipts = result.rows || [];
+
+  let inserted = 0;
+  let updated = 0;
+  let skipped = 0;
+
+  for (const onlineReceipt of onlineReceipts) {
+    const localClientId =
+      clientIdMap.get(Number(onlineReceipt.client_id));
+
+    if (!localClientId) {
+      console.warn("[SYNC][PULL][RECEIPT][SKIP_CLIENT_MAPPING]", {
+        onlineReceiptId: onlineReceipt.id,
+        onlineClientId: onlineReceipt.client_id,
+      });
+
+      skipped += 1;
+      continue;
+    }
+
+    let localInvoiceId: number | null = null;
+
+    if (onlineReceipt.invoice_id !== null) {
+      localInvoiceId =
+        invoiceIdMap.get(Number(onlineReceipt.invoice_id)) ?? null;
+
+      if (!localInvoiceId) {
+        console.warn("[SYNC][PULL][RECEIPT][SKIP_INVOICE_MAPPING]", {
+          onlineReceiptId: onlineReceipt.id,
+          onlineInvoiceId: onlineReceipt.invoice_id,
+        });
+
+        skipped += 1;
+        continue;
+      }
+    }
+
+    const amount = Number(onlineReceipt.amount ?? 0);
+
+    const existingLocalId =
+      findLocalReceiptIdForOnlineReceipt(
+        localClientId,
+        localInvoiceId,
+        amount
+      );
+
+    if (existingLocalId) {
+      sqlite
+        .prepare(`
+          UPDATE receipts
+          SET
+            receipt_number = ?,
+            client_id = ?,
+            invoice_id = ?,
+            amount = ?,
+            payment_method = ?,
+            status = ?,
+            notes = ?,
+            receipt_date = ?,
+            created_by = ?,
+            deleted_at = ?,
+            created_at = ?
+          WHERE id = ?
+        `)
+        .run(
+          String(onlineReceipt.receipt_number || ""),
+          localClientId,
+          localInvoiceId,
+          amount,
+          String(onlineReceipt.payment_method || "cash"),
+          String(onlineReceipt.status || "draft"),
+          onlineReceipt.notes ?? null,
+          String(onlineReceipt.receipt_date || ""),
+          onlineReceipt.created_by ?? null,
+          toSqliteTimestamp(onlineReceipt.deleted_at),
+          toSqliteTimestamp(onlineReceipt.created_at),
+          existingLocalId
+        );
+
+      updated += 1;
+      continue;
+    }
+
+    sqlite
+      .prepare(`
+        INSERT INTO receipts (
+          receipt_number,
+          client_id,
+          invoice_id,
+          amount,
+          payment_method,
+          status,
+          notes,
+          receipt_date,
+          created_by,
+          deleted_at,
+          created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `)
+      .run(
+        String(onlineReceipt.receipt_number || ""),
+        localClientId,
+        localInvoiceId,
+        amount,
+        String(onlineReceipt.payment_method || "cash"),
+        String(onlineReceipt.status || "draft"),
+        onlineReceipt.notes ?? null,
+        String(onlineReceipt.receipt_date || ""),
+        onlineReceipt.created_by ?? null,
+        toSqliteTimestamp(onlineReceipt.deleted_at),
+        toSqliteTimestamp(onlineReceipt.created_at)
+      );
+
+    inserted += 1;
+  }
+
+  console.log("[SYNC][PULL][RECEIPTS][DONE]", {
+    total: onlineReceipts.length,
+    inserted,
+    updated,
+    skipped,
+  });
+
+  return {
+    total: onlineReceipts.length,
+    inserted,
+    updated,
+    skipped,
+  };
+}
+
+export async function runOnlineToLocalSyncOnce(): Promise<{
+  onlineConnected: boolean;
+  lastError: string | null;
+  clients: {
+    total: number;
+    inserted: number;
+    updated: number;
+  };
+  invoices: {
+    total: number;
+    inserted: number;
+    updated: number;
+    skipped: number;
+  };
+  invoiceItems: {
+    total: number;
+    invoicesProcessed: number;
+    inserted: number;
+    skipped: number;
+  };
+  receipts: {
+    total: number;
+    inserted: number;
+    updated: number;
+    skipped: number;
+  };
+}> {
+  const emptyResult = {
+    onlineConnected: false,
+    lastError: null as string | null,
+    clients: {
+      total: 0,
+      inserted: 0,
+      updated: 0,
+    },
+    invoices: {
+      total: 0,
+      inserted: 0,
+      updated: 0,
+      skipped: 0,
+    },
+    invoiceItems: {
+      total: 0,
+      invoicesProcessed: 0,
+      inserted: 0,
+      skipped: 0,
+    },
+    receipts: {
+      total: 0,
+      inserted: 0,
+      updated: 0,
+      skipped: 0,
+    },
+  };
+
+  if (!sqlite) {
+    return {
+      ...emptyResult,
+      lastError: "SQLite database is unavailable",
+    };
+  }
+
+  const connectionString = getOnlineConnectionString();
+
+  if (!connectionString) {
+    return {
+      ...emptyResult,
+      lastError: "Online database connection string is not configured",
+    };
+  }
+
+  let client: any = null;
+
+  try {
+    client = await createOnlineClient(connectionString);
+
+    console.log("[SYNC][PULL] Online database connection: Connected");
+
+    const clientsResult =
+      await pullClientsFromOnline(client);
+
+    const invoicesResult =
+      await pullInvoicesFromOnline(
+        client,
+        clientsResult.clientIdMap
+      );
+
+    const invoiceItemsResult =
+      await pullInvoiceItemsFromOnline(
+        client,
+        invoicesResult.invoiceIdMap,
+        invoicesResult.invoiceIdsAllowedForItemPull
+      );
+
+    const receiptsResult =
+      await pullReceiptsFromOnline(
+        client,
+        clientsResult.clientIdMap,
+        invoicesResult.invoiceIdMap
+      );
+
+    console.log("[SYNC][PULL][DONE]", {
+      clients: clientsResult,
+      invoices: {
+        total: invoicesResult.total,
+        inserted: invoicesResult.inserted,
+        updated: invoicesResult.updated,
+        skipped: invoicesResult.skipped,
+      },
+      invoiceItems: invoiceItemsResult,
+      receipts: receiptsResult,
+    });
+
+    return {
+      onlineConnected: true,
+      lastError: null,
+      clients: {
+        total: clientsResult.total,
+        inserted: clientsResult.inserted,
+        updated: clientsResult.updated,
+      },
+      invoices: {
+        total: invoicesResult.total,
+        inserted: invoicesResult.inserted,
+        updated: invoicesResult.updated,
+        skipped: invoicesResult.skipped,
+      },
+      invoiceItems: invoiceItemsResult,
+      receipts: receiptsResult,
+    };
+  } catch (err) {
+    const lastError = errorMessage(err);
+
+    console.error("[SYNC][PULL][ERROR]", err);
+
+    return {
+      ...emptyResult,
+      lastError,
+    };
+  } finally {
+    if (client) {
+      try {
+        await client.end();
+      } catch {
+        // Ignore connection close errors.
+      }
+    }
+  }
 }
 
 // A template has no invoice dependency. Copy missing templates before clients.
