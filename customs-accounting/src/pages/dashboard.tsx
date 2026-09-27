@@ -5,6 +5,7 @@ import { Link } from "wouter";
 import {
   useListInvoices,
   useListClients,
+  useListReceipts,
 } from "@workspace/api-client-react";
 import { formatCurrency, formatDate, arabicNums } from "@/lib/utils";
 import {
@@ -54,6 +55,7 @@ export default function Dashboard() {
   const { user, can } = useAuth();
   const { settings, logoSrc } = useCompanySettings();
   const { data: invoices, isLoading: loadingInvoices } = useListInvoices();
+  const { data: receipts = [] } = useListReceipts();
   const { data: clients } = useListClients();
   const { data: accountingRows = [] } = useQuery({
     queryKey: ["accounting"],
@@ -79,14 +81,28 @@ export default function Dashboard() {
   }, []);
   const hidden = <span className="tracking-widest opacity-35 font-mono">••••••</span>;
 
-  const totalOutstanding =
-    invoices?.filter((i: typeof invoices[number]) => i.status === "issued").reduce((sum: number, inv: typeof invoices[number]) => sum + inv.total, 0) || 0;
-  const totalAdvancePayment =
-  invoices?.reduce<number>(
-    (sum: number, inv: typeof invoices[number]): number =>
-      sum + Number(inv.advancePayment || 0),
-    0,
-  ) || 0;
+  const receivedByInvoice = new Map<number, number>();
+  for (const receipt of receipts) {
+    if (receipt.status !== "issued" || receipt.invoiceId == null) continue;
+    const invoiceId = Number(receipt.invoiceId);
+    receivedByInvoice.set(
+      invoiceId,
+      (receivedByInvoice.get(invoiceId) ?? 0) + Number(receipt.amount || 0),
+    );
+  }
+
+  const collectedForInvoice = (invoice: NonNullable<typeof invoices>[number]) =>
+    Number((invoice as { advancePayment?: number }).advancePayment ?? 0) +
+    (receivedByInvoice.get(invoice.id) ?? 0);
+
+  const totalOutstanding = (invoices ?? []).reduce((sum, invoice) => {
+    if (invoice.status !== "issued") return sum;
+    return sum + Math.max(0, Number(invoice.total || 0) - collectedForInvoice(invoice));
+  }, 0);
+  const totalCollected = (invoices ?? []).reduce((sum, invoice) => {
+    if (invoice.status !== "issued") return sum;
+    return sum + collectedForInvoice(invoice);
+  }, 0);
   const totalUnpaidTransportation =
   accountingRows.reduce(
     (sum, row) =>
@@ -110,12 +126,8 @@ export default function Dashboard() {
 
   const totalPaymentsUncollected = accountingRows.reduce((sum, row) => {
     const invoice = invoices?.find((inv: typeof invoices[number]) => inv.id === row.id);
-
-    if (invoice?.status === "issued") {
-      return sum + Number(row.payments || 0);
-    }
-
-    return sum;
+    if (invoice?.status !== "issued") return sum;
+    return sum + Math.max(0, Number(row.payments || 0) - collectedForInvoice(invoice));
   }, 0);
 
   // The invoice list uses descending local IDs; createdAt can be empty after imports.
@@ -168,8 +180,8 @@ export default function Dashboard() {
       border: "border-border",
     },
     {
-      title: t("advancePayment"),
-      value: formatCurrency(totalAdvancePayment, currencySymbol, lang),
+      title: isAR ? "المحصّل" : "Collected",
+      value: formatCurrency(totalCollected, currencySymbol, lang),
       icon: DollarSign,
       color: "bg-primary/70",
       bg: "bg-violet-50 dark:bg-violet-950/30",
@@ -457,7 +469,7 @@ export default function Dashboard() {
                     </div>
                     <div className="text-end flex-shrink-0 ms-2">
                       <p className="font-bold text-sm font-mono text-foreground">
-                        {showAmounts ? formatCurrency(invoice.total) : hidden}
+                        {showAmounts ? formatCurrency(invoice.total, currencySymbol, lang) : hidden}
                       </p>
                       <StatusBadge status={invoice.status} />
                     </div>
