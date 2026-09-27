@@ -91,6 +91,20 @@ type LocalAccountingRow = {
   createdAt: string | null;
 };
 
+type LocalUserRow = {
+  id: number;
+  username: string;
+  passwordHash: string;
+  displayName: string;
+  displayNameAr: string | null;
+  displayNameEn: string | null;
+  role: string | null;
+  email: string | null;
+  phone: string | null;
+  receiverSignatureBase64: string | null;
+  createdAt: number | null;
+};
+
 type LocalClientRow = {
   id: number;
   name: string;
@@ -400,6 +414,53 @@ function getLocalAccountingEntry(entityId: string) {
       LIMIT 1
     `)
     .get(Number(entityId)) as LocalAccountingRow | undefined;
+}
+
+function getLocalUser(userId: number | null | undefined) {
+  if (!sqlite || !userId) return undefined;
+
+  return sqlite
+    .prepare(`
+      SELECT
+        id,
+        username,
+        password_hash AS passwordHash,
+        display_name AS displayName,
+        display_name_ar AS displayNameAr,
+        display_name_en AS displayNameEn,
+        role,
+        email,
+        phone,
+        receiver_signature_base64 AS receiverSignatureBase64,
+        created_at AS createdAt
+      FROM users
+      WHERE id = ?
+      LIMIT 1
+    `)
+    .get(Number(userId)) as LocalUserRow | undefined;
+}
+
+function getLocalUsers() {
+  if (!sqlite) return [];
+
+  return sqlite
+    .prepare(`
+      SELECT
+        id,
+        username,
+        password_hash AS passwordHash,
+        display_name AS displayName,
+        display_name_ar AS displayNameAr,
+        display_name_en AS displayNameEn,
+        role,
+        email,
+        phone,
+        receiver_signature_base64 AS receiverSignatureBase64,
+        created_at AS createdAt
+      FROM users
+      ORDER BY id ASC
+    `)
+    .all() as LocalUserRow[];
 }
 
 function getLocalClient(clientId: number) {
@@ -1335,6 +1396,41 @@ async function pullInvoiceItemsFromOnline(
   };
 }
 
+async function resolveLocalUserIdFromOnline(
+  client: any,
+  onlineUserId: number | null | undefined
+): Promise<number | null> {
+  if (!sqlite || !onlineUserId) return null;
+
+  const result = await client.query(
+    `
+      SELECT username
+      FROM users
+      WHERE id = $1
+      LIMIT 1
+    `,
+    [Number(onlineUserId)]
+  ) as { rows?: Array<{ username: string }> };
+
+  const username = String(result.rows?.[0]?.username || "").trim();
+  if (!username) return null;
+
+  const localUser = sqlite
+    .prepare(`
+      SELECT id
+      FROM users
+      WHERE LOWER(TRIM(username)) = LOWER(TRIM(?))
+      LIMIT 2
+    `)
+    .all(username) as Array<{ id: number }>;
+
+  if (localUser.length > 1) {
+    throw new Error(`Ambiguous local user match for username: ${username}`);
+  }
+
+  return localUser[0]?.id ? Number(localUser[0].id) : null;
+}
+
 async function pullReceiptsFromOnline(
   client: any,
   clientIdMap: Map<number, number>,
@@ -1401,6 +1497,11 @@ async function pullReceiptsFromOnline(
 
     const amount = Number(onlineReceipt.amount ?? 0);
 
+    const localCreatedBy = await resolveLocalUserIdFromOnline(
+      client,
+      onlineReceipt.created_by
+    );
+
     const existingLocalId =
       findLocalReceiptIdForOnlineReceipt(
         localClientId,
@@ -1435,7 +1536,7 @@ async function pullReceiptsFromOnline(
           String(onlineReceipt.status || "draft"),
           onlineReceipt.notes ?? null,
           String(onlineReceipt.receipt_date || ""),
-          onlineReceipt.created_by ?? null,
+          localCreatedBy,
           toSqliteTimestamp(onlineReceipt.deleted_at),
           toSqliteTimestamp(onlineReceipt.created_at),
           existingLocalId
@@ -1471,7 +1572,7 @@ async function pullReceiptsFromOnline(
         String(onlineReceipt.status || "draft"),
         onlineReceipt.notes ?? null,
         String(onlineReceipt.receipt_date || ""),
-        onlineReceipt.created_by ?? null,
+        localCreatedBy,
         toSqliteTimestamp(onlineReceipt.deleted_at),
         toSqliteTimestamp(onlineReceipt.created_at)
       );
@@ -2015,9 +2116,83 @@ async function resolveReceiptOnlineMapping(client: any, receipt: LocalReceiptRow
   };
 }
 
+async function resolveOnlineUserId(
+  client: any,
+  localUserId: number | null | undefined
+): Promise<number | null> {
+  if (!localUserId) return null;
+
+  const localUser = getLocalUser(localUserId);
+  if (!localUser) {
+    throw new Error(`Local user not found for userId: ${localUserId}`);
+  }
+
+  const username = String(localUser.username || "").trim();
+  if (!username) {
+    throw new Error(`Local user has no username for userId: ${localUserId}`);
+  }
+
+  const existing = await client.query(
+    `
+      SELECT id
+      FROM users
+      WHERE LOWER(TRIM(username)) = LOWER(TRIM($1))
+      LIMIT 2
+    `,
+    [username]
+  ) as { rows?: Array<{ id: number }> };
+
+  if ((existing.rows?.length ?? 0) > 1) {
+    throw new Error(`Ambiguous online user match for username: ${username}`);
+  }
+
+  if (existing.rows?.[0]?.id) {
+    return Number(existing.rows[0].id);
+  }
+
+  const inserted = await client.query(
+    `
+      INSERT INTO users (
+        username,
+        password_hash,
+        display_name,
+        display_name_ar,
+        display_name_en,
+        role,
+        email,
+        phone,
+        receiver_signature_base64,
+        created_at
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      RETURNING id
+    `,
+    [
+      username,
+      localUser.passwordHash,
+      localUser.displayName,
+      localUser.displayNameAr ?? null,
+      localUser.displayNameEn ?? null,
+      localUser.role || "user",
+      localUser.email ?? null,
+      localUser.phone ?? null,
+      localUser.receiverSignatureBase64 ?? null,
+      toPgTimestamp(localUser.createdAt) ?? new Date(),
+    ]
+  ) as { rows?: Array<{ id: number }> };
+
+  const onlineUserId = inserted.rows?.[0]?.id;
+  if (!onlineUserId) {
+    throw new Error(`Failed to create online user for username: ${username}`);
+  }
+
+  return Number(onlineUserId);
+}
+
 async function pushReceipt(client: any, receipt: LocalReceiptRow, operation: string, stats: SyncRunStats) {
   logReceiptSync(operation, receipt);
   const mapping = await resolveReceiptOnlineMapping(client, receipt);
+  const onlineCreatedBy = await resolveOnlineUserId(client, receipt.createdBy);
   const amount = Number(receipt.amount ?? 0);
   // A receipt number can repeat. The accounting identity requested here is
   // client + invoice (including a null invoice) + amount.
@@ -2037,7 +2212,8 @@ async function pushReceipt(client: any, receipt: LocalReceiptRow, operation: str
     await client.query(
       `UPDATE receipts SET receipt_number = $1, client_id = $2,
         invoice_id = $3, amount = $4, payment_method = $5,
-        status = $6, notes = $7, receipt_date = $8 WHERE id = $9`,
+        status = $6, notes = $7, receipt_date = $8,
+        created_by = $9 WHERE id = $10`,
       [
         String(receipt.receiptNumber || ""),
         mapping.onlineClientId,
@@ -2047,6 +2223,7 @@ async function pushReceipt(client: any, receipt: LocalReceiptRow, operation: str
         String(receipt.status || "draft"),
         receipt.notes ?? null,
         String(receipt.receiptDate || todayIsoDate()),
+        onlineCreatedBy,
         Number(row.id),
       ]
     );
@@ -2055,8 +2232,8 @@ async function pushReceipt(client: any, receipt: LocalReceiptRow, operation: str
   await client.query(
     `INSERT INTO receipts (
       receipt_number, client_id, invoice_id, amount,
-      payment_method, status, notes, receipt_date, created_at
-    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      payment_method, status, notes, receipt_date, created_by, created_at
+    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
     [
       String(receipt.receiptNumber || ""),
       mapping.onlineClientId,
@@ -2066,6 +2243,7 @@ async function pushReceipt(client: any, receipt: LocalReceiptRow, operation: str
       String(receipt.status || "draft"),
       receipt.notes ?? null,
       String(receipt.receiptDate || todayIsoDate()),
+      onlineCreatedBy,
       toPgTimestamp(receipt.createdAt) ?? new Date()
     ]
   );
