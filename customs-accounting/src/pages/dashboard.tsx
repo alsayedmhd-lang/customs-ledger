@@ -256,7 +256,7 @@ export default function Dashboard() {
   return (
     <motion.div
       variants={container} initial="hidden" animate="show"
-      className="space-y-5 [container-type:inline-size]"
+      className="space-y-3 [container-type:inline-size]"
     >
       <style>{`
         .dashboard-detail-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.5rem; }
@@ -275,12 +275,12 @@ export default function Dashboard() {
         <div className="absolute bottom-[-40px] left-[20%] w-[160px] h-[160px] rounded-full opacity-10"
           style={{ background: "radial-gradient(circle, rgba(255,255,255,0.55), transparent)" }} />
 
-        <div className="relative z-10 flex items-center gap-5 p-6 sm:p-8">
+        <div className="relative z-10 flex items-center gap-4 p-4 sm:p-5">
           {/* Logo */}
           <img
             src={logoSrc}
             alt="شعار الشركة"
-            className="w-20 h-20 sm:w-28 sm:h-28 flex-shrink-0 object-contain drop-shadow-2xl"
+            className="w-16 h-16 sm:w-24 sm:h-24 flex-shrink-0 object-contain drop-shadow-2xl"
             style={{ filter: "drop-shadow(0 0 20px rgba(255,255,255,0.24))" }}
             onError={(e) => {
               const el = e.currentTarget;
@@ -323,14 +323,14 @@ export default function Dashboard() {
               : (isAR ? "إظهار الأرقام" : "Show Numbers")}
           </button>
         </div>
-        <div className="grid gap-4" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 215px), 1fr))" }}>
+        <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 215px), 1fr))" }}>
           {stats.map((s) => (
             <motion.div
               key={s.title}
               variants={item}
-              className={`stat-card bg-card border ${s.border} rounded-2xl p-3 shadow-sm`}
+              className={`stat-card bg-card border ${s.border} rounded-2xl p-2 shadow-sm`}
             >
-              <div className={`flex items-start justify-between ${s.bg} rounded-xl p-2`}>
+              <div className={`flex items-start justify-between ${s.bg} rounded-xl p-1.5`}>
                 <div className="flex-1">
                   <p className="text-xs font-medium text-muted-foreground mb-1.5 uppercase tracking-wider">{s.title}</p>
                   <h3 className="text-xl font-semibold text-foreground tracking-tight">
@@ -341,7 +341,7 @@ export default function Dashboard() {
                   <s.icon className={`w-5 h-5 ${s.iconColor}`} />
                 </div>
               </div>
-              <div className={`mt-4 h-1 rounded-full ${s.color}`} />
+              <div className={`mt-2 h-1 rounded-full ${s.color}`} />
             </motion.div>
           ))}
         </div>
@@ -351,7 +351,7 @@ export default function Dashboard() {
         type="button"
         variants={item}
         onClick={handleOpenProjectGuide}
-        className="w-full bg-card border border-border rounded-2xl p-4 shadow-sm text-start transition-colors hover:bg-muted/50"
+        className="w-full bg-card border border-border rounded-2xl p-3 shadow-sm text-start transition-colors hover:bg-muted/50"
       >
         <div className="flex items-center gap-3">
           <div className="p-2.5 rounded-xl bg-primary/10 flex-shrink-0">
@@ -374,9 +374,9 @@ export default function Dashboard() {
         {/* Revenue Chart */}
         <motion.div
           variants={item}
-          className="min-w-0 bg-card border border-border rounded-2xl p-4 sm:p-6 shadow-sm"
+          className="min-w-0 bg-card border border-border rounded-2xl p-3 sm:p-4 shadow-sm"
         >
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center justify-between mb-3">
             <div>
               <h2 className="text-base font-bold text-foreground">{t("monthlyRevenue")}</h2>
               <p className="text-xs text-muted-foreground mt-0.5">{lang === "ar" ? "آخر 6 أشهر" : "Last 6 months"}</p>
@@ -385,7 +385,7 @@ export default function Dashboard() {
               <TrendingUp className="w-4 h-4 text-primary" />
             </div>
           </div>
-          <div className="h-56">
+          <div className="h-48">
             {chartData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={chartData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
@@ -457,7 +457,7 @@ export default function Dashboard() {
             ) : recentInvoices.length > 0 ? (
               recentInvoices.map((invoice) => (
                 <Link key={invoice.id} href={`/invoices/${invoice.id}/edit`}>
-                  <div className="flex items-center justify-between p-2.5 -mx-2.5 rounded-xl hover:bg-muted/50 cursor-pointer transition-colors group">
+                  <div className="flex items-center justify-between py-1.5 px-2 -mx-2 rounded-xl hover:bg-muted/50 cursor-pointer transition-colors group">
                     <div className="flex items-center gap-2.5 min-w-0">
                       <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
                         <FileText className="w-4 h-4 text-primary" />

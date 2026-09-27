@@ -1,4 +1,4 @@
-import { Suspense, lazy } from "react";
+import { Suspense, lazy, useEffect } from "react";
 import { Switch, Route, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -33,6 +33,30 @@ const AccountingPage = lazy(() => import("./pages/accounting/index"));
 const SettingsPage = lazy(() => import("./pages/settings/index"));
 const DeveloperSettingsPage = lazy(() => import("./pages/settings/developer"));
 const CustomerLedgerPage = lazy(() => import("./pages/customer-ledger"));
+
+const pagePreloaders = [
+  () => import("@/pages/customer-ledger/print"),
+  () => import("@/pages/not-found"),
+  () => import("./pages/login"),
+  () => import("./pages/dashboard"),
+  () => import("./pages/clients/index"),
+  () => import("./pages/clients/detail"),
+  () => import("./pages/clients/statement"),
+  () => import("./pages/invoices/index"),
+  () => import("./pages/invoices/form"),
+  () => import("./pages/invoices/receipt"),
+  () => import("./pages/templates/index"),
+  () => import("./pages/statements/index"),
+  () => import("./pages/receipts/index"),
+  () => import("./pages/receipts/form"),
+  () => import("./pages/receipts/print"),
+  () => import("./pages/users/index"),
+  () => import("./pages/trash/index"),
+  () => import("./pages/accounting/index"),
+  () => import("./pages/settings/index"),
+  () => import("./pages/settings/developer"),
+  () => import("./pages/customer-ledger"),
+];
 
 const queryClient = new QueryClient();
 const DEVELOPER_FRONTEND_ALLOWED_ROUTES = [
@@ -75,6 +99,14 @@ function ProtectedRouter() {
   const { user, isLoading } = useAuth();
   const { lang } = useLanguage();
   const [location] = useLocation();
+  useEffect(() => {
+    if (!user || isLoading || window.name === "external-print-window") return;
+    const timer = window.setTimeout(() => {
+      for (const load of pagePreloaders) void load();
+    }, 700);
+    return () => window.clearTimeout(timer);
+  }, [user, isLoading]);
+
   const isAR = lang === "ar";
   const isDeveloperFrontendOnly =
     sessionStorage.getItem("developer_entry_from_login") === "true" &&
