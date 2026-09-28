@@ -16,7 +16,7 @@ import {
 import { getStorageInfo } from "../utils/storage/get-storage-info";
 import { bootstrapInternalDatabase, completeInternalAccounting } from "../utils/internal-bootstrap";
 import { ensureInternalSyncJournal, getInternalSyncJournalStatus } from "../utils/internal-sync-journal";
-import { runInternalLocalToServerOnce, runInternalServerToLocalOnce } from "../utils/internal-sync-worker";
+import { runInternalLocalToServerOnce, runInternalServerToLocalOnce, runInternalBidirectionalOnce } from "../utils/internal-sync-worker";
 
 const router = Router();
 try {
@@ -1648,6 +1648,65 @@ router.get("/developer/internal-database/journal-status", (_req, res) => {
     return res.json({ ok: true, ...getInternalSyncJournalStatus() });
   } catch (error) {
     return res.status(503).json({ ok: false, error: sanitizeDatabaseError(error) });
+  }
+});
+
+router.get("/developer/internal-database/server-journal-status", async (_req, res) => {
+  let client: InstanceType<typeof PgClient> | undefined;
+  try {
+    const saved = mapInternalDatabaseSettings(await getSettingsRow());
+    let connectionString = saved.connectionString.trim();
+    if (!connectionString) {
+      if (!saved.host.trim() || !saved.databaseName.trim() || !saved.username.trim()) {
+        return res.status(400).json({ ok: false, error: "Internal server settings are incomplete" });
+      }
+      const url = new URL("postgresql://localhost");
+      url.hostname = saved.host.trim();
+      url.port = saved.port;
+      url.pathname = `/${encodeURIComponent(saved.databaseName.trim())}`;
+      url.username = saved.username.trim();
+      url.password = saved.password;
+      connectionString = url.toString();
+    }
+    if (!isPostgresConnectionString(connectionString)) {
+      return res.status(400).json({ ok: false, error: "Only PostgreSQL connection strings are supported" });
+    }
+    client = new PgClient({ connectionString, connectionTimeoutMillis: 5000, query_timeout: 5000 });
+    await client.connect();
+    const result = await client.query("SELECT COUNT(*) AS count FROM public.internal_sync_journal") as { rows: Array<{ count: string }> };
+    return res.json({ ok: true, pendingChanges: Number(result.rows[0].count) });
+  } catch (error) {
+    return res.status(400).json({ ok: false, error: sanitizeDatabaseError(error) });
+  } finally {
+    if (client) await client.end().catch(() => undefined);
+  }
+});
+
+router.post("/developer/internal-database/sync-bidirectional", async (_req, res) => {
+  try {
+    const saved = mapInternalDatabaseSettings(await getSettingsRow());
+    if (saved.syncMode !== "bidirectional") {
+      return res.status(400).json({ ok: false, error: "Save Bidirectional as the sync direction first" });
+    }
+    let connectionString = saved.connectionString.trim();
+    if (!connectionString) {
+      if (!saved.host.trim() || !saved.databaseName.trim() || !saved.username.trim()) {
+        return res.status(400).json({ ok: false, error: "Internal server settings are incomplete" });
+      }
+      const url = new URL("postgresql://localhost");
+      url.hostname = saved.host.trim();
+      url.port = saved.port;
+      url.pathname = `/${encodeURIComponent(saved.databaseName.trim())}`;
+      url.username = saved.username.trim();
+      url.password = saved.password;
+      connectionString = url.toString();
+    }
+    if (!isPostgresConnectionString(connectionString)) {
+      return res.status(400).json({ ok: false, error: "Only PostgreSQL connection strings are supported" });
+    }
+    return res.json({ ok: true, ...await runInternalBidirectionalOnce(connectionString) });
+  } catch (error) {
+    return res.status(400).json({ ok: false, error: sanitizeDatabaseError(error) });
   }
 });
 

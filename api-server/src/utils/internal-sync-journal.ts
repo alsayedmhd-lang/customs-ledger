@@ -33,6 +33,8 @@ export function ensureInternalSyncJournal() {
   // Recreate older triggers so a server pull can update SQLite without
   // sending those same rows straight back to PostgreSQL.
   for (const table of TABLES) {
+    const columns = (sqlite.prepare(`PRAGMA table_info("${table}")`).all() as Array<{ name: string }>).map(({ name }) => name);
+    const changed = columns.map((name) => `NEW."${name}" IS NOT OLD."${name}"`).join(" OR ");
     for (const [event, operation, reference] of [
       ["INSERT", "insert", "NEW"],
       ["UPDATE", "update", "NEW"],
@@ -43,6 +45,7 @@ export function ensureInternalSyncJournal() {
         CREATE TRIGGER internal_sync_${table}_${operation}
         AFTER ${event} ON "${table}"
         WHEN (SELECT capture_enabled FROM internal_sync_control WHERE id = 1) = 1
+          ${operation === "update" ? `AND (${changed})` : ""}
         BEGIN
           INSERT INTO internal_sync_journal (table_name, row_id, operation, created_at)
           VALUES ('${table}', ${reference}.id, '${operation}', CAST(unixepoch('now') * 1000 AS INTEGER));

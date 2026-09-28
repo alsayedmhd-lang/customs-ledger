@@ -23,6 +23,23 @@ const quote = (value: string) => `"${value}"`;
 let inFlight: Promise<{ processed: number; changedRows: number }> | null = null;
 let pullInFlight = false;
 
+export async function runInternalBidirectionalOnce(connectionString: string) {
+  if (inFlight || pullInFlight) throw new Error("An internal sync is already in progress");
+  pullInFlight = true;
+  try {
+    const pushed = await performInternalPush(connectionString, true);
+    let pulled;
+    try {
+      pulled = await performInternalJournalPull(connectionString);
+    } catch (error) {
+      throw new Error(`Local push completed (${pushed.processed} events), but server pull failed: ${error instanceof Error ? error.message : String(error)}`);
+    }
+    return { pushed, pulled };
+  } finally {
+    pullInFlight = false;
+  }
+}
+
 export function runInternalLocalToServerOnce(connectionString: string) {
   if (pullInFlight) throw new Error("An internal server pull is in progress");
   if (inFlight) return inFlight;
@@ -105,6 +122,15 @@ async function performInternalPull(connectionString: string) {
     await client.end().catch(() => undefined);
   }
 
+  return applyInternalSource(source);
+}
+
+function applyInternalSource(source: Array<{
+  name: string;
+  columns: Array<{ name: string; type: string }>;
+  rows: Array<Record<string, unknown>>;
+}>) {
+  if (!sqlite) throw new Error("SQLite database is unavailable");
   // better-sqlite3 transactions are synchronous. This second check closes
   // the gap between fetching the server snapshot and writing to SQLite.
   return sqlite.transaction(() => {
@@ -150,7 +176,64 @@ async function performInternalPull(connectionString: string) {
   })();
 }
 
-async function performInternalPush(connectionString: string) {
+async function performInternalJournalPull(connectionString: string) {
+  ensureInternalSyncJournal();
+  if (!sqlite) throw new Error("SQLite database is unavailable");
+  const pending = sqlite.prepare("SELECT COUNT(*) AS count FROM internal_sync_journal").get() as { count: number };
+  if (pending.count) throw new Error(`Local changes appeared during bidirectional sync (${pending.count}); retry after sending them`);
+  const client = new Client({ connectionString, connectionTimeoutMillis: 5000 });
+  let transaction = false;
+  let watermark = 0;
+  const source: Array<{ name: string; columns: Array<{ name: string; type: string }>; rows: Array<Record<string, unknown>> }> = [];
+  try {
+    await client.connect();
+    await client.query("BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY");
+    transaction = true;
+    await client.query("SET LOCAL statement_timeout = '30s'");
+    const result = await client.query(
+      "SELECT id, table_name, row_id, operation FROM public.internal_sync_journal ORDER BY id LIMIT 500",
+    );
+    const changes = result.rows as Array<{ id: string; table_name: string; row_id: number; operation: string }>;
+    if (changes.length) {
+      watermark = Number(changes[changes.length - 1].id);
+      const valid = new Set<string>(TABLES);
+      const ids = new Map<string, Set<number>>();
+      for (const change of changes) {
+        if (!valid.has(change.table_name)) throw new Error(`Unknown server journal table: ${change.table_name}`);
+        if (!ids.has(change.table_name)) ids.set(change.table_name, new Set());
+        ids.get(change.table_name)!.add(change.row_id);
+      }
+      for (const table of TABLES) {
+        const columns = sqlite.prepare(`PRAGMA table_info(${quote(table)})`).all() as Array<{ name: string; type: string }>;
+        const rows: Array<Record<string, unknown>> = [];
+        for (const id of ids.get(table) || []) {
+          const row = await client.query(`SELECT ${columns.map(({ name }) =>
+            TIMESTAMP_COLUMNS.has(`${table}.${name}`) ? `${quote(name)}::text AS ${quote(name)}` : quote(name)
+          ).join(", ")} FROM public.${quote(table)} WHERE id = $1`, [id]);
+          if (!row.rows.length) throw new Error(`Server deletion needs manual resolution: ${table} id ${id}`);
+          rows.push(row.rows[0]);
+        }
+        source.push({ name: table, columns, rows });
+      }
+    }
+    await client.query("COMMIT");
+    transaction = false;
+    if (!watermark) return { processed: 0, inserted: 0, updated: 0 };
+    const applied = applyInternalSource(source);
+    // A concurrent server transaction can commit an older sequence ID after
+    // our snapshot. Acknowledge only the IDs actually read in this run.
+    await client.query("DELETE FROM public.internal_sync_journal WHERE id = ANY($1::bigint[])",
+      [changes.map(({ id }) => id)]);
+    return { processed: changes.length, inserted: applied.inserted, updated: applied.updated };
+  } catch (error) {
+    if (transaction) await client.query("ROLLBACK").catch(() => undefined);
+    throw error;
+  } finally {
+    await client.end().catch(() => undefined);
+  }
+}
+
+async function performInternalPush(connectionString: string, bidirectional = false) {
   ensureInternalSyncJournal();
   if (!sqlite) throw new Error("SQLite database is unavailable");
   const changes = sqlite.prepare(`
@@ -184,6 +267,18 @@ async function performInternalPush(connectionString: string) {
     inTransaction = true;
     await client.query("SET LOCAL statement_timeout = '30s'");
     await client.query("SELECT pg_advisory_xact_lock(68291301)");
+    if (bidirectional) {
+      // Lock business tables before checking the remote journal so a server
+      // writer cannot slip an edit between conflict detection and our upsert.
+      await client.query(`LOCK TABLE ${TABLES.map((table) => `public.${quote(table)}`).join(", ")} IN SHARE ROW EXCLUSIVE MODE`);
+      const remote = await client.query("SELECT table_name, row_id FROM public.internal_sync_journal");
+      const localKeys = new Set(changes.map(({ tableName, rowId }) => `${tableName}:${rowId}`));
+      const conflicts = remote.rows.filter((row) => localKeys.has(`${row.table_name}:${row.row_id}`));
+      if (conflicts.length) throw new Error(`Internal sync conflict in ${conflicts.length} record(s); no local changes were sent`);
+    }
+    // PostgreSQL's journal must record independent server edits, not changes
+    // that this worker is already delivering from SQLite.
+    await client.query("SELECT set_config('ledger.internal_sync_origin', 'local', true)");
     // Children are removed first; parent rows are inserted first.
     for (const table of [...snapshot].reverse()) {
       for (const { id, row } of table.rows) {

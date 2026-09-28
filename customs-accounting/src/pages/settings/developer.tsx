@@ -467,10 +467,12 @@ export default function DeveloperSettingsPage() {
   const [isTestingInternalDatabase, setIsTestingInternalDatabase] = useState(false);
   const [isCheckingInternalReadiness, setIsCheckingInternalReadiness] = useState(false);
   const [internalJournalCount, setInternalJournalCount] = useState<number | null>(null);
+  const [serverJournalCount, setServerJournalCount] = useState<number | null>(null);
   const [isCheckingInternalJournal, setIsCheckingInternalJournal] = useState(false);
+  const [isCheckingServerJournal, setIsCheckingServerJournal] = useState(false);
   const [isRunningInternalPush, setIsRunningInternalPush] = useState(false);
   const [isRunningInternalPull, setIsRunningInternalPull] = useState(false);
-  const [isBootstrappingInternal, setIsBootstrappingInternal] = useState(false);
+  const [isRunningInternalBidirectional, setIsRunningInternalBidirectional] = useState(false);
   const [isCompletingAccounting, setIsCompletingAccounting] = useState(false);
   const [internalReadiness, setInternalReadiness] = useState<{
     schemaComplete: boolean;
@@ -798,6 +800,54 @@ export default function DeveloperSettingsPage() {
     }
   }
 
+  async function checkServerJournal() {
+    setIsCheckingServerJournal(true);
+    setInternalDatabaseMessage("");
+    try {
+      const response = await fetch(`${API_BASE}/developer/internal-database/server-journal-status`, {
+        headers: authHeaders(),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.ok) throw new Error(data.error || tr("تعذر فحص تغييرات الخادم", "Could not check server changes"));
+      const count = Number(data.pendingChanges || 0);
+      setServerJournalCount(count);
+      setInternalDatabaseMessage(tr(
+        `التغييرات المنتظرة من الخادم الداخلي: ${count}`,
+        `Changes pending from internal server: ${count}`,
+      ));
+    } catch (error) {
+      setInternalDatabaseMessage(error instanceof Error ? error.message : tr("تعذر فحص تغييرات الخادم", "Could not check server changes"));
+    } finally {
+      setIsCheckingServerJournal(false);
+    }
+  }
+
+  async function runInternalBidirectional() {
+    if (!window.confirm(tr(
+      "ستُرسل التغييرات المحلية وتُستلم تغييرات الخادم الداخلي. إذا تغيّر السجل نفسه في الجهتين ستتوقف المزامنة دون إرسال التعارض. تأكد من وجود نسخة احتياطية حديثة للقاعدتين. هل تريد التنفيذ؟",
+      "Local changes will be sent and internal server changes received. If the same record changed on both sides, the sync stops before sending the conflict. Ensure recent backups of both databases. Proceed?",
+    ))) return;
+    setIsRunningInternalBidirectional(true);
+    setInternalDatabaseMessage("");
+    try {
+      const response = await fetch(`${API_BASE}/developer/internal-database/sync-bidirectional`, {
+        method: "POST", headers: authHeaders(),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.ok) throw new Error(data.error || tr("فشلت المزامنة الثنائية", "Bidirectional sync failed"));
+      setInternalDatabaseMessage(tr(
+        `اكتملت المزامنة الثنائية: أُرسلت ${Number(data.pushed?.processed || 0)} تغييرات محلية، واستُلمت ${Number(data.pulled?.processed || 0)} تغييرات من الخادم (${Number(data.pulled?.inserted || 0)} جديد، ${Number(data.pulled?.updated || 0)} محدّث).`,
+        `Bidirectional sync complete: ${Number(data.pushed?.processed || 0)} local events sent, ${Number(data.pulled?.processed || 0)} server events received (${Number(data.pulled?.inserted || 0)} inserted, ${Number(data.pulled?.updated || 0)} updated).`,
+      ));
+      setInternalJournalCount(null);
+      setServerJournalCount(null);
+    } catch (error) {
+      setInternalDatabaseMessage(error instanceof Error ? error.message : tr("فشلت المزامنة الثنائية", "Bidirectional sync failed"));
+    } finally {
+      setIsRunningInternalBidirectional(false);
+    }
+  }
+
   async function runInternalPush() {
     setIsRunningInternalPush(true);
     setInternalDatabaseMessage("");
@@ -841,30 +891,6 @@ export default function DeveloperSettingsPage() {
       setInternalDatabaseMessage(error instanceof Error ? error.message : tr("فشل استلام بيانات الخادم الداخلي", "Could not receive internal server data"));
     } finally {
       setIsRunningInternalPull(false);
-    }
-  }
-
-  async function bootstrapInternal() {
-    if (!internalReadiness?.schemaComplete || internalReadiness.tables.some((row) => row.internalCount !== 0)) return;
-    if (!window.confirm(tr(
-      "نقل أولي للبيانات إلى الخادم الداخلي الفارغ؟ ستُنقل سجلات الأعمال، وتُستثنى المرفقات والرموز المؤقتة وإعدادات الجهاز وسجل انتظار Online.",
-      "Transfer initial data to the empty internal server? Business records will be copied; attachments, temporary codes, device settings and the Online queue are excluded.",
-    ))) return;
-    setIsBootstrappingInternal(true);
-    setInternalDatabaseMessage("");
-    try {
-      const response = await fetch(`${API_BASE}/developer/internal-database/bootstrap`, {
-        method: "POST", headers: authHeaders(),
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok || !data.ok) throw new Error(data.error || tr("تعذر النقل الأولي", "Initial transfer failed"));
-      const total = (data.transferred || []).reduce((sum: number, row: { count: number }) => sum + row.count, 0);
-      setInternalDatabaseMessage(tr(`اكتمل النقل الأولي: ${total} سجل. افحص الأعداد مرة أخرى.`, `Initial transfer completed: ${total} records. Check the counts again.`));
-      setInternalReadiness(null);
-    } catch (error) {
-      setInternalDatabaseMessage(error instanceof Error ? error.message : tr("تعذر النقل الأولي", "Initial transfer failed"));
-    } finally {
-      setIsBootstrappingInternal(false);
     }
   }
 
@@ -2727,7 +2753,7 @@ export default function DeveloperSettingsPage() {
                           onChange={(event) => setInternalDatabaseConfig((current) => ({ ...current, intervalMinutes: Number(event.target.value) }))} />
                       </DevField>
                     </div>
-                    <p className="text-xs text-muted-foreground">{tr("المزامنة اليدوية في الاتجاه المحدد متاحة. الحذف من الخادم لا يُحذف محليًا. المزامنة التلقائية وثنائية الاتجاه غير مفعّلتين.", "Manual sync is available in the selected direction. Server deletions are not applied locally. Automatic and bidirectional sync are not enabled.")}</p>
+                    <p className="text-xs text-muted-foreground">{tr("المزامنة اليدوية في الاتجاه المحدد متاحة. التعارض والحذف من الخادم يوقفان المزامنة الثنائية للمراجعة. المزامنة التلقائية غير مفعّلة.", "Manual sync is available in the selected direction. Conflicts and server deletions stop bidirectional sync for review. Automatic sync is not enabled.")}</p>
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -2743,9 +2769,8 @@ export default function DeveloperSettingsPage() {
                   <Button type="button" variant="outline" size="sm" onClick={checkInternalJournal} disabled={isCheckingInternalJournal}>
                     {isCheckingInternalJournal ? tr("جارٍ فحص التغييرات...", "Checking changes...") : tr("فحص التغييرات الداخلية", "Check internal changes")}
                   </Button>
-                  <Button type="button" variant="outline" size="sm" onClick={bootstrapInternal}
-                    disabled={isBootstrappingInternal || !internalReadiness?.schemaComplete || internalReadiness.tables.some((row) => row.internalCount !== 0)}>
-                    {isBootstrappingInternal ? tr("جارٍ النقل الأولي...", "Transferring...") : tr("نقل البيانات الأولي", "Initial data transfer")}
+                  <Button type="button" variant="outline" size="sm" onClick={checkServerJournal} disabled={isCheckingServerJournal}>
+                    {isCheckingServerJournal ? tr("جارٍ فحص الخادم...", "Checking server...") : tr("فحص تغييرات الخادم", "Check server changes")}
                   </Button>
                   {internalReadiness?.tables.some((row) => row.name === "invoice_accounting" && row.localCount !== null && row.internalCount !== null && row.internalCount < row.localCount) && (
                     <Button type="button" variant="outline" size="sm" onClick={completeInternalAccountingRows} disabled={isCompletingAccounting}>
@@ -2760,7 +2785,17 @@ export default function DeveloperSettingsPage() {
                     disabled={isRunningInternalPull || internalDatabaseConfig.syncMode !== "internal-to-local"}>
                     {isRunningInternalPull ? tr("جارٍ استلام البيانات...", "Receiving data...") : tr("مزامنة الداخلي إلى المحلي الآن", "Sync internal to local now")}
                   </Button>
+                  <Button type="button" size="sm" onClick={runInternalBidirectional}
+                    disabled={isRunningInternalBidirectional || internalDatabaseConfig.syncMode !== "bidirectional"}>
+                    {isRunningInternalBidirectional ? tr("جارٍ المزامنة الثنائية...", "Syncing both directions...") : tr("مزامنة ثنائية الآن", "Bidirectional sync now")}
+                  </Button>
                 </div>
+                {(internalJournalCount !== null || serverJournalCount !== null) && (
+                  <p className="text-xs text-muted-foreground">{tr(
+                    `المنتظر محليًا: ${internalJournalCount ?? "—"} | المنتظر على الخادم: ${serverJournalCount ?? "—"}`,
+                    `Local pending: ${internalJournalCount ?? "—"} | Server pending: ${serverJournalCount ?? "—"}`,
+                  )}</p>
+                )}
                 {internalDatabaseMessage && <p role="status" className="text-sm text-muted-foreground">{internalDatabaseMessage}</p>}
                 {internalReadiness && (
                   <div className="overflow-x-auto rounded-xl border border-border">
