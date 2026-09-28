@@ -107,6 +107,10 @@ const developerPermissionColumns = [
   ["internal_database_username", "ALTER TABLE company_settings ADD COLUMN internal_database_username TEXT DEFAULT ''"],
   ["internal_database_password", "ALTER TABLE company_settings ADD COLUMN internal_database_password TEXT DEFAULT ''"],
   ["internal_database_connection_string", "ALTER TABLE company_settings ADD COLUMN internal_database_connection_string TEXT DEFAULT ''"],
+  ["internal_sync_mode", "ALTER TABLE company_settings ADD COLUMN internal_sync_mode TEXT DEFAULT 'bidirectional'"],
+  ["internal_sync_auto_sync", "ALTER TABLE company_settings ADD COLUMN internal_sync_auto_sync INTEGER DEFAULT 0"],
+  ["internal_sync_timing", "ALTER TABLE company_settings ADD COLUMN internal_sync_timing TEXT DEFAULT 'startup'"],
+  ["internal_sync_interval_minutes", "ALTER TABLE company_settings ADD COLUMN internal_sync_interval_minutes INTEGER DEFAULT 30"],
   ["sync_mode", "ALTER TABLE company_settings ADD COLUMN sync_mode TEXT DEFAULT 'local-to-online'"],
   ["sync_auto_sync", "ALTER TABLE company_settings ADD COLUMN sync_auto_sync INTEGER DEFAULT 0"],
   ["sync_timing", "ALTER TABLE company_settings ADD COLUMN sync_timing TEXT DEFAULT 'startup'"],
@@ -1615,6 +1619,10 @@ function mapInternalDatabaseSettings(settings: any) {
     username: settings.internalDatabaseUsername || "",
     password: settings.internalDatabasePassword || "",
     connectionString: settings.internalDatabaseConnectionString || "",
+    syncMode: settings.internalSyncMode || "bidirectional",
+    autoSync: toBool(settings.internalSyncAutoSync),
+    timing: settings.internalSyncTiming || "startup",
+    intervalMinutes: Number(settings.internalSyncIntervalMinutes || 30),
   };
 }
 
@@ -1642,6 +1650,12 @@ router.put("/developer/internal-database/settings", async (req, res) => {
     if (connectionString && !isPostgresConnectionString(connectionString)) {
       return res.status(400).json({ error: "Only PostgreSQL connection strings are supported" });
     }
+    if (!["local-to-internal", "internal-to-local", "bidirectional"].includes(body.syncMode) ||
+        !["startup", "interval"].includes(body.timing) ||
+        !Number.isInteger(body.intervalMinutes) || body.intervalMinutes < 1 || body.intervalMinutes > 1440 ||
+        typeof body.autoSync !== "boolean") {
+      return res.status(400).json({ error: "Invalid internal sync settings" });
+    }
     const settings = await getSettingsRow();
     const [updated] = await db.update(companySettingsTable).set({
       internalDatabaseHost: body.host.trim(),
@@ -1650,12 +1664,53 @@ router.put("/developer/internal-database/settings", async (req, res) => {
       internalDatabaseUsername: body.username.trim(),
       internalDatabasePassword: body.password,
       internalDatabaseConnectionString: connectionString,
+      internalSyncMode: body.syncMode,
+      internalSyncAutoSync: body.autoSync,
+      internalSyncTiming: body.timing,
+      internalSyncIntervalMinutes: body.intervalMinutes,
       updatedAt: new Date(),
     }).where(eq(companySettingsTable.id, Number(settings.id))).returning();
     return res.json(mapInternalDatabaseSettings(updated));
   } catch (error) {
     console.error(error);
     return res.status(500).json({ error: "Failed to save internal database settings" });
+  }
+});
+
+router.post("/developer/internal-database/test-connection", async (_req, res) => {
+  let client: InstanceType<typeof PgClient> | undefined;
+  try {
+    const settings = await getSettingsRow();
+    const saved = mapInternalDatabaseSettings(settings);
+    let connectionString = saved.connectionString.trim();
+    if (!connectionString) {
+      const host = saved.host.trim();
+      const databaseName = saved.databaseName.trim();
+      const username = saved.username.trim();
+      if (!host || !databaseName || !username) {
+        return res.status(400).json({ success: false, error: "Internal server host, database name, and username are required" });
+      }
+      const url = new URL("postgresql://localhost");
+      url.hostname = host;
+      url.port = saved.port;
+      url.pathname = `/${encodeURIComponent(databaseName)}`;
+      url.username = username;
+      url.password = saved.password;
+      connectionString = url.toString();
+    }
+    if (!isPostgresConnectionString(connectionString)) {
+      return res.status(400).json({ success: false, error: "Only PostgreSQL connection strings are supported" });
+    }
+    client = new PgClient({ connectionString, connectionTimeoutMillis: 5000, query_timeout: 5000 });
+    await client.connect();
+    await client.query("select 1");
+    return res.json({ success: true });
+  } catch (error) {
+    return res.status(400).json({ success: false, error: sanitizeDatabaseError(error) });
+  } finally {
+    if (client) {
+      try { await client.end(); } catch { /* The connection test result is already known. */ }
+    }
   }
 });
 

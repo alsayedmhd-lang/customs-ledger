@@ -464,8 +464,11 @@ export default function DeveloperSettingsPage() {
   const [databaseMessage, setDatabaseMessage] = useState("");
   const [internalDatabaseMessage, setInternalDatabaseMessage] = useState("");
   const [isSavingInternalDatabase, setIsSavingInternalDatabase] = useState(false);
+  const [isTestingInternalDatabase, setIsTestingInternalDatabase] = useState(false);
+  const [internalDatabaseConnectionStatus, setInternalDatabaseConnectionStatus] = useState<"untested" | "connected" | "failed">("untested");
   const [internalDatabaseConfig, setInternalDatabaseConfig] = useState({
     host: "", port: "5432", databaseName: "", username: "", password: "", connectionString: "",
+    syncMode: "bidirectional", autoSync: false, timing: "startup", intervalMinutes: 30,
   });
   const [syncWorkerMessage, setSyncWorkerMessage] = useState("");
   const [systemDiagnostics, setSystemDiagnostics] = useState<SystemDiagnosticsResult | null>(null);
@@ -677,6 +680,8 @@ export default function DeveloperSettingsPage() {
       setInternalDatabaseConfig({
         host: data.host || "", port: data.port || "5432", databaseName: data.databaseName || "",
         username: data.username || "", password: data.password || "", connectionString: data.connectionString || "",
+        syncMode: data.syncMode || "bidirectional", autoSync: Boolean(data.autoSync),
+        timing: data.timing || "startup", intervalMinutes: Number(data.intervalMinutes || 30),
       });
     } catch (error) {
       setInternalDatabaseMessage(error instanceof Error ? error.message : tr("تعذر تحميل إعدادات الخادم الداخلي", "Failed to load internal server settings"));
@@ -692,6 +697,9 @@ export default function DeveloperSettingsPage() {
       });
       if (!response.ok) {
         const problem = await response.json().catch(() => ({}));
+        if (problem.error === "Invalid internal sync settings") {
+          throw new Error(tr("تحقق من خيارات المزامنة والفاصل الزمني (1 إلى 1440 دقيقة)", "Check sync options and the interval (1 to 1440 minutes)"));
+        }
         if (problem.error === "Invalid internal database port") {
           throw new Error(tr("المنفذ يجب أن يكون رقمًا بين 1 و65535", "Port must be between 1 and 65535"));
         }
@@ -702,6 +710,7 @@ export default function DeveloperSettingsPage() {
       }
       const data = await response.json();
       setInternalDatabaseConfig(data);
+      setInternalDatabaseConnectionStatus("untested");
       setInternalDatabaseMessage(tr("تم حفظ إعدادات الخادم الداخلي", "Internal server settings saved"));
     } catch (error) {
       setInternalDatabaseMessage(error instanceof Error ? error.message : tr("تعذر حفظ إعدادات الخادم الداخلي", "Failed to save internal server settings"));
@@ -709,6 +718,35 @@ export default function DeveloperSettingsPage() {
       setIsSavingInternalDatabase(false);
     }
   }
+
+  async function testInternalDatabaseConnection() {
+    setInternalDatabaseMessage("");
+    setIsTestingInternalDatabase(true);
+    try {
+      const response = await fetch(`${API_BASE}/developer/internal-database/test-connection`, {
+        method: "POST", headers: authHeaders(),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.success) {
+        setInternalDatabaseConnectionStatus("failed");
+        setInternalDatabaseMessage(data.error
+          ? tr(`فشل الاتصال: ${data.error}`, `Connection failed: ${data.error}`)
+          : tr("فشل اختبار الاتصال", "Connection test failed"));
+        return;
+      }
+      setInternalDatabaseConnectionStatus("connected");
+      setInternalDatabaseMessage(tr("نجح الاتصال بالخادم الداخلي", "Internal server connection succeeded"));
+    } catch {
+      setInternalDatabaseConnectionStatus("failed");
+      setInternalDatabaseMessage(tr("تعذر الوصول إلى خدمة اختبار الاتصال", "Could not reach the connection test service"));
+    } finally {
+      setIsTestingInternalDatabase(false);
+    }
+  }
+
+  useEffect(() => {
+    setInternalDatabaseConnectionStatus("untested");
+  }, [internalDatabaseConfig]);
 
   async function unlockDeveloper(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -2479,7 +2517,7 @@ export default function DeveloperSettingsPage() {
               </summary>
               <div className="space-y-4 border-t border-border p-5">
                 <p className="text-sm text-muted-foreground">
-                  {tr("احفظ إعدادات PostgreSQL الخاصة بالشبكة الداخلية هنا. سيُفعّل اختبار الاتصال والمزامنة بعد تجهيز الخادم الداخلي.", "Save PostgreSQL settings for the internal network here. Connection testing and sync will be enabled when the internal server is ready.")}
+                  {tr("احفظ إعدادات PostgreSQL الخاصة بالشبكة الداخلية ثم اختبر الاتصال. ستبقى المزامنة معطلة حتى تجهيزها.", "Save PostgreSQL settings for the internal network, then test the connection. Sync remains disabled until it is ready.")}
                 </p>
                 <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                   <DevField label={tr("عنوان الخادم الداخلي", "Internal server address")}>
@@ -2502,14 +2540,56 @@ export default function DeveloperSettingsPage() {
                   </DevField>
                 </div>
                 <div className="grid gap-3 md:grid-cols-2">
-                  <InfoRow isAR={isAR} label={tr("حالة اتصال الخادم الداخلي", "Internal server connection")} value={tr("لم يُختبر بعد", "Not tested yet")} />
+                  <InfoRow isAR={isAR} label={tr("حالة اتصال الخادم الداخلي", "Internal server connection")} value={internalDatabaseConnectionStatus === "connected" ? tr("متصل", "Connected") : internalDatabaseConnectionStatus === "failed" ? tr("فشل الاتصال", "Connection failed") : tr("لم يُختبر بعد", "Not tested yet")} />
                   <InfoRow isAR={isAR} label={tr("حالة المزامنة الداخلية", "Internal sync status")} value={tr("غير مفعّلة", "Not enabled")} />
+                </div>
+                <div className="grid gap-4 rounded-xl border border-border bg-background/70 p-4 xl:grid-cols-2">
+                  <div className="space-y-3">
+                    <h4 className="text-sm font-bold">{tr("اتجاه المزامنة الداخلية", "Internal sync direction")}</h4>
+                    {[
+                      { id: "local-to-internal", ar: "من المحلي إلى الخادم الداخلي", en: "Local to internal server" },
+                      { id: "internal-to-local", ar: "من الخادم الداخلي إلى المحلي", en: "Internal server to local" },
+                      { id: "bidirectional", ar: "مزامنة ثنائية الاتجاه", en: "Bidirectional sync" },
+                    ].map((option) => (
+                      <label key={option.id} className="flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-sm">
+                        <input type="radio" name="internal-sync-mode" className="h-4 w-4 accent-primary"
+                          checked={internalDatabaseConfig.syncMode === option.id}
+                          onChange={() => setInternalDatabaseConfig((current) => ({ ...current, syncMode: option.id }))} />
+                        <span>{tr(option.ar, option.en)}</span>
+                      </label>
+                    ))}
+                  </div>
+                  <div className="space-y-3">
+                    <h4 className="text-sm font-bold">{tr("جدولة المزامنة الداخلية", "Internal sync schedule")}</h4>
+                    <label className="flex items-center justify-between rounded-lg border border-border bg-background px-3 py-2 text-sm">
+                      <span>{tr("تشغيل تلقائي عند تفعيل المزامنة", "Auto sync when available")}</span>
+                      <input type="checkbox" className="h-4 w-4 accent-primary" checked={internalDatabaseConfig.autoSync}
+                        onChange={(event) => setInternalDatabaseConfig((current) => ({ ...current, autoSync: event.target.checked }))} />
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <DevField label={tr("التوقيت", "Timing")}>
+                        <select className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm"
+                          value={internalDatabaseConfig.timing}
+                          onChange={(event) => setInternalDatabaseConfig((current) => ({ ...current, timing: event.target.value }))}>
+                          <option value="startup">{tr("عند بدء التشغيل", "On startup")}</option>
+                          <option value="interval">{tr("كل فترة", "At intervals")}</option>
+                        </select>
+                      </DevField>
+                      <DevField label={tr("الفاصل بالدقائق", "Interval in minutes")}>
+                        <Input type="number" min={1} max={1440} value={internalDatabaseConfig.intervalMinutes}
+                          onChange={(event) => setInternalDatabaseConfig((current) => ({ ...current, intervalMinutes: Number(event.target.value) }))} />
+                      </DevField>
+                    </div>
+                    <p className="text-xs text-muted-foreground">{tr("تُحفظ الخيارات الآن، ولن تعمل المزامنة تلقائيًا حتى يتم تفعيل محركها.", "These options are saved now; sync will not run automatically until its worker is enabled.")}</p>
+                  </div>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <Button type="button" variant="outline" size="sm" onClick={saveInternalDatabaseSettings} disabled={isSavingInternalDatabase}>
                     {isSavingInternalDatabase ? tr("جارٍ الحفظ...", "Saving...") : tr("حفظ الإعدادات", "Save settings")}
                   </Button>
-                  <Button type="button" variant="outline" size="sm" disabled>{tr("اختبار الاتصال", "Test connection")}</Button>
+                  <Button type="button" variant="outline" size="sm" onClick={testInternalDatabaseConnection} disabled={isTestingInternalDatabase || isSavingInternalDatabase}>
+                    {isTestingInternalDatabase ? tr("جارٍ الاختبار...", "Testing...") : tr("اختبار الاتصال", "Test connection")}
+                  </Button>
                   <Button type="button" size="sm" disabled>{tr("بدء المزامنة الداخلية", "Start internal sync")}</Button>
                 </div>
                 {internalDatabaseMessage && <p role="status" className="text-sm text-muted-foreground">{internalDatabaseMessage}</p>}
