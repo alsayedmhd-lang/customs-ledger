@@ -14,6 +14,7 @@ import {
   runConfiguredSyncOnce,
 } from "../utils/sync-worker";
 import { getStorageInfo } from "../utils/storage/get-storage-info";
+import { bootstrapInternalDatabase, completeInternalAccounting } from "../utils/internal-bootstrap";
 
 const router = Router();
 const require = createRequire(path.join(process.cwd(), "package.json"));
@@ -1771,6 +1772,57 @@ router.get("/developer/internal-database/sync-readiness", async (_req, res) => {
     if (client) {
       try { await client.end(); } catch { /* Read-only inventory has finished. */ }
     }
+  }
+});
+
+router.post("/developer/internal-database/bootstrap", async (_req, res) => {
+  try {
+    const saved = mapInternalDatabaseSettings(await getSettingsRow());
+    let connectionString = saved.connectionString.trim();
+    if (!connectionString) {
+      if (!saved.host.trim() || !saved.databaseName.trim() || !saved.username.trim()) {
+        return res.status(400).json({ ok: false, error: "Internal server settings are incomplete" });
+      }
+      const url = new URL("postgresql://localhost");
+      url.hostname = saved.host.trim();
+      url.port = saved.port;
+      url.pathname = `/${encodeURIComponent(saved.databaseName.trim())}`;
+      url.username = saved.username.trim();
+      url.password = saved.password;
+      connectionString = url.toString();
+    }
+    if (!isPostgresConnectionString(connectionString)) {
+      return res.status(400).json({ ok: false, error: "Only PostgreSQL connection strings are supported" });
+    }
+    const result = await bootstrapInternalDatabase(connectionString);
+    return res.json({ ok: true, ...result });
+  } catch (error) {
+    return res.status(400).json({ ok: false, error: sanitizeDatabaseError(error) });
+  }
+});
+
+router.post("/developer/internal-database/complete-accounting", async (_req, res) => {
+  try {
+    const saved = mapInternalDatabaseSettings(await getSettingsRow());
+    let connectionString = saved.connectionString.trim();
+    if (!connectionString) {
+      if (!saved.host.trim() || !saved.databaseName.trim() || !saved.username.trim()) {
+        return res.status(400).json({ ok: false, error: "Internal server settings are incomplete" });
+      }
+      const url = new URL("postgresql://localhost");
+      url.hostname = saved.host.trim();
+      url.port = saved.port;
+      url.pathname = `/${encodeURIComponent(saved.databaseName.trim())}`;
+      url.username = saved.username.trim();
+      url.password = saved.password;
+      connectionString = url.toString();
+    }
+    if (!isPostgresConnectionString(connectionString)) {
+      return res.status(400).json({ ok: false, error: "Only PostgreSQL connection strings are supported" });
+    }
+    return res.json({ ok: true, ...await completeInternalAccounting(connectionString) });
+  } catch (error) {
+    return res.status(400).json({ ok: false, error: sanitizeDatabaseError(error) });
   }
 });
 

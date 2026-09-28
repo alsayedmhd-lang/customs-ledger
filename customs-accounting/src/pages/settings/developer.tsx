@@ -466,6 +466,8 @@ export default function DeveloperSettingsPage() {
   const [isSavingInternalDatabase, setIsSavingInternalDatabase] = useState(false);
   const [isTestingInternalDatabase, setIsTestingInternalDatabase] = useState(false);
   const [isCheckingInternalReadiness, setIsCheckingInternalReadiness] = useState(false);
+  const [isBootstrappingInternal, setIsBootstrappingInternal] = useState(false);
+  const [isCompletingAccounting, setIsCompletingAccounting] = useState(false);
   const [internalReadiness, setInternalReadiness] = useState<{
     schemaComplete: boolean;
     tables: Array<{ name: string; localCount: number | null; internalCount: number | null }>;
@@ -767,6 +769,51 @@ export default function DeveloperSettingsPage() {
       setInternalDatabaseMessage(error instanceof Error ? error.message : tr("تعذر فحص الجداول", "Could not check tables"));
     } finally {
       setIsCheckingInternalReadiness(false);
+    }
+  }
+
+  async function bootstrapInternal() {
+    if (!internalReadiness?.schemaComplete || internalReadiness.tables.some((row) => row.internalCount !== 0)) return;
+    if (!window.confirm(tr(
+      "نقل أولي للبيانات إلى الخادم الداخلي الفارغ؟ ستُنقل سجلات الأعمال، وتُستثنى المرفقات والرموز المؤقتة وإعدادات الجهاز وسجل انتظار Online.",
+      "Transfer initial data to the empty internal server? Business records will be copied; attachments, temporary codes, device settings and the Online queue are excluded.",
+    ))) return;
+    setIsBootstrappingInternal(true);
+    setInternalDatabaseMessage("");
+    try {
+      const response = await fetch(`${API_BASE}/developer/internal-database/bootstrap`, {
+        method: "POST", headers: authHeaders(),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.ok) throw new Error(data.error || tr("تعذر النقل الأولي", "Initial transfer failed"));
+      const total = (data.transferred || []).reduce((sum: number, row: { count: number }) => sum + row.count, 0);
+      setInternalDatabaseMessage(tr(`اكتمل النقل الأولي: ${total} سجل. افحص الأعداد مرة أخرى.`, `Initial transfer completed: ${total} records. Check the counts again.`));
+      setInternalReadiness(null);
+    } catch (error) {
+      setInternalDatabaseMessage(error instanceof Error ? error.message : tr("تعذر النقل الأولي", "Initial transfer failed"));
+    } finally {
+      setIsBootstrappingInternal(false);
+    }
+  }
+
+  async function completeInternalAccountingRows() {
+    setIsCompletingAccounting(true);
+    setInternalDatabaseMessage("");
+    try {
+      const response = await fetch(`${API_BASE}/developer/internal-database/complete-accounting`, {
+        method: "POST", headers: authHeaders(),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.ok) throw new Error(data.error || tr("تعذر إكمال سجلات الحسابات", "Could not complete accounting records"));
+      setInternalDatabaseMessage(tr(
+        `اكتملت سجلات الحسابات: أضيفت المعرفات ${(data.insertedIds || []).join(", ") || "لا يوجد"}. افحص الأعداد مرة أخرى.`,
+        `Accounting records completed: added IDs ${(data.insertedIds || []).join(", ") || "none"}. Check the counts again.`,
+      ));
+      setInternalReadiness(null);
+    } catch (error) {
+      setInternalDatabaseMessage(error instanceof Error ? error.message : tr("تعذر إكمال سجلات الحسابات", "Could not complete accounting records"));
+    } finally {
+      setIsCompletingAccounting(false);
     }
   }
 
@@ -2620,6 +2667,15 @@ export default function DeveloperSettingsPage() {
                   <Button type="button" variant="outline" size="sm" onClick={checkInternalSyncReadiness} disabled={isCheckingInternalReadiness || isSavingInternalDatabase}>
                     {isCheckingInternalReadiness ? tr("جارٍ فحص الجداول...", "Checking tables...") : tr("فحص جاهزية الجداول", "Check table readiness")}
                   </Button>
+                  <Button type="button" variant="outline" size="sm" onClick={bootstrapInternal}
+                    disabled={isBootstrappingInternal || !internalReadiness?.schemaComplete || internalReadiness.tables.some((row) => row.internalCount !== 0)}>
+                    {isBootstrappingInternal ? tr("جارٍ النقل الأولي...", "Transferring...") : tr("نقل البيانات الأولي", "Initial data transfer")}
+                  </Button>
+                  {internalReadiness?.tables.some((row) => row.name === "invoice_accounting" && row.localCount !== null && row.internalCount !== null && row.internalCount < row.localCount) && (
+                    <Button type="button" variant="outline" size="sm" onClick={completeInternalAccountingRows} disabled={isCompletingAccounting}>
+                      {isCompletingAccounting ? tr("جارٍ إكمال الحسابات...", "Completing accounting...") : tr("إكمال سجلات الحسابات", "Complete accounting records")}
+                    </Button>
+                  )}
                   <Button type="button" size="sm" disabled>{tr("بدء المزامنة الداخلية", "Start internal sync")}</Button>
                 </div>
                 {internalDatabaseMessage && <p role="status" className="text-sm text-muted-foreground">{internalDatabaseMessage}</p>}
