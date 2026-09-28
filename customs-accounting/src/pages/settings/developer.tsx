@@ -462,6 +462,11 @@ export default function DeveloperSettingsPage() {
   const [onlineDatabaseConnected, setOnlineDatabaseConnected] = useState(false);
   const [savedMessage, setSavedMessage] = useState("");
   const [databaseMessage, setDatabaseMessage] = useState("");
+  const [internalDatabaseMessage, setInternalDatabaseMessage] = useState("");
+  const [isSavingInternalDatabase, setIsSavingInternalDatabase] = useState(false);
+  const [internalDatabaseConfig, setInternalDatabaseConfig] = useState({
+    host: "", port: "5432", databaseName: "", username: "", password: "", connectionString: "",
+  });
   const [syncWorkerMessage, setSyncWorkerMessage] = useState("");
   const [systemDiagnostics, setSystemDiagnostics] = useState<SystemDiagnosticsResult | null>(null);
   const [systemDiagnosticsError, setSystemDiagnosticsError] = useState("");
@@ -572,6 +577,7 @@ export default function DeveloperSettingsPage() {
     if (unlocked) {
       void (async () => {
         await loadSettings();
+        await loadInternalDatabaseSettings();
         await loadCurrentLicenseStatus();
       })();
       void loadSyncQueueStatus();
@@ -660,6 +666,47 @@ export default function DeveloperSettingsPage() {
       applyDeveloperSettingsState(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : tr("تعذر تحميل إعدادات المطوّر", "Failed to load developer settings"));
+    }
+  }
+
+  async function loadInternalDatabaseSettings() {
+    try {
+      const response = await fetch(`${API_BASE}/developer/internal-database/settings`, { headers: authHeaders() });
+      if (!response.ok) throw new Error(tr("تعذر تحميل إعدادات الخادم الداخلي", "Failed to load internal server settings"));
+      const data = await response.json();
+      setInternalDatabaseConfig({
+        host: data.host || "", port: data.port || "5432", databaseName: data.databaseName || "",
+        username: data.username || "", password: data.password || "", connectionString: data.connectionString || "",
+      });
+    } catch (error) {
+      setInternalDatabaseMessage(error instanceof Error ? error.message : tr("تعذر تحميل إعدادات الخادم الداخلي", "Failed to load internal server settings"));
+    }
+  }
+
+  async function saveInternalDatabaseSettings() {
+    setInternalDatabaseMessage("");
+    setIsSavingInternalDatabase(true);
+    try {
+      const response = await fetch(`${API_BASE}/developer/internal-database/settings`, {
+        method: "PUT", headers: authHeaders(), body: JSON.stringify(internalDatabaseConfig),
+      });
+      if (!response.ok) {
+        const problem = await response.json().catch(() => ({}));
+        if (problem.error === "Invalid internal database port") {
+          throw new Error(tr("المنفذ يجب أن يكون رقمًا بين 1 و65535", "Port must be between 1 and 65535"));
+        }
+        if (problem.error === "Only PostgreSQL connection strings are supported") {
+          throw new Error(tr("رابط الاتصال يجب أن يبدأ بـ postgresql:// أو postgres://", "Connection string must start with postgresql:// or postgres://"));
+        }
+        throw new Error(tr("تعذر حفظ إعدادات الخادم الداخلي", "Failed to save internal server settings"));
+      }
+      const data = await response.json();
+      setInternalDatabaseConfig(data);
+      setInternalDatabaseMessage(tr("تم حفظ إعدادات الخادم الداخلي", "Internal server settings saved"));
+    } catch (error) {
+      setInternalDatabaseMessage(error instanceof Error ? error.message : tr("تعذر حفظ إعدادات الخادم الداخلي", "Failed to save internal server settings"));
+    } finally {
+      setIsSavingInternalDatabase(false);
     }
   }
 
@@ -2431,7 +2478,41 @@ export default function DeveloperSettingsPage() {
                 <span aria-hidden="true" className="text-muted-foreground transition-transform group-open:rotate-180">⌄</span>
               </summary>
               <div className="space-y-4 border-t border-border p-5">
-                <p className="text-sm text-muted-foreground">{tr("ستظهر إعدادات قاعدة بيانات الخادم الداخلي هنا عند توفرها في البرنامج.", "Internal server database settings will appear here when available in the application.")}</p>
+                <p className="text-sm text-muted-foreground">
+                  {tr("احفظ إعدادات PostgreSQL الخاصة بالشبكة الداخلية هنا. سيُفعّل اختبار الاتصال والمزامنة بعد تجهيز الخادم الداخلي.", "Save PostgreSQL settings for the internal network here. Connection testing and sync will be enabled when the internal server is ready.")}
+                </p>
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                  <DevField label={tr("عنوان الخادم الداخلي", "Internal server address")}>
+                    <Input value={internalDatabaseConfig.host} onChange={(event) => setInternalDatabaseConfig((current) => ({ ...current, host: event.target.value }))} placeholder="192.168.1.10" dir="ltr" />
+                  </DevField>
+                  <DevField label={tr("المنفذ", "Port")}>
+                    <Input value={internalDatabaseConfig.port} onChange={(event) => setInternalDatabaseConfig((current) => ({ ...current, port: event.target.value }))} placeholder="5432" dir="ltr" />
+                  </DevField>
+                  <DevField label={tr("اسم قاعدة البيانات", "Database name")}>
+                    <Input value={internalDatabaseConfig.databaseName} onChange={(event) => setInternalDatabaseConfig((current) => ({ ...current, databaseName: event.target.value }))} placeholder="ledger" dir="ltr" />
+                  </DevField>
+                  <DevField label={tr("اسم المستخدم", "Username")}>
+                    <Input value={internalDatabaseConfig.username} onChange={(event) => setInternalDatabaseConfig((current) => ({ ...current, username: event.target.value }))} dir="ltr" />
+                  </DevField>
+                  <DevField label={tr("كلمة المرور", "Password")}>
+                    <Input value={internalDatabaseConfig.password} onChange={(event) => setInternalDatabaseConfig((current) => ({ ...current, password: event.target.value }))} type="password" dir="ltr" />
+                  </DevField>
+                  <DevField label={tr("رابط الاتصال البديل", "Alternative connection string")}>
+                    <Input value={internalDatabaseConfig.connectionString} onChange={(event) => setInternalDatabaseConfig((current) => ({ ...current, connectionString: event.target.value }))} type="password" placeholder="postgresql://..." dir="ltr" />
+                  </DevField>
+                </div>
+                <div className="grid gap-3 md:grid-cols-2">
+                  <InfoRow isAR={isAR} label={tr("حالة اتصال الخادم الداخلي", "Internal server connection")} value={tr("لم يُختبر بعد", "Not tested yet")} />
+                  <InfoRow isAR={isAR} label={tr("حالة المزامنة الداخلية", "Internal sync status")} value={tr("غير مفعّلة", "Not enabled")} />
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" variant="outline" size="sm" onClick={saveInternalDatabaseSettings} disabled={isSavingInternalDatabase}>
+                    {isSavingInternalDatabase ? tr("جارٍ الحفظ...", "Saving...") : tr("حفظ الإعدادات", "Save settings")}
+                  </Button>
+                  <Button type="button" variant="outline" size="sm" disabled>{tr("اختبار الاتصال", "Test connection")}</Button>
+                  <Button type="button" size="sm" disabled>{tr("بدء المزامنة الداخلية", "Start internal sync")}</Button>
+                </div>
+                {internalDatabaseMessage && <p role="status" className="text-sm text-muted-foreground">{internalDatabaseMessage}</p>}
               </div>
             </details>
             {databaseMessage && <div role="status" className="text-sm text-muted-foreground">{databaseMessage}</div>}

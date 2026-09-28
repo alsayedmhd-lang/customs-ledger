@@ -101,6 +101,12 @@ const developerPermissionColumns = [
   ["database_name", "ALTER TABLE company_settings ADD COLUMN database_name TEXT DEFAULT ''"],
   ["database_username", "ALTER TABLE company_settings ADD COLUMN database_username TEXT DEFAULT ''"],
   ["database_password", "ALTER TABLE company_settings ADD COLUMN database_password TEXT DEFAULT ''"],
+  ["internal_database_host", "ALTER TABLE company_settings ADD COLUMN internal_database_host TEXT DEFAULT ''"],
+  ["internal_database_port", "ALTER TABLE company_settings ADD COLUMN internal_database_port TEXT DEFAULT '5432'"],
+  ["internal_database_name", "ALTER TABLE company_settings ADD COLUMN internal_database_name TEXT DEFAULT ''"],
+  ["internal_database_username", "ALTER TABLE company_settings ADD COLUMN internal_database_username TEXT DEFAULT ''"],
+  ["internal_database_password", "ALTER TABLE company_settings ADD COLUMN internal_database_password TEXT DEFAULT ''"],
+  ["internal_database_connection_string", "ALTER TABLE company_settings ADD COLUMN internal_database_connection_string TEXT DEFAULT ''"],
   ["sync_mode", "ALTER TABLE company_settings ADD COLUMN sync_mode TEXT DEFAULT 'local-to-online'"],
   ["sync_auto_sync", "ALTER TABLE company_settings ADD COLUMN sync_auto_sync INTEGER DEFAULT 0"],
   ["sync_timing", "ALTER TABLE company_settings ADD COLUMN sync_timing TEXT DEFAULT 'startup'"],
@@ -1598,6 +1604,58 @@ router.get("/developer/settings", async (_req, res) => {
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: "Failed to fetch developer settings" });
+  }
+});
+
+function mapInternalDatabaseSettings(settings: any) {
+  return {
+    host: settings.internalDatabaseHost || "",
+    port: settings.internalDatabasePort || "5432",
+    databaseName: settings.internalDatabaseName || "",
+    username: settings.internalDatabaseUsername || "",
+    password: settings.internalDatabasePassword || "",
+    connectionString: settings.internalDatabaseConnectionString || "",
+  };
+}
+
+router.get("/developer/internal-database/settings", async (_req, res) => {
+  try {
+    return res.json(mapInternalDatabaseSettings(await getSettingsRow()));
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: "Failed to fetch internal database settings" });
+  }
+});
+
+router.put("/developer/internal-database/settings", async (req, res) => {
+  try {
+    const body = req.body ?? {};
+    const fields = ["host", "databaseName", "username", "password", "connectionString"] as const;
+    if (fields.some((field) => typeof body[field] !== "string" || body[field].length > 2048)) {
+      return res.status(400).json({ error: "Invalid internal database settings" });
+    }
+    const port = String(body.port ?? "").trim();
+    if (!/^\d{1,5}$/.test(port) || Number(port) < 1 || Number(port) > 65535) {
+      return res.status(400).json({ error: "Invalid internal database port" });
+    }
+    const connectionString = body.connectionString.trim();
+    if (connectionString && !isPostgresConnectionString(connectionString)) {
+      return res.status(400).json({ error: "Only PostgreSQL connection strings are supported" });
+    }
+    const settings = await getSettingsRow();
+    const [updated] = await db.update(companySettingsTable).set({
+      internalDatabaseHost: body.host.trim(),
+      internalDatabasePort: port,
+      internalDatabaseName: body.databaseName.trim(),
+      internalDatabaseUsername: body.username.trim(),
+      internalDatabasePassword: body.password,
+      internalDatabaseConnectionString: connectionString,
+      updatedAt: new Date(),
+    }).where(eq(companySettingsTable.id, Number(settings.id))).returning();
+    return res.json(mapInternalDatabaseSettings(updated));
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ error: "Failed to save internal database settings" });
   }
 });
 
