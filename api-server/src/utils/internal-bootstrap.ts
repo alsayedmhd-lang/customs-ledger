@@ -28,7 +28,7 @@ const BOOLEANS = new Set([
 
 function quote(name: string) { return `"${name}"`; }
 
-function convert(table: string, column: string, value: unknown) {
+export function convertInternalValue(table: string, column: string, value: unknown) {
   if (value == null) return null;
   const key = `${table}.${column}`;
   if (TIMESTAMPS.has(key)) {
@@ -73,7 +73,7 @@ export async function bootstrapInternalDatabase(connectionString: string) {
       const missing = sourceColumns.filter((column) => !columns.has(column));
       if (missing.length) throw new Error(`Missing internal columns in ${name}: ${missing.join(", ")}`);
       for (const row of rows) {
-        const values = sourceColumns.map((column) => convert(name, column, row[column]));
+        const values = sourceColumns.map((column) => convertInternalValue(name, column, row[column]));
         const placeholders = sourceColumns.map((_, index) => `$${index + 1}`).join(", ");
         await client.query(
           `INSERT INTO public.${quote(name)} (${sourceColumns.map(quote).join(", ")}) VALUES (${placeholders})`,
@@ -119,7 +119,7 @@ export async function completeInternalAccounting(connectionString: string) {
     await client.query("SELECT pg_advisory_xact_lock(68291301)");
     const insertedIds: number[] = [];
     for (const row of rows) {
-      const values = columns.map((column) => convert("invoice_accounting", column, row[column]));
+      const values = columns.map((column) => convertInternalValue("invoice_accounting", column, row[column]));
       const inserted = await client.query(
         `INSERT INTO public.invoice_accounting (${columns.map(quote).join(", ")}) ` +
         `VALUES (${columns.map((_, index) => `$${index + 1}`).join(", ")}) ` +

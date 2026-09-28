@@ -466,6 +466,9 @@ export default function DeveloperSettingsPage() {
   const [isSavingInternalDatabase, setIsSavingInternalDatabase] = useState(false);
   const [isTestingInternalDatabase, setIsTestingInternalDatabase] = useState(false);
   const [isCheckingInternalReadiness, setIsCheckingInternalReadiness] = useState(false);
+  const [internalJournalCount, setInternalJournalCount] = useState<number | null>(null);
+  const [isCheckingInternalJournal, setIsCheckingInternalJournal] = useState(false);
+  const [isRunningInternalPush, setIsRunningInternalPush] = useState(false);
   const [isBootstrappingInternal, setIsBootstrappingInternal] = useState(false);
   const [isCompletingAccounting, setIsCompletingAccounting] = useState(false);
   const [internalReadiness, setInternalReadiness] = useState<{
@@ -769,6 +772,49 @@ export default function DeveloperSettingsPage() {
       setInternalDatabaseMessage(error instanceof Error ? error.message : tr("تعذر فحص الجداول", "Could not check tables"));
     } finally {
       setIsCheckingInternalReadiness(false);
+    }
+  }
+
+  async function checkInternalJournal() {
+    setIsCheckingInternalJournal(true);
+    setInternalDatabaseMessage("");
+    try {
+      const response = await fetch(`${API_BASE}/developer/internal-database/journal-status`, {
+        headers: authHeaders(),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.ok) throw new Error(data.error || tr("تعذر فحص التغييرات", "Could not check changes"));
+      const count = Number(data.pendingChanges || 0);
+      setInternalJournalCount(count);
+      setInternalDatabaseMessage(tr(
+        `التغييرات المحلية المنتظرة للخادم الداخلي: ${count}`,
+        `Local changes pending for internal server: ${count}`,
+      ));
+    } catch (error) {
+      setInternalDatabaseMessage(error instanceof Error ? error.message : tr("تعذر فحص التغييرات", "Could not check changes"));
+    } finally {
+      setIsCheckingInternalJournal(false);
+    }
+  }
+
+  async function runInternalPush() {
+    setIsRunningInternalPush(true);
+    setInternalDatabaseMessage("");
+    try {
+      const response = await fetch(`${API_BASE}/developer/internal-database/sync-local-to-server`, {
+        method: "POST", headers: authHeaders(),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.ok) throw new Error(data.error || tr("فشلت المزامنة الداخلية", "Internal sync failed"));
+      setInternalDatabaseMessage(tr(
+        `نُقلت ${Number(data.processed || 0)} تغييرات إلى الخادم الداخلي. افحص التغييرات مجددًا.`,
+        `${Number(data.processed || 0)} changes sent to the internal server. Check changes again.`,
+      ));
+      setInternalJournalCount(null);
+    } catch (error) {
+      setInternalDatabaseMessage(error instanceof Error ? error.message : tr("فشلت المزامنة الداخلية", "Internal sync failed"));
+    } finally {
+      setIsRunningInternalPush(false);
     }
   }
 
@@ -2615,7 +2661,8 @@ export default function DeveloperSettingsPage() {
                 </div>
                 <div className="grid gap-3 md:grid-cols-2">
                   <InfoRow isAR={isAR} label={tr("حالة اتصال الخادم الداخلي", "Internal server connection")} value={internalDatabaseConnectionStatus === "connected" ? tr("متصل", "Connected") : internalDatabaseConnectionStatus === "failed" ? tr("فشل الاتصال", "Connection failed") : tr("لم يُختبر بعد", "Not tested yet")} />
-                  <InfoRow isAR={isAR} label={tr("حالة المزامنة الداخلية", "Internal sync status")} value={tr("غير مفعّلة", "Not enabled")} />
+                  <InfoRow isAR={isAR} label={tr("حالة المزامنة الداخلية", "Internal sync status")} value={tr("التشغيل اليدوي من المحلي إلى الداخلي متاح عند اختيار اتجاهه", "Manual local-to-internal sync is available when selected")} />
+                  <InfoRow isAR={isAR} label={tr("التغييرات المحلية المنتظرة للخادم الداخلي", "Local changes pending for internal server")} value={internalJournalCount ?? tr("لم تُفحص", "Not checked")} />
                 </div>
                 <div className="grid gap-4 rounded-xl border border-border bg-background/70 p-4 xl:grid-cols-2">
                   <div className="space-y-3">
@@ -2654,7 +2701,7 @@ export default function DeveloperSettingsPage() {
                           onChange={(event) => setInternalDatabaseConfig((current) => ({ ...current, intervalMinutes: Number(event.target.value) }))} />
                       </DevField>
                     </div>
-                    <p className="text-xs text-muted-foreground">{tr("تُحفظ الخيارات الآن، ولن تعمل المزامنة تلقائيًا حتى يتم تفعيل محركها.", "These options are saved now; sync will not run automatically until its worker is enabled.")}</p>
+                    <p className="text-xs text-muted-foreground">{tr("المزامنة اليدوية من المحلي إلى الداخلي متاحة. لم تُفعّل المزامنة التلقائية أو الاتجاهات الأخرى بعد.", "Manual local-to-internal sync is available. Automatic sync and other directions are not enabled yet.")}</p>
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -2667,6 +2714,9 @@ export default function DeveloperSettingsPage() {
                   <Button type="button" variant="outline" size="sm" onClick={checkInternalSyncReadiness} disabled={isCheckingInternalReadiness || isSavingInternalDatabase}>
                     {isCheckingInternalReadiness ? tr("جارٍ فحص الجداول...", "Checking tables...") : tr("فحص جاهزية الجداول", "Check table readiness")}
                   </Button>
+                  <Button type="button" variant="outline" size="sm" onClick={checkInternalJournal} disabled={isCheckingInternalJournal}>
+                    {isCheckingInternalJournal ? tr("جارٍ فحص التغييرات...", "Checking changes...") : tr("فحص التغييرات الداخلية", "Check internal changes")}
+                  </Button>
                   <Button type="button" variant="outline" size="sm" onClick={bootstrapInternal}
                     disabled={isBootstrappingInternal || !internalReadiness?.schemaComplete || internalReadiness.tables.some((row) => row.internalCount !== 0)}>
                     {isBootstrappingInternal ? tr("جارٍ النقل الأولي...", "Transferring...") : tr("نقل البيانات الأولي", "Initial data transfer")}
@@ -2676,7 +2726,10 @@ export default function DeveloperSettingsPage() {
                       {isCompletingAccounting ? tr("جارٍ إكمال الحسابات...", "Completing accounting...") : tr("إكمال سجلات الحسابات", "Complete accounting records")}
                     </Button>
                   )}
-                  <Button type="button" size="sm" disabled>{tr("بدء المزامنة الداخلية", "Start internal sync")}</Button>
+                  <Button type="button" size="sm" onClick={runInternalPush}
+                    disabled={isRunningInternalPush || internalDatabaseConfig.syncMode !== "local-to-internal"}>
+                    {isRunningInternalPush ? tr("جارٍ إرسال التغييرات...", "Sending changes...") : tr("مزامنة المحلي إلى الداخلي الآن", "Sync local to internal now")}
+                  </Button>
                 </div>
                 {internalDatabaseMessage && <p role="status" className="text-sm text-muted-foreground">{internalDatabaseMessage}</p>}
                 {internalReadiness && (
