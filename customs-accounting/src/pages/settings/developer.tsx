@@ -465,6 +465,11 @@ export default function DeveloperSettingsPage() {
   const [internalDatabaseMessage, setInternalDatabaseMessage] = useState("");
   const [isSavingInternalDatabase, setIsSavingInternalDatabase] = useState(false);
   const [isTestingInternalDatabase, setIsTestingInternalDatabase] = useState(false);
+  const [isCheckingInternalReadiness, setIsCheckingInternalReadiness] = useState(false);
+  const [internalReadiness, setInternalReadiness] = useState<{
+    schemaComplete: boolean;
+    tables: Array<{ name: string; localCount: number | null; internalCount: number | null }>;
+  } | null>(null);
   const [internalDatabaseConnectionStatus, setInternalDatabaseConnectionStatus] = useState<"untested" | "connected" | "failed">("untested");
   const [internalDatabaseConfig, setInternalDatabaseConfig] = useState({
     host: "", port: "5432", databaseName: "", username: "", password: "", connectionString: "",
@@ -744,8 +749,30 @@ export default function DeveloperSettingsPage() {
     }
   }
 
+  async function checkInternalSyncReadiness() {
+    setIsCheckingInternalReadiness(true);
+    setInternalDatabaseMessage("");
+    setInternalReadiness(null);
+    try {
+      const response = await fetch(`${API_BASE}/developer/internal-database/sync-readiness`, {
+        headers: authHeaders(),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.ok) throw new Error(data.error || tr("فشل فحص الجداول", "Table check failed"));
+      setInternalReadiness(data);
+      setInternalDatabaseMessage(data.schemaComplete
+        ? tr("الجداول موجودة. راجع أعداد السجلات قبل تشغيل المزامنة.", "Tables exist. Review record counts before starting sync.")
+        : tr("بعض الجداول مفقودة. أكمل إنشاءها قبل تشغيل المزامنة.", "Some tables are missing. Create them before starting sync."));
+    } catch (error) {
+      setInternalDatabaseMessage(error instanceof Error ? error.message : tr("تعذر فحص الجداول", "Could not check tables"));
+    } finally {
+      setIsCheckingInternalReadiness(false);
+    }
+  }
+
   useEffect(() => {
     setInternalDatabaseConnectionStatus("untested");
+    setInternalReadiness(null);
   }, [internalDatabaseConfig]);
 
   async function unlockDeveloper(event: React.FormEvent<HTMLFormElement>) {
@@ -2590,9 +2617,30 @@ export default function DeveloperSettingsPage() {
                   <Button type="button" variant="outline" size="sm" onClick={testInternalDatabaseConnection} disabled={isTestingInternalDatabase || isSavingInternalDatabase}>
                     {isTestingInternalDatabase ? tr("جارٍ الاختبار...", "Testing...") : tr("اختبار الاتصال", "Test connection")}
                   </Button>
+                  <Button type="button" variant="outline" size="sm" onClick={checkInternalSyncReadiness} disabled={isCheckingInternalReadiness || isSavingInternalDatabase}>
+                    {isCheckingInternalReadiness ? tr("جارٍ فحص الجداول...", "Checking tables...") : tr("فحص جاهزية الجداول", "Check table readiness")}
+                  </Button>
                   <Button type="button" size="sm" disabled>{tr("بدء المزامنة الداخلية", "Start internal sync")}</Button>
                 </div>
                 {internalDatabaseMessage && <p role="status" className="text-sm text-muted-foreground">{internalDatabaseMessage}</p>}
+                {internalReadiness && (
+                  <div className="overflow-x-auto rounded-xl border border-border">
+                    <table className="w-full text-sm">
+                      <thead className="bg-muted/50"><tr>
+                        <th className="p-2 text-start">{tr("الجدول", "Table")}</th>
+                        <th className="p-2 text-start">{tr("المحلي", "Local")}</th>
+                        <th className="p-2 text-start">{tr("الخادم الداخلي", "Internal server")}</th>
+                      </tr></thead>
+                      <tbody>{internalReadiness.tables.map((row) => (
+                        <tr key={row.name} className="border-t border-border">
+                          <td className="p-2" dir="ltr">{row.name}</td>
+                          <td className="p-2">{row.localCount ?? tr("مفقود", "Missing")}</td>
+                          <td className="p-2">{row.internalCount ?? tr("مفقود", "Missing")}</td>
+                        </tr>
+                      ))}</tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             </details>
             {databaseMessage && <div role="status" className="text-sm text-muted-foreground">{databaseMessage}</div>}

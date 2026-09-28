@@ -1714,6 +1714,66 @@ router.post("/developer/internal-database/test-connection", async (_req, res) =>
   }
 });
 
+// Read-only inventory for the internal PostgreSQL target. It intentionally
+// does not consume the Online sync queue or modify either database.
+router.get("/developer/internal-database/sync-readiness", async (_req, res) => {
+  const tableNames = [
+    "clients", "users", "invoice_item_templates", "invoices",
+    "invoice_items", "receipts", "customer_ledger",
+    "invoice_accounting", "invoice_attachments", "invoice_audit_logs",
+    "otp_codes", "sync_queue", "company_settings",
+  ] as const;
+  let client: InstanceType<typeof PgClient> | undefined;
+  try {
+    if (!sqlite) return res.status(503).json({ ok: false, error: "SQLite database is unavailable" });
+    const saved = mapInternalDatabaseSettings(await getSettingsRow());
+    let connectionString = saved.connectionString.trim();
+    if (!connectionString) {
+      if (!saved.host.trim() || !saved.databaseName.trim() || !saved.username.trim()) {
+        return res.status(400).json({ ok: false, error: "Internal server settings are incomplete" });
+      }
+      const url = new URL("postgresql://localhost");
+      url.hostname = saved.host.trim();
+      url.port = saved.port;
+      url.pathname = `/${encodeURIComponent(saved.databaseName.trim())}`;
+      url.username = saved.username.trim();
+      url.password = saved.password;
+      connectionString = url.toString();
+    }
+    if (!isPostgresConnectionString(connectionString)) {
+      return res.status(400).json({ ok: false, error: "Only PostgreSQL connection strings are supported" });
+    }
+    client = new PgClient({ connectionString, connectionTimeoutMillis: 5000, query_timeout: 5000 });
+    await client.connect();
+    const result: Array<{ name: string; localCount: number | null; internalCount: number | null; error?: string }> = [];
+    for (const name of tableNames) {
+      const exists = sqlite.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(name);
+      const localCount = exists
+        ? Number((sqlite.prepare(`SELECT COUNT(*) AS count FROM "${name}"`).get() as { count: number }).count)
+        : null;
+      const remote = await client.query(`SELECT to_regclass('public.${name}') AS table_name`) as { rows: Array<{ table_name: string | null }> };
+      const internalCount = remote.rows[0]?.table_name
+        ? Number(((await client.query(`SELECT COUNT(*) AS count FROM public."${name}"`)) as { rows: Array<{ count: string }> }).rows[0].count)
+        : null;
+      result.push({ name, localCount, internalCount });
+    }
+    const complete = result.every((row) => row.localCount !== null && row.internalCount !== null);
+    return res.json({
+      ok: true,
+      schemaComplete: complete,
+      databaseName: saved.databaseName || new URL(connectionString).pathname.slice(1),
+      tables: result,
+      syncEnabled: false,
+    });
+  } catch (error) {
+    return res.status(400).json({ ok: false, error: sanitizeDatabaseError(error) });
+  } finally {
+    if (client) {
+      try { await client.end(); } catch { /* Read-only inventory has finished. */ }
+    }
+  }
+});
+
 router.get("/developer/database/check", (_req, res) => {
   return res.json({
     databaseStatus: sqlite ? "connected" : "unavailable",
