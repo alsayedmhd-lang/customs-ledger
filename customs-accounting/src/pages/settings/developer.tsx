@@ -1432,7 +1432,7 @@ export default function DeveloperSettingsPage() {
 <html lang="${isAR ? "ar" : "en"}" dir="${direction}">
 <head>
   <meta charset="utf-8" />
-  <title>Ledger - System Diagnostics Report</title>
+  <title>${escapeDiagnosticReportHtml(tr("Ledger - تقرير تشخيص النظام", "Ledger - System Diagnostics Report"))}</title>
   <style>
     @page { size: A4; margin: 14mm; }
     * { box-sizing: border-box; }
@@ -1544,18 +1544,18 @@ export default function DeveloperSettingsPage() {
 <body>
   <main class="report-page">
   <section class="header">
-    <h1>Ledger - System Diagnostics Report</h1>
+    <h1>${escapeDiagnosticReportHtml(tr("Ledger - تقرير تشخيص النظام", "Ledger - System Diagnostics Report"))}</h1>
     <div class="meta">
       <div><strong>${escapeDiagnosticReportHtml(tr("التاريخ والوقت", "Date and time"))}:</strong> ${escapeDiagnosticReportHtml(checkedAt)}</div>
       <div><strong>${escapeDiagnosticReportHtml(tr("إصدار التطبيق", "App Version"))}:</strong> ${escapeDiagnosticReportHtml(appVersion)}</div>
-      <div><strong>${escapeDiagnosticReportHtml("Data Root")}:</strong> ${escapeDiagnosticReportHtml(dataRoot)}</div>
+      <div><strong>${escapeDiagnosticReportHtml(tr("مسار البيانات", "Data Root"))}:</strong> ${escapeDiagnosticReportHtml(dataRoot)}</div>
       <div><strong>${escapeDiagnosticReportHtml(tr("حالة التقرير", "Report Status"))}:</strong> ${escapeDiagnosticReportHtml(data.ok ? tr("لا توجد أخطاء حرجة", "No critical issues") : tr("توجد أخطاء حرجة", "Critical issues found"))}</div>
     </div>
   </section>
   <section class="summary">
-    <div class="summary-card"><div class="summary-label">Passed</div><div class="summary-value">${escapeDiagnosticReportHtml(data.summary.passed)}</div></div>
-    <div class="summary-card"><div class="summary-label">Warnings</div><div class="summary-value">${escapeDiagnosticReportHtml(data.summary.warnings)}</div></div>
-    <div class="summary-card"><div class="summary-label">Critical</div><div class="summary-value">${escapeDiagnosticReportHtml(data.summary.critical)}</div></div>
+    <div class="summary-card"><div class="summary-label">${escapeDiagnosticReportHtml(tr("ناجح", "Passed"))}</div><div class="summary-value">${escapeDiagnosticReportHtml(data.summary.passed)}</div></div>
+    <div class="summary-card"><div class="summary-label">${escapeDiagnosticReportHtml(tr("تحذيرات", "Warnings"))}</div><div class="summary-value">${escapeDiagnosticReportHtml(data.summary.warnings)}</div></div>
+    <div class="summary-card"><div class="summary-label">${escapeDiagnosticReportHtml(tr("حرج", "Critical"))}</div><div class="summary-value">${escapeDiagnosticReportHtml(data.summary.critical)}</div></div>
   </section>
   <table>
     <thead>
@@ -1912,153 +1912,24 @@ export default function DeveloperSettingsPage() {
         <Card className="rounded-lg">
           <CardHeader><CardTitle className="text-lg">{tr("قاعدة البيانات", "Database")}</CardTitle></CardHeader>
           <CardContent className="space-y-4">
+            <details className="group rounded-2xl border border-border bg-card shadow-sm" open>
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-5 text-base font-semibold text-foreground [&::-webkit-details-marker]:hidden">
+                <span className="flex items-center gap-2"><Database className="h-5 w-5 text-primary" />{tr("قاعدة البيانات المحلية (SQLite)", "Local database (SQLite)")}</span>
+                <span aria-hidden="true" className="text-muted-foreground transition-transform group-open:rotate-180">⌄</span>
+              </summary>
+              <div className="space-y-4 border-t border-border p-5">
             <div className="grid gap-3 md:grid-cols-2">
               <InfoRow isAR={isAR} label={tr("مسار SQLite", "SQLite path")} value={settings.sqlitePath} />
               <InfoRow isAR={isAR} label={tr("حالة قاعدة البيانات", "Database status")} value={settings.databaseStatus} />
               <InfoRow isAR={isAR} label={tr("حجم قاعدة البيانات", "Database size")} value={formatBytes(settings.databaseSize, isAR)} />
               <InfoRow isAR={isAR} label={tr("آخر نسخة احتياطية", "Last backup")} value={settings.lastBackupAt} />
             </div>
-            <div className="rounded-2xl border border-border bg-background/70 p-4 shadow-sm">
-              <div className="mb-3 flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2 text-sm font-bold text-foreground">
-                  <RefreshCw className={cn("h-4 w-4 text-primary", isSyncQueueLoading && "animate-spin")} />
-                  <span>{tr("حالة قائمة المزامنة", "Sync queue status")}</span>
-                  {isSyncQueueLoading && <span className="text-xs font-medium text-muted-foreground">{tr("جارٍ التحميل...", "Loading...")}</span>}
-                </div>
-                <Button type="button" variant="outline" size="sm" onClick={loadSyncQueueStatus} disabled={isSyncQueueLoading} className="gap-2">
-                  <RefreshCw className={cn("h-3.5 w-3.5", isSyncQueueLoading && "animate-spin")} />
-                  {tr("تحديث", "Refresh")}
-                </Button>
-                <Button type="button" size="sm" onClick={() => void runSyncWorkerNow()} disabled={isSyncWorkerRunning} className="gap-2">
-                  <RefreshCw className={cn("h-3.5 w-3.5", isSyncWorkerRunning && "animate-spin")} />
-                  {isSyncWorkerRunning ? tr("جارٍ التشغيل...", "Running...") : tr("تشغيل المزامنة الآن", "Run sync now")}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={retryFailedSyncItems}
-                  disabled={isRetryingFailedSync || syncQueueStatus.failed === 0}
-                  className="gap-2"
-                >
-                  <RefreshCw className={cn("h-3.5 w-3.5", isRetryingFailedSync && "animate-spin")} />
-                  {isRetryingFailedSync ? tr("جارٍ الإعادة...", "Retrying...") : tr("إعادة محاولة الفاشلة", "Retry Failed")}
-                </Button>
-              </div>
-              <div className="mb-3 text-xs font-medium text-muted-foreground">
-                {tr("المزامنة التلقائية تعمل كل دقيقتين عند توفر الاتصال", "Auto sync runs every 2 minutes when connected")}
-              </div>
-              {syncWorkerMessage && (
-                <div className="mb-3 rounded-md border border-border bg-background px-3 py-2 text-sm text-muted-foreground">
-                  {syncWorkerMessage}
-                </div>
-              )}
-              <div className="grid gap-3 md:grid-cols-5">
-                <InfoRow isAR={isAR} label={tr("المزامنة المنتظرة", "Pending sync")} value={syncQueueStatus.pending} />
-                <InfoRow isAR={isAR} label={tr("المزامنة الناجحة", "Synced")} value={syncQueueStatus.synced} />
-                <InfoRow isAR={isAR} label={tr("المزامنة الفاشلة", "Failed sync")} value={syncQueueStatus.failed} />
-                <InfoRow isAR={isAR} label={tr("آخر مزامنة", "Last sync")} value={formatSyncQueueDate(syncQueueStatus.lastSync, isAR)} />
-                <InfoRow isAR={isAR} label={tr("آخر خطأ", "Last error")} value={syncQueueStatus.lastError || "-"} />
-              </div>
-              <div className="mt-4">
-                <div className="mb-2 text-xs font-semibold text-muted-foreground">{tr("آخر عناصر القائمة", "Recent Queue Items")}</div>
-                {syncQueueStatus.recent.length === 0 ? (
-                  <div className="rounded-md border border-border bg-background px-3 py-2 text-sm text-muted-foreground">
-                    {tr("لا توجد عناصر في القائمة بعد", "No queue items yet")}
-                  </div>
-                ) : (
-                  <ResizableScrollArea storageKey="settings-developer" maxHeight={250} className="rounded-md border border-border">
-                    <table className="w-full min-w-[760px] text-left text-xs">
-                      <thead className="bg-muted/50 text-muted-foreground">
-                        <tr>
-                          <th className="px-3 py-2 font-semibold">{tr("الكيان", "Entity")}</th>
-                          <th className="px-3 py-2 font-semibold">{tr("العملية", "Operation")}</th>
-                          <th className="px-3 py-2 font-semibold">{tr("الحالة", "Status")}</th>
-                          <th className="px-3 py-2 font-semibold">{tr("المحاولات", "Attempts")}</th>
-                          <th className="px-3 py-2 font-semibold">{tr("آخر خطأ", "Last Error")}</th>
-                          <th className="px-3 py-2 font-semibold">{tr("تاريخ الإنشاء", "Created")}</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {syncQueueStatus.recent.map((item) => (
-                          <tr key={item.id} className="border-t border-border">
-                            <td className="px-3 py-2">
-                              <div className="font-medium">{item.entityType || "-"}</div>
-                              <div className="text-muted-foreground">{item.entityId || "-"}</div>
-                            </td>
-                            <td className="px-3 py-2">{item.operation || "-"}</td>
-                            <td className="px-3 py-2">
-                              <span className={cn("inline-flex rounded-full border px-2 py-0.5 text-[11px] font-semibold", syncQueueStatusBadgeClass(item.status || ""))}>
-                                {item.status || "-"}
-                              </span>
-                            </td>
-                            <td className="px-3 py-2">{item.attempts}</td>
-                            <td className="px-3 py-2">
-                              <div className="max-w-[220px] truncate" title={item.lastError || ""}>{item.lastError || "-"}</div>
-                            </td>
-                            <td className="px-3 py-2">{formatSyncQueueDate(item.createdAt, isAR)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </ResizableScrollArea>
-                )}
-              </div>
-            </div>
-            <div className="rounded-2xl border border-border bg-background/70 p-4 shadow-sm">
-              <div className="mb-3 flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2 text-sm font-bold text-foreground">
-                  <Activity className={cn("h-4 w-4 text-primary", isReadinessLoading && "animate-pulse")} />
-                  <span>{tr("حالة الشبكة وجاهزية المزامنة", "Network / Sync Readiness Status")}</span>
-                  {isReadinessLoading && <span className="text-xs font-medium text-muted-foreground">{tr("جارٍ الفحص...", "Checking...")}</span>}
-                </div>
-                <Button type="button" variant="outline" size="sm" onClick={loadReadinessStatus} disabled={isReadinessLoading} className="gap-2">
-                  <RefreshCw className={cn("h-3.5 w-3.5", isReadinessLoading && "animate-spin")} />
-                  {tr("تحديث", "Refresh")}
-                </Button>
-              </div>
-              <div className="grid gap-3 md:grid-cols-5">
-                <InfoRow isAR={isAR} label={tr("وضع التطبيق", "App Mode")} value="SQLite Local" />
-                <InfoRow isAR={isAR} label={tr("حالة API", "API Status")} value={readinessStatus.apiStatus === "connected" ? tr("متصل", "Connected") : tr("خطأ", "Error")} />
-                <InfoRow isAR={isAR} label={tr("محرك المزامنة", "Sync Engine")} value={getSyncEngineStatus(syncConfig.autoSync, onlineDatabaseConnected, isAR)} />
-                <InfoRow isAR={isAR} label={tr("آخر مزامنة", "Last Sync")} value={tr("غير متاح", "Not available")} />
-                <InfoRow isAR={isAR} label={tr("حالة الاتصال", "Online Status")} value={readinessStatus.onlineStatus === "online" ? tr("متصل بالإنترنت", "Online") : tr("غير متصل", "Offline")} />
-              </div>
-            </div>
             <div className="flex flex-wrap gap-2">
               <Button type="button" variant="outline" onClick={checkDatabase} className="gap-2"><RefreshCw className="h-4 w-4" />{tr("فحص الاتصال", "Check connection")}</Button>
               <Button type="button" variant="outline" onClick={copyDatabasePath} className="gap-2"><Copy className="h-4 w-4" />{tr("نسخ مسار قاعدة البيانات", "Copy database path")}</Button>
               <Button type="button" variant="outline" onClick={createSqlFile} className="gap-2"><FileText className="h-4 w-4" />{tr("إنشاء ملف SQL", "Create SQL file")}</Button>
             </div>
-            {databaseMessage && <div className="text-sm text-muted-foreground">{databaseMessage}</div>}
 
-            <div className="rounded-2xl border border-border bg-background/70 p-4 shadow-sm">
-              <div className="mb-4 flex items-center gap-2 text-sm font-bold text-foreground">
-                <Database className="h-4 w-4 text-primary" />
-                <span>{tr("نوع قاعدة البيانات", "Database type")}</span>
-              </div>
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                {[
-                  { id: "local" as DatabaseMode, icon: Database, label: tr("قاعدة محلية (SQLite)", "Local database (SQLite)") },
-                  { id: "online" as DatabaseMode, icon: Cloud, label: tr("قاعدة أونلاين (PostgreSQL / MySQL لاحقًا)", "Online database (PostgreSQL / MySQL later)") },
-                ].map((option) => (
-                  <button
-                    key={option.id}
-                    type="button"
-                    onClick={() => setDatabaseMode(option.id)}
-                    className={cn(
-                      "flex items-center gap-3 rounded-xl border p-3 text-sm transition",
-                      databaseMode === option.id ? "border-primary bg-primary/5 text-primary shadow-sm" : "border-border bg-background hover:border-primary/40"
-                    )}
-                  >
-                    <option.icon className="h-4 w-4 shrink-0" />
-                    <span className="font-semibold">{option.label}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {databaseMode === "local" && (
               <div className="rounded-2xl border border-border bg-background/70 p-4 shadow-sm">
                 <div className="mb-4 flex items-center gap-2 text-sm font-bold text-foreground">
                   <Database className="h-4 w-4 text-emerald-600" />
@@ -2086,143 +1957,6 @@ export default function DeveloperSettingsPage() {
                   <Button type="button" variant="outline" onClick={createSqlFile} size="sm">{tr("تحميل ملف SQL لإنشاء قاعدة جديدة", "Download SQL file to create a new database")}</Button>
                 </div>
               </div>
-            )}
-
-            {databaseMode === "online" && (
-              <div className="rounded-2xl border border-border bg-background/70 p-4 shadow-sm">
-                <div className="mb-4 flex items-center gap-2 text-sm font-bold text-foreground">
-                  <Cloud className="h-4 w-4 text-blue-600" />
-                  <span>{tr("إعدادات قاعدة البيانات الأونلاين", "Online database settings")}</span>
-                </div>
-                <div className="mb-4 flex h-10 items-center justify-between rounded-md border border-border bg-background px-3 text-sm">
-                  <span className="text-muted-foreground">{tr("Online", "Online")}</span>
-                  <span className={cn("font-semibold", onlineDatabaseConnected ? "text-emerald-600" : "text-red-600")}>
-                    {onlineDatabaseConnected ? tr("متصل بالأونلاين", "Connected") : tr("غير متصل بالأونلاين", "Disconnected")}
-                  </span>
-                </div>
-                <label className="mb-4 flex items-center gap-2 text-sm font-semibold text-foreground">
-                  <input
-                    type="checkbox"
-                    checked={databaseConfig.useConnectionString}
-                    onChange={(event) => setDatabaseConfig((current) => ({ ...current, useConnectionString: event.target.checked }))}
-                    className="h-4 w-4 accent-primary"
-                  />
-                  <span>{tr("استخدام Connection String كامل", "Use full connection string")}</span>
-                </label>
-
-                {databaseConfig.useConnectionString ? (
-                  <DevField label="Connection String">
-                    <Input
-                      type="password"
-                      value={databaseConfig.connectionString}
-                      onChange={(event) => setDatabaseConfig((current) => ({ ...current, connectionString: event.target.value }))}
-                      placeholder="postgresql://user:password@host:5432/database"
-                      dir="ltr"
-                    />
-                  </DevField>
-                ) : (
-                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-                    <DevField label="Host">
-                      <Input value={databaseConfig.host} onChange={(event) => setDatabaseConfig((current) => ({ ...current, host: event.target.value }))} dir="ltr" />
-                    </DevField>
-                    <DevField label="Port">
-                      <Input value={databaseConfig.port} onChange={(event) => setDatabaseConfig((current) => ({ ...current, port: event.target.value }))} dir="ltr" />
-                    </DevField>
-                    <DevField label={tr("اسم قاعدة البيانات", "Database name")}>
-                      <Input value={databaseConfig.databaseName} onChange={(event) => setDatabaseConfig((current) => ({ ...current, databaseName: event.target.value }))} dir="ltr" />
-                    </DevField>
-                    <DevField label={tr("اسم المستخدم", "Username")}>
-                      <Input value={databaseConfig.username} onChange={(event) => setDatabaseConfig((current) => ({ ...current, username: event.target.value }))} dir="ltr" />
-                    </DevField>
-                    <DevField label={tr("كلمة المرور", "Password")}>
-                      <Input type="password" value={databaseConfig.password} onChange={(event) => setDatabaseConfig((current) => ({ ...current, password: event.target.value }))} dir="ltr" />
-                    </DevField>
-                  </div>
-                )}
-              </div>
-            )}
-
-            <div className="rounded-2xl border border-border bg-background/70 p-4 shadow-sm">
-              <div className="mb-4 flex flex-wrap gap-2">
-                <Button type="button" variant="outline" onClick={testPreparedConnection} size="sm" disabled={isTestingConnection}>
-                  {isTestingConnection ? tr("جارٍ الاختبار...", "Testing...") : tr("اختبار الاتصال", "Test connection")}
-                </Button>
-                <Button type="button" variant="outline" onClick={savePreparedConnection} size="sm">{tr("حفظ الإعدادات", "Save settings")}</Button>
-                {onlineDatabaseConnected ? (
-                  <Button type="button" variant="outline" onClick={disconnectOnlineDatabase} size="sm">{tr("فصل الاتصال", "Disconnect")}</Button>
-                ) : (
-                  <Button type="button" onClick={connectOnlineDatabase} size="sm" disabled={isConnectingOnline}>
-                    {isConnectingOnline ? tr("جارٍ الاتصال...", "Connecting...") : tr("اتصال", "Connect")}
-                  </Button>
-                )}
-              </div>
-
-              <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-                <div>
-                  <div className="mb-3 flex items-center gap-2 text-sm font-bold text-foreground">
-                    <RefreshCw className="h-4 w-4 text-primary" />
-                    <span>{tr("خيارات المزامنة", "Sync options")}</span>
-                  </div>
-                  <div className="grid grid-cols-1 gap-2">
-                    {[
-                      { id: "local-to-online" as SyncMode, label: tr("مزامنة المحلي إلى الأونلاين", "Sync local to online") },
-                      { id: "online-to-local" as SyncMode, label: tr("مزامنة الأونلاين إلى المحلي", "Sync online to local") },
-                      { id: "bidirectional" as SyncMode, label: tr("مزامنة ثنائية الاتجاه", "Bidirectional sync") },
-                    ].map((mode) => (
-                      <label key={mode.id} className="flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-sm">
-                        <input
-                          type="radio"
-                          checked={syncConfig.mode === mode.id}
-                          onChange={() => setSyncConfig((current) => ({ ...current, mode: mode.id }))}
-                          className="h-4 w-4 accent-primary"
-                        />
-                        <span>{mode.label}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <div className="mb-3 flex items-center gap-2 text-sm font-bold text-foreground">
-                    <Activity className="h-4 w-4 text-primary" />
-                    <span>{tr("الجدولة والحالة", "Schedule and status")}</span>
-                  </div>
-                  <label className="flex items-center justify-between rounded-lg border border-border bg-background px-3 py-2 text-sm">
-                    <span>{tr("مزامنة تلقائية", "Auto sync")}</span>
-                    <input
-                      type="checkbox"
-                      checked={syncConfig.autoSync}
-                      onChange={(event) => setSyncConfig((current) => ({ ...current, autoSync: event.target.checked }))}
-                      className="h-4 w-4 accent-primary"
-                    />
-                  </label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <DevField label={tr("التوقيت", "Timing")}>
-                      <select
-                        value={syncConfig.timing}
-                        onChange={(event) => setSyncConfig((current) => ({ ...current, timing: event.target.value as AutoSyncTiming }))}
-                        className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm"
-                      >
-                        <option value="startup">{tr("عند بدء التشغيل", "On startup")}</option>
-                        <option value="interval">{tr("كل فترة", "Interval")}</option>
-                      </select>
-                    </DevField>
-                    <DevField label={tr("الفاصل بالدقائق", "Interval in minutes")}>
-                      <Input
-                        type="number"
-                        min={1}
-                        value={syncConfig.intervalMinutes}
-                        onChange={(event) => setSyncConfig((current) => ({ ...current, intervalMinutes: Number(event.target.value) }))}
-                      />
-                    </DevField>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <InfoRow isAR={isAR} label={tr("آخر مزامنة", "Last sync")} value={formatSyncQueueDate(syncQueueStatus.lastSync, isAR)} />
-                    <InfoRow isAR={isAR} label={tr("الحالة", "Status")} value={getSyncQueueDisplayStatus(syncQueueStatus, isAR)} />
-                  </div>
-                </div>
-              </div>
-            </div>
             <div className="rounded-2xl border border-border bg-card p-5 shadow-sm space-y-4">
               <div className="flex items-start justify-between gap-4">
                 <div>
@@ -2416,6 +2150,291 @@ export default function DeveloperSettingsPage() {
                 )}
               </div>
             </div>
+              </div>
+            </details>
+            <details className="group rounded-2xl border border-border bg-card shadow-sm">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-5 text-base font-semibold text-foreground [&::-webkit-details-marker]:hidden">
+                <span className="flex items-center gap-2"><Cloud className="h-5 w-5 text-primary" />{tr("قاعدة البيانات عبر الإنترنت (PostgreSQL)", "Online database (PostgreSQL)")}</span>
+                <span aria-hidden="true" className="text-muted-foreground transition-transform group-open:rotate-180">⌄</span>
+              </summary>
+              <div className="space-y-4 border-t border-border p-5">
+            <div className="rounded-2xl border border-border bg-background/70 p-4 shadow-sm">
+              <div className="mb-4 flex items-center gap-2 text-sm font-bold text-foreground">
+                <Database className="h-4 w-4 text-primary" />
+                <span>{tr("وضع الاتصال بقاعدة البيانات", "Database connection mode")}</span>
+              </div>
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                {[
+                  { id: "local" as DatabaseMode, icon: Database, label: tr("قاعدة محلية (SQLite)", "Local database (SQLite)") },
+                  { id: "online" as DatabaseMode, icon: Cloud, label: tr("قاعدة عبر الإنترنت (PostgreSQL)", "Online database (PostgreSQL)") },
+                ].map((option) => (
+                  <button
+                    key={option.id}
+                    type="button"
+                    onClick={() => setDatabaseMode(option.id)}
+                    className={cn(
+                      "flex items-center gap-3 rounded-xl border p-3 text-sm transition",
+                      databaseMode === option.id ? "border-primary bg-primary/5 text-primary shadow-sm" : "border-border bg-background hover:border-primary/40"
+                    )}
+                  >
+                    <option.icon className="h-4 w-4 shrink-0" />
+                    <span className="font-semibold">{option.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+              <div className="rounded-2xl border border-border bg-background/70 p-4 shadow-sm">
+                <div className="mb-4 flex items-center gap-2 text-sm font-bold text-foreground">
+                  <Cloud className="h-4 w-4 text-blue-600" />
+                  <span>{tr("إعدادات قاعدة البيانات عبر الإنترنت", "Online database settings")}</span>
+                </div>
+                <div className="mb-4 flex h-10 items-center justify-between rounded-md border border-border bg-background px-3 text-sm">
+                  <span className="text-muted-foreground">{tr("الاتصال عبر الإنترنت", "Online connection")}</span>
+                  <span className={cn("font-semibold", onlineDatabaseConnected ? "text-emerald-600" : "text-red-600")}>
+                    {onlineDatabaseConnected ? tr("متصل بالأونلاين", "Connected") : tr("غير متصل بالأونلاين", "Disconnected")}
+                  </span>
+                </div>
+                <label className="mb-4 flex items-center gap-2 text-sm font-semibold text-foreground">
+                  <input
+                    type="checkbox"
+                    checked={databaseConfig.useConnectionString}
+                    onChange={(event) => setDatabaseConfig((current) => ({ ...current, useConnectionString: event.target.checked }))}
+                    className="h-4 w-4 accent-primary"
+                  />
+                  <span>{tr("استخدام رابط اتصال كامل", "Use a full connection string")}</span>
+                </label>
+
+                {databaseConfig.useConnectionString ? (
+                  <DevField label={tr("رابط الاتصال", "Connection string")}>
+                    <Input
+                      type="password"
+                      value={databaseConfig.connectionString}
+                      onChange={(event) => setDatabaseConfig((current) => ({ ...current, connectionString: event.target.value }))}
+                      placeholder="postgresql://user:password@host:5432/database"
+                      dir="ltr"
+                    />
+                  </DevField>
+                ) : (
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+                    <DevField label={tr("عنوان الخادم", "Host")}>
+                      <Input value={databaseConfig.host} onChange={(event) => setDatabaseConfig((current) => ({ ...current, host: event.target.value }))} dir="ltr" />
+                    </DevField>
+                    <DevField label={tr("المنفذ", "Port")}>
+                      <Input value={databaseConfig.port} onChange={(event) => setDatabaseConfig((current) => ({ ...current, port: event.target.value }))} dir="ltr" />
+                    </DevField>
+                    <DevField label={tr("اسم قاعدة البيانات", "Database name")}>
+                      <Input value={databaseConfig.databaseName} onChange={(event) => setDatabaseConfig((current) => ({ ...current, databaseName: event.target.value }))} dir="ltr" />
+                    </DevField>
+                    <DevField label={tr("اسم المستخدم", "Username")}>
+                      <Input value={databaseConfig.username} onChange={(event) => setDatabaseConfig((current) => ({ ...current, username: event.target.value }))} dir="ltr" />
+                    </DevField>
+                    <DevField label={tr("كلمة المرور", "Password")}>
+                      <Input type="password" value={databaseConfig.password} onChange={(event) => setDatabaseConfig((current) => ({ ...current, password: event.target.value }))} dir="ltr" />
+                    </DevField>
+                  </div>
+                )}
+              </div>
+            <div className="rounded-2xl border border-border bg-background/70 p-4 shadow-sm">
+              <div className="mb-4 flex flex-wrap gap-2">
+                <Button type="button" variant="outline" onClick={testPreparedConnection} size="sm" disabled={isTestingConnection}>
+                  {isTestingConnection ? tr("جارٍ الاختبار...", "Testing...") : tr("اختبار الاتصال", "Test connection")}
+                </Button>
+                <Button type="button" variant="outline" onClick={savePreparedConnection} size="sm">{tr("حفظ الإعدادات", "Save settings")}</Button>
+                {onlineDatabaseConnected ? (
+                  <Button type="button" variant="outline" onClick={disconnectOnlineDatabase} size="sm">{tr("فصل الاتصال", "Disconnect")}</Button>
+                ) : (
+                  <Button type="button" onClick={connectOnlineDatabase} size="sm" disabled={isConnectingOnline}>
+                    {isConnectingOnline ? tr("جارٍ الاتصال...", "Connecting...") : tr("اتصال", "Connect")}
+                  </Button>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+                <div>
+                  <div className="mb-3 flex items-center gap-2 text-sm font-bold text-foreground">
+                    <RefreshCw className="h-4 w-4 text-primary" />
+                    <span>{tr("خيارات المزامنة", "Sync options")}</span>
+                  </div>
+                  <div className="grid grid-cols-1 gap-2">
+                    {[
+                      { id: "local-to-online" as SyncMode, label: tr("مزامنة المحلي إلى الأونلاين", "Sync local to online") },
+                      { id: "online-to-local" as SyncMode, label: tr("مزامنة الأونلاين إلى المحلي", "Sync online to local") },
+                      { id: "bidirectional" as SyncMode, label: tr("مزامنة ثنائية الاتجاه", "Bidirectional sync") },
+                    ].map((mode) => (
+                      <label key={mode.id} className="flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-sm">
+                        <input
+                          type="radio"
+                          checked={syncConfig.mode === mode.id}
+                          onChange={() => setSyncConfig((current) => ({ ...current, mode: mode.id }))}
+                          className="h-4 w-4 accent-primary"
+                        />
+                        <span>{mode.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="mb-3 flex items-center gap-2 text-sm font-bold text-foreground">
+                    <Activity className="h-4 w-4 text-primary" />
+                    <span>{tr("الجدولة والحالة", "Schedule and status")}</span>
+                  </div>
+                  <label className="flex items-center justify-between rounded-lg border border-border bg-background px-3 py-2 text-sm">
+                    <span>{tr("مزامنة تلقائية", "Auto sync")}</span>
+                    <input
+                      type="checkbox"
+                      checked={syncConfig.autoSync}
+                      onChange={(event) => setSyncConfig((current) => ({ ...current, autoSync: event.target.checked }))}
+                      className="h-4 w-4 accent-primary"
+                    />
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <DevField label={tr("التوقيت", "Timing")}>
+                      <select
+                        value={syncConfig.timing}
+                        onChange={(event) => setSyncConfig((current) => ({ ...current, timing: event.target.value as AutoSyncTiming }))}
+                        className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm"
+                      >
+                        <option value="startup">{tr("عند بدء التشغيل", "On startup")}</option>
+                        <option value="interval">{tr("كل فترة", "Interval")}</option>
+                      </select>
+                    </DevField>
+                    <DevField label={tr("الفاصل بالدقائق", "Interval in minutes")}>
+                      <Input
+                        type="number"
+                        min={1}
+                        value={syncConfig.intervalMinutes}
+                        onChange={(event) => setSyncConfig((current) => ({ ...current, intervalMinutes: Number(event.target.value) }))}
+                      />
+                    </DevField>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <InfoRow isAR={isAR} label={tr("آخر مزامنة", "Last sync")} value={formatSyncQueueDate(syncQueueStatus.lastSync, isAR)} />
+                    <InfoRow isAR={isAR} label={tr("الحالة", "Status")} value={getSyncQueueDisplayStatus(syncQueueStatus, isAR)} />
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="rounded-2xl border border-border bg-background/70 p-4 shadow-sm">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 text-sm font-bold text-foreground">
+                  <Activity className={cn("h-4 w-4 text-primary", isReadinessLoading && "animate-pulse")} />
+                  <span>{tr("حالة الشبكة وجاهزية المزامنة", "Network / Sync Readiness Status")}</span>
+                  {isReadinessLoading && <span className="text-xs font-medium text-muted-foreground">{tr("جارٍ الفحص...", "Checking...")}</span>}
+                </div>
+                <Button type="button" variant="outline" size="sm" onClick={loadReadinessStatus} disabled={isReadinessLoading} className="gap-2">
+                  <RefreshCw className={cn("h-3.5 w-3.5", isReadinessLoading && "animate-spin")} />
+                  {tr("تحديث", "Refresh")}
+                </Button>
+              </div>
+              <div className="grid gap-3 md:grid-cols-5">
+                <InfoRow isAR={isAR} label={tr("وضع التطبيق", "App Mode")} value={tr("SQLite محلي", "Local SQLite")} />
+                <InfoRow isAR={isAR} label={tr("حالة API", "API Status")} value={readinessStatus.apiStatus === "connected" ? tr("متصل", "Connected") : tr("خطأ", "Error")} />
+                <InfoRow isAR={isAR} label={tr("محرك المزامنة", "Sync Engine")} value={getSyncEngineStatus(syncConfig.autoSync, onlineDatabaseConnected, isAR)} />
+                <InfoRow isAR={isAR} label={tr("آخر مزامنة", "Last Sync")} value={tr("غير متاح", "Not available")} />
+                <InfoRow isAR={isAR} label={tr("حالة الاتصال", "Online Status")} value={readinessStatus.onlineStatus === "online" ? tr("متصل بالإنترنت", "Online") : tr("غير متصل", "Offline")} />
+              </div>
+            </div>
+            <div className="rounded-2xl border border-border bg-background/70 p-4 shadow-sm">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 text-sm font-bold text-foreground">
+                  <RefreshCw className={cn("h-4 w-4 text-primary", isSyncQueueLoading && "animate-spin")} />
+                  <span>{tr("حالة قائمة المزامنة", "Sync queue status")}</span>
+                  {isSyncQueueLoading && <span className="text-xs font-medium text-muted-foreground">{tr("جارٍ التحميل...", "Loading...")}</span>}
+                </div>
+                <Button type="button" variant="outline" size="sm" onClick={loadSyncQueueStatus} disabled={isSyncQueueLoading} className="gap-2">
+                  <RefreshCw className={cn("h-3.5 w-3.5", isSyncQueueLoading && "animate-spin")} />
+                  {tr("تحديث", "Refresh")}
+                </Button>
+                <Button type="button" size="sm" onClick={() => void runSyncWorkerNow()} disabled={isSyncWorkerRunning} className="gap-2">
+                  <RefreshCw className={cn("h-3.5 w-3.5", isSyncWorkerRunning && "animate-spin")} />
+                  {isSyncWorkerRunning ? tr("جارٍ التشغيل...", "Running...") : tr("تشغيل المزامنة الآن", "Run sync now")}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={retryFailedSyncItems}
+                  disabled={isRetryingFailedSync || syncQueueStatus.failed === 0}
+                  className="gap-2"
+                >
+                  <RefreshCw className={cn("h-3.5 w-3.5", isRetryingFailedSync && "animate-spin")} />
+                  {isRetryingFailedSync ? tr("جارٍ الإعادة...", "Retrying...") : tr("إعادة محاولة الفاشلة", "Retry Failed")}
+                </Button>
+              </div>
+              <div className="mb-3 text-xs font-medium text-muted-foreground">
+                {tr("المزامنة التلقائية تعمل كل دقيقتين عند توفر الاتصال", "Auto sync runs every 2 minutes when connected")}
+              </div>
+              {syncWorkerMessage && (
+                <div className="mb-3 rounded-md border border-border bg-background px-3 py-2 text-sm text-muted-foreground">
+                  {syncWorkerMessage}
+                </div>
+              )}
+              <div className="grid gap-3 md:grid-cols-5">
+                <InfoRow isAR={isAR} label={tr("المزامنة المنتظرة", "Pending sync")} value={syncQueueStatus.pending} />
+                <InfoRow isAR={isAR} label={tr("المزامنة الناجحة", "Synced")} value={syncQueueStatus.synced} />
+                <InfoRow isAR={isAR} label={tr("المزامنة الفاشلة", "Failed sync")} value={syncQueueStatus.failed} />
+                <InfoRow isAR={isAR} label={tr("آخر مزامنة", "Last sync")} value={formatSyncQueueDate(syncQueueStatus.lastSync, isAR)} />
+                <InfoRow isAR={isAR} label={tr("آخر خطأ", "Last error")} value={syncQueueStatus.lastError || "-"} />
+              </div>
+              <div className="mt-4">
+                <div className="mb-2 text-xs font-semibold text-muted-foreground">{tr("آخر عناصر القائمة", "Recent Queue Items")}</div>
+                {syncQueueStatus.recent.length === 0 ? (
+                  <div className="rounded-md border border-border bg-background px-3 py-2 text-sm text-muted-foreground">
+                    {tr("لا توجد عناصر في القائمة بعد", "No queue items yet")}
+                  </div>
+                ) : (
+                  <ResizableScrollArea storageKey="settings-developer" maxHeight={250} className="rounded-md border border-border">
+                    <table className="w-full min-w-[760px] text-left text-xs">
+                      <thead className="bg-muted/50 text-muted-foreground">
+                        <tr>
+                          <th className="px-3 py-2 font-semibold">{tr("الكيان", "Entity")}</th>
+                          <th className="px-3 py-2 font-semibold">{tr("العملية", "Operation")}</th>
+                          <th className="px-3 py-2 font-semibold">{tr("الحالة", "Status")}</th>
+                          <th className="px-3 py-2 font-semibold">{tr("المحاولات", "Attempts")}</th>
+                          <th className="px-3 py-2 font-semibold">{tr("آخر خطأ", "Last Error")}</th>
+                          <th className="px-3 py-2 font-semibold">{tr("تاريخ الإنشاء", "Created")}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {syncQueueStatus.recent.map((item) => (
+                          <tr key={item.id} className="border-t border-border">
+                            <td className="px-3 py-2">
+                              <div className="font-medium">{item.entityType || "-"}</div>
+                              <div className="text-muted-foreground">{item.entityId || "-"}</div>
+                            </td>
+                            <td className="px-3 py-2">{item.operation || "-"}</td>
+                            <td className="px-3 py-2">
+                              <span className={cn("inline-flex rounded-full border px-2 py-0.5 text-[11px] font-semibold", syncQueueStatusBadgeClass(item.status || ""))}>
+                                {item.status || "-"}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2">{item.attempts}</td>
+                            <td className="px-3 py-2">
+                              <div className="max-w-[220px] truncate" title={item.lastError || ""}>{item.lastError || "-"}</div>
+                            </td>
+                            <td className="px-3 py-2">{formatSyncQueueDate(item.createdAt, isAR)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </ResizableScrollArea>
+                )}
+              </div>
+            </div>
+              </div>
+            </details>
+            <details className="group rounded-2xl border border-border bg-card shadow-sm">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-5 text-base font-semibold text-foreground [&::-webkit-details-marker]:hidden">
+                <span className="flex items-center gap-2"><Database className="h-5 w-5 text-primary" />{tr("قاعدة بيانات الخادم الداخلي", "Internal server database")}</span>
+                <span aria-hidden="true" className="text-muted-foreground transition-transform group-open:rotate-180">⌄</span>
+              </summary>
+              <div className="space-y-4 border-t border-border p-5">
+                <p className="text-sm text-muted-foreground">{tr("ستظهر إعدادات قاعدة بيانات الخادم الداخلي هنا عند توفرها في البرنامج.", "Internal server database settings will appear here when available in the application.")}</p>
+              </div>
+            </details>
+            {databaseMessage && <div role="status" className="text-sm text-muted-foreground">{databaseMessage}</div>}
           </CardContent>
         </Card>
       )}
@@ -2513,9 +2532,9 @@ export default function DeveloperSettingsPage() {
                 <>
                   <div className="grid gap-3 md:grid-cols-4">
                     <InfoRow isAR={isAR} label={tr("آخر فحص", "Checked at")} value={systemDiagnostics.checkedAt} />
-                    <InfoRow isAR={isAR} label="Passed" value={systemDiagnostics.summary.passed} />
-                    <InfoRow isAR={isAR} label="Warnings" value={systemDiagnostics.summary.warnings} />
-                    <InfoRow isAR={isAR} label="Critical" value={systemDiagnostics.summary.critical} />
+                    <InfoRow isAR={isAR} label={tr("ناجح", "Passed")} value={systemDiagnostics.summary.passed} />
+                    <InfoRow isAR={isAR} label={tr("تحذيرات", "Warnings")} value={systemDiagnostics.summary.warnings} />
+                    <InfoRow isAR={isAR} label={tr("حرج", "Critical")} value={systemDiagnostics.summary.critical} />
                   </div>
 
                   <div className="overflow-x-auto rounded-md border border-border">
