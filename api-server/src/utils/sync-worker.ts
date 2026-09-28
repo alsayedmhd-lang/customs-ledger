@@ -99,9 +99,17 @@ type LocalUserRow = {
   displayNameAr: string | null;
   displayNameEn: string | null;
   role: string | null;
+  isActive: number | null;
+  pendingApproval: number | null;
+  permissions: string | null;
+  clientId: number | null;
+  clientViewPermissions: string | null;
   email: string | null;
   phone: string | null;
+  whatsappApiKey: string | null;
   receiverSignatureBase64: string | null;
+  twoFactorEmail: number | null;
+  twoFactorWhatsapp: number | null;
   createdAt: number | null;
 };
 
@@ -429,9 +437,17 @@ function getLocalUser(userId: number | null | undefined) {
         display_name_ar AS displayNameAr,
         display_name_en AS displayNameEn,
         role,
+        is_active AS isActive,
+        pending_approval AS pendingApproval,
+        permissions,
+        client_id AS clientId,
+        client_view_permissions AS clientViewPermissions,
         email,
         phone,
+        whatsapp_api_key AS whatsappApiKey,
         receiver_signature_base64 AS receiverSignatureBase64,
+        two_factor_email AS twoFactorEmail,
+        two_factor_whatsapp AS twoFactorWhatsapp,
         created_at AS createdAt
       FROM users
       WHERE id = ?
@@ -453,14 +469,156 @@ function getLocalUsers() {
         display_name_ar AS displayNameAr,
         display_name_en AS displayNameEn,
         role,
+        is_active AS isActive,
+        pending_approval AS pendingApproval,
+        permissions,
+        client_id AS clientId,
+        client_view_permissions AS clientViewPermissions,
         email,
         phone,
+        whatsapp_api_key AS whatsappApiKey,
         receiver_signature_base64 AS receiverSignatureBase64,
+        two_factor_email AS twoFactorEmail,
+        two_factor_whatsapp AS twoFactorWhatsapp,
         created_at AS createdAt
       FROM users
       ORDER BY id ASC
     `)
     .all() as LocalUserRow[];
+}
+
+// User IDs are local to each database. A username identifies the same account.
+// Existing accounts are left intact because users has no updated_at column to
+// resolve concurrent password, permission, or activation changes safely.
+async function syncUsersBeforeQueue(client: any) {
+  let inserted = 0;
+  for (const user of getLocalUsers()) {
+    const username = String(user.username || "").trim();
+    if (!username || !user.passwordHash) {
+      throw new Error(`Local user ${user.id} has no username or password hash`);
+    }
+    const existing = await client.query(
+      "SELECT id FROM users WHERE LOWER(TRIM(username)) = LOWER(TRIM($1)) LIMIT 2",
+      [username]
+    ) as { rows?: Array<{ id: number }> };
+    if ((existing.rows?.length ?? 0) > 1) {
+      throw new Error(`Ambiguous online user match for username: ${username}`);
+    }
+    if (existing.rows?.length) continue;
+
+    const onlineClientId = user.clientId
+      ? await resolveOnlineClientIdForLocalClientId(client, user.clientId)
+      : null;
+    await client.query(
+      `INSERT INTO users (
+        username, password_hash, display_name, display_name_ar, display_name_en,
+        role, is_active, pending_approval, permissions, client_id,
+        client_view_permissions, email, phone, whatsapp_api_key,
+        receiver_signature_base64, two_factor_email, two_factor_whatsapp, created_at
+      ) VALUES (
+        $1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10,
+        $11::jsonb, $12, $13, $14, $15, $16, $17, $18
+      )`,
+      [
+        username, user.passwordHash, user.displayName,
+        user.displayNameAr, user.displayNameEn, user.role || "user",
+        user.isActive !== 0, user.pendingApproval === 1,
+        user.permissions, onlineClientId, user.clientViewPermissions,
+        user.email, user.phone, user.whatsappApiKey,
+        user.receiverSignatureBase64, user.twoFactorEmail === 1,
+        user.twoFactorWhatsapp === 1, toPgTimestamp(user.createdAt) ?? new Date(),
+      ]
+    );
+    inserted += 1;
+  }
+  console.log("[SYNC][PUSH][USERS][DONE]", { inserted });
+}
+
+async function pullUsersFromOnline(client: any, clientIdMap: Map<number, number>) {
+  if (!sqlite) throw new Error("SQLite database is not available");
+  const result = await client.query(`
+    SELECT id, username, password_hash, display_name, display_name_ar,
+      display_name_en, role, is_active, pending_approval, permissions,
+      client_id, client_view_permissions, email, phone, whatsapp_api_key,
+      receiver_signature_base64, two_factor_email, two_factor_whatsapp, created_at
+    FROM users ORDER BY id ASC
+  `) as { rows?: Array<Record<string, any>> };
+  const rows = result.rows || [];
+  let inserted = 0;
+  let skipped = 0;
+
+  for (const user of rows) {
+    const username = String(user.username || "").trim();
+    if (!username || !user.password_hash) {
+      throw new Error(`Online user ${user.id} has no username or password hash`);
+    }
+    const existing = sqlite.prepare(
+      "SELECT id FROM users WHERE LOWER(TRIM(username)) = LOWER(TRIM(?)) LIMIT 2"
+    ).all(username) as Array<{ id: number }>;
+    if (existing.length > 1) {
+      throw new Error(`Ambiguous local user match for username: ${username}`);
+    }
+    if (existing.length) {
+      skipped += 1;
+      continue;
+    }
+    const localClientId = user.client_id == null
+      ? null
+      : clientIdMap.get(Number(user.client_id));
+    if (user.client_id != null && !localClientId) {
+      throw new Error(`No local client mapping for online user ${username}`);
+    }
+    sqlite.prepare(`
+      INSERT INTO users (
+        username, password_hash, display_name, display_name_ar, display_name_en,
+        role, is_active, pending_approval, permissions, client_id,
+        client_view_permissions, email, phone, whatsapp_api_key,
+        receiver_signature_base64, two_factor_email, two_factor_whatsapp, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      username, user.password_hash, user.display_name,
+      user.display_name_ar, user.display_name_en, user.role || "user",
+      user.is_active === false ? 0 : 1, user.pending_approval === true ? 1 : 0,
+      user.permissions == null ? null : JSON.stringify(user.permissions),
+      localClientId,
+      user.client_view_permissions == null ? null : JSON.stringify(user.client_view_permissions),
+      user.email, user.phone, user.whatsapp_api_key,
+      user.receiver_signature_base64, user.two_factor_email === true ? 1 : 0,
+      user.two_factor_whatsapp === true ? 1 : 0,
+      toSqliteTimestamp(user.created_at) ?? Date.now()
+    );
+    inserted += 1;
+  }
+  console.log("[SYNC][PULL][USERS][DONE]", { total: rows.length, inserted, skipped });
+  return { total: rows.length, inserted, skipped };
+}
+
+async function pullTemplatesFromOnline(client: any) {
+  if (!sqlite) throw new Error("SQLite database is not available");
+  const result = await client.query(
+    "SELECT description, default_unit_price, created_at FROM invoice_item_templates ORDER BY id ASC"
+  ) as { rows?: Array<{ description: string; default_unit_price: number | string | null; created_at: string | Date | null }> };
+  const rows = result.rows || [];
+  let inserted = 0;
+  for (const template of rows) {
+    const description = String(template.description || "").trim();
+    if (!description) throw new Error("Online template has no description");
+    const existing = sqlite.prepare(
+      "SELECT id FROM invoice_item_templates WHERE LOWER(TRIM(description)) = ? LIMIT 2"
+    ).all(normalizeText(description)) as Array<{ id: number }>;
+    if (existing.length > 1) throw new Error(`Ambiguous local template: ${description}`);
+    if (existing.length) continue;
+    sqlite.prepare(`
+      INSERT INTO invoice_item_templates (description, default_unit_price, created_at)
+      VALUES (?, ?, ?)
+    `).run(
+      description, Number(template.default_unit_price ?? 0),
+      toSqliteTimestamp(template.created_at) ?? Date.now()
+    );
+    inserted += 1;
+  }
+  console.log("[SYNC][PULL][TEMPLATES][DONE]", { total: rows.length, inserted });
+  return { total: rows.length, inserted };
 }
 
 function getLocalClient(clientId: number) {
@@ -1057,6 +1215,7 @@ async function pullInvoicesFromOnline(
       continue;
     }
 
+    const localCreatedBy = await resolveLocalUserIdFromOnline(client, onlineInvoice.created_by);
     const shipmentRef =
       String(onlineInvoice.shipment_ref ?? "").trim() || null;
 
@@ -1157,7 +1316,7 @@ async function pullInvoicesFromOnline(
           onlineInvoice.port_of_entry ?? null,
           onlineInvoice.importer_exporter_name ?? null,
           Number(onlineInvoice.advance_payment ?? 0),
-          onlineInvoice.created_by ?? null,
+          localCreatedBy,
           toSqliteTimestamp(onlineInvoice.deleted_at),
           toSqliteTimestamp(onlineInvoice.created_at),
           toSqliteTimestamp(onlineInvoice.updated_at),
@@ -1241,7 +1400,7 @@ async function pullInvoicesFromOnline(
         onlineInvoice.port_of_entry ?? null,
         onlineInvoice.importer_exporter_name ?? null,
         Number(onlineInvoice.advance_payment ?? 0),
-        onlineInvoice.created_by ?? null,
+        localCreatedBy,
         toSqliteTimestamp(onlineInvoice.deleted_at),
         toSqliteTimestamp(onlineInvoice.created_at) ?? Date.now(),
         toSqliteTimestamp(onlineInvoice.updated_at) ?? Date.now()
@@ -1598,11 +1757,13 @@ async function pullReceiptsFromOnline(
 export async function runOnlineToLocalSyncOnce(): Promise<{
   onlineConnected: boolean;
   lastError: string | null;
+  templates: { total: number; inserted: number };
   clients: {
     total: number;
     inserted: number;
     updated: number;
   };
+  users: { total: number; inserted: number; skipped: number };
   invoices: {
     total: number;
     inserted: number;
@@ -1625,11 +1786,13 @@ export async function runOnlineToLocalSyncOnce(): Promise<{
   const emptyResult = {
     onlineConnected: false,
     lastError: null as string | null,
+    templates: { total: 0, inserted: 0 },
     clients: {
       total: 0,
       inserted: 0,
       updated: 0,
     },
+    users: { total: 0, inserted: 0, skipped: 0 },
     invoices: {
       total: 0,
       inserted: 0,
@@ -1676,6 +1839,9 @@ export async function runOnlineToLocalSyncOnce(): Promise<{
     const clientsResult =
       await pullClientsFromOnline(client);
 
+    const templatesResult = await pullTemplatesFromOnline(client);
+    const usersResult = await pullUsersFromOnline(client, clientsResult.clientIdMap);
+
     const invoicesResult =
       await pullInvoicesFromOnline(
         client,
@@ -1697,7 +1863,9 @@ export async function runOnlineToLocalSyncOnce(): Promise<{
       );
 
     console.log("[SYNC][PULL][DONE]", {
+      templates: templatesResult,
       clients: clientsResult,
+      users: usersResult,
       invoices: {
         total: invoicesResult.total,
         inserted: invoicesResult.inserted,
@@ -1711,11 +1879,13 @@ export async function runOnlineToLocalSyncOnce(): Promise<{
     return {
       onlineConnected: true,
       lastError: null,
+      templates: templatesResult,
       clients: {
         total: clientsResult.total,
         inserted: clientsResult.inserted,
         updated: clientsResult.updated,
       },
+      users: usersResult,
       invoices: {
         total: invoicesResult.total,
         inserted: invoicesResult.inserted,
@@ -1804,6 +1974,7 @@ async function resolveOnlineClientIdForLocalClientId(client: any, localClientId:
 
 async function pushInvoiceCreate(client: any, invoice: LocalInvoiceRow, onlineClientId: number, stats: SyncRunStats) {
   const issueDate = getInvoiceIssueDate(invoice);
+  const onlineCreatedBy = await resolveOnlineUserId(client, invoice.createdBy);
   logInvoiceSync("create", invoice);
   console.log("Sync worker pushing invoice", { invoiceId: invoice.id, invoiceNumber: invoice.invoiceNumber, issueDate });
   console.log("[SYNC][INVOICE][PAYLOAD]", {
@@ -1906,7 +2077,7 @@ async function pushInvoiceCreate(client: any, invoice: LocalInvoiceRow, onlineCl
       invoice.portOfEntry ?? null,
       invoice.importerExporterName ?? null,
       Number(invoice.advancePayment ?? 0),
-      invoice.createdBy ?? null,
+      onlineCreatedBy,
       toPgTimestamp(invoice.deletedAt),
       toPgTimestamp(invoice.createdAt) ?? new Date(),
       toPgTimestamp(invoice.updatedAt) ?? new Date(),
@@ -2484,6 +2655,7 @@ export async function runSyncWorkerOnce(): Promise<{
         // A failed prerequisite keeps the queue untouched so it can be retried.
         await syncTemplatesBeforeQueue(client);
         await syncClientsBeforeQueue(client);
+        await syncUsersBeforeQueue(client);
       } catch (err) {
         lastError = errorMessage(err);
         console.error("[SYNC][PREREQUISITES][ERROR]", err);
