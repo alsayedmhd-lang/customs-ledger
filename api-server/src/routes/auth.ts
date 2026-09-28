@@ -1,7 +1,8 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import { db } from "@workspace/db";
+import { db, sqlite } from "@workspace/db";
+import { runConfiguredSyncOnce } from "../utils/sync-worker";
 import { usersTable, otpCodesTable, DEFAULT_PERMISSIONS, companySettingsTable } from "@workspace/db/schema";
 import { and, eq, gt, isNull, sql } from "drizzle-orm";
 import { signToken, requireAuth, requireAdmin } from "../middleware/auth";
@@ -35,6 +36,30 @@ function requireAdminOrDeveloperUsersManagement(
   }
 
   return requireAdmin(req, res, next);
+}
+
+// Login completes before background sync starts; a disconnected online database
+// must never prevent local authentication.
+function scheduleLoginSync() {
+  if (!sqlite) return;
+  try {
+    const settings = sqlite.prepare(
+      "SELECT sync_auto_sync AS autoSync, sync_timing AS timing, sync_mode AS mode FROM company_settings LIMIT 1"
+    ).get() as { autoSync: number; timing: string; mode: string } | undefined;
+    if (!settings?.autoSync || settings.timing !== "startup") return;
+    setImmediate(() => {
+      void runConfiguredSyncOnce(settings.mode).then((result) => {
+        sqlite.prepare("UPDATE company_settings SET sync_status = ?, sync_last_sync_time = ?")
+          .run(result.lastError ? "failed" : "success", result.lastError ? "" : new Date().toISOString());
+        if (result.lastError) console.warn("[SYNC][LOGIN]", result.lastError);
+      }).catch((error) => {
+        console.error("[SYNC][LOGIN][ERROR]", error);
+        try { sqlite.prepare("UPDATE company_settings SET sync_status = 'failed'").run(); } catch { /* Log above. */ }
+      });
+    });
+  } catch (error) {
+    console.warn("[SYNC][LOGIN] Settings unavailable", error);
+  }
 }
 
 // ── OTP helpers ───────────────────────────────────────────────────────────────
@@ -239,7 +264,7 @@ await db.run(sql`
   VALUES (${user.id}, ${code}, ${expiresAt.getTime()})
 `);
     let sent = false;
-    
+
     // 1) جرّب واتساب أولًا إذا البيانات موجودة
     if (user.twoFactorWhatsapp && user.phone && user.whatsappApiKey) {
       try {
@@ -254,13 +279,13 @@ await db.run(sql`
         console.error("[LOGIN OTP WHATSAPP ERROR]", error);
       }
     }
-    
+
     // 2) أرسل الإيميل أيضًا إذا موجود
     if (user.twoFactorEmail && user.email) {
       try {
         const emailSent = await sendOTPEmail(user.email, code, user.displayName);
         console.log("[LOGIN OTP] Email send result:", emailSent, "email:", user.email);
-    
+
         if (emailSent) {
           sent = true;
         }
@@ -349,6 +374,8 @@ router.post("/auth/verify-otp", async (req, res) => {
     user.role === "admin"
       ? DEFAULT_PERMISSIONS
       : (user.permissions ?? DEFAULT_PERMISSIONS);
+
+  scheduleLoginSync();
 
   return res.json({
     token,

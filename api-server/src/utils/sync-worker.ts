@@ -604,10 +604,11 @@ async function pullTemplatesFromOnline(client: any) {
     const description = String(template.description || "").trim();
     if (!description) throw new Error("Online template has no description");
     const existing = sqlite.prepare(
-      "SELECT id FROM invoice_item_templates WHERE LOWER(TRIM(description)) = ? LIMIT 2"
-    ).all(normalizeText(description)) as Array<{ id: number }>;
-    if (existing.length > 1) throw new Error(`Ambiguous local template: ${description}`);
-    if (existing.length) continue;
+      "SELECT description FROM invoice_item_templates"
+    ).all() as Array<{ description: string }>;
+    if (existing.some((row) => normalizeText(row.description) === normalizeText(description))) {
+      continue;
+    }
     sqlite.prepare(`
       INSERT INTO invoice_item_templates (description, default_unit_price, created_at)
       VALUES (?, ?, ?)
@@ -1918,20 +1919,27 @@ export async function runOnlineToLocalSyncOnce(): Promise<{
 // A template has no invoice dependency. Copy missing templates before clients.
 // Match on description because local numeric IDs are not shared across devices.
 async function syncTemplatesBeforeQueue(client: any) {
+  const online = await client.query(
+    "SELECT description FROM invoice_item_templates"
+  ) as { rows?: Array<{ description: string }> };
+
+  const onlineDescriptions = new Set(
+    (online.rows || []).map((row) => normalizeText(row.description))
+  );
+
   for (const template of getLocalTemplates() || []) {
     const description = String(template.description || "").trim();
     if (!description) throw new Error(`Local template ${template.id} has no description`);
-    const existing = await client.query(
-      "SELECT id FROM invoice_item_templates WHERE lower(trim(description)) = $1 LIMIT 1",
-      [normalizeText(description)]
-    ) as { rows?: Array<{ id: number }> };
 
-    if (existing.rows?.length) continue;
+    const normalized = normalizeText(description);
+    if (onlineDescriptions.has(normalized)) continue;
+
     await client.query(
       `INSERT INTO invoice_item_templates (description, default_unit_price, created_at)
        VALUES ($1, $2, $3)`,
       [description, Number(template.defaultUnitPrice ?? 0), toPgTimestamp(template.createdAt) ?? new Date()]
     );
+    onlineDescriptions.add(normalized);
   }
 }
 
@@ -2735,4 +2743,74 @@ export async function runSyncWorkerOnce(): Promise<{
     console.warn("Sync worker failed", err);
     return { pendingCount: 0, processedCount: 0, onlineConnected: false, lastError: errorMessage(err), autoRestoredCount: 0 };
   }
+}
+
+export type ConfiguredSyncResult = {
+  syncMode: string;
+  pendingCount: number;
+  processedCount: number;
+  onlineConnected: boolean;
+  lastError: string | null;
+  autoRestoredCount: number;
+  pullResult?: Awaited<ReturnType<typeof runOnlineToLocalSyncOnce>>;
+};
+
+let configuredSyncInFlight: Promise<ConfiguredSyncResult> | null = null;
+
+// A shared run prevents a login trigger and a manual request from interleaving.
+export function runConfiguredSyncOnce(mode: string): Promise<ConfiguredSyncResult> {
+  if (configuredSyncInFlight) return configuredSyncInFlight;
+  configuredSyncInFlight = performConfiguredSync(mode).finally(() => {
+    configuredSyncInFlight = null;
+  });
+  return configuredSyncInFlight;
+}
+
+async function performConfiguredSync(mode: string): Promise<ConfiguredSyncResult> {
+  const syncMode = ["local-to-online", "online-to-local", "bidirectional"].includes(mode)
+    ? mode : "local-to-online";
+  let pendingCount = 0;
+  let processedCount = 0;
+  let autoRestoredCount = 0;
+  let onlineConnected = false;
+  let lastError: string | null = null;
+
+  if (syncMode !== "online-to-local") {
+    // Each worker pass processes at most ten queue entries. Finish the queue
+    // before pulling online data into a bidirectional installation.
+    for (let pass = 0; pass < (syncMode === "bidirectional" ? 100 : 1); pass++) {
+      const pushed = await runSyncWorkerOnce();
+      processedCount += pushed.processedCount;
+      autoRestoredCount += pushed.autoRestoredCount;
+      onlineConnected = pushed.onlineConnected;
+      lastError = pushed.lastError;
+      if (lastError || !onlineConnected) break;
+      if (syncMode !== "bidirectional") {
+        pendingCount = pushed.pendingCount;
+        break;
+      }
+      const outstanding = sqlite!.prepare(
+        "SELECT COUNT(*) AS count FROM sync_queue WHERE status = 'pending' OR (status = 'failed' AND retry_count < 5)"
+      ).get() as { count: number };
+      pendingCount = outstanding.count;
+      if (!pendingCount) break;
+      if (!pushed.processedCount || pass === 99) {
+        lastError = `Local to Online queue remains unfinished (${pendingCount} items)`;
+        break;
+      }
+    }
+    if (syncMode === "local-to-online" || lastError || pendingCount) {
+      return { syncMode, pendingCount, processedCount, onlineConnected, lastError, autoRestoredCount };
+    }
+  }
+
+  const pullResult = await runOnlineToLocalSyncOnce();
+  onlineConnected = pullResult.onlineConnected;
+  lastError = pullResult.lastError;
+  processedCount += pullResult.templates.inserted + pullResult.users.inserted +
+    pullResult.clients.inserted + pullResult.clients.updated +
+    pullResult.invoices.inserted + pullResult.invoices.updated +
+    pullResult.invoiceItems.inserted +
+    pullResult.receipts.inserted + pullResult.receipts.updated;
+  return { syncMode, pendingCount, processedCount, onlineConnected, lastError, autoRestoredCount, pullResult };
 }

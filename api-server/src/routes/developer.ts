@@ -11,8 +11,7 @@ import packageJson from "../../../package.json";
 import { requireAdmin } from "../middleware/auth";
 import { ensureSyncQueueTable } from "../utils/ensure-sync-queue-table";
 import {
-  runSyncWorkerOnce,
-  runOnlineToLocalSyncOnce,
+  runConfiguredSyncOnce,
 } from "../utils/sync-worker";
 import { getStorageInfo } from "../utils/storage/get-storage-info";
 
@@ -1738,53 +1737,17 @@ router.post("/developer/sync-queue/retry-failed", (_req, res) => {
 
 router.post("/developer/sync/run-once", async (_req, res) => {
   const settings = await getSettingsRow();
-  const syncMode = String(settings?.syncMode || "local-to-online");
-
-  if (syncMode === "online-to-local") {
-    const result = await runOnlineToLocalSyncOnce();
-
-    const processedCount =
-      result.clients.inserted +
-      result.clients.updated +
-      result.invoices.inserted +
-      result.invoices.updated +
-      result.invoiceItems.inserted +
-      result.receipts.inserted +
-      result.receipts.updated;
-
-    return res.json({
-      ok: true,
-      syncMode,
-      pendingCount: 0,
-      processedCount,
-      onlineConnected: result.onlineConnected,
-      lastError: result.lastError,
-      autoRestoredCount: 0,
-      pullResult: {
-        clients: result.clients,
-        invoices: result.invoices,
-        invoiceItems: result.invoiceItems,
-        receipts: result.receipts,
-      },
-      message: result.onlineConnected
-        ? "Online: Connected. Online to Local sync completed."
-        : `Online: Disconnected${result.lastError ? ` - ${result.lastError}` : ""}`,
-    });
+  const result = await runConfiguredSyncOnce(String(settings?.syncMode || "local-to-online"));
+  if (sqlite) {
+    sqlite.prepare("UPDATE company_settings SET sync_status = ?, sync_last_sync_time = ?")
+      .run(result.lastError ? "failed" : "success", result.lastError ? "" : new Date().toISOString());
   }
-
-  const result = await runSyncWorkerOnce();
-
   return res.json({
-    ok: true,
-    syncMode,
-    pendingCount: result.pendingCount,
-    processedCount: result.processedCount,
-    onlineConnected: result.onlineConnected,
-    lastError: result.lastError,
-    autoRestoredCount: result.autoRestoredCount,
-    message: result.onlineConnected
-      ? "Online: Connected. Local to Online sync completed."
-      : `Online: Disconnected${result.lastError ? ` - ${result.lastError}` : ""}`,
+    ok: !result.lastError,
+    ...result,
+    message: result.lastError
+      ? `Sync failed: ${result.lastError}`
+      : `Online: Connected. ${result.syncMode} sync completed.`,
   });
 });
 
