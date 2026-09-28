@@ -17,6 +17,7 @@ import { getStorageInfo } from "../utils/storage/get-storage-info";
 import { bootstrapInternalDatabase, completeInternalAccounting } from "../utils/internal-bootstrap";
 import { ensureInternalSyncJournal, getInternalSyncJournalStatus } from "../utils/internal-sync-journal";
 import { runInternalLocalToServerOnce, runInternalServerToLocalOnce, runInternalBidirectionalOnce } from "../utils/internal-sync-worker";
+import { checkInternalSyncScheduleNow, getInternalAutoSyncStatus, startInternalSyncScheduler } from "../utils/internal-sync-scheduler";
 
 const router = Router();
 try {
@@ -1512,6 +1513,7 @@ async function getSettingsRow() {
 
 ensureDeveloperSettingsColumns();
 ensureSyncQueueTable();
+startInternalSyncScheduler();
 
 router.post("/developer/unlock", (req, res) => {
   const expectedPassword = process.env.DEVELOPER_PASSWORD;
@@ -1644,11 +1646,16 @@ router.get("/developer/internal-database/settings", async (_req, res) => {
 });
 
 router.get("/developer/internal-database/journal-status", (_req, res) => {
+  
   try {
     return res.json({ ok: true, ...getInternalSyncJournalStatus() });
   } catch (error) {
     return res.status(503).json({ ok: false, error: sanitizeDatabaseError(error) });
   }
+});
+
+router.get("/developer/internal-database/auto-status", (_req, res) => {
+  return res.json(getInternalAutoSyncStatus());
 });
 
 router.get("/developer/internal-database/server-journal-status", async (_req, res) => {
@@ -1801,6 +1808,7 @@ router.put("/developer/internal-database/settings", async (req, res) => {
       internalSyncIntervalMinutes: body.intervalMinutes,
       updatedAt: new Date(),
     }).where(eq(companySettingsTable.id, Number(settings.id))).returning();
+    checkInternalSyncScheduleNow();
     return res.json(mapInternalDatabaseSettings(updated));
   } catch (error) {
     console.error(error);

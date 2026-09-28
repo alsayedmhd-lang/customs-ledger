@@ -463,6 +463,7 @@ export default function DeveloperSettingsPage() {
   const [savedMessage, setSavedMessage] = useState("");
   const [databaseMessage, setDatabaseMessage] = useState("");
   const [internalDatabaseMessage, setInternalDatabaseMessage] = useState("");
+  const [internalAutoStatus, setInternalAutoStatus] = useState<{ running: boolean; lastCheckAt: string | null; lastAttemptAt: string | null; lastSuccessAt: string | null; lastError: string | null } | null>(null);
   const [isSavingInternalDatabase, setIsSavingInternalDatabase] = useState(false);
   const [isTestingInternalDatabase, setIsTestingInternalDatabase] = useState(false);
   const [isCheckingInternalReadiness, setIsCheckingInternalReadiness] = useState(false);
@@ -696,8 +697,38 @@ export default function DeveloperSettingsPage() {
         syncMode: data.syncMode || "bidirectional", autoSync: Boolean(data.autoSync),
         timing: data.timing || "startup", intervalMinutes: Number(data.intervalMinutes || 30),
       });
+      void checkInternalAutoStatus();
     } catch (error) {
       setInternalDatabaseMessage(error instanceof Error ? error.message : tr("تعذر تحميل إعدادات الخادم الداخلي", "Failed to load internal server settings"));
+    }
+  }
+
+  async function checkInternalAutoStatus() {
+    try {
+      const response = await fetch(`${API_BASE}/developer/internal-database/auto-status`, { headers: authHeaders() });
+      if (!response.ok) throw new Error();
+      setInternalAutoStatus(await response.json());
+      const [local, server] = await Promise.allSettled([
+        fetch(`${API_BASE}/developer/internal-database/journal-status`, { headers: authHeaders() }),
+        fetch(`${API_BASE}/developer/internal-database/server-journal-status`, { headers: authHeaders() }),
+      ]);
+      if (local.status === "fulfilled" && local.value.ok) {
+        const data = await local.value.json();
+        if (data.ok) setInternalJournalCount(Number(data.pendingChanges || 0));
+      }
+      if (server.status === "fulfilled") {
+        setInternalDatabaseConnectionStatus(server.value.ok ? "connected" : "failed");
+        if (server.value.ok) {
+          const data = await server.value.json();
+          if (data.ok) setServerJournalCount(Number(data.pendingChanges || 0));
+        } else setServerJournalCount(null);
+      } else {
+        setInternalDatabaseConnectionStatus("failed");
+        setServerJournalCount(null);
+      }
+    } catch {
+      setInternalAutoStatus(null);
+      setInternalDatabaseMessage(tr("تعذر قراءة حالة المزامنة التلقائية", "Could not read automatic sync status"));
     }
   }
 
@@ -2689,7 +2720,7 @@ export default function DeveloperSettingsPage() {
               </summary>
               <div className="space-y-4 border-t border-border p-5">
                 <p className="text-sm text-muted-foreground">
-                  {tr("احفظ إعدادات PostgreSQL الخاصة بالشبكة الداخلية ثم اختبر الاتصال. ستبقى المزامنة معطلة حتى تجهيزها.", "Save PostgreSQL settings for the internal network, then test the connection. Sync remains disabled until it is ready.")}
+                  {tr("احفظ إعدادات PostgreSQL الخاصة بالشبكة الداخلية، ثم اختبر الاتصال أو تابع حالة المزامنة أدناه.", "Save the internal PostgreSQL settings, then test the connection or review sync status below.")}
                 </p>
                 <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                   <DevField label={tr("عنوان الخادم الداخلي", "Internal server address")}>
@@ -2713,8 +2744,9 @@ export default function DeveloperSettingsPage() {
                 </div>
                 <div className="grid gap-3 md:grid-cols-2">
                   <InfoRow isAR={isAR} label={tr("حالة اتصال الخادم الداخلي", "Internal server connection")} value={internalDatabaseConnectionStatus === "connected" ? tr("متصل", "Connected") : internalDatabaseConnectionStatus === "failed" ? tr("فشل الاتصال", "Connection failed") : tr("لم يُختبر بعد", "Not tested yet")} />
-                  <InfoRow isAR={isAR} label={tr("حالة المزامنة الداخلية", "Internal sync status")} value={tr("التشغيل اليدوي من المحلي إلى الداخلي متاح عند اختيار اتجاهه", "Manual local-to-internal sync is available when selected")} />
+                  <InfoRow isAR={isAR} label={tr("حالة المزامنة الداخلية", "Internal sync status")} value={!internalDatabaseConfig.autoSync ? tr("التشغيل التلقائي متوقف", "Automatic sync is off") : internalAutoStatus?.running ? tr("المزامنة جارية", "Sync in progress") : internalAutoStatus?.lastError ? tr("آخر محاولة فشلت", "Last attempt failed") : internalAutoStatus?.lastSuccessAt ? tr("آخر محاولة نجحت", "Last attempt succeeded") : tr("بانتظار أول تشغيل", "Waiting for first run")} />
                   <InfoRow isAR={isAR} label={tr("التغييرات المحلية المنتظرة للخادم الداخلي", "Local changes pending for internal server")} value={internalJournalCount ?? tr("لم تُفحص", "Not checked")} />
+                  <InfoRow isAR={isAR} label={tr("تغييرات الخادم المنتظرة محليًا", "Server changes pending locally")} value={serverJournalCount ?? tr("تعذر الفحص", "Unavailable")} />
                 </div>
                 <div className="grid gap-4 rounded-xl border border-border bg-background/70 p-4 xl:grid-cols-2">
                   <div className="space-y-3">
@@ -2753,10 +2785,12 @@ export default function DeveloperSettingsPage() {
                           onChange={(event) => setInternalDatabaseConfig((current) => ({ ...current, intervalMinutes: Number(event.target.value) }))} />
                       </DevField>
                     </div>
-                    <p className="text-xs text-muted-foreground">{tr("المزامنة اليدوية في الاتجاه المحدد متاحة. التعارض والحذف من الخادم يوقفان المزامنة الثنائية للمراجعة. المزامنة التلقائية غير مفعّلة.", "Manual sync is available in the selected direction. Conflicts and server deletions stop bidirectional sync for review. Automatic sync is not enabled.")}</p>
+                    <p className="text-xs text-muted-foreground">{tr("بعد حفظ التفعيل، تعمل المزامنة تلقائيًا عند بدء البرنامج أو كل فترة حسب اختيارك. التعارض والحذف من الخادم يوقفان المزامنة الثنائية للمراجعة.", "After saving, sync runs automatically on startup or at the selected interval. Conflicts and server deletions stop bidirectional sync for review.")}</p>
+                    {internalAutoStatus && <p className="text-xs text-muted-foreground">{tr("آخر فحص للجدولة", "Last schedule check")}: {internalAutoStatus.lastCheckAt ? new Date(internalAutoStatus.lastCheckAt).toLocaleString() : tr("لا يوجد", "None")} · {tr("آخر محاولة", "Last attempt")}: {internalAutoStatus.lastAttemptAt ? new Date(internalAutoStatus.lastAttemptAt).toLocaleString() : tr("لا توجد", "None")} · {tr("آخر نجاح", "Last success")}: {internalAutoStatus.lastSuccessAt ? new Date(internalAutoStatus.lastSuccessAt).toLocaleString() : tr("لا يوجد", "None")} {internalAutoStatus.running ? tr("· جارٍ التشغيل", "· Running") : ""} {internalAutoStatus.lastError ? `· ${tr("آخر خطأ", "Last error")}: ${internalAutoStatus.lastError}` : ""}</p>}
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2">
+                  <Button type="button" variant="outline" size="sm" onClick={checkInternalAutoStatus}>{tr("تحديث حالة التشغيل التلقائي", "Refresh automatic sync status")}</Button>
                   <Button type="button" variant="outline" size="sm" onClick={saveInternalDatabaseSettings} disabled={isSavingInternalDatabase}>
                     {isSavingInternalDatabase ? tr("جارٍ الحفظ...", "Saving...") : tr("حفظ الإعدادات", "Save settings")}
                   </Button>
