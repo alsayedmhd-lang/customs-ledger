@@ -143,6 +143,7 @@ CREATE TABLE IF NOT EXISTS invoice_attachments (
 CREATE TABLE IF NOT EXISTS invoice_item_templates (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   description TEXT NOT NULL,
+  item_code TEXT UNIQUE,
   default_unit_price REAL DEFAULT 0,
   created_at INTEGER
 );

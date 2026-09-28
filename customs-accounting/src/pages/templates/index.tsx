@@ -124,6 +124,9 @@ export default function TemplatesList() {
               <div key={tmpl.id}
                 className="bg-card border border-border/50 rounded-xl p-3 shadow-sm hover:shadow-md transition-all group hover:-translate-y-0.5 flex flex-col gap-1"
               >
+                <span className="text-xs font-mono text-muted-foreground">
+                  {(tmpl as InvoiceItemTemplate & { itemCode?: string | null }).itemCode}
+                </span>
                 <p
                   onClick={() => setEditingTemplate(tmpl)}
                   className="text-xs font-medium text-foreground line-clamp-2 leading-snug cursor-pointer hover:text-primary transition-colors"
@@ -189,7 +192,7 @@ export default function TemplatesList() {
                         i % 2 === 0 ? "" : "bg-muted/10"
                       )}
                     >
-                      <td className="px-4 py-3 font-mono text-xs text-muted-foreground w-10">{i + 1}</td>
+                      <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{(tmpl as InvoiceItemTemplate & { itemCode?: string | null }).itemCode ?? i + 1}</td>
                       <td className="px-4 py-3 font-medium text-foreground">
                         <span
                           onClick={() => setEditingTemplate(tmpl)}
@@ -268,6 +271,9 @@ function TemplateCard({
         <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center mb-3">
           <PackageSearch className="w-4 h-4 text-primary" />
         </div>
+        <span className="text-xs font-mono text-muted-foreground">
+          {(tmpl as InvoiceItemTemplate & { itemCode?: string | null }).itemCode}
+        </span>
         <h3
           onClick={() => onEdit(tmpl)}
           className="font-bold text-foreground line-clamp-2 text-sm leading-relaxed cursor-pointer hover:text-primary transition-colors"

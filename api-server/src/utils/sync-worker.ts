@@ -127,6 +127,7 @@ type LocalClientRow = {
 
 type LocalTemplateRow = {
   id: number;
+  itemCode: string | null;
   description: string;
   defaultUnitPrice: number | null;
   createdAt: number | null;
@@ -596,26 +597,49 @@ async function pullUsersFromOnline(client: any, clientIdMap: Map<number, number>
 async function pullTemplatesFromOnline(client: any) {
   if (!sqlite) throw new Error("SQLite database is not available");
   const result = await client.query(
-    "SELECT description, default_unit_price, created_at FROM invoice_item_templates ORDER BY id ASC"
-  ) as { rows?: Array<{ description: string; default_unit_price: number | string | null; created_at: string | Date | null }> };
+    "SELECT item_code, description, default_unit_price, created_at FROM invoice_item_templates ORDER BY item_code ASC"
+  ) as { rows?: Array<{
+    item_code: string | null;
+    description: string;
+    default_unit_price: number | string | null;
+    created_at: string | Date | null;
+  }> };
   const rows = result.rows || [];
   let inserted = 0;
+  const local = sqlite.prepare(
+    "SELECT id, item_code AS itemCode, description FROM invoice_item_templates"
+  ).all() as Array<{ id: number; itemCode: string | null; description: string }>;
+
   for (const template of rows) {
+    const code = String(template.item_code || "").trim();
     const description = String(template.description || "").trim();
-    if (!description) throw new Error("Online template has no description");
-    const existing = sqlite.prepare(
-      "SELECT description FROM invoice_item_templates"
-    ).all() as Array<{ description: string }>;
-    if (existing.some((row) => normalizeText(row.description) === normalizeText(description))) {
+    if (!code || !description) throw new Error("Online template has no code or description");
+
+    const byCode = local.find((row) => row.itemCode === code);
+    if (byCode) continue;
+
+    const byDescription = local.find(
+      (row) => normalizeText(row.description) === normalizeText(description)
+    );
+    if (byDescription) {
+      if (byDescription.itemCode && byDescription.itemCode !== code) {
+        throw new Error(`Template code conflict: ${description}`);
+      }
+      sqlite.prepare(
+        "UPDATE invoice_item_templates SET item_code = ? WHERE id = ?"
+      ).run(code, byDescription.id);
+      byDescription.itemCode = code;
       continue;
     }
-    sqlite.prepare(`
-      INSERT INTO invoice_item_templates (description, default_unit_price, created_at)
-      VALUES (?, ?, ?)
+
+    const insertedRow = sqlite.prepare(`
+      INSERT INTO invoice_item_templates (item_code, description, default_unit_price, created_at)
+      VALUES (?, ?, ?, ?)
     `).run(
-      description, Number(template.default_unit_price ?? 0),
+      code, description, Number(template.default_unit_price ?? 0),
       toSqliteTimestamp(template.created_at) ?? Date.now()
     );
+    local.push({ id: Number(insertedRow.lastInsertRowid), itemCode: code, description });
     inserted += 1;
   }
   console.log("[SYNC][PULL][TEMPLATES][DONE]", { total: rows.length, inserted });
@@ -652,9 +676,9 @@ function getLocalClients() {
 
 function getLocalTemplates() {
   return sqlite?.prepare(`
-    SELECT id, description, default_unit_price AS defaultUnitPrice,
-           created_at AS createdAt
-    FROM invoice_item_templates ORDER BY id ASC
+    SELECT id, item_code AS itemCode, description,
+           default_unit_price AS defaultUnitPrice, created_at AS createdAt
+    FROM invoice_item_templates ORDER BY item_code ASC
   `).all() as LocalTemplateRow[] | undefined;
 }
 
@@ -1917,29 +1941,45 @@ export async function runOnlineToLocalSyncOnce(): Promise<{
 }
 
 // A template has no invoice dependency. Copy missing templates before clients.
-// Match on description because local numeric IDs are not shared across devices.
+// Match templates by their shared code; local numeric IDs differ across devices.
 async function syncTemplatesBeforeQueue(client: any) {
   const online = await client.query(
-    "SELECT description FROM invoice_item_templates"
-  ) as { rows?: Array<{ description: string }> };
-
-  const onlineDescriptions = new Set(
-    (online.rows || []).map((row) => normalizeText(row.description))
-  );
+    "SELECT item_code, description FROM invoice_item_templates"
+  ) as { rows?: Array<{ item_code: string | null; description: string }> };
+  const onlineRows = online.rows || [];
 
   for (const template of getLocalTemplates() || []) {
+    const code = String(template.itemCode || "").trim();
     const description = String(template.description || "").trim();
-    if (!description) throw new Error(`Local template ${template.id} has no description`);
+    if (!code || !description) {
+      throw new Error(`Local template ${template.id} has no code or description`);
+    }
 
-    const normalized = normalizeText(description);
-    if (onlineDescriptions.has(normalized)) continue;
+    const byCode = onlineRows.find((row) => row.item_code === code);
+    if (byCode) continue;
+
+    const byDescription = onlineRows.find(
+      (row) => normalizeText(row.description) === normalizeText(description)
+    );
+    if (byDescription) {
+      if (byDescription.item_code && byDescription.item_code !== code) {
+        throw new Error(`Template code conflict: ${description}`);
+      }
+      await client.query(
+        "UPDATE invoice_item_templates SET item_code = $1 WHERE item_code IS NULL AND description = $2",
+        [code, byDescription.description]
+      );
+      byDescription.item_code = code;
+      continue;
+    }
 
     await client.query(
-      `INSERT INTO invoice_item_templates (description, default_unit_price, created_at)
-       VALUES ($1, $2, $3)`,
-      [description, Number(template.defaultUnitPrice ?? 0), toPgTimestamp(template.createdAt) ?? new Date()]
+      `INSERT INTO invoice_item_templates (item_code, description, default_unit_price, created_at)
+       VALUES ($1, $2, $3, $4)`,
+      [code, description, Number(template.defaultUnitPrice ?? 0),
+       toPgTimestamp(template.createdAt) ?? new Date()]
     );
-    onlineDescriptions.add(normalized);
+    onlineRows.push({ item_code: code, description });
   }
 }
 

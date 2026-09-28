@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
+import { randomUUID } from "node:crypto";
 import { db, invoiceItemTemplatesTable } from "@workspace/db";
-import { eq, desc } from "drizzle-orm";
+import { eq, asc } from "drizzle-orm";
 
 const router: IRouter = Router();
 
@@ -12,7 +13,7 @@ router.get("/invoice-item-templates", async (req, res) => {
     const templates = await db
       .select()
       .from(invoiceItemTemplatesTable)
-      .orderBy(desc(invoiceItemTemplatesTable.createdAt));
+      .orderBy(asc(invoiceItemTemplatesTable.itemCode));
     res.json(templates.map(formatTemplate));
   } catch (err) {
     console.error(err);
@@ -32,6 +33,7 @@ router.post("/invoice-item-templates", async (req, res) => {
       .insert(invoiceItemTemplatesTable)
       .values({
         description,
+        itemCode: `X-${randomUUID()}`,
         defaultUnitPrice: parseFloat(defaultUnitPrice ?? "0").toFixed(2),
       })
       .returning();
@@ -85,6 +87,7 @@ router.delete("/invoice-item-templates/:id", async (req, res) => {
 function formatTemplate(t: typeof invoiceItemTemplatesTable.$inferSelect) {
   return {
     id: t.id,
+    itemCode: t.itemCode,
     description: t.description,
     defaultUnitPrice: t.defaultUnitPrice,
     createdAt: t.createdAt ? new Date(t.createdAt).toISOString() : null,
@@ -125,6 +128,7 @@ router.post("/invoice-item-templates/import", async (req: any, res: any) => {
       } else {
         await db.insert(invoiceItemTemplatesTable).values({
           ...values,
+          itemCode: `X-${randomUUID()}`,
           createdAt: new Date(),
         });
 

@@ -2,10 +2,12 @@ import express, { type Express, type Request, type Response } from "express";
 import cors from "cors";
 import router from "./routes";
 import { ensureInvoiceAttachmentsTable } from "./utils/ensure-invoice-attachments-table";
+import { ensureInvoiceItemTemplateCodes } from "./utils/ensure-invoice-item-template-codes";
 
 const app: Express = express();
 
 ensureInvoiceAttachmentsTable();
+ensureInvoiceItemTemplateCodes();
 
 const allowedOrigins = [
   "https://customs-ledger-front.vercel.app",
