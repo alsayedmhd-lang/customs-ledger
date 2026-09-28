@@ -16,7 +16,7 @@ import {
 import { getStorageInfo } from "../utils/storage/get-storage-info";
 import { bootstrapInternalDatabase, completeInternalAccounting } from "../utils/internal-bootstrap";
 import { ensureInternalSyncJournal, getInternalSyncJournalStatus } from "../utils/internal-sync-journal";
-import { runInternalLocalToServerOnce } from "../utils/internal-sync-worker";
+import { runInternalLocalToServerOnce, runInternalServerToLocalOnce } from "../utils/internal-sync-worker";
 
 const router = Router();
 try {
@@ -1674,6 +1674,34 @@ router.post("/developer/internal-database/sync-local-to-server", async (_req, re
       return res.status(400).json({ ok: false, error: "Only PostgreSQL connection strings are supported" });
     }
     return res.json({ ok: true, ...await runInternalLocalToServerOnce(connectionString) });
+  } catch (error) {
+    return res.status(400).json({ ok: false, error: sanitizeDatabaseError(error) });
+  }
+});
+
+router.post("/developer/internal-database/sync-server-to-local", async (_req, res) => {
+  try {
+    const saved = mapInternalDatabaseSettings(await getSettingsRow());
+    if (saved.syncMode !== "internal-to-local") {
+      return res.status(400).json({ ok: false, error: "Save Internal server to local as the sync direction first" });
+    }
+    let connectionString = saved.connectionString.trim();
+    if (!connectionString) {
+      if (!saved.host.trim() || !saved.databaseName.trim() || !saved.username.trim()) {
+        return res.status(400).json({ ok: false, error: "Internal server settings are incomplete" });
+      }
+      const url = new URL("postgresql://localhost");
+      url.hostname = saved.host.trim();
+      url.port = saved.port;
+      url.pathname = `/${encodeURIComponent(saved.databaseName.trim())}`;
+      url.username = saved.username.trim();
+      url.password = saved.password;
+      connectionString = url.toString();
+    }
+    if (!isPostgresConnectionString(connectionString)) {
+      return res.status(400).json({ ok: false, error: "Only PostgreSQL connection strings are supported" });
+    }
+    return res.json({ ok: true, ...await runInternalServerToLocalOnce(connectionString) });
   } catch (error) {
     return res.status(400).json({ ok: false, error: sanitizeDatabaseError(error) });
   }

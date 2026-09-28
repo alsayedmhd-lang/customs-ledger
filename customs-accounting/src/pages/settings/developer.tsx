@@ -469,6 +469,7 @@ export default function DeveloperSettingsPage() {
   const [internalJournalCount, setInternalJournalCount] = useState<number | null>(null);
   const [isCheckingInternalJournal, setIsCheckingInternalJournal] = useState(false);
   const [isRunningInternalPush, setIsRunningInternalPush] = useState(false);
+  const [isRunningInternalPull, setIsRunningInternalPull] = useState(false);
   const [isBootstrappingInternal, setIsBootstrappingInternal] = useState(false);
   const [isCompletingAccounting, setIsCompletingAccounting] = useState(false);
   const [internalReadiness, setInternalReadiness] = useState<{
@@ -815,6 +816,31 @@ export default function DeveloperSettingsPage() {
       setInternalDatabaseMessage(error instanceof Error ? error.message : tr("فشلت المزامنة الداخلية", "Internal sync failed"));
     } finally {
       setIsRunningInternalPush(false);
+    }
+  }
+
+  async function runInternalPull() {
+    if (!window.confirm(tr(
+      "سيُحدّث هذا الإجراء السجلات المحلية من الخادم الداخلي، بشرط عدم وجود تغييرات محلية منتظرة. خذ نسخة احتياطية من local.db قبل المتابعة. هل تريد التنفيذ؟",
+      "This will update local records from the internal server if no local changes are pending. Back up local.db before continuing. Proceed?",
+    ))) return;
+    setIsRunningInternalPull(true);
+    setInternalDatabaseMessage("");
+    try {
+      const response = await fetch(`${API_BASE}/developer/internal-database/sync-server-to-local`, {
+        method: "POST", headers: authHeaders(),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || !data.ok) throw new Error(data.error || tr("فشل استلام بيانات الخادم الداخلي", "Could not receive internal server data"));
+      setInternalDatabaseMessage(tr(
+        `اكتملت المزامنة: ${Number(data.inserted || 0)} سجل جديد، و${Number(data.updated || 0)} سجل محدّث. الحذف غير مشمول.`,
+        `Sync complete: ${Number(data.inserted || 0)} inserted, ${Number(data.updated || 0)} updated. Deletions are not included.`,
+      ));
+      setInternalJournalCount(null);
+    } catch (error) {
+      setInternalDatabaseMessage(error instanceof Error ? error.message : tr("فشل استلام بيانات الخادم الداخلي", "Could not receive internal server data"));
+    } finally {
+      setIsRunningInternalPull(false);
     }
   }
 
@@ -2701,7 +2727,7 @@ export default function DeveloperSettingsPage() {
                           onChange={(event) => setInternalDatabaseConfig((current) => ({ ...current, intervalMinutes: Number(event.target.value) }))} />
                       </DevField>
                     </div>
-                    <p className="text-xs text-muted-foreground">{tr("المزامنة اليدوية من المحلي إلى الداخلي متاحة. لم تُفعّل المزامنة التلقائية أو الاتجاهات الأخرى بعد.", "Manual local-to-internal sync is available. Automatic sync and other directions are not enabled yet.")}</p>
+                    <p className="text-xs text-muted-foreground">{tr("المزامنة اليدوية في الاتجاه المحدد متاحة. الحذف من الخادم لا يُحذف محليًا. المزامنة التلقائية وثنائية الاتجاه غير مفعّلتين.", "Manual sync is available in the selected direction. Server deletions are not applied locally. Automatic and bidirectional sync are not enabled.")}</p>
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -2729,6 +2755,10 @@ export default function DeveloperSettingsPage() {
                   <Button type="button" size="sm" onClick={runInternalPush}
                     disabled={isRunningInternalPush || internalDatabaseConfig.syncMode !== "local-to-internal"}>
                     {isRunningInternalPush ? tr("جارٍ إرسال التغييرات...", "Sending changes...") : tr("مزامنة المحلي إلى الداخلي الآن", "Sync local to internal now")}
+                  </Button>
+                  <Button type="button" size="sm" onClick={runInternalPull}
+                    disabled={isRunningInternalPull || internalDatabaseConfig.syncMode !== "internal-to-local"}>
+                    {isRunningInternalPull ? tr("جارٍ استلام البيانات...", "Receiving data...") : tr("مزامنة الداخلي إلى المحلي الآن", "Sync internal to local now")}
                   </Button>
                 </div>
                 {internalDatabaseMessage && <p role="status" className="text-sm text-muted-foreground">{internalDatabaseMessage}</p>}

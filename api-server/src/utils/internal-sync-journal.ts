@@ -23,15 +23,26 @@ export function ensureInternalSyncJournal() {
     CREATE INDEX IF NOT EXISTS internal_sync_journal_row_idx
     ON internal_sync_journal(table_name, row_id, id)
   `).run();
+  sqlite.prepare(`
+    CREATE TABLE IF NOT EXISTS internal_sync_control (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      capture_enabled INTEGER NOT NULL DEFAULT 1
+    )
+  `).run();
+  sqlite.prepare("INSERT OR IGNORE INTO internal_sync_control(id, capture_enabled) VALUES (1, 1)").run();
+  // Recreate older triggers so a server pull can update SQLite without
+  // sending those same rows straight back to PostgreSQL.
   for (const table of TABLES) {
     for (const [event, operation, reference] of [
       ["INSERT", "insert", "NEW"],
       ["UPDATE", "update", "NEW"],
       ["DELETE", "delete", "OLD"],
     ] as const) {
+      sqlite.prepare(`DROP TRIGGER IF EXISTS internal_sync_${table}_${operation}`).run();
       sqlite.prepare(`
-        CREATE TRIGGER IF NOT EXISTS internal_sync_${table}_${operation}
+        CREATE TRIGGER internal_sync_${table}_${operation}
         AFTER ${event} ON "${table}"
+        WHEN (SELECT capture_enabled FROM internal_sync_control WHERE id = 1) = 1
         BEGIN
           INSERT INTO internal_sync_journal (table_name, row_id, operation, created_at)
           VALUES ('${table}', ${reference}.id, '${operation}', CAST(unixepoch('now') * 1000 AS INTEGER));

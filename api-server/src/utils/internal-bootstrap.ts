@@ -31,6 +31,11 @@ function quote(name: string) { return `"${name}"`; }
 export function convertInternalValue(table: string, column: string, value: unknown) {
   if (value == null) return null;
   const key = `${table}.${column}`;
+  if (key === "customer_ledger.created_at" && typeof value === "string" && !/^\d+(?:\.\d+)?$/.test(value)) {
+    const date = Date.parse(value.includes("T") ? value : `${value.replace(" ", "T")}Z`);
+    if (!Number.isFinite(date)) throw new Error(`Invalid date in ${key}`);
+    return date;
+  }
   if (TIMESTAMPS.has(key)) {
     const date = typeof value === "number" ? new Date(value) : new Date(String(value));
     if (!Number.isFinite(date.getTime())) throw new Error(`Invalid date in ${key}`);
