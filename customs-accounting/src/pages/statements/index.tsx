@@ -2,14 +2,14 @@ import ResizableScrollArea from "@/components/layout/ResizableScrollArea";
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { Link } from "wouter";
-import { useListClients, useListInvoices } from "@workspace/api-client-react";
+import { useListClients, useListInvoices, useListReceipts } from "@workspace/api-client-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { BookOpen, FileText, TrendingDown, TrendingUp, User, Printer, Eye, EyeOff } from "lucide-react";
 import { useLanguage } from "@/lib/language-context";
 
 type Client = NonNullable<ReturnType<typeof useListClients>["data"]>[number];
 type Invoice = NonNullable<ReturnType<typeof useListInvoices>["data"]>[number];
-
+type Receipt = NonNullable<ReturnType<typeof useListReceipts>["data"]>[number];
 interface ClientSummary {
   client: Client;
   totalInvoiced: number;
@@ -36,8 +36,20 @@ export default function StatementsIndex() {
   const hidden = <span className="tracking-widest opacity-35 font-mono">••••••</span>;
   const { data: clients, isLoading: loadingClients } = useListClients();
   const { data: allInvoices, isLoading: loadingInvoices } = useListInvoices();
+  const { data: receipts = [], isLoading: loadingReceipts } = useListReceipts();
 
-  const loading = loadingClients || loadingInvoices;
+  const receivedByInvoice = new Map<number, number>();
+    for (const receipt of receipts) {
+      if (receipt.status !== "issued" || receipt.invoiceId == null) continue;
+
+      const invoiceId = Number(receipt.invoiceId);
+      receivedByInvoice.set(
+        invoiceId,
+        (receivedByInvoice.get(invoiceId) ?? 0) + Number(receipt.amount || 0),
+      );
+    }
+
+  const loading = loadingClients || loadingInvoices || loadingReceipts;
 
   const clientSummaries: ClientSummary[] = (clients?.map((client: Client) => {
     const invoices = allInvoices?.filter((inv: Invoice) => {
@@ -62,10 +74,13 @@ export default function StatementsIndex() {
     }) || [];
 
     const totalInvoiced = invoices.reduce((sum, inv) => sum + inv.total, 0);
-    const totalPaid = invoices
-      .filter(i => i.status === "paid")
-      .reduce((sum, inv) => sum + inv.total, 0);
-
+    const totalPaid = invoices.reduce(
+      (sum, inv) =>
+        sum +
+        Number((inv as Invoice & { advancePayment?: number }).advancePayment ?? 0) +
+        (receivedByInvoice.get(inv.id) ?? 0),
+      0,
+    );
     const balance = totalInvoiced - totalPaid;
 
     const lastInvoice = [...invoices].sort(
