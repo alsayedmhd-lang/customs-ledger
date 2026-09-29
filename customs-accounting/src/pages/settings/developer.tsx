@@ -596,6 +596,14 @@ export default function DeveloperSettingsPage() {
     }
   }, [unlocked]);
 
+  useEffect(() => {
+    if (!unlocked || !onlineDatabaseConnected) return;
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === "visible") void loadSyncQueueStatus();
+    }, 60_000);
+    return () => window.clearInterval(timer);
+  }, [unlocked, onlineDatabaseConnected]);
+
   function applyDeveloperSettingsState(data: DeveloperSettings) {
     const nextSettings = { ...defaultSettings, ...data };
     setSettings(nextSettings);
@@ -2617,7 +2625,7 @@ export default function DeveloperSettingsPage() {
               <div className="mb-3 text-xs font-medium text-muted-foreground">
                 {syncConfig.autoSync && onlineDatabaseConnected
                   ? syncConfig.timing === "interval"
-                    ? tr(`تعمل المزامنة تلقائيًا في الخلفية كل ${syncConfig.intervalMinutes} دقيقة أثناء تشغيل البرنامج.`, `Background sync runs every ${syncConfig.intervalMinutes} minute(s) while the app is running.`)
+                    ? tr(`تعمل المزامنة تلقائيًا عند تشغيل البرنامج، ثم كل ${syncConfig.intervalMinutes} دقيقة أثناء تشغيله.`, `Automatic sync runs when the app starts, then every ${syncConfig.intervalMinutes} minute(s) while it is running.`)
                     : tr("تعمل المزامنة تلقائيًا بعد تسجيل الدخول.", "Automatic sync runs after sign-in.")
                   : tr("المزامنة التلقائية متوقفة على هذا الجهاز.", "Automatic sync is off on this device.")}
               </div>
