@@ -18,6 +18,7 @@ import { bootstrapInternalDatabase, completeInternalAccounting } from "../utils/
 import { ensureInternalSyncJournal, getInternalSyncJournalStatus } from "../utils/internal-sync-journal";
 import { runInternalLocalToServerOnce, runInternalServerToLocalOnce, runInternalBidirectionalOnce } from "../utils/internal-sync-worker";
 import { checkInternalSyncScheduleNow, getInternalAutoSyncStatus, startInternalSyncScheduler } from "../utils/internal-sync-scheduler";
+import { startOnlineSyncScheduler } from "../utils/online-sync-scheduler";
 
 function getRuntimeAppVersion(): string {
   const resourcesPath = (process as NodeJS.Process & { resourcesPath?: string }).resourcesPath;
@@ -1527,6 +1528,7 @@ async function getSettingsRow() {
 ensureDeveloperSettingsColumns();
 ensureSyncQueueTable();
 startInternalSyncScheduler();
+startOnlineSyncScheduler();
 
 router.post("/developer/unlock", (req, res) => {
   const expectedPassword = process.env.DEVELOPER_PASSWORD;
@@ -1808,6 +1810,9 @@ router.put("/developer/internal-database/settings", async (req, res) => {
       return res.status(400).json({ error: "Invalid internal sync settings" });
     }
     const settings = await getSettingsRow();
+    if (body.autoSync && settings.databaseMode === "online" && settings.syncAutoSync) {
+      return res.status(409).json({ error: "Disable Online automatic sync before enabling internal automatic sync" });
+    }
     const [updated] = await db.update(companySettingsTable).set({
       internalDatabaseHost: body.host.trim(),
       internalDatabasePort: port,
@@ -2240,6 +2245,13 @@ router.put("/developer/settings", async (req, res) => {
   try {
     const settings = await getSettingsRow();
     const body = req.body ?? {};
+    if (!["startup", "interval"].includes(body.syncTiming) ||
+        !Number.isInteger(body.syncIntervalMinutes) || body.syncIntervalMinutes < 1 || body.syncIntervalMinutes > 1440) {
+      return res.status(400).json({ error: "Invalid Online sync schedule" });
+    }
+    if (body.syncAutoSync && body.databaseMode === "online" && settings.internalSyncAutoSync) {
+      return res.status(409).json({ error: "Disable internal automatic sync before enabling Online automatic sync" });
+    }
 
     const [updated] = await db
       .update(companySettingsTable)

@@ -19,7 +19,6 @@ const UNLOCK_KEY = "developer_unlocked";
 const UNLOCKED_AT_KEY = "developer_unlocked_at";
 const ONLINE_DATABASE_CONNECTED_KEY = "developer_online_database_connected";
 const DEVELOPER_IDLE_TIMEOUT_MS = 5 * 60 * 1000;
-const AUTO_SYNC_INTERVAL_MS = 2 * 60 * 1000;
 const DEFAULT_LOGIN_FOOTER_TEXT = "Internal Accounting System For Companes - alsayed.mhd@gmail.com - Phone - 00201009697521 - 0097460020446";
 type LoginMessageType = "welcome" | "notice" | "warning" | "quote";
 
@@ -754,6 +753,9 @@ export default function DeveloperSettingsPage() {
       });
       if (!response.ok) {
         const problem = await response.json().catch(() => ({}));
+        if (problem.error === "Disable Online automatic sync before enabling internal automatic sync") {
+          throw new Error(tr("أوقف مزامنة Online التلقائية أولاً", "Turn off Online automatic sync first"));
+        }
         if (problem.error === "Invalid internal sync settings") {
           throw new Error(tr("تحقق من خيارات المزامنة والفاصل الزمني (1 إلى 1440 دقيقة)", "Check sync options and the interval (1 to 1440 minutes)"));
         }
@@ -1126,20 +1128,6 @@ export default function DeveloperSettingsPage() {
       setIsSyncWorkerRunning(false);
     }
   }
-
-  useEffect(() => {
-    if (!unlocked || !onlineDatabaseConnected || databaseMode !== "online" || !syncConfig.autoSync) return;
-
-    const intervalId = window.setInterval(() => {
-      if (syncWorkerRunningRef.current) return;
-      if (typeof navigator !== "undefined" && navigator.onLine === false) return;
-      if (!onlineDatabaseConnected) return;
-
-      void runSyncWorkerNow({ silent: true });
-    }, AUTO_SYNC_INTERVAL_MS);
-
-    return () => window.clearInterval(intervalId);
-  }, [unlocked, onlineDatabaseConnected, databaseMode, syncConfig.autoSync]);
 
   async function retryFailedSyncItems() {
     setSyncWorkerMessage("");
@@ -2652,7 +2640,11 @@ export default function DeveloperSettingsPage() {
                 </Button>
               </div>
               <div className="mb-3 text-xs font-medium text-muted-foreground">
-                {tr("المزامنة التلقائية تعمل كل دقيقتين عند توفر الاتصال", "Auto sync runs every 2 minutes when connected")}
+                {syncConfig.autoSync && onlineDatabaseConnected
+                  ? syncConfig.timing === "interval"
+                    ? tr(`تعمل المزامنة تلقائيًا في الخلفية كل ${syncConfig.intervalMinutes} دقيقة أثناء تشغيل البرنامج.`, `Background sync runs every ${syncConfig.intervalMinutes} minute(s) while the app is running.`)
+                    : tr("تعمل المزامنة تلقائيًا بعد تسجيل الدخول.", "Automatic sync runs after sign-in.")
+                  : tr("المزامنة التلقائية متوقفة على هذا الجهاز.", "Automatic sync is off on this device.")}
               </div>
               {syncWorkerMessage && (
                 <div className="mb-3 rounded-md border border-border bg-background px-3 py-2 text-sm text-muted-foreground">

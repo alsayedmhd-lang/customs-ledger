@@ -7,6 +7,8 @@ import {
 
 type Settings = {
   enabled: number;
+  onlineAutoSync: number;
+  databaseMode: string;
   timing: string;
   minutes: number;
   mode: string;
@@ -30,6 +32,7 @@ function readSettings(): Settings | undefined {
   if (!sqlite) return;
   return sqlite.prepare(`
     SELECT internal_sync_auto_sync AS enabled,
+           sync_auto_sync AS onlineAutoSync, database_mode AS databaseMode,
            internal_sync_timing AS timing,
            internal_sync_interval_minutes AS minutes,
            internal_sync_mode AS mode,
@@ -90,7 +93,7 @@ async function tick() {
     console.warn("[INTERNAL_SYNC][AUTO] Settings unavailable", error);
     return;
   }
-  if (!settings || !settings.enabled) {
+  if (!settings || !settings.enabled || (settings.databaseMode === "online" && settings.onlineAutoSync)) {
     configuration = "";
     lastAttempt = 0;
     lastSuccess = 0;
