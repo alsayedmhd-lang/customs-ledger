@@ -19,6 +19,19 @@ import { ensureInternalSyncJournal, getInternalSyncJournalStatus } from "../util
 import { runInternalLocalToServerOnce, runInternalServerToLocalOnce, runInternalBidirectionalOnce } from "../utils/internal-sync-worker";
 import { checkInternalSyncScheduleNow, getInternalAutoSyncStatus, startInternalSyncScheduler } from "../utils/internal-sync-scheduler";
 
+function getRuntimeAppVersion(): string {
+  const resourcesPath = (process as NodeJS.Process & { resourcesPath?: string }).resourcesPath;
+  if (resourcesPath) {
+    try {
+      const manifest = JSON.parse(fs.readFileSync(path.join(resourcesPath, "app.asar", "package.json"), "utf8"));
+      if (typeof manifest.version === "string" && manifest.version) return `v${manifest.version}`;
+    } catch {
+      // The development build has no packaged app manifest.
+    }
+  }
+  return `v${packageJson.version}`;
+}
+
 const router = Router();
 try {
   ensureInternalSyncJournal();
@@ -1487,7 +1500,7 @@ function mapDeveloperPermissions(settings: any) {
     databaseStatus: sqlite ? "connected" : "unavailable",
     databaseSize,
     lastBackupAt: null,
-    appVersion: `v${packageJson.version}`,
+    appVersion: getRuntimeAppVersion(),
     frontendPath: path.resolve(process.cwd(), "customs-accounting"),
     backendPath: process.cwd(),
     apiStatus: "online",
@@ -1593,7 +1606,7 @@ router.get("/developer/system-diagnostics/export", async (_req, res) => {
     const report = sanitizeDiagnosticExportValue({
       generatedAt,
       appName: "Ledger",
-      appVersion: `v${packageJson.version}`,
+      appVersion: getRuntimeAppVersion(),
       dataRoot: context?.dataRoot || null,
       diagnostics,
     });

@@ -129,7 +129,6 @@ const tabs = [
   { id: "manager", labelAr: "صلاحيات المدير", labelEn: "Manager Access", icon: Users },
   { id: "database", labelAr: "قاعدة البيانات", labelEn: "Database", icon: Database },
   { id: "diagnostics", labelAr: "النظام والتشخيص", labelEn: "Diagnostics", icon: Activity },
-  { id: "updates", labelAr: "التحديث والتوزيع", labelEn: "Updates", icon: PackageCheck },
 ] as const;
 
 type TabId = (typeof tabs)[number]["id"];
@@ -1717,7 +1716,7 @@ export default function DeveloperSettingsPage() {
     const direction = isAR ? "rtl" : "ltr";
     const align = isAR ? "right" : "left";
     const checkedAt = formatSyncQueueDate(data.checkedAt, isAR);
-    const appVersion = settings.appVersion || import.meta.env.VITE_APP_VERSION || "";
+    const appVersion = import.meta.env.VITE_APP_VERSION || settings.appVersion || "";
     const dataRoot = getSystemDiagnosticsDataRoot(data);
     const statusClass = (status: SystemDiagnosticStatus) => {
       if (status === "pass") return "status-pass";
@@ -2862,7 +2861,6 @@ export default function DeveloperSettingsPage() {
           <Card className="rounded-lg">
             <CardHeader><CardTitle className="text-lg">{tr("النظام والتشخيص", "Diagnostics")}</CardTitle></CardHeader>
             <CardContent className="grid gap-3 md:grid-cols-2">
-              <InfoRow isAR={isAR} label={tr("إصدار التطبيق", "App version")} value={settings.appVersion || import.meta.env.VITE_APP_VERSION} />
               <InfoRow isAR={isAR} label={tr("مسار الواجهة", "Frontend path")} value={settings.frontendPath} />
               <InfoRow isAR={isAR} label={tr("مسار الخادم", "Backend path")} value={settings.backendPath} />
               <InfoRow isAR={isAR} label={tr("حالة API", "API status")} value={settings.apiStatus} />
@@ -3219,18 +3217,6 @@ export default function DeveloperSettingsPage() {
             </div>
 
         </div>
-      )}
-
-      {activeTab === "updates" && (
-        <Card className="rounded-lg">
-          <CardHeader><CardTitle className="text-lg">{tr("التحديث والتوزيع", "Updates and Distribution")}</CardTitle></CardHeader>
-          <CardContent className="grid gap-3 md:grid-cols-2">
-            <InfoRow isAR={isAR} label={tr("إصدار التطبيق", "App version")} value={settings.appVersion || import.meta.env.VITE_APP_VERSION} />
-            <InfoRow isAR={isAR} label={tr("وضع البناء", "Build mode")} value={settings.buildMode} />
-            <InfoRow isAR={isAR} label={tr("نسخة packaged", "Packaged build")} value={settings.isPackaged} />
-            <InfoRow isAR={isAR} label={tr("مسار التثبيت", "Install path")} value={settings.installPath} />
-          </CardContent>
-        </Card>
       )}
     </SettingsShell>
   );

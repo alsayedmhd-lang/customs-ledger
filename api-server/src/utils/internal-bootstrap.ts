@@ -34,7 +34,7 @@ export function convertInternalValue(table: string, column: string, value: unkno
   if (key === "customer_ledger.created_at" && typeof value === "string" && !/^\d+(?:\.\d+)?$/.test(value)) {
     const date = Date.parse(value.includes("T") ? value : `${value.replace(" ", "T")}Z`);
     if (!Number.isFinite(date)) throw new Error(`Invalid date in ${key}`);
-    return date;
+    return new Date(date).toISOString();
   }
   if (TIMESTAMPS.has(key)) {
     const date = typeof value === "number" ? new Date(value) : new Date(String(value));
