@@ -2100,6 +2100,9 @@ router.post("/developer/sync-queue/retry-failed", (_req, res) => {
 
 router.post("/developer/sync/run-once", async (_req, res) => {
   const settings = await getSettingsRow();
+  if (settings?.databaseMode !== "online") {
+    return res.status(409).json({ ok: false, onlineConnected: false, message: "Online synchronization is disconnected on this device" });
+  }
   const result = await runConfiguredSyncOnce(String(settings?.syncMode || "local-to-online"));
   if (sqlite) {
     sqlite.prepare("UPDATE company_settings SET sync_status = ?, sync_last_sync_time = ?")
@@ -2112,6 +2115,29 @@ router.post("/developer/sync/run-once", async (_req, res) => {
       ? `Sync failed: ${result.lastError}`
       : `Online: Connected. ${result.syncMode} sync completed.`,
   });
+});
+
+router.post("/developer/sync/online-connection", async (req, res) => {
+  try {
+    const enabled = req.body?.enabled;
+    if (typeof enabled !== "boolean") return res.status(400).json({ error: "enabled must be a boolean" });
+    const settings = await getSettingsRow();
+    const connectionString = enabled ? String(req.body?.connectionString || "").trim() : "";
+    if (enabled && !isPostgresConnectionString(connectionString)) {
+      return res.status(400).json({ error: "A PostgreSQL connection string is required" });
+    }
+    const [updated] = await db.update(companySettingsTable).set({
+      databaseMode: enabled ? "online" : "local",
+      databaseProvider: "sqlite",
+      ...(enabled ? { databaseConnectionString: connectionString, databaseUseConnectionString: true } : {}),
+      ...(enabled ? {} : { syncAutoSync: false }),
+      updatedAt: new Date(),
+    } as any).where(eq(companySettingsTable.id, Number(settings.id))).returning();
+    return res.json(mapDeveloperPermissions(updated));
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: "Failed to change online connection" });
+  }
 });
 
 router.post("/developer/sync/check-connection", async (_req, res) => {

@@ -607,6 +607,10 @@ export default function DeveloperSettingsPage() {
     const nextSettings = { ...defaultSettings, ...data };
     setSettings(nextSettings);
     setDatabaseMode(nextSettings.databaseMode === "online" ? "online" : "local");
+    if (nextSettings.databaseMode !== "online") {
+      sessionStorage.removeItem(ONLINE_DATABASE_CONNECTED_KEY);
+      setOnlineDatabaseConnected(false);
+    }
     setDatabaseConfig((current) => ({
       ...current,
       localPath: nextSettings.sqlitePath || current.localPath,
@@ -1115,7 +1119,7 @@ export default function DeveloperSettingsPage() {
   }
 
   useEffect(() => {
-    if (!unlocked || !onlineDatabaseConnected) return;
+    if (!unlocked || !onlineDatabaseConnected || databaseMode !== "online" || !syncConfig.autoSync) return;
 
     const intervalId = window.setInterval(() => {
       if (syncWorkerRunningRef.current) return;
@@ -1126,7 +1130,7 @@ export default function DeveloperSettingsPage() {
     }, AUTO_SYNC_INTERVAL_MS);
 
     return () => window.clearInterval(intervalId);
-  }, [unlocked, onlineDatabaseConnected]);
+  }, [unlocked, onlineDatabaseConnected, databaseMode, syncConfig.autoSync]);
 
   async function retryFailedSyncItems() {
     setSyncWorkerMessage("");
@@ -1378,11 +1382,6 @@ export default function DeveloperSettingsPage() {
   async function connectOnlineDatabase() {
     setDatabaseMessage("");
 
-    if (databaseMode !== "online") {
-      setDatabaseMessage(tr("اختر قاعدة أونلاين للاتصال", "Select Online database to connect"));
-      return;
-    }
-
     if (!databaseConfig.useConnectionString) {
       setDatabaseMessage(tr("فعّل خيار Connection String الكامل ثم أدخل الرابط", "Enable full connection string and enter the URL"));
       return;
@@ -1413,6 +1412,13 @@ export default function DeveloperSettingsPage() {
         return;
       }
 
+      const activation = await fetch(`${API_BASE}/developer/sync/online-connection`, {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify({ enabled: true, connectionString }),
+      });
+      if (!activation.ok) throw new Error(tr("تعذر تفعيل مزامنة الأونلاين", "Could not enable online synchronization"));
+      applyDeveloperSettingsState(await activation.json());
       sessionStorage.setItem(ONLINE_DATABASE_CONNECTED_KEY, "true");
       setOnlineDatabaseConnected(true);
       setDatabaseMessage(tr("Online: متصل بالأونلاين", "Online: Connected"));
@@ -1423,10 +1429,25 @@ export default function DeveloperSettingsPage() {
     }
   }
 
-  function disconnectOnlineDatabase() {
-    sessionStorage.removeItem(ONLINE_DATABASE_CONNECTED_KEY);
-    setOnlineDatabaseConnected(false);
-    setDatabaseMessage(tr("Online: غير متصل بالأونلاين", "Online: Disconnected"));
+  async function disconnectOnlineDatabase() {
+    setDatabaseMessage("");
+    setIsSaving(true);
+    try {
+      const res = await fetch(`${API_BASE}/developer/sync/online-connection`, {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify({ enabled: false }),
+      });
+      if (!res.ok) throw new Error(tr("تعذر فصل مزامنة الأونلاين", "Could not disconnect online synchronization"));
+      applyDeveloperSettingsState(await res.json());
+      sessionStorage.removeItem(ONLINE_DATABASE_CONNECTED_KEY);
+      setOnlineDatabaseConnected(false);
+      setDatabaseMessage(tr("تم فصل الأونلاين وإيقاف مزامنته على هذا الجهاز", "Online synchronization is disconnected on this device"));
+    } catch (err) {
+      setDatabaseMessage(err instanceof Error ? err.message : tr("تعذر فصل الاتصال", "Could not disconnect"));
+    } finally {
+      setIsSaving(false);
+    }
   }
 
   async function savePreparedConnection() {
@@ -2530,7 +2551,7 @@ export default function DeveloperSettingsPage() {
                 </Button>
                 <Button type="button" variant="outline" onClick={savePreparedConnection} size="sm">{tr("حفظ الإعدادات", "Save settings")}</Button>
                 {onlineDatabaseConnected ? (
-                  <Button type="button" variant="outline" onClick={disconnectOnlineDatabase} size="sm">{tr("فصل الاتصال", "Disconnect")}</Button>
+                  <Button type="button" variant="outline" onClick={disconnectOnlineDatabase} size="sm" disabled={isSaving}>{tr("فصل الاتصال", "Disconnect")}</Button>
                 ) : (
                   <Button type="button" onClick={connectOnlineDatabase} size="sm" disabled={isConnectingOnline}>
                     {isConnectingOnline ? tr("جارٍ الاتصال...", "Connecting...") : tr("اتصال", "Connect")}
