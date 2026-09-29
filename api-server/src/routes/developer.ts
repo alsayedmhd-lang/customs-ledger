@@ -2027,9 +2027,12 @@ router.get("/developer/sync-queue/status", (_req, res) => {
     const synced = sqlite
       .prepare("SELECT COUNT(*) AS count FROM sync_queue WHERE status IN ('success', 'synced', 'done')")
       .get() as { count: number };
-    const lastSync = sqlite
+    const lastQueueChange = sqlite
       .prepare("SELECT MAX(COALESCE(updated_at, created_at)) AS value FROM sync_queue WHERE status IN ('success', 'synced', 'done')")
       .get() as { value: number | null };
+    const lastSync = sqlite
+      .prepare("SELECT sync_last_sync_time AS value FROM company_settings LIMIT 1")
+      .get() as { value: string | null } | undefined;
     const lastError = sqlite
       .prepare(`
         SELECT last_error AS value
@@ -2071,7 +2074,7 @@ router.get("/developer/sync-queue/status", (_req, res) => {
       pending: Number(pending?.count || 0),
       synced: Number(synced?.count || 0),
       failed: Number(failed?.count || 0),
-      lastSync: lastSync?.value ? new Date(Number(lastSync.value)).toISOString() : null,
+      lastSync: lastSync?.value || (lastQueueChange?.value ? new Date(Number(lastQueueChange.value)).toISOString() : null),
       lastError: lastError?.value || null,
       recent: recent.map((item) => ({
         ...item,
@@ -2295,8 +2298,6 @@ router.put("/developer/settings", async (req, res) => {
         syncAutoSync: !!body.syncAutoSync,
         syncTiming: String(body.syncTiming || "startup"),
         syncIntervalMinutes: Number(body.syncIntervalMinutes || 30),
-        syncLastSyncTime: String(body.syncLastSyncTime || ""),
-        syncStatus: String(body.syncStatus || "idle"),
         updatedAt: new Date(),
       } as any)
       .where(eq(companySettingsTable.id, Number(settings.id)))
