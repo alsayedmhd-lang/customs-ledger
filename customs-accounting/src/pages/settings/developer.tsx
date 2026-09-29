@@ -607,11 +607,11 @@ export default function DeveloperSettingsPage() {
   function applyDeveloperSettingsState(data: DeveloperSettings) {
     const nextSettings = { ...defaultSettings, ...data };
     setSettings(nextSettings);
-    setDatabaseMode(nextSettings.databaseMode === "online" ? "online" : "local");
-    if (nextSettings.databaseMode !== "online") {
-      sessionStorage.removeItem(ONLINE_DATABASE_CONNECTED_KEY);
-      setOnlineDatabaseConnected(false);
-    }
+    const onlineEnabled = nextSettings.databaseMode === "online";
+    setDatabaseMode(onlineEnabled ? "online" : "local");
+    setOnlineDatabaseConnected(onlineEnabled);
+    if (onlineEnabled) sessionStorage.setItem(ONLINE_DATABASE_CONNECTED_KEY, "true");
+    else sessionStorage.removeItem(ONLINE_DATABASE_CONNECTED_KEY);
     setDatabaseConfig((current) => ({
       ...current,
       localPath: nextSettings.sqlitePath || current.localPath,
@@ -2512,7 +2512,7 @@ export default function DeveloperSettingsPage() {
                 <div className="mb-4 flex h-10 items-center justify-between rounded-md border border-border bg-background px-3 text-sm">
                   <span className="text-muted-foreground">{tr("تفعيل مزامنة الأونلاين", "Online sync setting")}</span>
                   <span className={cn("font-semibold", onlineDatabaseConnected ? "text-emerald-600" : "text-red-600")}>
-                    {databaseMode === "online" && onlineDatabaseConnected ? tr("مفعّلة بعد اختبار الاتصال", "Enabled after connection test") : tr("متوقفة على هذا الجهاز", "Off on this device")}
+                    {onlineDatabaseConnected ? tr("مزامنة الأونلاين مفعّلة", "Online sync enabled") : tr("متوقفة على هذا الجهاز", "Off on this device")}
                   </span>
                 </div>
                 <label className="mb-4 flex items-center gap-2 text-sm font-semibold text-foreground">
