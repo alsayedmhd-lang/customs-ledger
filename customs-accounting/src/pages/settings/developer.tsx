@@ -1347,11 +1347,6 @@ export default function DeveloperSettingsPage() {
   async function testPreparedConnection() {
     setDatabaseMessage("");
 
-    if (databaseMode !== "online") {
-      setDatabaseMessage(tr("اختر قاعدة أونلاين لاختبار Connection String", "Select Online database to test the connection string"));
-      return;
-    }
-
     if (!databaseConfig.useConnectionString) {
       setDatabaseMessage(tr("فعّل خيار Connection String الكامل ثم أدخل الرابط", "Enable full connection string and enter the URL"));
       return;
@@ -2478,32 +2473,6 @@ export default function DeveloperSettingsPage() {
                 <span aria-hidden="true" className="text-muted-foreground transition-transform group-open:rotate-180">⌄</span>
               </summary>
               <div className="space-y-4 border-t border-border p-5">
-            <div className="rounded-2xl border border-border bg-background/70 p-4 shadow-sm">
-              <div className="mb-4 flex items-center gap-2 text-sm font-bold text-foreground">
-                <Database className="h-4 w-4 text-primary" />
-                <span>{tr("وضع الاتصال بقاعدة البيانات", "Database connection mode")}</span>
-              </div>
-              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                {[
-                  { id: "local" as DatabaseMode, icon: Database, label: tr("قاعدة محلية (SQLite)", "Local database (SQLite)") },
-                  { id: "online" as DatabaseMode, icon: Cloud, label: tr("قاعدة عبر الإنترنت (PostgreSQL)", "Online database (PostgreSQL)") },
-                ].map((option) => (
-                  <button
-                    key={option.id}
-                    type="button"
-                    onClick={() => setDatabaseMode(option.id)}
-                    className={cn(
-                      "flex items-center gap-3 rounded-xl border p-3 text-sm transition",
-                      databaseMode === option.id ? "border-primary bg-primary/5 text-primary shadow-sm" : "border-border bg-background hover:border-primary/40"
-                    )}
-                  >
-                    <option.icon className="h-4 w-4 shrink-0" />
-                    <span className="font-semibold">{option.label}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
               <div className="rounded-2xl border border-border bg-background/70 p-4 shadow-sm">
                 <div className="mb-4 flex items-center gap-2 text-sm font-bold text-foreground">
                   <Cloud className="h-4 w-4 text-blue-600" />
