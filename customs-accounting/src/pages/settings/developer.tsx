@@ -394,12 +394,6 @@ function getSyncQueueDisplayStatus(status: SyncQueueStatus, isAR: boolean) {
   return isAR ? "خامل" : "Idle";
 }
 
-function getSyncEngineStatus(autoSync: boolean, onlineEnabled: boolean, isAR: boolean) {
-  if (!onlineEnabled) return isAR ? "مزامنة الأونلاين متوقفة" : "Online sync is off";
-  return autoSync ? (isAR ? "المزامنة التلقائية مفعّلة" : "Automatic sync enabled")
-    : (isAR ? "المزامنة اليدوية متاحة" : "Manual sync available");
-}
-
 function InfoRow({ label, value, isAR }: { label: string; value?: string | number | boolean | null; isAR: boolean }) {
   return (
     <div className="rounded-lg border border-border bg-background px-3 py-2">
@@ -2225,9 +2219,10 @@ export default function DeveloperSettingsPage() {
               <InfoRow isAR={isAR} label={tr("حالة قاعدة البيانات", "Database status")} value={settings.databaseStatus} />
               <InfoRow isAR={isAR} label={tr("حجم قاعدة البيانات", "Database size")} value={formatBytes(settings.databaseSize, isAR)} />
               <InfoRow isAR={isAR} label={tr("آخر نسخة احتياطية", "Last backup")} value={settings.lastBackupAt} />
+              <InfoRow isAR={isAR} label={tr("حالة API المحلي", "Local API status")} value={readinessStatus.apiStatus === "connected" ? tr("يستجيب", "Responding") : tr("لا يستجيب", "Not responding")} />
             </div>
             <div className="flex flex-wrap gap-2">
-              <Button type="button" variant="outline" onClick={checkDatabase} className="gap-2"><RefreshCw className="h-4 w-4" />{tr("فحص الاتصال", "Check connection")}</Button>
+              <Button type="button" variant="outline" onClick={() => { void checkDatabase(); void loadReadinessStatus(); }} disabled={isReadinessLoading} className="gap-2"><RefreshCw className={cn("h-4 w-4", isReadinessLoading && "animate-spin")} />{tr("فحص الاتصال", "Check connection")}</Button>
               <Button type="button" variant="outline" onClick={copyDatabasePath} className="gap-2"><Copy className="h-4 w-4" />{tr("نسخ مسار قاعدة البيانات", "Copy database path")}</Button>
               <Button type="button" variant="outline" onClick={createSqlFile} className="gap-2"><FileText className="h-4 w-4" />{tr("إنشاء ملف SQL", "Create SQL file")}</Button>
             </div>
@@ -2590,26 +2585,6 @@ export default function DeveloperSettingsPage() {
                     <InfoRow isAR={isAR} label={tr("الحالة", "Status")} value={getSyncQueueDisplayStatus(syncQueueStatus, isAR)} />
                   </div>
                 </div>
-              </div>
-            </div>
-            <div className="rounded-2xl border border-border bg-background/70 p-4 shadow-sm">
-              <div className="mb-3 flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2 text-sm font-bold text-foreground">
-                  <Activity className={cn("h-4 w-4 text-primary", isReadinessLoading && "animate-pulse")} />
-                  <span>{tr("حالة التطبيق وقاعدة البيانات المحلية", "App and Local Database Status")}</span>
-                  {isReadinessLoading && <span className="text-xs font-medium text-muted-foreground">{tr("جارٍ الفحص...", "Checking...")}</span>}
-                </div>
-                <Button type="button" variant="outline" size="sm" onClick={loadReadinessStatus} disabled={isReadinessLoading} className="gap-2">
-                  <RefreshCw className={cn("h-3.5 w-3.5", isReadinessLoading && "animate-spin")} />
-                  {tr("تحديث", "Refresh")}
-                </Button>
-              </div>
-              <div className="grid gap-3 md:grid-cols-5">
-                <InfoRow isAR={isAR} label={tr("محرك التخزين", "Storage engine")} value={tr("SQLite محلي", "Local SQLite")} />
-                <InfoRow isAR={isAR} label={tr("حالة API المحلي", "Local API status")} value={readinessStatus.apiStatus === "connected" ? tr("يستجيب", "Responding") : tr("لا يستجيب", "Not responding")} />
-                <InfoRow isAR={isAR} label={tr("مزامنة الأونلاين", "Online sync")} value={getSyncEngineStatus(syncConfig.autoSync, databaseMode === "online" && onlineDatabaseConnected, isAR)} />
-                <InfoRow isAR={isAR} label={tr("آخر مزامنة للأونلاين", "Last online sync")} value={formatSyncQueueDate(syncQueueStatus.lastSync, isAR)} />
-                <InfoRow isAR={isAR} label={tr("قاعدة SQLite المحلية", "Local SQLite Database")} value={readinessStatus.sqliteStatus === "connected" ? tr("متصل بقاعدة البيانات المحلية", "Connected to local database") : tr("قاعدة البيانات المحلية غير متاحة", "Local database unavailable")} />
               </div>
             </div>
             <div className="rounded-2xl border border-border bg-background/70 p-4 shadow-sm">
