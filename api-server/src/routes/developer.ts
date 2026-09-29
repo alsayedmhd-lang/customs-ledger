@@ -8,7 +8,7 @@ import path from "path";
 import crypto from "crypto";
 import { createRequire } from "module";
 import packageJson from "../../../package.json";
-import { requireAdmin } from "../middleware/auth";
+import { requireAdmin, requireAuth } from "../middleware/auth";
 import { ensureSyncQueueTable } from "../utils/ensure-sync-queue-table";
 import {
   runConfiguredSyncOnce,
@@ -34,6 +34,80 @@ function getRuntimeAppVersion(): string {
 }
 
 const router = Router();
+// A read-only summary for signed-in dashboard users. Never return database credentials.
+router.get("/dashboard/system-status", requireAuth, async (_req, res) => {
+  const local = (() => {
+    try {
+      return Boolean(sqlite && (sqlite.prepare("SELECT 1 AS ok").get() as { ok: number }).ok === 1);
+    } catch {
+      return false;
+    }
+  })();
+
+  try {
+    const settings = await getSettingsRow();
+    const checkPostgres = async (connectionString: string) => {
+      if (!isPostgresConnectionString(connectionString)) return false;
+      const client = new PgClient({ connectionString, connectionTimeoutMillis: 5000, query_timeout: 5000 });
+      try {
+        await client.connect();
+        await client.query("select 1");
+        return true;
+      } catch {
+        return false;
+      } finally {
+        try { await client.end(); } catch { /* The connection is already unavailable. */ }
+      }
+    };
+
+    const internalSettings = mapInternalDatabaseSettings(settings);
+    let internalConnection = internalSettings.connectionString.trim();
+    if (!internalConnection && internalSettings.host.trim() && internalSettings.databaseName.trim() && internalSettings.username.trim()) {
+      const url = new URL("postgresql://localhost");
+      url.hostname = internalSettings.host.trim();
+      url.port = internalSettings.port;
+      url.pathname = `/${encodeURIComponent(internalSettings.databaseName.trim())}`;
+      url.username = internalSettings.username.trim();
+      url.password = internalSettings.password;
+      internalConnection = url.toString();
+    }
+
+    const onlineConnection = String((settings as any)?.databaseConnectionString || "").trim();
+    const onlineConfigured = Boolean(onlineConnection);
+    const internalConfigured = Boolean(internalConnection);
+    const [online, internal] = await Promise.all([
+      onlineConfigured ? checkPostgres(onlineConnection) : false,
+      internalConfigured ? checkPostgres(internalConnection) : false,
+    ]);
+
+    let pending = 0;
+    let failed = 0;
+    if (local) {
+      try {
+        const rows = sqlite!.prepare(
+          "SELECT status, COUNT(*) AS count FROM sync_queue WHERE status IN ('pending', 'failed') GROUP BY status",
+        ).all() as Array<{ status: string; count: number }>;
+        for (const row of rows) {
+          if (row.status === "pending") pending = row.count;
+          if (row.status === "failed") failed = row.count;
+        }
+      } catch { /* The queue may not exist on a fresh installation. */ }
+    }
+
+    return res.json({
+      connections: { local, online, internal, onlineConfigured, internalConfigured },
+      sync: {
+        status: String((settings as any)?.syncStatus || "idle"),
+        lastSync: (settings as any)?.syncLastSyncTime || null,
+        pending,
+        failed,
+      },
+    });
+  } catch {
+    return res.status(503).json({ error: "System status is unavailable" });
+  }
+});
+
 try {
   ensureInternalSyncJournal();
 } catch (error) {

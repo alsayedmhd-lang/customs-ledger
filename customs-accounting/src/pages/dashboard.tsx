@@ -10,7 +10,7 @@ import {
 import { formatCurrency, formatDate, arabicNums } from "@/lib/utils";
 import {
   FileText, Users, DollarSign, AlertCircle, ArrowLeft, ArrowRight, TrendingUp, Eye, EyeOff,
-  BookOpen,
+  BookOpen, Database, RefreshCw,
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
@@ -31,6 +31,11 @@ interface AccountingRow {
   otherExpensesPaid: boolean;
 }
 
+type SystemStatus = {
+  connections: { local: boolean; online: boolean; internal: boolean; onlineConfigured: boolean; internalConfigured: boolean };
+  sync: { status: string; lastSync: string | null; pending: number; failed: number };
+};
+
 const API_BASE = (
   import.meta.env.VITE_API_BASE_URL || "http://localhost:3000"
 ).replace(/\/$/, "");
@@ -49,6 +54,14 @@ async function fetchAccounting(): Promise<AccountingRow[]> {
   return res.json();
 }
 
+async function fetchSystemStatus(): Promise<SystemStatus> {
+  const res = await fetch(`${API_BASE}/api/dashboard/system-status`, {
+    headers: { Authorization: `Bearer ${getToken()}` },
+  });
+  if (!res.ok) throw new Error("Failed to load system status");
+  return res.json();
+}
+
 export default function Dashboard() {
   const { t, lang, currencySymbol } = useLanguage();
   const isAR = lang === "ar";
@@ -64,6 +77,12 @@ export default function Dashboard() {
       !!user &&
       user.role !== "client" &&
       (user.role === "admin" || can("canViewAccounting")),
+  });
+  const { data: systemStatus, isError: systemStatusError } = useQuery({
+    queryKey: ["dashboard-system-status"],
+    queryFn: fetchSystemStatus,
+    enabled: !!user,
+    refetchInterval: 60_000,
   });
   const [showAmounts, setShowAmounts] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(() =>
@@ -135,17 +154,24 @@ export default function Dashboard() {
     .sort((a, b) => Number(b.id) - Number(a.id))
     .slice(0, 5);
 
-  const chartData = invoices
-    ?.filter((i: typeof invoices[number]) => i.status !== "cancelled")
-    .reduce(
-  (acc: { name: string; total: number }[], inv: typeof invoices[number]) => {
-      const month = new Date(inv.issueDate).toLocaleString(lang === "ar" ? "ar-EG" : "en-US", { month: "short" });
-      const existing = acc.find(item => item.name === month);
-      if (existing) existing.total += inv.total;
-      else acc.push({ name: month, total: inv.total });
-      return acc;
-    }, [] as { name: string; total: number }[])
-    .slice(-6) || [];
+  const chartData = Array.from(
+    (invoices ?? []).reduce((months, inv) => {
+      if (inv.status === "cancelled") return months;
+      const match = /^(\d{4})-(0[1-9]|1[0-2])(?:-\d{2})?/.exec(inv.issueDate ?? "");
+      if (!match) return months;
+      const key = `${match[1]}-${match[2]}`;
+      months.set(key, (months.get(key) ?? 0) + Number(inv.total ?? 0));
+      return months;
+    }, new Map<string, number>()),
+    ([key, total]) => {
+      const [year, month] = key.split("-").map(Number);
+      return {
+        key,
+        name: new Date(year, month - 1, 1).toLocaleString(lang === "ar" ? "ar-EG" : "en-US", { month: "short" }),
+        total,
+      };
+    },
+  ).sort((a, b) => a.key.localeCompare(b.key)).slice(-6);
 
   const greeting = () => {
     const h = new Date().getHours();
@@ -344,6 +370,38 @@ export default function Dashboard() {
               <div className={`mt-2 h-1 rounded-full ${s.color}`} />
             </motion.div>
           ))}
+          <motion.div variants={item} className="stat-card bg-card border border-border rounded-2xl p-2 shadow-sm">
+            <div className="flex items-start justify-between bg-emerald-50 dark:bg-emerald-950/30 rounded-xl p-1.5 min-h-[58px]">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-medium text-muted-foreground mb-1.5">{isAR ? "حالة الاتصال" : "Connections"}</p>
+                <div className="flex flex-wrap gap-x-2 gap-y-1 text-[11px] font-semibold">
+                  {(["local", "online", "internal"] as const).filter((key) => key === "local" || (systemStatus && (key === "online" ? systemStatus.connections.onlineConfigured : systemStatus.connections.internalConfigured))).map((key) => {
+                    const label = key === "local" ? (isAR ? "محلي" : "Local") : key === "online" ? "Online" : (isAR ? "داخلي" : "Internal");
+                    const connected = systemStatus?.connections[key];
+                    return <span key={key} className={connected === undefined || systemStatusError ? "text-muted-foreground" : connected ? "text-emerald-700 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}>
+                      {label}: {connected === undefined || systemStatusError ? "—" : connected ? (isAR ? "متصل" : "On") : (isAR ? "منقطع" : "Off")}
+                    </span>;
+                  })}
+                </div>
+              </div>
+              <Database className="w-5 h-5 text-emerald-600 flex-shrink-0 m-2" />
+            </div>
+            <div className="mt-2 h-1 rounded-full bg-emerald-500/70" />
+          </motion.div>
+          <motion.div variants={item} className="stat-card bg-card border border-border rounded-2xl p-2 shadow-sm">
+            <div className="flex items-start justify-between bg-sky-50 dark:bg-sky-950/30 rounded-xl p-1.5 min-h-[58px]">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-medium text-muted-foreground mb-1.5">{isAR ? "مزامنة Online" : "Online sync"}</p>
+                <p className="text-xs font-semibold text-foreground">
+                  {systemStatusError || !systemStatus ? "—" : systemStatus.sync.failed > 0 || systemStatus.sync.status === "failed" ? (isAR ? "توجد أخطاء" : "Errors") : systemStatus.sync.status === "running" ? (isAR ? "جارٍ التنفيذ" : "Running") : systemStatus.sync.pending > 0 ? (isAR ? "بانتظار المزامنة" : "Pending") : systemStatus.sync.status === "success" ? (isAR ? "مكتملة" : "Complete") : (isAR ? "لم تُشغّل بعد" : "Not run yet")}
+                  {systemStatus && !systemStatusError && ` · ${isAR ? "معلّق" : "Pending"} ${arabicNums(systemStatus.sync.pending, lang)} · ${isAR ? "فشل" : "Failed"} ${arabicNums(systemStatus.sync.failed, lang)}`}
+                </p>
+                {systemStatus?.sync.lastSync && !systemStatusError && <p className="text-[10px] text-muted-foreground truncate">{isAR ? "آخر مزامنة: " : "Last sync: "}{new Date(systemStatus.sync.lastSync).toLocaleString(isAR ? "ar-QA" : "en-US")}</p>}
+              </div>
+              <RefreshCw className="w-5 h-5 text-sky-600 flex-shrink-0 m-2" />
+            </div>
+            <div className="mt-2 h-1 rounded-full bg-sky-500/70" />
+          </motion.div>
         </div>
       </div>
 
@@ -503,6 +561,3 @@ export function StatusBadge({ status }: { status: string }) {
     </span>
   );
 }
-
-
-
