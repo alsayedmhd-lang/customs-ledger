@@ -856,8 +856,8 @@ export default function DeveloperSettingsPage() {
       const count = Number(data.pendingChanges || 0);
       setServerJournalCount(count);
       setInternalDatabaseMessage(tr(
-        `التغييرات المنتظرة من الخادم الداخلي: ${count}`,
-        `Changes pending from internal server: ${count}`,
+        `تعديلات PostgreSQL المباشرة في السجل: ${count}`,
+        `Direct PostgreSQL edits in journal: ${count}`,
       ));
     } catch (error) {
       setInternalDatabaseMessage(error instanceof Error ? error.message : tr("تعذر فحص تغييرات الخادم", "Could not check server changes"));
@@ -2746,7 +2746,7 @@ export default function DeveloperSettingsPage() {
                   <InfoRow isAR={isAR} label={tr("آخر فحص للخادم الداخلي", "Last internal server check")} value={internalDatabaseConnectionStatus === "connected" ? tr("نجح الاتصال", "Connection succeeded") : internalDatabaseConnectionStatus === "failed" ? tr("فشل الاتصال", "Connection failed") : tr("لم يُختبر بعد", "Not tested yet")} />
                   <InfoRow isAR={isAR} label={tr("حالة المزامنة الداخلية", "Internal sync status")} value={!internalDatabaseConfig.autoSync ? tr("التشغيل التلقائي متوقف", "Automatic sync is off") : internalAutoStatus?.running ? tr("المزامنة جارية", "Sync in progress") : internalAutoStatus?.lastError ? tr("آخر محاولة فشلت", "Last attempt failed") : internalAutoStatus?.lastSuccessAt ? tr("آخر محاولة نجحت", "Last attempt succeeded") : tr("بانتظار أول تشغيل", "Waiting for first run")} />
                   <InfoRow isAR={isAR} label={tr("التغييرات المحلية المنتظرة للخادم الداخلي", "Local changes pending for internal server")} value={internalJournalCount ?? tr("لم تُفحص", "Not checked")} />
-                  <InfoRow isAR={isAR} label={tr("تغييرات الخادم المنتظرة محليًا", "Server changes pending locally")} value={serverJournalCount ?? tr("تعذر الفحص", "Unavailable")} />
+                  <InfoRow isAR={isAR} label={tr("تعديلات الخادم المباشرة في السجل", "Direct server edits in journal")} value={serverJournalCount ?? tr("تعذر الفحص", "Unavailable")} />
                 </div>
                 <div className="grid gap-4 rounded-xl border border-border bg-background/70 p-4 xl:grid-cols-2">
                   <div className="space-y-3">
@@ -2804,7 +2804,7 @@ export default function DeveloperSettingsPage() {
                     {isCheckingInternalJournal ? tr("جارٍ فحص التغييرات...", "Checking changes...") : tr("فحص التغييرات الداخلية", "Check internal changes")}
                   </Button>
                   <Button type="button" variant="outline" size="sm" onClick={checkServerJournal} disabled={isCheckingServerJournal}>
-                    {isCheckingServerJournal ? tr("جارٍ فحص الخادم...", "Checking server...") : tr("فحص تغييرات الخادم", "Check server changes")}
+                    {isCheckingServerJournal ? tr("جارٍ فحص الخادم...", "Checking server...") : tr("فحص سجل تعديلات الخادم", "Check server edit journal")}
                   </Button>
                   {internalReadiness?.tables.some((row) => row.name === "invoice_accounting" && row.localCount !== null && row.internalCount !== null && row.internalCount < row.localCount) && (
                     <Button type="button" variant="outline" size="sm" onClick={completeInternalAccountingRows} disabled={isCompletingAccounting}>
@@ -2826,10 +2826,14 @@ export default function DeveloperSettingsPage() {
                 </div>
                 {(internalJournalCount !== null || serverJournalCount !== null) && (
                   <p className="text-xs text-muted-foreground">{tr(
-                    `المنتظر محليًا: ${internalJournalCount ?? "—"} | المنتظر على الخادم: ${serverJournalCount ?? "—"}`,
-                    `Local pending: ${internalJournalCount ?? "—"} | Server pending: ${serverJournalCount ?? "—"}`,
+                    `المنتظر محليًا: ${internalJournalCount ?? "—"} | تعديلات الخادم المباشرة: ${serverJournalCount ?? "—"}`,
+                    `Local pending: ${internalJournalCount ?? "—"} | Direct server edits: ${serverJournalCount ?? "—"}`,
                   )}</p>
                 )}
+                <p className="text-xs text-muted-foreground">{tr(
+                  "تغييرات الأجهزة الأخرى لا تظهر في عدّاد تعديلات الخادم المباشرة؛ تلتقطها المزامنة الثنائية بفحص السجلات.",
+                  "Edits from other devices are not counted as direct server edits; bidirectional sync finds them by checking the records.",
+                )}</p>
                 {internalDatabaseMessage && <p role="status" className="text-sm text-muted-foreground">{internalDatabaseMessage}</p>}
                 {internalReadiness && (
                   <div className="overflow-x-auto rounded-xl border border-border">
