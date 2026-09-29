@@ -30,7 +30,15 @@ export async function runInternalBidirectionalOnce(connectionString: string) {
     const pushed = await performInternalPush(connectionString, true);
     let pulled;
     try {
-      pulled = await performInternalJournalPull(connectionString);
+      // Direct PostgreSQL edits use the server journal. SQLite pushes from
+      // other devices do not, so refresh all rows after consuming the journal.
+      const journal = await performInternalJournalPull(connectionString);
+      const refreshed = await performInternalPull(connectionString);
+      pulled = {
+        processed: journal.processed + refreshed.inserted + refreshed.updated,
+        inserted: journal.inserted + refreshed.inserted,
+        updated: journal.updated + refreshed.updated,
+      };
     } catch (error) {
       throw new Error(`Local push completed (${pushed.processed} events), but server pull failed: ${error instanceof Error ? error.message : String(error)}`);
     }
