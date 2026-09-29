@@ -182,7 +182,7 @@ type SystemDiagnosticsResult = {
 };
 type ReadinessStatus = {
   apiStatus: "connected" | "error";
-  onlineStatus: "online" | "offline";
+  sqliteStatus: "connected" | "unavailable";
 };
 type DataStorageAnalysisItem = {
   name: string;
@@ -349,6 +349,7 @@ function formatDisplayValue(value: string | number | boolean | null | undefined,
     online_disconnected: ["غير متصل بالأونلاين", "Disconnected"],
     "not connected": ["غير متصل", "Not connected"],
     not_connected: ["غير متصل", "Not connected"],
+    untested: ["لم يُفحص بعد", "Not checked yet"],
     unavailable: ["غير متاح", "Unavailable"],
     idle: ["خامل", "Idle"],
     success: ["نجحت", "Success"],
@@ -395,10 +396,10 @@ function getSyncQueueDisplayStatus(status: SyncQueueStatus, isAR: boolean) {
   return isAR ? "خامل" : "Idle";
 }
 
-function getSyncEngineStatus(autoSync: boolean, onlineConnected: boolean, isAR: boolean) {
-  if (autoSync) return isAR ? "تلقائي / نشط" : "Automatic / Active";
-  if (onlineConnected) return isAR ? "وضع المزامنة: يدوي" : "Manual Sync Mode";
-  return isAR ? "يدوي / غير متصل بالأونلاين" : "Manual / Online disconnected";
+function getSyncEngineStatus(autoSync: boolean, onlineEnabled: boolean, isAR: boolean) {
+  if (!onlineEnabled) return isAR ? "مزامنة الأونلاين متوقفة" : "Online sync is off";
+  return autoSync ? (isAR ? "المزامنة التلقائية مفعّلة" : "Automatic sync enabled")
+    : (isAR ? "المزامنة اليدوية متاحة" : "Manual sync available");
 }
 
 function InfoRow({ label, value, isAR }: { label: string; value?: string | number | boolean | null; isAR: boolean }) {
@@ -504,7 +505,7 @@ export default function DeveloperSettingsPage() {
   });
   const [readinessStatus, setReadinessStatus] = useState<ReadinessStatus>({
     apiStatus: "error",
-    onlineStatus: typeof navigator !== "undefined" && navigator.onLine ? "online" : "offline",
+    sqliteStatus: "unavailable",
   });
   const [databaseMode, setDatabaseMode] = useState<DatabaseMode>("local");
   const [licenseDeviceId, setLicenseDeviceId] = useState("");
@@ -514,7 +515,7 @@ export default function DeveloperSettingsPage() {
   const [generatedLicenseText, setGeneratedLicenseText] = useState("");
   const [databaseConfig, setDatabaseConfig] = useState({
     localPath: "lib/db/local.db",
-    connectionStatus: "connected",
+    connectionStatus: "untested",
     host: "",
     port: "5432",
     databaseName: "",
@@ -719,19 +720,28 @@ export default function DeveloperSettingsPage() {
       if (local.status === "fulfilled" && local.value.ok) {
         const data = await local.value.json();
         if (data.ok) setInternalJournalCount(Number(data.pendingChanges || 0));
+        else setInternalJournalCount(null);
+      } else {
+        setInternalJournalCount(null);
       }
       if (server.status === "fulfilled") {
-        setInternalDatabaseConnectionStatus(server.value.ok ? "connected" : "failed");
         if (server.value.ok) {
           const data = await server.value.json();
-          if (data.ok) setServerJournalCount(Number(data.pendingChanges || 0));
-        } else setServerJournalCount(null);
+          setInternalDatabaseConnectionStatus(data.ok ? "connected" : "failed");
+          setServerJournalCount(data.ok ? Number(data.pendingChanges || 0) : null);
+        } else {
+          setInternalDatabaseConnectionStatus("failed");
+          setServerJournalCount(null);
+        }
       } else {
         setInternalDatabaseConnectionStatus("failed");
         setServerJournalCount(null);
       }
     } catch {
       setInternalAutoStatus(null);
+      setInternalDatabaseConnectionStatus("untested");
+      setInternalJournalCount(null);
+      setServerJournalCount(null);
       setInternalDatabaseMessage(tr("تعذر قراءة حالة المزامنة التلقائية", "Could not read automatic sync status"));
     }
   }
@@ -1163,18 +1173,19 @@ export default function DeveloperSettingsPage() {
 
   async function loadReadinessStatus() {
     setIsReadinessLoading(true);
-    const onlineStatus = typeof navigator !== "undefined" && navigator.onLine ? "online" : "offline";
 
     try {
       const res = await fetch(`${API_BASE}/healthz`, { headers: authHeaders() });
+      const databaseRes = res.ok ? await fetch(`${API_BASE}/developer/database/check`, { headers: authHeaders() }) : null;
+      const database = databaseRes?.ok ? await databaseRes.json() : null;
       setReadinessStatus({
         apiStatus: res.ok ? "connected" : "error",
-        onlineStatus,
+        sqliteStatus: database?.databaseStatus === "connected" ? "connected" : "unavailable",
       });
     } catch {
       setReadinessStatus({
         apiStatus: "error",
-        onlineStatus,
+        sqliteStatus: "unavailable",
       });
     } finally {
       setIsReadinessLoading(false);
@@ -2252,12 +2263,12 @@ export default function DeveloperSettingsPage() {
                       dir="ltr"
                     />
                   </DevField>
-                  <DevField label={tr("حالة الاتصال", "Connection status")}>
+                  <DevField label={tr("حالة قاعدة SQLite المحلية", "Local SQLite database status")}>
                     <div className="flex h-10 items-center justify-between rounded-md border border-border bg-background px-3 text-sm">
-                      <span className={cn("font-semibold", databaseConfig.connectionStatus === "connected" ? "text-emerald-600" : "text-red-600")}>
+                      <span className={cn("font-semibold", databaseConfig.connectionStatus === "connected" ? "text-emerald-600" : databaseConfig.connectionStatus === "untested" ? "text-muted-foreground" : "text-red-600")}>
                         {formatDisplayValue(databaseConfig.connectionStatus, isAR)}
                       </span>
-                      <span className={cn("h-2.5 w-2.5 rounded-full", databaseConfig.connectionStatus === "connected" ? "bg-emerald-500" : "bg-red-500")} />
+                      <span className={cn("h-2.5 w-2.5 rounded-full", databaseConfig.connectionStatus === "connected" ? "bg-emerald-500" : databaseConfig.connectionStatus === "untested" ? "bg-muted-foreground" : "bg-red-500")} />
                     </div>
                   </DevField>
                 </div>
@@ -2499,9 +2510,9 @@ export default function DeveloperSettingsPage() {
                   <span>{tr("إعدادات قاعدة البيانات عبر الإنترنت", "Online database settings")}</span>
                 </div>
                 <div className="mb-4 flex h-10 items-center justify-between rounded-md border border-border bg-background px-3 text-sm">
-                  <span className="text-muted-foreground">{tr("الاتصال عبر الإنترنت", "Online connection")}</span>
+                  <span className="text-muted-foreground">{tr("تفعيل مزامنة الأونلاين", "Online sync setting")}</span>
                   <span className={cn("font-semibold", onlineDatabaseConnected ? "text-emerald-600" : "text-red-600")}>
-                    {onlineDatabaseConnected ? tr("متصل بالأونلاين", "Connected") : tr("غير متصل بالأونلاين", "Disconnected")}
+                    {databaseMode === "online" && onlineDatabaseConnected ? tr("مفعّلة بعد اختبار الاتصال", "Enabled after connection test") : tr("متوقفة على هذا الجهاز", "Off on this device")}
                   </span>
                 </div>
                 <label className="mb-4 flex items-center gap-2 text-sm font-semibold text-foreground">
@@ -2629,7 +2640,7 @@ export default function DeveloperSettingsPage() {
               <div className="mb-3 flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2 text-sm font-bold text-foreground">
                   <Activity className={cn("h-4 w-4 text-primary", isReadinessLoading && "animate-pulse")} />
-                  <span>{tr("حالة الشبكة وجاهزية المزامنة", "Network / Sync Readiness Status")}</span>
+                  <span>{tr("حالة التطبيق وقاعدة البيانات المحلية", "App and Local Database Status")}</span>
                   {isReadinessLoading && <span className="text-xs font-medium text-muted-foreground">{tr("جارٍ الفحص...", "Checking...")}</span>}
                 </div>
                 <Button type="button" variant="outline" size="sm" onClick={loadReadinessStatus} disabled={isReadinessLoading} className="gap-2">
@@ -2638,11 +2649,11 @@ export default function DeveloperSettingsPage() {
                 </Button>
               </div>
               <div className="grid gap-3 md:grid-cols-5">
-                <InfoRow isAR={isAR} label={tr("وضع التطبيق", "App Mode")} value={tr("SQLite محلي", "Local SQLite")} />
-                <InfoRow isAR={isAR} label={tr("حالة API", "API Status")} value={readinessStatus.apiStatus === "connected" ? tr("متصل", "Connected") : tr("خطأ", "Error")} />
-                <InfoRow isAR={isAR} label={tr("محرك المزامنة", "Sync Engine")} value={getSyncEngineStatus(syncConfig.autoSync, onlineDatabaseConnected, isAR)} />
-                <InfoRow isAR={isAR} label={tr("آخر مزامنة", "Last Sync")} value={tr("غير متاح", "Not available")} />
-                <InfoRow isAR={isAR} label={tr("حالة الاتصال", "Online Status")} value={readinessStatus.onlineStatus === "online" ? tr("متصل بالإنترنت", "Online") : tr("غير متصل", "Offline")} />
+                <InfoRow isAR={isAR} label={tr("محرك التخزين", "Storage engine")} value={tr("SQLite محلي", "Local SQLite")} />
+                <InfoRow isAR={isAR} label={tr("حالة API المحلي", "Local API status")} value={readinessStatus.apiStatus === "connected" ? tr("يستجيب", "Responding") : tr("لا يستجيب", "Not responding")} />
+                <InfoRow isAR={isAR} label={tr("مزامنة الأونلاين", "Online sync")} value={getSyncEngineStatus(syncConfig.autoSync, databaseMode === "online" && onlineDatabaseConnected, isAR)} />
+                <InfoRow isAR={isAR} label={tr("آخر مزامنة للأونلاين", "Last online sync")} value={formatSyncQueueDate(syncQueueStatus.lastSync, isAR)} />
+                <InfoRow isAR={isAR} label={tr("قاعدة SQLite المحلية", "Local SQLite Database")} value={readinessStatus.sqliteStatus === "connected" ? tr("متصل بقاعدة البيانات المحلية", "Connected to local database") : tr("قاعدة البيانات المحلية غير متاحة", "Local database unavailable")} />
               </div>
             </div>
             <div className="rounded-2xl border border-border bg-background/70 p-4 shadow-sm">
@@ -2764,7 +2775,7 @@ export default function DeveloperSettingsPage() {
                   </DevField>
                 </div>
                 <div className="grid gap-3 md:grid-cols-2">
-                  <InfoRow isAR={isAR} label={tr("حالة اتصال الخادم الداخلي", "Internal server connection")} value={internalDatabaseConnectionStatus === "connected" ? tr("متصل", "Connected") : internalDatabaseConnectionStatus === "failed" ? tr("فشل الاتصال", "Connection failed") : tr("لم يُختبر بعد", "Not tested yet")} />
+                  <InfoRow isAR={isAR} label={tr("آخر فحص للخادم الداخلي", "Last internal server check")} value={internalDatabaseConnectionStatus === "connected" ? tr("نجح الاتصال", "Connection succeeded") : internalDatabaseConnectionStatus === "failed" ? tr("فشل الاتصال", "Connection failed") : tr("لم يُختبر بعد", "Not tested yet")} />
                   <InfoRow isAR={isAR} label={tr("حالة المزامنة الداخلية", "Internal sync status")} value={!internalDatabaseConfig.autoSync ? tr("التشغيل التلقائي متوقف", "Automatic sync is off") : internalAutoStatus?.running ? tr("المزامنة جارية", "Sync in progress") : internalAutoStatus?.lastError ? tr("آخر محاولة فشلت", "Last attempt failed") : internalAutoStatus?.lastSuccessAt ? tr("آخر محاولة نجحت", "Last attempt succeeded") : tr("بانتظار أول تشغيل", "Waiting for first run")} />
                   <InfoRow isAR={isAR} label={tr("التغييرات المحلية المنتظرة للخادم الداخلي", "Local changes pending for internal server")} value={internalJournalCount ?? tr("لم تُفحص", "Not checked")} />
                   <InfoRow isAR={isAR} label={tr("تغييرات الخادم المنتظرة محليًا", "Server changes pending locally")} value={serverJournalCount ?? tr("تعذر الفحص", "Unavailable")} />
