@@ -706,6 +706,11 @@ router.post("/invoices", requireAuth, async (req, res) => {
   }
 });
 
+// Legacy invoices may place the repeat counter before the declaration.
+function getDuplicateShipmentBase(value: unknown) {
+  return getShipmentBase(String(value ?? "").replace(/^\s*\(\d+\)\s*/, ""));
+}
+
 // Advisory checks only: creation and update remain unchanged.
 router.get("/invoices/duplicate-check", requireAuth, async (req, res) => {
   try {
@@ -713,7 +718,7 @@ router.get("/invoices/duplicate-check", requireAuth, async (req, res) => {
     if (clientScope && (!clientScope.clientId || clientScope.permissions?.canViewInvoices === false)) {
       return res.status(403).json({ error: "Invoices are not allowed for this client user" });
     }
-    const shipmentBase = getShipmentBase(typeof req.query.shipmentRef === "string" ? req.query.shipmentRef : "");
+    const shipmentBase = getDuplicateShipmentBase(typeof req.query.shipmentRef === "string" ? req.query.shipmentRef : "");
     const bill = typeof req.query.billOfLading === "string" ? req.query.billOfLading.trim().toUpperCase() : "";
     const excludeId = Number(req.query.excludeInvoiceId) || 0;
     const checkShipment = shipmentBase.length === 14;
@@ -722,7 +727,12 @@ router.get("/invoices/duplicate-check", requireAuth, async (req, res) => {
 
     const filters = [isNull(invoicesTable.deletedAt)];
     if (checkShipment) {
-      const normalizedRef = sql`replace(replace(replace(replace(replace(replace(${invoicesTable.shipmentRef}, ' ', ''), '-', ''), '/', ''), '(', ''), ')', ''), '.', '')`;
+      const trimmedRef = sql`trim(${invoicesTable.shipmentRef})`;
+      const referenceWithoutPrefix = sql`case
+        when substr(${trimmedRef}, 1, 1) = '(' and instr(${trimmedRef}, ')') > 0
+        then substr(${trimmedRef}, instr(${trimmedRef}, ')') + 1)
+        else ${trimmedRef} end`;
+      const normalizedRef = sql`replace(replace(replace(replace(replace(replace(${referenceWithoutPrefix}, ' ', ''), '-', ''), '/', ''), '(', ''), ')', ''), '.', '')`;
       filters.push(like(normalizedRef, `${shipmentBase}%`));
     } else {
       filters.push(sql`upper(trim(${invoicesTable.billOfLading})) = ${bill}`);
@@ -755,7 +765,7 @@ router.get("/invoices/duplicate-check", requireAuth, async (req, res) => {
     const billMatches = [];
     for (const row of rows) {
       if (row.id === excludeId) continue;
-      const sameShipment = checkShipment && getShipmentBase(row.shipmentRef) === shipmentBase;
+      const sameShipment = checkShipment && getDuplicateShipmentBase(row.shipmentRef) === shipmentBase;
       const sameBill = checkBill && String(row.billOfLading ?? "").trim().toUpperCase() === bill;
       if (!sameShipment && !sameBill) continue;
       const match = {

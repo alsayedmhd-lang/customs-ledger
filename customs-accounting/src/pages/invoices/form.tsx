@@ -474,6 +474,7 @@ export default function InvoiceForm() {
   const { lang, isRTL } = useLanguage();
   const isAR = lang === "ar";
   const [users, setUsers] = useState<any[]>([]);
+  const [focusCopiedShipment, setFocusCopiedShipment] = useState(false);
   const [receiptLookupPending, setReceiptLookupPending] = useState(false);
   const [attachments, setAttachments] = useState<InvoiceAttachment[]>([]);
   const [attachmentsLoading, setAttachmentsLoading] = useState(false);
@@ -614,6 +615,7 @@ export default function InvoiceForm() {
     handleSubmit,
     watch,
     setValue,
+    setFocus,
     reset,
     getValues,
     formState: { errors },
@@ -764,6 +766,7 @@ export default function InvoiceForm() {
       })) ?? [],
     });
     sessionStorage.removeItem("copy_invoice");
+    setFocusCopiedShipment(true);
   }
   if (!isEdit && !sessionStorage.getItem("copy_invoice") && user?.id) {
     setValue("createdBy", String(user.id));
@@ -771,6 +774,16 @@ export default function InvoiceForm() {
 }
 
   }, [hasInvoiceId, isEdit, existingInvoice, isCopyMode, reset, setLocation, setValue, user?.id]);
+
+  // Focus once, after copied values and input refs have been rendered.
+  useEffect(() => {
+    if (!focusCopiedShipment) return;
+    const frame = window.requestAnimationFrame(() => {
+      setFocus("shipmentRef");
+      setFocusCopiedShipment(false);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [focusCopiedShipment, setFocus]);
 
   useEffect(() => {
   if (!isEdit && user?.id) {
@@ -790,7 +803,10 @@ export default function InvoiceForm() {
   const declarationBaseNumber = getDeclarationBaseNumber(shipmentRefWatch);
   const [duplicateField, setDuplicateField] = useState<"shipment" | "bill" | null>(null);
   const billOfLadingWatch = watch("billOfLading");
-  const duplicateShipmentBase = duplicateField === "shipment" && declarationBaseNumber.length === 14 ? declarationBaseNumber : "";
+  const duplicateDeclarationBase = getDeclarationBaseNumber(
+    String(shipmentRefWatch ?? "").replace(/^\s*\(\d+\)\s*/, "")
+  );
+  const duplicateShipmentBase = duplicateField === "shipment" && duplicateDeclarationBase.length === 14 ? duplicateDeclarationBase : "";
   const normalizedDuplicateBill = String(billOfLadingWatch ?? "").trim().toUpperCase();
   const duplicateBill = duplicateField === "bill" && normalizedDuplicateBill.length > 0 ? normalizedDuplicateBill : "";
   const duplicateExcludeId = isEdit ? invoiceId : 0;
