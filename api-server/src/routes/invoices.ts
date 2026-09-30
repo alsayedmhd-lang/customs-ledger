@@ -11,7 +11,7 @@ import {
   customerLedgerTableSqlite,
 } from "@workspace/db";
 import { invoiceAuditLogsTableSqlite } from "../../../lib/db/src/schema/invoices-sqlite";
-import { eq, desc, isNull, and, like, isNotNull } from "drizzle-orm";
+import { eq, desc, isNull, and, like, isNotNull, sql } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth";
 import { enqueueSyncChange } from "../utils/sync-queue";
 
@@ -703,6 +703,78 @@ router.post("/invoices", requireAuth, async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// Advisory checks only: creation and update remain unchanged.
+router.get("/invoices/duplicate-check", requireAuth, async (req, res) => {
+  try {
+    const clientScope = await getClientScope(req);
+    if (clientScope && (!clientScope.clientId || clientScope.permissions?.canViewInvoices === false)) {
+      return res.status(403).json({ error: "Invoices are not allowed for this client user" });
+    }
+    const shipmentBase = getShipmentBase(typeof req.query.shipmentRef === "string" ? req.query.shipmentRef : "");
+    const bill = typeof req.query.billOfLading === "string" ? req.query.billOfLading.trim().toUpperCase() : "";
+    const excludeId = Number(req.query.excludeInvoiceId) || 0;
+    const checkShipment = shipmentBase.length === 14;
+    const checkBill = Boolean(bill);
+    if (!checkShipment && !checkBill) return res.json({ shipmentMatches: [], billMatches: [] });
+
+    const filters = [isNull(invoicesTable.deletedAt)];
+    if (checkShipment) {
+      const normalizedRef = sql`replace(replace(replace(replace(replace(replace(${invoicesTable.shipmentRef}, ' ', ''), '-', ''), '/', ''), '(', ''), ')', ''), '.', '')`;
+      filters.push(like(normalizedRef, `${shipmentBase}%`));
+    } else {
+      filters.push(sql`upper(trim(${invoicesTable.billOfLading})) = ${bill}`);
+    }
+    if (clientScope?.clientId) filters.push(eq(invoicesTable.clientId, clientScope.clientId));
+    if (!["admin", "supervisor", "client"].includes(req.user!.role)) {
+      filters.push(eq(invoicesTable.createdBy, req.user!.userId));
+    }
+    // Fetch reference fields only; do not load items or attachments.
+    const rows = await db.select({
+      id: invoicesTable.id,
+      invoiceNumber: invoicesTable.invoiceNumber,
+      shipmentRef: invoicesTable.shipmentRef,
+      billOfLading: invoicesTable.billOfLading,
+      subtotal: invoicesTable.subtotal,
+      taxAmount: invoicesTable.taxAmount,
+      total: invoicesTable.total,
+      advancePayment: invoicesTable.advancePayment,
+      createdAt: invoicesTable.createdAt,
+      displayNameAr: usersTable.displayNameAr,
+      displayNameEn: usersTable.displayNameEn,
+      displayName: usersTable.displayName,
+      username: usersTable.username,
+    }).from(invoicesTable)
+      .leftJoin(usersTable, eq(invoicesTable.createdBy, usersTable.id))
+      .where(and(...filters))
+      .orderBy(desc(invoicesTable.id));
+
+    const shipmentMatches = [];
+    const billMatches = [];
+    for (const row of rows) {
+      if (row.id === excludeId) continue;
+      const sameShipment = checkShipment && getShipmentBase(row.shipmentRef) === shipmentBase;
+      const sameBill = checkBill && String(row.billOfLading ?? "").trim().toUpperCase() === bill;
+      if (!sameShipment && !sameBill) continue;
+      const match = {
+        id: row.id,
+        invoiceNumber: row.invoiceNumber,
+        shipmentRef: row.shipmentRef,
+        billOfLading: row.billOfLading,
+        createdByName: row.displayNameAr || row.displayNameEn || row.displayName || row.username || null,
+        createdAt: row.createdAt ? row.createdAt.toISOString() : null,
+        invoiceTotal: getOriginalInvoiceTotal(row),
+      };
+      if (sameShipment) shipmentMatches.push(match);
+      if (sameBill) billMatches.push(match);
+    }
+    res.setHeader("Cache-Control", "no-store");
+    return res.json({ shipmentMatches, billMatches });
+  } catch (err) {
+    console.error("Invoice duplicate check failed", err);
+    return res.status(500).json({ error: "Could not check duplicate references" });
   }
 });
 

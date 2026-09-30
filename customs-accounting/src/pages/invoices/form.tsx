@@ -411,6 +411,56 @@ function SortableRow({
   );
 }
 
+type DuplicateInvoiceMatch = {
+  id: number;
+  invoiceNumber: string;
+  shipmentRef: string | null;
+  billOfLading: string | null;
+  createdByName: string | null;
+  createdAt: string | null;
+  invoiceTotal: number;
+};
+
+type DuplicateInvoiceResult = {
+  shipmentMatches: DuplicateInvoiceMatch[];
+  billMatches: DuplicateInvoiceMatch[];
+};
+
+function DuplicateInvoiceWarning({ matches, kind, isAR }: {
+  matches: DuplicateInvoiceMatch[];
+  kind: "shipment" | "bill";
+  isAR: boolean;
+}) {
+  if (!matches.length) return null;
+  return (
+    <div role="status" className={`pointer-events-none absolute top-20 inset-x-4 z-50 max-w-2xl rounded-xl border border-amber-500/50 bg-amber-50/85 p-4 text-sm leading-6 font-medium text-slate-950 shadow-lg dark:bg-slate-900/85 dark:text-slate-50 ${isAR ? "ml-auto" : "mr-auto"}`}>
+      <p className="font-bold text-amber-800 dark:text-amber-300">
+        {kind === "shipment"
+          ? (isAR ? `تنبيه: هذا البيان له ${matches.length} فاتورة سابقة.` : `Warning: this declaration has ${matches.length} previous invoice(s).`)
+          : (isAR ? `تنبيه: هذه البوليصة موجودة في ${matches.length} فاتورة سابقة.` : `Warning: this bill of lading appears in ${matches.length} previous invoice(s).`)}
+      </p>
+      <ul className="mt-2 max-h-52 space-y-2 overflow-y-auto">
+        {matches.map((match) => (
+          <li key={match.id} className="border-b border-amber-500/20 pb-2 last:border-0">
+            <span className="font-bold">
+              {isAR ? "الفاتورة" : "Invoice"} <bdi>{match.invoiceNumber}</bdi>
+            </span>
+            {" — "}{isAR ? "البيان" : "Declaration"}: <bdi>{match.shipmentRef || "—"}</bdi>
+            <div className="mt-1">
+              {isAR ? "أنشأها" : "Created by"}: {match.createdByName || (isAR ? "غير معروف" : "Unknown")}
+              {" — "}{isAR ? "وقت الإنشاء" : "Created at"}: {match.createdAt && !Number.isNaN(new Date(match.createdAt).getTime())
+                ? new Date(match.createdAt).toLocaleString(isAR ? "ar-QA" : "en-GB")
+                : (isAR ? "غير متوفر" : "Unavailable")}
+              {" — "}{isAR ? "إجمالي الفاتورة" : "Invoice total"}: {formatCurrency(match.invoiceTotal)}
+            </div>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-2 text-xs">{isAR ? "يمكنك متابعة الحفظ إذا كان التكرار مقصودًا." : "You can continue saving if the duplicate is intentional."}</p>
+    </div>
+  );
+}
+
 export default function InvoiceForm() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
@@ -738,6 +788,57 @@ export default function InvoiceForm() {
   const advancePaymentWatch = watch("advancePayment") || 0;
   const shipmentRefWatch = watch("shipmentRef");
   const declarationBaseNumber = getDeclarationBaseNumber(shipmentRefWatch);
+  const [duplicateField, setDuplicateField] = useState<"shipment" | "bill" | null>(null);
+  const billOfLadingWatch = watch("billOfLading");
+  const duplicateShipmentBase = duplicateField === "shipment" && declarationBaseNumber.length === 14 ? declarationBaseNumber : "";
+  const normalizedDuplicateBill = String(billOfLadingWatch ?? "").trim().toUpperCase();
+  const duplicateBill = duplicateField === "bill" && normalizedDuplicateBill.length > 0 ? normalizedDuplicateBill : "";
+  const duplicateExcludeId = isEdit ? invoiceId : 0;
+  const duplicateKey = JSON.stringify([duplicateShipmentBase, duplicateBill, duplicateExcludeId]);
+  const [duplicateCheck, setDuplicateCheck] = useState<{
+    key: string;
+    result: DuplicateInvoiceResult;
+    failed: boolean;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!duplicateShipmentBase && !duplicateBill) {
+      setDuplicateCheck(null);
+      return;
+    }
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      try {
+        const params = new URLSearchParams();
+        if (duplicateShipmentBase) params.set("shipmentRef", duplicateShipmentBase);
+        if (duplicateBill) params.set("billOfLading", duplicateBill);
+        if (duplicateExcludeId) params.set("excludeInvoiceId", String(duplicateExcludeId));
+        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/invoices/duplicate-check?${params}`, {
+          headers: { Authorization: `Bearer ${sessionStorage.getItem("auth_token")}` },
+          signal: controller.signal,
+          cache: "no-store",
+        });
+        if (!response.ok) throw new Error("Duplicate check failed");
+        const result: DuplicateInvoiceResult = await response.json();
+        if (!Array.isArray(result.shipmentMatches) || !Array.isArray(result.billMatches)) {
+          throw new Error("Invalid duplicate check result");
+        }
+        if (!controller.signal.aborted) setDuplicateCheck({ key: duplicateKey, result, failed: false });
+      } catch {
+        if (!controller.signal.aborted) {
+          setDuplicateCheck({ key: duplicateKey, result: { shipmentMatches: [], billMatches: [] }, failed: true });
+        }
+      }
+    }, 500);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [duplicateShipmentBase, duplicateBill, duplicateExcludeId, duplicateKey]);
+
+  // Hide results immediately when the typed references change.
+  const currentDuplicateCheck = duplicateCheck?.key === duplicateKey ? duplicateCheck : null;
+
   const attachmentsEnabled = Boolean(isEdit && invoiceId && declarationBaseNumber);
   const attachmentsByCategory = new Map<string, InvoiceAttachment[]>();
   for (const attachment of attachments) {
@@ -1435,13 +1536,18 @@ export default function InvoiceForm() {
             </h2>
           </div>
 
-          <div className="p-4 grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="relative p-4 grid grid-cols-2 md:grid-cols-4 gap-3">
             <div>
               <label className={labelCls}>
                 {isAR ? "رقم البيان" : "Shipment Ref"}
               </label>
               <input
                 {...register("shipmentRef")}
+                onFocus={() => setDuplicateField("shipment")}
+                onBlur={(event) => {
+                  void register("shipmentRef").onBlur(event);
+                  setDuplicateField(null);
+                }}
                 placeholder={isAR ? "مثال: 123456" : "e.g. 123456"}
                 className={inputCls}
               />
@@ -1453,10 +1559,23 @@ export default function InvoiceForm() {
            
               <input
                 {...register("billOfLading")}
+                onFocus={() => setDuplicateField("bill")}
+                onBlur={(event) => {
+                  void register("billOfLading").onBlur(event);
+                  setDuplicateField(null);
+                }}
                 placeholder="MSKU1234567"
                 className={inputCls}
               />
             </div>
+
+            <DuplicateInvoiceWarning matches={currentDuplicateCheck?.result.shipmentMatches || []} kind="shipment" isAR={isAR} />
+            <DuplicateInvoiceWarning matches={currentDuplicateCheck?.result.billMatches || []} kind="bill" isAR={isAR} />
+            {currentDuplicateCheck?.failed && (
+              <p role="status" className="pointer-events-none absolute top-20 inset-x-4 z-50 rounded-lg border border-amber-500/40 bg-amber-50/85 p-3 text-sm font-medium text-amber-900 shadow-lg dark:bg-slate-900/85 dark:text-amber-200">
+                {isAR ? "تعذر فحص تكرار البيان والبوليصة حاليًا. يمكنك متابعة الحفظ." : "Duplicate references could not be checked. You can continue saving."}
+              </p>
+            )}
 
             <div>
               <label className={labelCls}>
