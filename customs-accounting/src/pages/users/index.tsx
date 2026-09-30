@@ -508,8 +508,8 @@ export default function UsersPage() {
                 <input value={form.displayNameEn} onChange={e => setForm(p => ({ ...p, displayNameEn: e.target.value, displayName: p.displayNameAr || e.target.value || p.displayName }))} className={inputCls} dir="ltr" placeholder="Name In English" />
               </Field>
             </div>
-            <Field label={isAR ? "الاسم الكامل (احتياطي)" : "Full Name (fallback)"}>
-              <input value={form.displayName} onChange={e => setForm(p => ({ ...p, displayName: e.target.value }))} className={inputCls} required placeholder={isAR ? "يُستخدم إن لم يُحدد اسم بالعربية أو الإنجليزية" : "Used if no Arabic/English name is set"} />
+            <Field label={isAR ? "المندوب" : "SALES MAN"}>
+              <input value={form.displayName} onChange={e => setForm(p => ({ ...p, displayName: e.target.value }))} className={inputCls} required placeholder={isAR ? "اسم المندوب" : "Sales man name"} />
             </Field>
             <Field label={isAR ? "اسم المستخدم (للدخول)" : "Username (for login)"}><input value={form.username} onChange={e => setForm(p => ({ ...p, username: e.target.value }))} className={inputCls} required /></Field>
             <Field label={isAR ? "كلمة السر" : "Password"}><input type="password" value={form.password} onChange={e => setForm(p => ({ ...p, password: e.target.value }))} className={inputCls} required /></Field>
@@ -550,7 +550,7 @@ export default function UsersPage() {
                 <input value={editForm.displayNameEn} onChange={e => setEditForm(p => ({ ...p, displayNameEn: e.target.value }))} className={inputCls} dir="ltr" placeholder="Name In English" />
               </Field>
             </div>
-            <Field label={isAR ? "الاسم الكامل (احتياطي)" : "Full Name (fallback)"}><input value={editForm.displayName} onChange={e => setEditForm(p => ({ ...p, displayName: e.target.value }))} className={inputCls} required /></Field>
+            <Field label={isAR ? "المندوب" : "SALES MAN"}><input value={editForm.displayName} onChange={e => setEditForm(p => ({ ...p, displayName: e.target.value }))} className={inputCls} required /></Field>
             <Field label={isAR ? "الدور" : "Role"}>
               <select
                 value={editForm.role}
