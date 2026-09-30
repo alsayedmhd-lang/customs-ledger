@@ -17,23 +17,16 @@ import { useLanguage } from "@/lib/language-context";
 import { useCompanySettings, DEFAULT_SETTINGS, type CompanySettings } from "@/lib/company-settings-context";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import { getRoleLabel } from "@/lib/role-labels";
 import {
   Building2, Globe, Phone, Mail, MapPin, Hash, Upload, Save, RefreshCw,
   Stamp, Eye, EyeOff, Shield, Printer, Info, Image, RotateCcw, User,
   Palette, Sun, Moon, Monitor, Zap, ZapOff, Layers, RectangleHorizontal, Square, Minus,
   AlignVerticalJustifyStart, AlignVerticalJustifyCenter, AlignVerticalSpaceAround,
-  Wallpaper, SlidersHorizontal, Ban, Blend, Database, Cloud,
+  Wallpaper, SlidersHorizontal, Ban, Blend,
 } from "lucide-react";
 import { useDisplaySettings, COLOR_PRESETS, SIDEBAR_COLOR_PRESETS, type PrimaryColor, type BorderRadius, type Density, type SidebarColor, type BgType } from "@/lib/display-settings-context";
 
 type TabId = "preview" | "backup" | "company" | "branding" | "print" | "display" | "update";
-type BackupView = "backup-import" | "database-sync";
-type DatabaseMode = "local" | "online";
-type SyncMode = "local-to-online" | "online-to-local" | "bidirectional";
-type AutoSyncTiming = "startup" | "interval";
-type SyncStatus = "idle" | "success" | "failed" | "in-progress";
-
 const API_BASE = `${import.meta.env.VITE_API_BASE_URL}/api`;
 
 const formatDateYMD = (value: Date | string | null | undefined = new Date()) => {
@@ -54,7 +47,7 @@ function Section({ icon: Icon, title, color, children, contentClassName }: {
     <ResizableScrollArea storageKey={`settings-section:${title}`} maxHeight={10000} maxDragHeight={5000} minHeight={120}>
       <div className="w-full bg-card rounded-2xl border border-border/50 shadow-sm overflow-hidden">
         <div className={`flex items-center gap-2 px-5 py-3.5 border-b border-border/40 ${color}`}>
-          <Icon className="w-3.5 h-3.5" />
+          <Icon className="w-4 h-4 shrink-0" />
           <h2 className="text-sm font-bold">{title}</h2>
         </div>
         <div className={cn("w-full p-5", contentClassName)}>{children}</div>
@@ -66,7 +59,7 @@ function Section({ icon: Icon, title, color, children, contentClassName }: {
 function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
     <div className="space-y-1">
-      <label className="block text-xs font-semibold text-muted-foreground uppercase tracking-wide">{label}</label>
+      <label className="block text-xs font-semibold text-muted-foreground ">{label}</label>
       {children}
       {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
     </div>
@@ -457,11 +450,11 @@ function SettingsPrintPreviews({
               ].map((row) => (
                 <div key={row.join("-")} className="grid grid-cols-2 border-b border-dashed border-gray-200 last:border-b-0">
                   <div className="px-5 py-1.5 border-r border-dashed border-gray-200">
-                    <div className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">{row[0]}</div>
+                    <div className="text-[9px] font-bold text-gray-400 r">{row[0]}</div>
                     <div className="text-[13px] leading-tight font-bold text-gray-900">{row[1]}</div>
                   </div>
                   <div className="px-5 py-1.5">
-                    <div className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">{row[2]}</div>
+                    <div className="text-[9px] font-bold text-gray-400 r">{row[2]}</div>
                     <div className="text-[13px] leading-tight font-bold text-gray-900 font-mono">{row[3]}</div>
                   </div>
                 </div>
@@ -574,12 +567,12 @@ function SettingsPrintPreviews({
             <div className="px-6 py-3 border-b border-gray-300 relative z-10">
               <div className="grid grid-cols-2 gap-6">
                 <div className="text-right">
-                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">بيانات العميل / CLIENT DETAILS</p>
+                  <p className="text-xs font-bold text-gray-500 r mb-2">بيانات العميل / CLIENT DETAILS</p>
                   <p className="text-base font-black text-gray-900">{isAR ? "عميل تجريبي" : "Sample Client"}</p>
                   <p className="text-sm text-gray-600 mt-0.5">{isAR ? "الدوحة، قطر" : "Doha, Qatar"}</p>
                 </div>
                 <div className="border-2 border-gray-700 rounded text-sm">
-                  <div className="bg-gray-800 text-white text-center py-1 font-bold text-xs uppercase tracking-widest">ملخص الحساب / ACCOUNT SUMMARY</div>
+                  <div className="bg-gray-800 text-white text-center py-1 font-bold text-xs st">ملخص الحساب / ACCOUNT SUMMARY</div>
                   <div className="divide-y divide-gray-200">
                     <div className="flex justify-between px-4 py-1.5"><span>إجمالي المدين / Total Debit</span><span className="font-mono font-bold">QR 4,750.00</span></div>
                     <div className="flex justify-between px-4 py-1.5"><span>إجمالي الدائن / Total Credit</span><span className="font-mono font-bold text-green-700">QR 1,250.00</span></div>
@@ -647,12 +640,12 @@ function SettingsPrintPreviews({
             <div className="px-6 py-3 border-b border-gray-300 relative z-10">
               <div className="grid grid-cols-2 gap-6">
                 <div className="text-right">
-                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">بيانات العميل / CLIENT DETAILS</p>
+                  <p className="text-xs font-bold text-gray-500 r mb-2">بيانات العميل / CLIENT DETAILS</p>
                   <p className="text-base font-black text-gray-900">{isAR ? "عميل تجريبي" : "Sample Client"}</p>
                   <p className="text-sm text-gray-600 mt-0.5">{isAR ? "الدوحة، قطر" : "Doha, Qatar"}</p>
                 </div>
                 <div className="border-2 border-gray-700 rounded text-sm">
-                  <div className="bg-gray-800 text-white text-center py-1 font-bold text-xs uppercase tracking-widest">ملخص الحساب / ACCOUNT SUMMARY</div>
+                  <div className="bg-gray-800 text-white text-center py-1 font-bold text-xs st">ملخص الحساب / ACCOUNT SUMMARY</div>
                   <div className="divide-y divide-gray-200">
                     <div className="flex justify-between px-4 py-1.5"><span>إجمالي المدين / Total Debit</span><span className="font-mono font-bold">QR 4,750.00</span></div>
                     <div className="flex justify-between px-4 py-1.5"><span>إجمالي الدائن / Total Credit</span><span className="font-mono font-bold text-green-700">QR 1,250.00</span></div>
@@ -741,277 +734,6 @@ function PreviewScaleControl({
         />
       </div>
     </label>
-  );
-}
-
-function DatabaseSyncPanel({
-  isAR,
-  databaseMode,
-  setDatabaseMode,
-  databaseConfig,
-  setDatabaseConfig,
-  syncConfig,
-  setSyncConfig,
-}: {
-  isAR: boolean;
-  databaseMode: DatabaseMode;
-  setDatabaseMode: (mode: DatabaseMode) => void;
-  databaseConfig: {
-    localPath: string;
-    connectionStatus: string;
-    host: string;
-    port: string;
-    databaseName: string;
-    username: string;
-    password: string;
-    useConnectionString: boolean;
-    connectionString: string;
-  };
-  setDatabaseConfig: React.Dispatch<React.SetStateAction<{
-    localPath: string;
-    connectionStatus: string;
-    host: string;
-    port: string;
-    databaseName: string;
-    username: string;
-    password: string;
-    useConnectionString: boolean;
-    connectionString: string;
-  }>>;
-  syncConfig: {
-    mode: SyncMode;
-    autoSync: boolean;
-    timing: AutoSyncTiming;
-    intervalMinutes: number;
-    lastSyncTime: string;
-    status: SyncStatus;
-  };
-  setSyncConfig: React.Dispatch<React.SetStateAction<{
-    mode: SyncMode;
-    autoSync: boolean;
-    timing: AutoSyncTiming;
-    intervalMinutes: number;
-    lastSyncTime: string;
-    status: SyncStatus;
-  }>>;
-}) {
-  return (
-    <div className="space-y-4" dir={isAR ? "rtl" : "ltr"}>
-      <div className={`${isAR ? "text-right" : "text-left"}`}>
-        <h3 className="text-sm font-bold text-foreground">
-          {isAR ? "قاعدة البيانات والمزامنة" : "Database & Sync"}
-        </h3>
-        <p className="mt-1 text-xs text-muted-foreground">
-          {isAR
-            ? "واجهة مبدئية لاختيار مصدر قاعدة البيانات وتجهيز إعدادات المزامنة بدون تنفيذ اتصال فعلي حاليًا."
-            : "Feature-ready controls for choosing a database source and preparing sync settings without running real connections yet."}
-        </p>
-      </div>
-
-      <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-        <div className="mb-4 flex items-center gap-2 text-sm font-bold text-foreground">
-          <Database className="h-4 w-4 text-primary" />
-          <span>{isAR ? "نوع قاعدة البيانات" : "Database Type"}</span>
-        </div>
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-          {[
-            { id: "local" as DatabaseMode, icon: Database, labelAr: "قاعدة محلية (SQLite)", labelEn: "Local Database (SQLite)" },
-            { id: "online" as DatabaseMode, icon: Cloud, labelAr: "قاعدة أونلاين (PostgreSQL / MySQL لاحقًا)", labelEn: "Online Database (PostgreSQL / MySQL later)" },
-          ].map((option) => (
-            <button
-              key={option.id}
-              type="button"
-              onClick={() => setDatabaseMode(option.id)}
-              className={cn(
-                "flex items-center gap-3 rounded-xl border p-3 text-sm transition",
-                databaseMode === option.id
-                  ? "border-primary bg-primary/5 text-primary shadow-sm"
-                  : "border-border bg-background hover:border-primary/40"
-              )}
-            >
-              <option.icon className="h-4 w-4 shrink-0" />
-              <span className="font-semibold">{isAR ? option.labelAr : option.labelEn}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {databaseMode === "local" && (
-        <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-          <div className="mb-4 flex items-center gap-2 text-sm font-bold text-foreground">
-            <Database className="h-4 w-4 text-emerald-600" />
-            <span>{isAR ? "قاعدة البيانات المحلية" : "Local Database"}</span>
-          </div>
-          <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-            <Field label={isAR ? "مسار قاعدة البيانات" : "Database Path"}>
-              <input
-                value={databaseConfig.localPath}
-                onChange={(e) => setDatabaseConfig((p) => ({ ...p, localPath: e.target.value }))}
-                className={inp}
-              />
-            </Field>
-            <Field label={isAR ? "حالة الاتصال" : "Connection Status"}>
-              <div className="flex h-10 items-center justify-between rounded-xl border border-border bg-background px-3 text-sm">
-                <span className={cn("font-semibold", databaseConfig.connectionStatus === "Connected" ? "text-emerald-600" : "text-red-600")}>
-                  {databaseConfig.connectionStatus === "Connected" ? (isAR ? "متصل" : "Connected") : (isAR ? "غير متصل" : "Not Connected")}
-                </span>
-                <span className={cn("h-2.5 w-2.5 rounded-full", databaseConfig.connectionStatus === "Connected" ? "bg-emerald-500" : "bg-red-500")} />
-              </div>
-            </Field>
-          </div>
-          <div className="mt-4 flex flex-wrap gap-2">
-            <button type="button" className="h-9 rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground hover:bg-primary/90">
-              {isAR ? "إنشاء قاعدة جديدة" : "Generate New Database"}
-            </button>
-            <button type="button" className="h-9 rounded-lg border border-border bg-background px-3 text-xs font-semibold hover:bg-muted">
-              {isAR ? "تحميل ملف SQL لإنشاء قاعدة جديدة" : "Upload SQL File"}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {databaseMode === "online" && (
-        <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-          <div className="mb-4 flex items-center gap-2 text-sm font-bold text-foreground">
-            <Cloud className="h-4 w-4 text-blue-600" />
-            <span>{isAR ? "إعدادات قاعدة البيانات الأونلاين" : "Online Database Settings"}</span>
-          </div>
-          <label className="mb-4 flex items-center gap-2 text-sm font-semibold text-foreground">
-            <input
-              type="checkbox"
-              checked={databaseConfig.useConnectionString}
-              onChange={(e) => setDatabaseConfig((p) => ({ ...p, useConnectionString: e.target.checked }))}
-              className="h-4 w-4 accent-primary"
-            />
-            <span>{isAR ? "استخدام Connection String كامل" : "Use full Connection String"}</span>
-          </label>
-
-          {databaseConfig.useConnectionString ? (
-            <Field label="Connection String">
-              <input
-                type="password"
-                value={databaseConfig.connectionString}
-                onChange={(e) => setDatabaseConfig((p) => ({ ...p, connectionString: e.target.value }))}
-                placeholder="postgresql://user:password@host:5432/database"
-                dir="ltr"
-                className={inp}
-              />
-            </Field>
-          ) : (
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-              <Field label="Host">
-                <input value={databaseConfig.host} onChange={(e) => setDatabaseConfig((p) => ({ ...p, host: e.target.value }))} className={inp} dir="ltr" />
-              </Field>
-              <Field label="Port">
-                <input value={databaseConfig.port} onChange={(e) => setDatabaseConfig((p) => ({ ...p, port: e.target.value }))} className={inp} dir="ltr" />
-              </Field>
-              <Field label={isAR ? "اسم قاعدة البيانات" : "Database Name"}>
-                <input value={databaseConfig.databaseName} onChange={(e) => setDatabaseConfig((p) => ({ ...p, databaseName: e.target.value }))} className={inp} dir="ltr" />
-              </Field>
-              <Field label={isAR ? "اسم المستخدم" : "Username"}>
-                <input value={databaseConfig.username} onChange={(e) => setDatabaseConfig((p) => ({ ...p, username: e.target.value }))} className={inp} dir="ltr" />
-              </Field>
-              <Field label={isAR ? "كلمة المرور" : "Password"}>
-                <input type="password" value={databaseConfig.password} onChange={(e) => setDatabaseConfig((p) => ({ ...p, password: e.target.value }))} className={inp} dir="ltr" />
-              </Field>
-            </div>
-          )}
-        </div>
-      )}
-
-      <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-        <div className="mb-4 flex flex-wrap gap-2">
-          <button type="button" className="h-9 rounded-lg border border-border bg-muted/30 px-3 text-xs font-semibold text-foreground hover:bg-muted/50">
-            {isAR ? "اختبار الاتصال" : "Test Connection"}
-          </button>
-          <button type="button" className="h-9 rounded-lg border border-border bg-muted/30 px-3 text-xs font-semibold text-foreground hover:bg-muted/50">
-            {isAR ? "حفظ الإعدادات" : "Save Configuration"}
-          </button>
-          <button type="button" className="h-9 rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground hover:bg-primary/90">
-            {isAR ? "اتصال" : "Connect"}
-          </button>
-        </div>
-
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-          <div>
-            <div className="mb-3 flex items-center gap-2 text-sm font-bold text-foreground">
-              <RefreshCw className="h-4 w-4 text-primary" />
-              <span>{isAR ? "خيارات المزامنة" : "Sync Options"}</span>
-            </div>
-            <div className="grid grid-cols-1 gap-2">
-              {[
-                { id: "local-to-online" as SyncMode, labelAr: "مزامنة المحلي إلى الأونلاين", labelEn: "Sync Local -> Online" },
-                { id: "online-to-local" as SyncMode, labelAr: "مزامنة الأونلاين إلى المحلي", labelEn: "Sync Online -> Local" },
-                { id: "bidirectional" as SyncMode, labelAr: "مزامنة ثنائية الاتجاه", labelEn: "Sync Both (Bidirectional)" },
-              ].map((mode) => (
-                <label key={mode.id} className="flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-sm">
-                  <input
-                    type="radio"
-                    checked={syncConfig.mode === mode.id}
-                    onChange={() => setSyncConfig((p) => ({ ...p, mode: mode.id }))}
-                    className="h-4 w-4 accent-primary"
-                  />
-                  <span>{isAR ? mode.labelAr : mode.labelEn}</span>
-                </label>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <div className="mb-3 flex items-center gap-2 text-sm font-bold text-foreground">
-              <SlidersHorizontal className="h-4 w-4 text-primary" />
-              <span>{isAR ? "التحكم في المزامنة" : "Sync Control"}</span>
-            </div>
-            <div className="space-y-3 rounded-xl border border-border bg-background p-3">
-              <label className="flex items-center justify-between gap-3 text-sm font-semibold">
-                <span>{isAR ? "تشغيل تلقائي" : "Auto Sync"}</span>
-                <button type="button" onClick={() => setSyncConfig((p) => ({ ...p, autoSync: !p.autoSync }))} className={tog(syncConfig.autoSync)}>
-                  <span className={`absolute top-0.5 left-0.5 h-3.5 w-3.5 rounded-full bg-white shadow transition-transform ${syncConfig.autoSync ? "translate-x-5" : ""}`} />
-                </button>
-              </label>
-              <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-                <label className="flex items-center gap-2 text-sm">
-                  <input type="radio" checked={syncConfig.timing === "startup"} onChange={() => setSyncConfig((p) => ({ ...p, timing: "startup" }))} className="h-4 w-4 accent-primary" />
-                  <span>{isAR ? "عند فتح البرنامج" : "Every app start"}</span>
-                </label>
-                <label className="flex items-center gap-2 text-sm">
-                  <input type="radio" checked={syncConfig.timing === "interval"} onChange={() => setSyncConfig((p) => ({ ...p, timing: "interval" }))} className="h-4 w-4 accent-primary" />
-                  <span>{isAR ? "كل X دقيقة" : "Every X minutes"}</span>
-                </label>
-              </div>
-              <Field label={isAR ? "الفاصل بالدقائق" : "Interval Minutes"}>
-                <input
-                  type="number"
-                  min={1}
-                  value={syncConfig.intervalMinutes}
-                  onChange={(e) => setSyncConfig((p) => ({ ...p, intervalMinutes: Math.max(1, Number(e.target.value) || 1) }))}
-                  className={inp}
-                />
-              </Field>
-              <button type="button" className="h-9 w-full rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground hover:bg-primary/90">
-                {isAR ? "بدء المزامنة" : "Start Sync"}
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
-          <div className="rounded-xl border border-border bg-background p-3">
-            <div className="text-xs font-semibold uppercase text-muted-foreground">{isAR ? "آخر مزامنة" : "Last Sync Time"}</div>
-            <div className="mt-1 font-mono text-sm text-foreground">{syncConfig.lastSyncTime}</div>
-          </div>
-          <div className="rounded-xl border border-border bg-background p-3">
-            <div className="text-xs font-semibold uppercase text-muted-foreground">{isAR ? "الحالة" : "Status"}</div>
-            <div className="mt-1 text-sm font-bold text-muted-foreground">
-              {syncConfig.status === "success" && (isAR ? "نجاح" : "Success")}
-              {syncConfig.status === "failed" && (isAR ? "فشل" : "Failed")}
-              {syncConfig.status === "in-progress" && (isAR ? "قيد التنفيذ" : "In Progress")}
-              {syncConfig.status === "idle" && (isAR ? "جاهز" : "Ready")}
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
   );
 }
 
@@ -1146,34 +868,6 @@ export default function SettingsPage() {
   }, [customerLedgerPreviewScale]);
   const [backupPassword, setBackupPassword] = useState("");
   const [importPassword, setImportPassword] = useState("");
-  const [backupView, setBackupView] = useState<BackupView>("backup-import");
-  const [databaseMode, setDatabaseMode] = useState<DatabaseMode>("local");
-  const [databaseConfig, setDatabaseConfig] = useState({
-    localPath: "lib/db/local.db",
-    connectionStatus: "Connected",
-    host: "",
-    port: "5432",
-    databaseName: "",
-    username: "",
-    password: "",
-    useConnectionString: false,
-    connectionString: "",
-  });
-  const [syncConfig, setSyncConfig] = useState<{
-    mode: SyncMode;
-    autoSync: boolean;
-    timing: AutoSyncTiming;
-    intervalMinutes: number;
-    lastSyncTime: string;
-    status: SyncStatus;
-  }>({
-    mode: "local-to-online",
-    autoSync: false,
-    timing: "startup",
-    intervalMinutes: 15,
-    lastSyncTime: "-",
-    status: "idle",
-  });
   const [updateStatus, setUpdateStatus] = useState(isAR ? "جاهز" : "Ready");
   const [updateVersion, setUpdateVersion] = useState("");
   const [updateProgress, setUpdateProgress] = useState(0);
@@ -1711,7 +1405,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
     };
     const MAX_IMAGE_DIMENSION = 1200;
     const OUTPUT_QUALITY = 0.82;
-    
+
     async function compressImageToDataUrl(
       file: File,
       options?: {
@@ -1727,42 +1421,42 @@ const decryptBackupData = async (backupFile: any, password: string) => {
         quality = OUTPUT_QUALITY,
         outputType = "image/png",
       } = options || {};
-    
+
       const fileDataUrl = await new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(String(reader.result || ""));
       reader.onerror = () => reject(new Error("Failed to read image"));
       reader.readAsDataURL(file);
     });
-    
+
       const img = await new Promise<HTMLImageElement>((resolve, reject) => {
         const image = new window.Image();
         image.onload = () => resolve(image);
         image.onerror = () => reject(new Error("Failed to load image"));
         image.src = fileDataUrl;
       });
-    
+
       let targetWidth = img.width;
       let targetHeight = img.height;
-    
+
       const ratio = Math.min(maxWidth / targetWidth, maxHeight / targetHeight, 1);
-    
+
       targetWidth = Math.round(targetWidth * ratio);
       targetHeight = Math.round(targetHeight * ratio);
-    
+
       const canvas = document.createElement("canvas");
       canvas.width = targetWidth;
       canvas.height = targetHeight;
-    
+
       const ctx = canvas.getContext("2d");
       if (!ctx) throw new Error("Canvas not supported");
-    
+
       ctx.clearRect(0, 0, targetWidth, targetHeight);
       ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
-    
+
       return canvas.toDataURL(outputType, quality);
     }
-    
+
     const handleImageRemove = (
       field: "logoBase64" | "stampBase64" | "watermarkBase64" | "accountantSignatureBase64" | "receiverSignatureBase64",
       setPreview?: (value: string) => void
@@ -1770,7 +1464,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
       setForm((prev) => ({ ...prev, [field]: null }));
       setPreview?.("");
     };
-  
+
     const handleSave = async () => {
       setSaving(true);
       try {
@@ -1841,18 +1535,18 @@ const decryptBackupData = async (backupFile: any, password: string) => {
           },
           body: JSON.stringify(payload),
         });
-    
+
         if (!res.ok) throw new Error("Failed");
-    
+
         const saved = await res.json();
         const mergedSaved = { ...DEFAULT_SETTINGS, ...saved };
-    
+
         setForm(mergedSaved);
         setSettings(mergedSaved);
         sessionStorage.setItem("company_settings", JSON.stringify(mergedSaved));
-    
+
         await refresh();
-    
+
         toast({
           title: isAR
             ? "✅ تم الحفظ بنجاح — التغييرات مفعلة الآن"
@@ -1897,9 +1591,6 @@ const decryptBackupData = async (backupFile: any, password: string) => {
   { id: "display", icon: Palette, labelAr: "المظهر", labelEn: "Display", color: "text-fuchsia-500" }, // آخر واحد
 ];
 
-  const resolvedName = (isAR ? user?.displayNameAr : user?.displayNameEn) || user?.displayName || "";
-  const roleLabel = getRoleLabel(user?.role, isAR);
-  const canSeeDeveloperLink = user?.role === "admin" || user?.role === "manager";
   const canViewSettingsTab = (tabId: TabId) => {
     if (canViewAllSettingsTabs) return true;
     if (tabId === "preview") return true;
@@ -1918,10 +1609,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
     if (visibleTabs.length > 0 && !visibleTabs.some((tab) => tab.id === activeTab)) {
       setActiveTab(visibleTabs[0].id);
     }
-    if (activeTab === "backup" && backupView === "database-sync") {
-      setBackupView("backup-import");
-    }
-  }, [activeTab, backupView, visibleTabIds]);
+  }, [activeTab, visibleTabIds]);
 
   if (visibleTabs.length === 0) {
     return (
@@ -1953,18 +1641,6 @@ const decryptBackupData = async (backupFile: any, password: string) => {
         onTabChange={setActiveTab}
         actions={
           <>
-            {false && canSeeDeveloperLink && (
-              <button
-                type="button"
-                onClick={() => {
-                  openDeveloperSettings();
-                }}
-                className="inline-flex items-center justify-center gap-2 rounded-xl border border-border bg-background px-3 py-2.5 text-sm font-semibold text-muted-foreground shadow-sm transition hover:bg-muted hover:text-foreground"
-              >
-                <Shield className="h-4 w-4" />
-                {isAR ? "المطور" : "Developer"}
-              </button>
-            )}
             <button
               onClick={handleSave}
               disabled={saving}
@@ -1976,77 +1652,6 @@ const decryptBackupData = async (backupFile: any, password: string) => {
           </>
         }
       >
-      {/* ── Sticky Sidebar ─────────────────────────────────────── */}
-      {false && (
-      <div
-        className="hidden legacy-settings-sidebar"
-        dir={isRTL ? "rtl" : "ltr"}
-      >
-
-        {/* User card */}
-        <div className="bg-card rounded-2xl border border-border/50 shadow-sm p-3">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white font-black text-sm shadow-md shrink-0">
-              {resolvedName?.[0]?.toUpperCase() || <User className="w-3.5 h-3.5" />}
-            </div>
-            <div className="min-w-0">
-              <p className="text-xs font-bold truncate leading-tight">
-                {isAR ? (resolvedName || user?.displayName) : (user?.displayNameEn || resolvedName || user?.displayName)}
-              </p>
-              <div className="flex flex-col items-start">
-                <span className="text-sm font-medium text-muted-foreground">{roleLabel}</span>
-                {canSeeDeveloperLink && (
-                  <span
-                    onDoubleClick={() => {
-                      openDeveloperSettings();
-                    }}
-                    className="mt-1 text-[10px] text-muted-foreground/40 hover:text-muted-foreground/70 select-none"
-                  >
-                    {import.meta.env.VITE_APP_VERSION || "v2.0.0"}
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Tab list */}
-        <nav className="bg-card rounded-2xl border border-border/50 shadow-sm p-2 space-y-0.5">
-          {visibleTabs.map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={cn(
-                "w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium transition-all text-start",
-                activeTab === tab.id
-                  ? "bg-primary/10 text-primary font-semibold shadow-sm ring-1 ring-primary/20"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
-              )}
-            >
-              <tab.icon className={cn("w-3.5 h-3.5 shrink-0", activeTab === tab.id ? "text-primary" : tab.color)} />
-              <div className="flex items-center justify-between w-full">
-              <span>{isAR ? tab.labelAr : tab.labelEn}</span>
-
-              {activeTab === tab.id && (
-                <span className="w-1.5 h-1.5 rounded-full bg-primary" />
-              )}
-            </div>
-            </button>
-          ))}
-        </nav>
-
-        {/* Save button */}
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground font-semibold rounded-xl shadow-lg shadow-primary/20 hover:-translate-y-0.5 transition-all disabled:opacity-60 text-sm"
-        >
-          {saving ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
-          {saving ? (isAR ? "جارٍ الحفظ..." : "Saving...") : (isAR ? "حفظ التغييرات" : "Save Changes")}
-        </button>
-      </div>
-      )}
-
       {/* ── Content Area ───────────────────────────────────────── */}
       <div
         className={cn("min-w-0 w-full space-y-5", isRTL ? "md:order-1" : "md:order-2")}
@@ -2054,9 +1659,9 @@ const decryptBackupData = async (backupFile: any, password: string) => {
       >
 
         {/* Section title */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-bold">
+            <h2 className="text-lg font-semibold">
               {activeTab === "preview" && (isAR ? "المعاينة" : "Preview")}
               {activeTab === "company" && (isAR ? "بيانات الشركة" : "Company")}
               {activeTab === "branding" && (isAR ? "الشعارات" : "Branding")}
@@ -2064,7 +1669,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
               {activeTab === "backup" && (isAR ? "استيراد وتصدير البيانات" : "Data Import & Export")}
               {activeTab === "update" && (isAR ? "تحديث البرنامج" : "Software Update")}
               {activeTab === "display" && (isAR ? "المظهر" : "Display")}
-            </h1>
+            </h2>
             <p className="text-sm text-muted-foreground mt-0.5">
               {activeTab === "preview" && (isAR ? "معاينة مباشرة لشكل المستندات قبل الطباعة" : "Live preview of documents before printing")}
               {activeTab === "company" && (isAR ? "إدارة بيانات الشركة الأساسية ومعلومات التواصل" : "Manage company identity and contact details")}
@@ -2076,7 +1681,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
             </p>
           </div>
         </div>
-        
+
 
           {/* ── Preview Tab Content ── */}
 
@@ -2280,30 +1885,6 @@ const decryptBackupData = async (backupFile: any, password: string) => {
               color="bg-emerald-500/5"
             >
               <div className="space-y-4">
-                {/* Program Data - خارج الإطار */}
-                <div className="grid grid-cols-1 gap-2 rounded-xl border border-border/60 bg-muted/20 p-1" dir={isAR ? "rtl" : "ltr"}>
-                  {[
-                    { id: "backup-import" as BackupView, icon: Shield, labelAr: "التصدير والاستيراد", labelEn: "Export and import" },
-                  ].map((item) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => setBackupView(item.id)}
-                      className={cn(
-                        "flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition",
-                        backupView === item.id
-                          ? "bg-background text-primary shadow-sm ring-1 ring-primary/20"
-                          : "text-muted-foreground hover:bg-background/70 hover:text-foreground"
-                      )}
-                    >
-                      <item.icon className="h-4 w-4" />
-                      <span>{isAR ? item.labelAr : item.labelEn}</span>
-                    </button>
-                  ))}
-                </div>
-
-                {backupView === "backup-import" && (
-                  <>
                 <div className={`${isAR ? "text-right" : "text-left"}`}>
                   <h3 className="text-sm font-bold text-foreground">
                     {isAR ? "بيانات البرنامج" : "Program Data"}
@@ -2323,7 +1904,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                 >
                   {/* All Data Row "كل البيانات" */}
                   <div className="border border-border bg-background rounded-lg p-3 mb-3">
-                    <div className="flex items-center justify-between gap-3 w-full">
+                    <div className="flex flex-wrap items-center justify-between gap-3 w-full">
                       <span className="text-sm font-medium whitespace-nowrap">
                         {isAR ? "كل البيانات" : "All Data"}
                       </span>
@@ -2452,12 +2033,13 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                  </div>
 
                  <div
-                  className="flex items-center justify-between border border-border bg-background rounded-lg px-3 py-2 mt-2 w-full"
+                  className="flex flex-wrap items-center justify-between gap-3 border border-border bg-card rounded-xl p-4 mt-4 w-full"
                   dir={isAR ? "rtl" : "ltr"}
                 >
-                  <span className="text-sm whitespace-nowrap">
-                    {isAR ? "كلمة مرور الطوارئ (الماستر)" : "Master Emergency Password"}
-                  </span>
+                  <div className="space-y-1">
+                    <h3 className="text-sm font-semibold">{isAR ? "كلمة مرور الطوارئ (الماستر)" : "Master Emergency Password"}</h3>
+                    <p className="text-xs text-muted-foreground">{isAR ? "اتركها فارغة للإبقاء على كلمة المرور الحالية، ثم اضغط حفظ التغييرات عند تعديلها." : "Leave empty to keep the current password. Click Save Changes after editing."}</p>
+                  </div>
 
                   <div className="relative">
                     <input
@@ -2465,7 +2047,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                       value={form.masterPassword || ""}
                       onChange={(e) => setForm((f) => ({ ...f, masterPassword: e.target.value }))}
                       placeholder={isAR ? "اتركها فارغة لعدم التغيير" : "Leave empty to keep unchanged"}
-                      className={`h-8 w-40 rounded-md border border-border bg-background text-xs text-foreground ${
+                      className={`h-10 w-full sm:w-64 rounded-md border border-border bg-background text-sm text-foreground ${
                         isAR ? "pl-8 pr-2" : "pr-8 pl-2"
                       }`}
                     />
@@ -2645,12 +2227,53 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                     }}
                   />
 
-                  <div className="grid grid-cols-2 gap-3 mt-4">
+                  <div className="grid grid-cols-1 gap-3 mt-4 xl:grid-cols-2">
+                    {/* البنود */}
+                    <div className="flex flex-wrap justify-between items-center gap-3 border border-border bg-background rounded-xl p-3">
+                      <span className="text-sm">{isAR ? "البنود" : "Items"}</span>
+                      <div className="flex gap-2">
+                        <button type="button" onClick={exportItems} className="h-8 px-3 text-xs bg-muted/30 border border-border text-foreground rounded-md hover:bg-muted/50 transition">
+                          {isAR ? "تصدير" : "Export"}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            document.getElementById("items-import")?.click();
+                          }}
+                          className="h-8 px-3 text-xs bg-muted/30 border border-border text-foreground rounded-md hover:bg-muted/50 transition"
+                        >
+                          {isAR ? "استيراد" : "Import"}
+                        </button>
+
+                      </div>
+                    </div>
+                    {/* العملاء */}
+                    <div className="flex flex-wrap justify-between items-center gap-3 border border-border bg-background rounded-xl p-3">
+                      <span className="text-sm">{isAR ? "العملاء" : "Clients"}</span>
+                      <div className="flex gap-2">
+                        <button type="button" onClick={exportClients} className="h-8 px-3 text-xs bg-muted/30 border border-border text-foreground rounded-md hover:bg-muted/50 transition">
+                          {isAR ? "تصدير" : "Export"}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            document.getElementById("clients-import")?.click();
+                          }}
+                          className="h-8 px-3 text-xs bg-muted/30 border border-border text-foreground rounded-md hover:bg-muted/50 transition"
+                        >
+                          {isAR ? "استيراد" : "Import"}
+                        </button>
+
+                      </div>
+                    </div>
+
                     {/* الفواتير */}
-                    <div className="flex justify-between items-center border border-border bg-background rounded-lg p-2">
+                    <div className="flex flex-wrap justify-between items-center gap-3 border border-border bg-background rounded-xl p-3">
                       <span className="text-sm">{isAR ? "الفواتير" : "Invoices"}</span>
                       <div className="flex gap-2">
-                      
+
                         <button type="button" onClick={exportInvoices} disabled={!canUseInvoicesBackupImport} className={cn("h-8 px-3 text-xs bg-muted/30 border border-border text-foreground rounded-md hover:bg-muted/50 transition", !canUseInvoicesBackupImport && "cursor-not-allowed opacity-50 hover:bg-muted/30")}>
                           {isAR ? "تصدير" : "Export"}
                         </button>
@@ -2673,29 +2296,8 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                       </div>
                     </div>
 
-                    {/* العملاء */}
-                    <div className="flex justify-between items-center border border-border bg-background rounded-lg p-2">
-                      <span className="text-sm">{isAR ? "العملاء" : "Clients"}</span>
-                      <div className="flex gap-2">
-                        <button type="button" onClick={exportClients} className="h-8 px-3 text-xs bg-muted/30 border border-border text-foreground rounded-md hover:bg-muted/50 transition">
-                          {isAR ? "تصدير" : "Export"}
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => {
-                            document.getElementById("clients-import")?.click();
-                          }}
-                          className="h-8 px-3 text-xs bg-muted/30 border border-border text-foreground rounded-md hover:bg-muted/50 transition"
-                        >
-                          {isAR ? "استيراد" : "Import"}
-                        </button>
-
-                      </div>
-                    </div>
-
                     {/* سندات القبض */}
-                    <div className="flex justify-between items-center border border-border bg-background rounded-lg p-2">
+                    <div className="flex flex-wrap justify-between items-center gap-3 border border-border bg-background rounded-xl p-3">
                       <span className="text-sm">{isAR ? "سندات القبض" : "Receipts"}</span>
                       <div className="flex gap-2">
                         <button type="button" onClick={exportReceipts} className="h-8 px-3 text-xs bg-muted/30 border border-border text-foreground rounded-md hover:bg-muted/50 transition">
@@ -2711,34 +2313,12 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                         >
                           {isAR ? "استيراد" : "Import"}
                         </button>
-                        
+
                       </div>
                     </div>
 
-                    {/* البنود */}
-                    <div className="flex justify-between items-center border border-border bg-background rounded-lg p-2">
-                      <span className="text-sm">{isAR ? "البنود" : "Items"}</span>
-                      <div className="flex gap-2">
-                        <button type="button" onClick={exportItems} className="h-8 px-3 text-xs bg-muted/30 border border-border text-foreground rounded-md hover:bg-muted/50 transition">
-                          {isAR ? "تصدير" : "Export"}
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => {
-                            document.getElementById("items-import")?.click();
-                          }}
-                          className="h-8 px-3 text-xs bg-muted/30 border border-border text-foreground rounded-md hover:bg-muted/50 transition"
-                        >
-                          {isAR ? "استيراد" : "Import"}
-                        </button>
-                        
-                      </div>
-                    </div>
                   </div>
                 </div>
-                  </>
-                )}
               </div>
             </Section>
           )}
@@ -2940,7 +2520,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
             </Section>
           )}
 
-          
+
 
           {/* ── Display Tab ── */}
 
@@ -3090,7 +2670,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                 {display.bgType === "color" && (
                   <div className="space-y-4">
                     <div className="flex items-center gap-4">
-                      <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide shrink-0">
+                      <label className="text-xs font-semibold text-muted-foreground  shrink-0">
                         {isAR ? "اختر اللون" : "Pick color"}
                       </label>
                       <div className="flex items-center gap-3 flex-1">
@@ -3193,7 +2773,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-2">
                         <SlidersHorizontal className="w-3.5 h-3.5 text-muted-foreground" />
-                        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                        <span className="text-xs font-semibold text-muted-foreground ">
                           {isAR ? "درجة الشفافية" : "Opacity"}
                         </span>
                       </div>
@@ -3305,23 +2885,23 @@ const decryptBackupData = async (backupFile: any, password: string) => {
             <Field label={isAR ? "اسم الشركة (عربي)" : "Company Name (Arabic)"}>
               <input value={form.nameAr} onChange={e => setForm(p => ({ ...p, nameAr: e.target.value }))} className={inp} placeholder="اسم الشركة بالعربي" />
             </Field>
-            
+
             <Field label={isAR ? "اسم الشركة (إنجليزي)" : "Company Name (English)"}>
               <input value={form.nameEn} onChange={e => setForm(p => ({ ...p, nameEn: e.target.value }))} className={inp} placeholder="Enter company name in English" />
             </Field>
-            
+
             <Field label={isAR ? "الترجمة الثانوية (عربي)" : "Subtitle (Arabic)"}>
               <input value={form.subtitleAr} onChange={e => setForm(p => ({ ...p, subtitleAr: e.target.value }))} className={inp} placeholder="الترجمة الثانوية بالعربي" />
             </Field>
-            
+
             <Field label={isAR ? "الترجمة الثانوية (إنجليزي)" : "Subtitle (English)"}>
               <input value={form.subtitleEn} onChange={e => setForm(p => ({ ...p, subtitleEn: e.target.value }))} className={inp} placeholder="Enter subtitle in English" />
             </Field>
-            
+
             <Field label={isAR ? "الوصف (عربي)" : "Tagline (Arabic)"}>
               <input value={form.taglineAr} onChange={e => setForm(p => ({ ...p, taglineAr: e.target.value }))} className={inp} placeholder="وصف النشاط بالعربي" />
             </Field>
-            
+
             <Field label={isAR ? "الوصف (إنجليزي)" : "Tagline (English)"}>
               <input value={form.taglineEn} onChange={e => setForm(p => ({ ...p, taglineEn: e.target.value }))} className={inp} placeholder="Enter business description in English" />
             </Field>
@@ -3391,7 +2971,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {/* Logo */}
               {canEditLogo && <div className="space-y-3">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{isAR ? "شعار الشركة" : "Company Logo"}</p>
+                <p className="text-xs font-semibold text-muted-foreground ">{isAR ? "شعار الشركة" : "Company Logo"}</p>
                 <div className="flex flex-col items-center justify-center gap-3 p-4 border-2 border-dashed border-border rounded-xl bg-muted/20 hover:bg-muted/30 transition-colors min-h-[160px]">
                   <img src={currentLogoSrc} alt="logo" className="h-16 w-auto object-contain" onError={(e) => { e.currentTarget.style.display = "none"; }} />
                   <div className="flex gap-2 flex-wrap justify-center">
@@ -3407,7 +2987,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                   <p className="text-xs text-muted-foreground text-center">{isAR ? "PNG/JPG · أقصى 2 MB" : "PNG/JPG · Max 2 MB"}</p>
                 </div>
                 <input ref={logoRef} type="file" accept="image/*" className="hidden" onChange={e => handleImageUpload(e, "logoBase64", setLogoPreview)} />
-              
+
                  <div className="space-y-2">
                   <label className="text-xs font-medium text-muted-foreground">
                     {isAR ? "حجم الشعار" : "Logo Size"}
@@ -3438,11 +3018,11 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                     className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm"
                   />
                 </div>   
-              
+
               </div>}
               {/* Stamp */}
               {canEditStamp && <div className="space-y-3">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{isAR ? "ختم الشركة" : "Company Stamp"}</p>
+                <p className="text-xs font-semibold text-muted-foreground ">{isAR ? "ختم الشركة" : "Company Stamp"}</p>
                 <div className="flex flex-col items-center justify-center gap-3 p-4 border-2 border-dashed border-border rounded-xl bg-muted/20 hover:bg-muted/30 transition-colors min-h-[160px]">
                   <img src={currentStampSrc} alt="stamp" className="h-16 w-auto object-contain" onError={(e) => { e.currentTarget.style.display = "none"; }} />
                   <div className="flex gap-2 flex-wrap justify-center">
@@ -3459,10 +3039,10 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                 </div>
                 <input ref={stampRef} type="file" accept="image/*" className="hidden" onChange={e => handleImageUpload(e, "stampBase64", setStampPreview)} />
               </div>}
-              
+
                 {/* Accountant Signature */}
                 {canEditAccountantSignature && <div className="space-y-3">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                <p className="text-xs font-semibold text-muted-foreground ">
                   {isAR ? "توقيع المحاسب" : "Accountant Signature"}
                 </p>
 
@@ -3524,7 +3104,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
 
               {/* Watermark */}
               {canEditBranding && <div className="space-y-3">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">{isAR ? "العلامة المائية" : "Watermark"}</p>
+                <p className="text-xs font-semibold text-muted-foreground ">{isAR ? "العلامة المائية" : "Watermark"}</p>
                 <div className="flex flex-col items-center justify-center gap-3 p-4 border-2 border-dashed border-purple-400/40 rounded-xl bg-purple-500/5 hover:bg-purple-500/10 transition-colors min-h-[160px]">
                   <img src={currentWatermarkSrc} alt="watermark" className="h-16 w-auto object-contain opacity-40" onError={(e) => { e.currentTarget.style.display = "none"; }} />
                   <div className="flex gap-2 flex-wrap justify-center">
@@ -3560,7 +3140,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                     logoSrc={currentLogoSrc}
                     isAR={isAR}
                     invoiceNumber="INV-PREVIEW"
-                    statusText="مسودة"
+                    statusText={isAR ? "مسودة" : "Draft"}
                   />
 
                   {/* Footer preview */}
@@ -3776,13 +3356,13 @@ const decryptBackupData = async (backupFile: any, password: string) => {
             </Section>
           )}
           {/* Info banner */}
-          {activeTab !== "preview" && (
+          {["company", "branding", "print"].includes(activeTab) && (
             <div className="flex items-start gap-3 p-4 bg-blue-500/5 border border-blue-500/20 rounded-2xl text-sm text-blue-700 dark:text-blue-300">
               <Info className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
               <p>
                 {isAR
-                  ? "جميع التغييرات تُطبَّق فوراً في كامل البرنامج وصفحات الطباعة عند الحفظ دون الحاجة لإعادة تشغيل."
-                  : "All changes are applied instantly across the entire app and print pages upon saving — no restart needed."}
+                  ? "احفظ التغييرات لتطبيق إعدادات الشركة والشعارات والطباعة في البرنامج والمستندات."
+                  : "Save changes to apply company, branding, and print settings to the application and documents."}
               </p>
             </div>
           )}
