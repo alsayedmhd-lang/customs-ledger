@@ -244,7 +244,8 @@ async function performInternalJournalPull(connectionString: string) {
 async function performInternalPush(connectionString: string, bidirectional = false) {
   ensureInternalSyncJournal();
   if (!sqlite) throw new Error("SQLite database is unavailable");
-  const changes = sqlite.prepare(`
+  const sqliteDb = sqlite;
+  const changes = sqliteDb.prepare(`
     SELECT id, table_name AS tableName, row_id AS rowId
     FROM internal_sync_journal ORDER BY id LIMIT 500
   `).all() as Array<{ id: number; tableName: string; rowId: number }>;
@@ -261,10 +262,10 @@ async function performInternalPush(connectionString: string, bidirectional = fal
   // beyond the watermark and will be processed on the next run.
   const snapshot = TABLES.map((table) => ({
     name: table,
-    columns: (sqlite.prepare(`PRAGMA table_info(${quote(table)})`).all() as Array<{ name: string }>).map((item) => item.name),
+    columns: (sqliteDb.prepare(`PRAGMA table_info(${quote(table)})`).all() as Array<{ name: string }>).map((item) => item.name),
     rows: [...(rowIds.get(table) || [])].map((id) => ({
       id,
-      row: sqlite.prepare(`SELECT * FROM ${quote(table)} WHERE id = ?`).get(id) as Record<string, unknown> | undefined,
+      row: sqliteDb.prepare(`SELECT * FROM ${quote(table)} WHERE id = ?`).get(id) as Record<string, unknown> | undefined,
     })),
   }));
   const client = new Client({ connectionString, connectionTimeoutMillis: 5000 });

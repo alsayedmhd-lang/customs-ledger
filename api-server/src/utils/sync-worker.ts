@@ -1092,6 +1092,43 @@ async function pullClientsFromOnline(client: any) {
           `Mapped local client ${existingLocalId} was not found`
         );
       }
+    const localUpdatedAt = existing.updatedAt
+      ? new Date(existing.updatedAt).getTime()
+      : 0;
+
+    const onlineUpdatedAt = onlineClient.updated_at
+      ? new Date(onlineClient.updated_at).getTime()
+      : 0;
+
+    if (localUpdatedAt > onlineUpdatedAt) {
+      clientIdMap.set(Number(onlineClient.id), existingLocalId);
+
+      console.log("[SYNC][PULL][CLIENT][SKIP_OLDER_ONLINE]", {
+        onlineClientId: onlineClient.id,
+        localClientId: existingLocalId,
+        localUpdatedAt,
+        onlineUpdatedAt,
+      });
+
+      continue;
+    }
+
+    if (
+      localUpdatedAt > 0 &&
+      onlineUpdatedAt > 0 &&
+      localUpdatedAt === onlineUpdatedAt
+    ) {
+      clientIdMap.set(Number(onlineClient.id), existingLocalId);
+
+      console.log("[SYNC][PULL][CLIENT][SKIP_SAME_TIMESTAMP]", {
+        onlineClientId: onlineClient.id,
+        localClientId: existingLocalId,
+        localUpdatedAt,
+        onlineUpdatedAt,
+      });
+
+      continue;
+    }
 
       sqlite
         .prepare(`
