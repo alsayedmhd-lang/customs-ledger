@@ -7,6 +7,15 @@ import { ensureMasterPasswordHashColumn } from "../utils/ensure-company-settings
 
 const router = Router();
 
+function normalizePrintFontSize(value: unknown, fallback: number) {
+  const size = Number(value ?? fallback);
+  return Number.isFinite(size) ? Math.max(8, Math.min(48, size)) : fallback;
+}
+
+function normalizePrintAlign(value: unknown): "left" | "center" | "right" {
+  return value === "left" || value === "right" ? value : "center";
+}
+
 function ensureCompanySettingsPrintTitleColumns() {
   if (!sqlite) return;
   const table = sqlite.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'company_settings'").get();
@@ -15,6 +24,20 @@ function ensureCompanySettingsPrintTitleColumns() {
   const columns = sqlite.prepare("PRAGMA table_info(company_settings)").all() as Array<{ name: string }>;
   const existing = new Set(columns.map((column) => column.name));
   const statements = [
+    ["receipt_title_ar", "ALTER TABLE company_settings ADD COLUMN receipt_title_ar TEXT DEFAULT 'سند قبض'"],
+    ["receipt_title_en", "ALTER TABLE company_settings ADD COLUMN receipt_title_en TEXT DEFAULT 'RECEIPT VOUCHER'"],
+    ["receipt_title_font_size", "ALTER TABLE company_settings ADD COLUMN receipt_title_font_size INTEGER DEFAULT 24"],
+    ["receipt_title_visible", "ALTER TABLE company_settings ADD COLUMN receipt_title_visible INTEGER DEFAULT 1"],
+    ["receipt_title_align", "ALTER TABLE company_settings ADD COLUMN receipt_title_align TEXT DEFAULT 'center'"],
+    ["receipt_title_bold", "ALTER TABLE company_settings ADD COLUMN receipt_title_bold INTEGER DEFAULT 1"],
+    ["receipt_subtitle_ar", "ALTER TABLE company_settings ADD COLUMN receipt_subtitle_ar TEXT DEFAULT ''"],
+    ["receipt_subtitle_en", "ALTER TABLE company_settings ADD COLUMN receipt_subtitle_en TEXT DEFAULT ''"],
+    ["receipt_subtitle_font_size", "ALTER TABLE company_settings ADD COLUMN receipt_subtitle_font_size INTEGER DEFAULT 12"],
+    ["invoice_title_en_font_size", "ALTER TABLE company_settings ADD COLUMN invoice_title_en_font_size INTEGER DEFAULT 14"],
+    ["receipt_title_en_font_size", "ALTER TABLE company_settings ADD COLUMN receipt_title_en_font_size INTEGER DEFAULT 12"],
+    ["statement_title_en_font_size", "ALTER TABLE company_settings ADD COLUMN statement_title_en_font_size INTEGER DEFAULT 14"],
+    ["customer_ledger_title_en_font_size", "ALTER TABLE company_settings ADD COLUMN customer_ledger_title_en_font_size INTEGER DEFAULT 14"],
+
     ["logo_height", "ALTER TABLE company_settings ADD COLUMN logo_height INTEGER DEFAULT 80"],
     ["invoice_title_visible", "ALTER TABLE company_settings ADD COLUMN invoice_title_visible INTEGER DEFAULT 1"],
     ["invoice_title_align", "ALTER TABLE company_settings ADD COLUMN invoice_title_align TEXT DEFAULT 'center'"],
@@ -66,6 +89,19 @@ router.get("/company-settings", async (_req, res) => {
 
     return res.json({
       ...safeSettings,
+      receiptTitleAr: (settings as any).receiptTitleAr ?? "سند قبض",
+      receiptTitleEn: (settings as any).receiptTitleEn ?? "RECEIPT VOUCHER",
+      receiptTitleFontSize: (settings as any).receiptTitleFontSize ?? 24,
+      receiptTitleVisible: (settings as any).receiptTitleVisible ?? true,
+      receiptTitleAlign: (settings as any).receiptTitleAlign ?? "center",
+      receiptTitleBold: (settings as any).receiptTitleBold ?? true,
+      receiptSubtitleAr: (settings as any).receiptSubtitleAr ?? "",
+      receiptSubtitleEn: (settings as any).receiptSubtitleEn ?? "",
+      receiptSubtitleFontSize: (settings as any).receiptSubtitleFontSize ?? 12,
+      invoiceTitleEnFontSize: (settings as any).invoiceTitleEnFontSize ?? 14,
+      receiptTitleEnFontSize: (settings as any).receiptTitleEnFontSize ?? 12,
+      statementTitleEnFontSize: (settings as any).statementTitleEnFontSize ?? 14,
+      customerLedgerTitleEnFontSize: (settings as any).customerLedgerTitleEnFontSize ?? 14,
       invoiceCashTitleAr: settings.invoiceCashTitleAr,
       invoiceCashTitleEn: settings.invoiceCashTitleEn,
       invoiceCreditTitleAr: settings.invoiceCreditTitleAr,
@@ -143,6 +179,19 @@ router.put("/company-settings", requireAdmin, async (req, res) => {
       showStampOnReceipts: body.showStampOnReceipts ?? false,
       showStampOnStatements: body.showStampOnStatements ?? false,
       footerText: body.footerText,
+      receiptTitleAr: body.receiptTitleAr ?? "سند قبض",
+      receiptTitleEn: body.receiptTitleEn ?? "RECEIPT VOUCHER",
+      receiptTitleFontSize: normalizePrintFontSize(body.receiptTitleFontSize, 24),
+      receiptTitleVisible: body.receiptTitleVisible ?? true,
+      receiptTitleAlign: normalizePrintAlign(body.receiptTitleAlign),
+      receiptTitleBold: body.receiptTitleBold ?? true,
+      receiptSubtitleAr: body.receiptSubtitleAr ?? "",
+      receiptSubtitleEn: body.receiptSubtitleEn ?? "",
+      receiptSubtitleFontSize: normalizePrintFontSize(body.receiptSubtitleFontSize, 12),
+      invoiceTitleEnFontSize: normalizePrintFontSize(body.invoiceTitleEnFontSize, 14),
+      receiptTitleEnFontSize: normalizePrintFontSize(body.receiptTitleEnFontSize, 12),
+      statementTitleEnFontSize: normalizePrintFontSize(body.statementTitleEnFontSize, 14),
+      customerLedgerTitleEnFontSize: normalizePrintFontSize(body.customerLedgerTitleEnFontSize, 14),
       invoiceCashTitleAr: body.invoiceCashTitleAr,
       invoiceCashTitleEn: body.invoiceCashTitleEn,
       invoiceCreditTitleAr: body.invoiceCreditTitleAr,

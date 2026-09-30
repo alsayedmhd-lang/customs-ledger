@@ -75,12 +75,12 @@ export default function StatementsIndex() {
 
     const totalInvoiced = invoices.reduce((sum, inv) => sum + inv.total, 0);
     const totalPaid = invoices.reduce(
-      (sum, inv) =>
-        sum +
-        Number((inv as Invoice & { advancePayment?: number }).advancePayment ?? 0) +
-        (receivedByInvoice.get(inv.id) ?? 0),
-      0,
-    );
+        (sum, inv) =>
+          sum +
+          Number((inv as Invoice & { advancePayment?: number }).advancePayment ?? 0) +
+          (receivedByInvoice.get(inv.id) ?? 0),
+          0,
+          );
     const balance = totalInvoiced - totalPaid;
 
     const lastInvoice = [...invoices].sort(

@@ -567,16 +567,9 @@ export default function ReceiptPrint() {
               </div>
             )}
             </div>
-          {/* <PrintDocumentFooter kind="receipt" reference={receipt.receiptNumber} />
-          <div className="hidden">
-            طُبع في{" "}
-            {new Date().toLocaleDateString("ar-EG-u-nu-latn", {
-              year: "numeric",
-              month: "long",
-              day: "numeric",
-            })}
-            {" — "} رقم السند: {receipt.receiptNumber}
-          </div> */}
+          {settings.footerText && (
+            <div className="px-6 py-1 text-center text-xs text-gray-500 whitespace-pre-line">{settings.footerText}</div>
+          )}
         </div>
     </A4PrintShell>
   );

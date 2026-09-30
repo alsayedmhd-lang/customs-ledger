@@ -81,6 +81,7 @@ export default function InvoicePrintHeader({
             titleAr={company.invoiceCreditTitleAr || "فاتورة نقداً / على الحساب"}
             titleEn={company.invoiceCreditTitleEn || "Cash / Credit Invoice"}
             titleFontSize={company.invoiceTitleFontSize || 30}
+            titleEnFontSize={company.invoiceTitleEnFontSize ?? 14}
             subtitleAr={company.invoiceSubtitleAr || ""}
             subtitleEn={company.invoiceSubtitleEn || ""}
             subtitleFontSize={company.invoiceSubtitleFontSize || 12}

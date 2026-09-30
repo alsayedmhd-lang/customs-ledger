@@ -312,9 +312,14 @@ router.get("/clients/:id/statement", async (req, res) => {
     const totalDue = invoices
       .filter((i) => i.status !== "cancelled")
       .reduce((sum, i) => sum + getOriginalInvoiceTotal(i), 0);
+    const filteredInvoiceIds = new Set(invoices.map((inv) => Number(inv.id)));
+    const filteredIssuedReceipts = issuedReceipts.filter((receipt) =>
+      !receipt.invoiceId || filteredInvoiceIds.has(Number(receipt.invoiceId))
+    );
+
     const totalPaid =
       invoices.reduce((sum, i) => sum + Number((i as any).advancePayment ?? 0), 0) +
-      issuedReceipts.reduce((sum, r) => sum + Number(r.amount ?? 0), 0);
+      filteredIssuedReceipts.reduce((sum, r) => sum + Number(r.amount ?? 0), 0);
 
     res.json({
       client: formatClient(client),

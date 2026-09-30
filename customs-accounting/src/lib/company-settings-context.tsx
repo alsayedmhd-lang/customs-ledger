@@ -31,6 +31,19 @@ export interface CompanySettings {
   loginFooterText: string;
   loginMessageText: string;
   loginMessageType: "welcome" | "notice" | "warning" | "quote";
+  receiptTitleAr: string;
+  receiptTitleEn: string;
+  receiptTitleFontSize: number;
+  receiptTitleVisible: boolean;
+  receiptTitleAlign: "left" | "center" | "right";
+  receiptTitleBold: boolean;
+  receiptSubtitleAr: string;
+  receiptSubtitleEn: string;
+  receiptSubtitleFontSize: number;
+  invoiceTitleEnFontSize: number;
+  receiptTitleEnFontSize: number;
+  statementTitleEnFontSize: number;
+  customerLedgerTitleEnFontSize: number;
   invoiceCashTitleAr: string;
   invoiceCashTitleEn: string;
   invoiceCreditTitleAr: string;
@@ -93,6 +106,19 @@ export const DEFAULT_SETTINGS: CompanySettings = {
   loginFooterText: "",
   loginMessageText: "",
   loginMessageType: "welcome",
+  receiptTitleAr: "سند قبض",
+  receiptTitleEn: "RECEIPT VOUCHER",
+  receiptTitleFontSize: 24,
+  receiptTitleVisible: true,
+  receiptTitleAlign: "center",
+  receiptTitleBold: true,
+  receiptSubtitleAr: "",
+  receiptSubtitleEn: "",
+  receiptSubtitleFontSize: 12,
+  invoiceTitleEnFontSize: 14,
+  receiptTitleEnFontSize: 12,
+  statementTitleEnFontSize: 14,
+  customerLedgerTitleEnFontSize: 14,
   invoiceCashTitleAr: "فاتورة نقداً",
   invoiceCashTitleEn: "Cash Invoice",
   invoiceCreditTitleAr: "فاتورة نقداً / على الحساب",

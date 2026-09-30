@@ -1,0 +1,708 @@
+--- a/customs-accounting/src/pages/settings/index.tsx
++++ b/customs-accounting/src/pages/settings/index.tsx
+@@ -2,6 +2,7 @@
+ import InvoicePrintHeader from "@/components/invoice-print-header";
+ import {
+   PrintDocumentFooter,
++  PrintTitleBlock,
+   PrintSignaturesStamp,
+   PrintWatermark,
+   ReceiptPrintHeader,
+@@ -66,99 +67,70 @@
+   );
+ }
+ 
+-type TitleDisplayOptions = {
+-  enabled: boolean;
+-  align: "left" | "center" | "right";
+-  bold: boolean;
+-  subtitleAr: string;
+-  subtitleEn: string;
+-  subtitleSize: number;
+-};
+-
+-function TitleOptionsGrid({
+-  title,
+-  isAR,
+-  value,
+-  onChange,
+-}: {
+-  title: string;
+-  isAR: boolean;
+-  value: TitleDisplayOptions;
+-  onChange: (next: TitleDisplayOptions) => void;
++function DocumentTitleEditor({ prefix, titlePrefix = prefix, label, isAR, form, setForm }: {
++  prefix: "invoice" | "receipt" | "statement" | "customerLedger";
++  titlePrefix?: string; label: string; isAR: boolean; form: any;
++  setForm: React.Dispatch<React.SetStateAction<any>>;
+ }) {
+-  const update = (patch: Partial<TitleDisplayOptions>) => onChange({ ...value, ...patch });
+-
++  const defaults = DEFAULT_SETTINGS as any;
++  const read = (suffix: string) => form[prefix + suffix] ?? defaults[prefix + suffix];
++  const titleAr = form[titlePrefix + "TitleAr"] ?? defaults[titlePrefix + "TitleAr"] ?? "";
++  const titleEn = form[titlePrefix + "TitleEn"] ?? defaults[titlePrefix + "TitleEn"] ?? "";
++  const set = (key: string, value: unknown) => setForm((current: any) => ({ ...current, [key]: value }));
++  const size = (value: string) => Math.max(8, Math.min(48, Number(value) || 8));
+   return (
+-    <div className="space-y-4">
+-      <div className="text-xs font-bold text-muted-foreground">{title}</div>
+-
++    <div className="space-y-5">
++      <h3 className="text-base font-semibold">{label}</h3>
++      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
++        <Field label={isAR ? "نص العنوان بالعربية" : "Arabic title text"}>
++          <input value={titleAr} dir="rtl" onChange={e => set(titlePrefix + "TitleAr", e.target.value)} className={inp} />
++        </Field>
++        <Field label={isAR ? "نص العنوان بالإنجليزية" : "English title text"}>
++          <input value={titleEn} dir="ltr" onChange={e => set(titlePrefix + "TitleEn", e.target.value)} className={inp} />
++        </Field>
++        <Field label={isAR ? "حجم خط العنوان العربي" : "Arabic title font size"}>
++          <input type="number" min={8} max={48} value={read("TitleFontSize")} onChange={e => set(prefix + "TitleFontSize", size(e.target.value))} className={inp} />
++        </Field>
++        <Field label={isAR ? "حجم خط العنوان الإنجليزي" : "English title font size"}>
++          <input type="number" min={8} max={48} value={read("TitleEnFontSize")} onChange={e => set(prefix + "TitleEnFontSize", size(e.target.value))} className={inp} />
++        </Field>
++      </div>
+       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+-        <div className="space-y-1">
+-          <div className="text-[11px] font-medium text-muted-foreground">{isAR ? "تفعيل" : "Toggle"}</div>
+-          <label className="flex items-center gap-2 rounded-xl border border-border bg-background px-3 py-2 text-sm">
+-            <input
+-              type="checkbox"
+-              checked={value.enabled}
+-              onChange={(e) => update({ enabled: e.target.checked })}
+-              className="h-4 w-4 accent-primary"
+-            />
+-            <span>{isAR ? "إظهار العنوان" : "Show title"}</span>
+-          </label>
+-        </div>
+-
+-        <Field label={isAR ? "المحاذاة" : "Align"}>
+-          <select
+-            value={value.align}
+-            onChange={(e) => update({ align: e.target.value as TitleDisplayOptions["align"] })}
+-            className={inp}
+-            dir="ltr"
+-          >
++        <label className="flex min-h-10 items-center gap-2 rounded-lg border border-border bg-background px-3 py-2">
++          <input type="checkbox" checked={!!read("TitleVisible")} onChange={e => set(prefix + "TitleVisible", e.target.checked)} className="h-4 w-4 accent-primary" />
++          {isAR ? "إظهار العنوان" : "Show title"}
++        </label>
++        <Field label={isAR ? "المحاذاة" : "Alignment"}>
++          <select value={read("TitleAlign")} onChange={e => set(prefix + "TitleAlign", e.target.value)} className={inp}>
+             <option value="right">{isAR ? "يمين" : "Right"}</option>
+             <option value="center">{isAR ? "وسط" : "Center"}</option>
+             <option value="left">{isAR ? "يسار" : "Left"}</option>
+           </select>
+         </Field>
+-
+-        <div className="space-y-1">
+-          <div className="text-[11px] font-medium text-muted-foreground">{isAR ? "عريض" : "Bold"}</div>
+-          <label className="flex items-center gap-2 rounded-xl border border-border bg-background px-3 py-2 text-sm">
+-            <input
+-              type="checkbox"
+-              checked={value.bold}
+-              onChange={(e) => update({ bold: e.target.checked })}
+-              className="h-4 w-4 accent-primary"
+-            />
+-            <span>{isAR ? "عريض" : "Bold"}</span>
+-          </label>
++        <label className="flex min-h-10 items-center gap-2 rounded-lg border border-border bg-background px-3 py-2">
++          <input type="checkbox" checked={!!read("TitleBold")} onChange={e => set(prefix + "TitleBold", e.target.checked)} className="h-4 w-4 accent-primary" />
++          {isAR ? "خط عريض" : "Bold title"}
++        </label>
++      </div>
++      <details className="rounded-xl border border-border bg-background">
++        <summary className="cursor-pointer px-4 py-3 text-sm font-medium">{isAR ? "سطر إضافي تحت العنوان (اختياري)" : "Additional subtitle (optional)"}</summary>
++        <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_120px] gap-4 p-4 pt-0">
++          <Field label={isAR ? "السطر الإضافي بالعربية" : "Arabic subtitle"}>
++            <input value={read("SubtitleAr") || ""} dir="rtl" onChange={e => set(prefix + "SubtitleAr", e.target.value)} placeholder={isAR ? "لا يظهر عند تركه فارغًا" : "Hidden when empty"} className={inp} />
++          </Field>
++          <Field label={isAR ? "السطر الإضافي بالإنجليزية" : "English subtitle"}>
++            <input value={read("SubtitleEn") || ""} dir="ltr" onChange={e => set(prefix + "SubtitleEn", e.target.value)} placeholder={isAR ? "لا يظهر عند تركه فارغًا" : "Hidden when empty"} className={inp} />
++          </Field>
++          <Field label={isAR ? "حجم الخط" : "Font size"}>
++            <input type="number" min={8} max={48} value={read("SubtitleFontSize")} onChange={e => set(prefix + "SubtitleFontSize", size(e.target.value))} className={inp} />
++          </Field>
+         </div>
+-      </div>
+-
+-      <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_120px] gap-4">
+-        <Field label={isAR ? "العربية" : "Arabic"}>
+-          <input
+-            value={value.subtitleAr}
+-            onChange={(e) => update({ subtitleAr: e.target.value })}
+-            className={inp}
+-          />
+-        </Field>
+-
+-        <Field label={isAR ? "English" : "English"}>
+-          <input
+-            value={value.subtitleEn}
+-            onChange={(e) => update({ subtitleEn: e.target.value })}
+-            className={inp}
+-            dir="ltr"
+-          />
+-        </Field>
+-
+-        <Field label={isAR ? "الحجم" : "Size"}>
+-          <input
+-            type="number"
+-            value={value.subtitleSize}
+-            onChange={(e) => update({ subtitleSize: Number(e.target.value) })}
+-            className={inp}
+-          />
+-        </Field>
++      </details>
++      <div className="rounded-xl border border-border bg-muted/20 p-4">
++        <p className="mb-3 text-sm font-medium text-muted-foreground">{isAR ? "معاينة مباشرة للنص وحجم الخط" : "Live text and font size preview"}</p>
++        <div className="rounded-lg border border-gray-200 bg-white p-5 text-gray-900 overflow-auto">
++          {read("TitleVisible") ? <PrintTitleBlock visible align={read("TitleAlign")} bold={!!read("TitleBold")} titleAr={titleAr} titleEn={titleEn} titleFontSize={Number(read("TitleFontSize"))} titleEnFontSize={Number(read("TitleEnFontSize"))} subtitleAr={read("SubtitleAr")} subtitleEn={read("SubtitleEn")} subtitleFontSize={Number(read("SubtitleFontSize"))} /> : <p className="text-center text-sm text-gray-500">{isAR ? "العنوان مخفي في الطباعة" : "Title hidden in print"}</p>}
++        </div>
+       </div>
+     </div>
+   );
+@@ -1520,10 +1492,6 @@
+             logoHeight: Number((settings as CompanySettings & { logoHeight?: number }).logoHeight ?? 0),
+             stampBase64: settings.stampBase64 ?? null,
+             watermarkBase64: settings.watermarkBase64 ?? null,
+-            showWatermark: settings.showWatermark ?? true,
+-            showStampOnInvoices: settings.showStampOnInvoices ?? true,
+-            showStampOnReceipts: settings.showStampOnReceipts ?? true,
+-            showStampOnStatements: settings.showStampOnStatements ?? true,
+           });
+         }
+ 
+@@ -3141,7 +3109,6 @@
+                 .ledger-print-tools input:not([type="checkbox"]), .ledger-print-tools select { min-height: 40px; font-size: 14px; border-radius: 8px; }
+                 .ledger-print-tools input[type="number"] { width: 120px; max-width: 100%; }
+                 .ledger-print-tools textarea { font-size: 14px; line-height: 1.6; border-radius: 8px; }
+-                .ledger-print-tools .text-xs, .ledger-print-tools .text-sm { font-size: 14px; line-height: 20px; }
+               `}</style>
+               <div className="space-y-4">
+ 
+@@ -3159,15 +3126,13 @@
+                   ))}
+                 </div>
+                 {[
+-                  { field: "showWatermark" as const, labelAr: "إظهار العلامة المائية في صفحات الطباعة", labelEn: "Show watermark on print pages", icon: Eye },
+                   { field: "showStampOnInvoices" as const, labelAr: "إظهار الختم على الفواتير", labelEn: "Show stamp on invoices", icon: Stamp },
+                   { field: "showStampOnReceipts" as const, labelAr: "إظهار الختم على سندات القبض", labelEn: "Show stamp on receipts", icon: Stamp },
+                   { field: "showStampOnStatements" as const, labelAr: "إظهار الختم على كشوف الحساب", labelEn: "Show stamp on statements", icon: Stamp },
+                 ].filter(({ field }) =>
+                   (printTab === "invoice" && field === "showStampOnInvoices") ||
+                   (printTab === "receipt" && field === "showStampOnReceipts") ||
+-                  (printTab === "statement" && field === "showStampOnStatements") ||
+-                  (printTab === "common" && field === "showWatermark")
++                  (printTab === "statement" && field === "showStampOnStatements")
+                 ).map(({ field, labelAr, labelEn, icon: Icon }) => (
+                   <div key={field} className="flex items-center justify-between gap-4 p-3 rounded-xl hover:bg-muted/30 transition-colors">
+                     <div className="flex items-center gap-3">
+@@ -3181,216 +3146,45 @@
+                 ))}
+ 
+                 <div id="print-panel-invoice" role="tabpanel" aria-labelledby="print-tab-invoice" hidden={printTab !== "invoice"} className="space-y-5">
+-                <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_120px] gap-4">
+-                <Field label={isAR ? "عنوان الفاتورة الأساسي" : "Main Invoice Title"}>
+-                  <input
+-                    value={form.invoiceCreditTitleAr}
+-                    onChange={e => setForm(p => ({ ...p, invoiceCreditTitleAr: e.target.value }))}
+-                    className={inp}
+-                  />
+-                </Field>
+-
+-                <Field label={isAR ? "عنوان الفاتورة الفرعي" : "Sub Invoice Title"}>
+-                  <input
+-                    value={form.invoiceCreditTitleEn}
+-                    onChange={e => setForm(p => ({ ...p, invoiceCreditTitleEn: e.target.value }))}
+-                    className={inp}
+-                  />
+-                </Field>
+-
+-                <Field label={isAR ? "حجم عنوان الفاتورة" : "Invoice Title Font Size"}>
+-                  <input
+-                    type="number"
+-                    value={form.invoiceTitleFontSize}
+-                    onChange={e => setForm(p => ({ ...p, invoiceTitleFontSize: Number(e.target.value) }))}
+-                    className={inp}
+-                  />
+-                </Field>
+-
+-                </div>
+-                <TitleOptionsGrid
+-                  title={isAR ? "خصائص عنوان الفاتورة" : "Invoice Title Properties"}
+-                  isAR={isAR}
+-                  value={{
+-                    enabled: !!form.invoiceTitleVisible,
+-                    align: form.invoiceTitleAlign || "center",
+-                    bold: !!form.invoiceTitleBold,
+-                    subtitleAr: form.invoiceSubtitleAr || "",
+-                    subtitleEn: form.invoiceSubtitleEn || "",
+-                    subtitleSize: Number(form.invoiceSubtitleFontSize ?? 12),
+-                  }}
+-                  onChange={(next) =>
+-                    setForm((p) => ({
+-                      ...p,
+-                      invoiceTitleVisible: next.enabled,
+-                      invoiceTitleAlign: next.align,
+-                      invoiceTitleBold: next.bold,
+-                      invoiceSubtitleAr: next.subtitleAr,
+-                      invoiceSubtitleEn: next.subtitleEn,
+-                      invoiceSubtitleFontSize: next.subtitleSize,
+-                    }))
+-                  }
+-                />
+-
+-                <details className="rounded-xl border border-border bg-background">
+-                  <summary className="cursor-pointer px-4 py-3 text-sm font-medium">{isAR ? "معاينة رأس الفاتورة" : "Invoice header preview"}</summary>
+-                {/* Invoice Preview */}
+-                <div
+-                  className="bg-white rounded-xl shadow-inner border border-gray-200 overflow-hidden mb-4 p-4 space-y-4"
+-                  style={{ fontFamily: "'Cairo', sans-serif" }}
+-                >
+-                  <InvoicePrintHeader
+-                    company={form}
+-                    logoSrc={currentLogoSrc}
+-                    isAR={isAR}
+-                    invoiceNumber="INV-PREVIEW"
+-                    statusText={isAR ? "مسودة" : "Draft"}
+-                  />
+-
+-                  {/* Footer preview */}
+-                  {form.footerText && (
+-                    <div className="text-center text-xs text-gray-500 border-t pt-2">
+-                      {form.footerText}
++                  <DocumentTitleEditor prefix="invoice" titlePrefix="invoiceCredit" label={isAR ? "عنوان الفاتورة" : "Invoice title"} isAR={isAR} form={form} setForm={setForm} />
++                  <details className="rounded-xl border border-border bg-background">
++                    <summary className="cursor-pointer px-4 py-3 text-sm font-medium">{isAR ? "معاينة رأس الفاتورة" : "Invoice header preview"}</summary>
++                    <div className="overflow-auto rounded-b-xl bg-white p-4 text-gray-900"><InvoicePrintHeader company={form} logoSrc={currentLogoSrc} isAR={isAR} invoiceNumber="INV-PREVIEW" statusText={isAR ? "مسودة" : "Draft"} /></div>
++                  </details>
++                </div>
++                <div id="print-panel-receipt" role="tabpanel" aria-labelledby="print-tab-receipt" hidden={printTab !== "receipt"} className="space-y-5">
++                  <DocumentTitleEditor prefix="receipt" titlePrefix="receipt" label={isAR ? "عنوان سند القبض" : "Receipt title"} isAR={isAR} form={form} setForm={setForm} />
++                  <details className="rounded-xl border border-border bg-background">
++                    <summary className="cursor-pointer px-4 py-3 text-sm font-medium">{isAR ? "معاينة رأس سند القبض" : "Receipt header preview"}</summary>
++                    <div className="overflow-auto rounded-b-xl bg-white text-gray-900"><ReceiptPrintHeader receiptNumber="RCP-PREVIEW" override={{ settings: form, logoSrc: currentLogoSrc }} /></div>
++                  </details>
++                </div>
++                <div id="print-panel-statement" role="tabpanel" aria-labelledby="print-tab-statement" hidden={printTab !== "statement"} className="space-y-5">
++                  <DocumentTitleEditor prefix="statement" titlePrefix="statement" label={isAR ? "عنوان كشف الحساب" : "Statement title"} isAR={isAR} form={form} setForm={setForm} />
++                </div>
++                <div id="print-panel-ledger" role="tabpanel" aria-labelledby="print-tab-ledger" hidden={printTab !== "ledger"} className="space-y-5">
++                  <DocumentTitleEditor prefix="customerLedger" titlePrefix="customerLedger" label={isAR ? "عنوان ملخص العميل المالي" : "Customer summary title"} isAR={isAR} form={form} setForm={setForm} />
++                </div>
++                <div id="print-panel-common" role="tabpanel" aria-labelledby="print-tab-common" hidden={printTab !== "common"} className="space-y-5">
++                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
++                    <div className="rounded-xl border border-border bg-muted/20 p-4 space-y-3">
++                      <h3 className="text-base font-semibold">{isAR ? "العلامة المائية" : "Watermark"}</h3>
++                      <div className="flex items-center justify-between gap-3"><span className="text-sm">{isAR ? "إظهارها في صفحات الطباعة" : "Show on print pages"}</span><Toggle field="showWatermark" /></div>
++                      <p className="text-sm text-muted-foreground">{isAR ? "تؤثر في الفواتير وسندات القبض والكشوف. تُرفع الصورة من تبويب الشعارات." : "Applies to invoices, receipts and statements. Upload the image in Branding."}</p>
+                     </div>
+-                  )}
+-
+-                  {/* Stamp preview */}
+-                  {form.showStampOnInvoices && currentStampSrc && (
+-                    <div className="flex justify-center pt-3">
+-                      <img
+-                        src={currentStampSrc}
+-                        alt="stamp"
+-                        className="h-16 opacity-90 object-contain drop-shadow-sm"
+-                      />
++                    <div className="rounded-xl border border-border bg-muted/20 p-4 space-y-3">
++                      <h3 className="text-base font-semibold">{isAR ? "التوقيعات" : "Signatures"}</h3>
++                      {canEditAccountantSignature && <div className="flex items-center justify-between gap-3"><span className="text-sm">{isAR ? "إظهار توقيع المحاسب" : "Show accountant signature"}</span><Toggle field="showAccountantSignature" /></div>}
++                      <div className="flex items-center justify-between gap-3"><span className="text-sm">{isAR ? "إظهار توقيع المستلم" : "Show receiver signature"}</span><Toggle field="showReceiverSignature" /></div>
++                      <p className="text-sm text-muted-foreground">{isAR ? "تؤثر في المستندات التي تعرض التوقيعات، مع مراعاة خيار إظهار التوقيعات داخل معاينة الطباعة." : "Applies where signatures are supported, subject to the signature toggle in print preview."}</p>
+                     </div>
+-                  )}
+-                </div>
+-
+-                </details>
+-                </div>
+-                <div id="print-panel-receipt" role="tabpanel" aria-labelledby="print-tab-receipt" hidden={printTab !== "receipt"} className="space-y-5">
+-                  <p className="text-sm text-muted-foreground">{isAR ? "اضبط ظهور الختم على سندات القبض من الخيار أعلاه. تُدار صور الختم والتوقيع من تبويب الشعارات." : "Use the option above to control the receipt stamp. Stamp and signature images are managed in Branding."}</p>
+-                </div>
+-                <div id="print-panel-statement" role="tabpanel" aria-labelledby="print-tab-statement" hidden={printTab !== "statement"} className="space-y-5">
+-                <div className="space-y-2">
+-                  <div className="text-xs font-bold text-muted-foreground">
+-                    {isAR ? "عنوان كشف الحساب" : "Statement Title"}
+                   </div>
+-                  <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_120px] gap-4">
+-                    <Field label={isAR ? "عربي" : "Arabic"}>
+-                      <input
+-                        value={form.statementTitleAr}
+-                        onChange={e => setForm(p => ({ ...p, statementTitleAr: e.target.value }))}
+-                        className={inp}
+-                      />
+-                    </Field>
+-
+-                    <Field label="English">
+-                      <input
+-                        value={form.statementTitleEn}
+-                        onChange={e => setForm(p => ({ ...p, statementTitleEn: e.target.value }))}
+-                        className={inp}
+-                      />
+-                    </Field>
+-
+-                    <Field label={isAR ? "الحجم" : "Size"}>
+-                      <input
+-                        type="number"
+-                        value={form.statementTitleFontSize}
+-                        onChange={e => setForm(p => ({ ...p, statementTitleFontSize: Number(e.target.value) }))}
+-                        className={inp}
+-                      />
+-                    </Field>
+-                  </div>
+-                </div>
+-
+-                <TitleOptionsGrid
+-                  title={isAR ? "خصائص عنوان كشف الحساب" : "Statement Title Properties"}
+-                  isAR={isAR}
+-                  value={{
+-                    enabled: !!form.statementTitleVisible,
+-                    align: form.statementTitleAlign || "center",
+-                    bold: !!form.statementTitleBold,
+-                    subtitleAr: form.statementSubtitleAr || "",
+-                    subtitleEn: form.statementSubtitleEn || "",
+-                    subtitleSize: Number(form.statementSubtitleFontSize ?? 12),
+-                  }}
+-                  onChange={(next) =>
+-                    setForm((p) => ({
+-                      ...p,
+-                      statementTitleVisible: next.enabled,
+-                      statementTitleAlign: next.align,
+-                      statementTitleBold: next.bold,
+-                      statementSubtitleAr: next.subtitleAr,
+-                      statementSubtitleEn: next.subtitleEn,
+-                      statementSubtitleFontSize: next.subtitleSize,
+-                    }))
+-                  }
+-                />
+-
+-                </div>
+-                <div id="print-panel-ledger" role="tabpanel" aria-labelledby="print-tab-ledger" hidden={printTab !== "ledger"} className="space-y-5">
+-                <div className="space-y-2">
+-                  <div className="text-xs font-bold text-muted-foreground">
+-                    {isAR ? "عنوان ملخص العميل المالي" : "Customer Financial Summary Title"}
+-                  </div>
+-                  <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_120px] gap-4">
+-                    <Field label={isAR ? "عربي" : "Arabic"}>
+-                      <input
+-                        value={form.customerLedgerTitleAr}
+-                        onChange={e => setForm(p => ({ ...p, customerLedgerTitleAr: e.target.value }))}
+-                        className={inp}
+-                      />
+-                    </Field>
+-
+-                    <Field label="English">
+-                      <input
+-                        value={form.customerLedgerTitleEn}
+-                        onChange={e => setForm(p => ({ ...p, customerLedgerTitleEn: e.target.value }))}
+-                        className={inp}
+-                      />
+-                    </Field>
+-
+-                    <Field label={isAR ? "الحجم" : "Size"}>
+-                      <input
+-                        type="number"
+-                        value={form.customerLedgerTitleFontSize}
+-                        onChange={e => setForm(p => ({ ...p, customerLedgerTitleFontSize: Number(e.target.value) }))}
+-                        className={inp}
+-                      />
+-                    </Field>
+-                  </div>
+-                </div>
+-
+-                <TitleOptionsGrid
+-                  title={isAR ? "خصائص عنوان ملخص العميل المالي" : "Customer Financial Summary Title Properties"}
+-                  isAR={isAR}
+-                  value={{
+-                    enabled: !!form.customerLedgerTitleVisible,
+-                    align: form.customerLedgerTitleAlign || "center",
+-                    bold: !!form.customerLedgerTitleBold,
+-                    subtitleAr: form.customerLedgerSubtitleAr || "",
+-                    subtitleEn: form.customerLedgerSubtitleEn || "",
+-                    subtitleSize: Number(form.customerLedgerSubtitleFontSize ?? 12),
+-                  }}
+-                  onChange={(next) =>
+-                    setForm((p) => ({
+-                      ...p,
+-                      customerLedgerTitleVisible: next.enabled,
+-                      customerLedgerTitleAlign: next.align,
+-                      customerLedgerTitleBold: next.bold,
+-                      customerLedgerSubtitleAr: next.subtitleAr,
+-                      customerLedgerSubtitleEn: next.subtitleEn,
+-                      customerLedgerSubtitleFontSize: next.subtitleSize,
+-                    }))
+-                  }
+-                />
+-
+-                </div>
+-                <div id="print-panel-common" role="tabpanel" aria-labelledby="print-tab-common" hidden={printTab !== "common"} className="space-y-5">
++                  <div className="rounded-xl border border-border bg-muted/20 p-4 space-y-4">
++                    <h3 className="text-base font-semibold">{isAR ? "تذييل المستندات" : "Document footer"}</h3>
++
+                 <Field
+                   label={isAR ? "نص التذييل في صفحات الطباعة" : "Footer text on print pages"}
+-                  hint={isAR ? "يظهر في أسفل كل فاتورة وسند" : "Appears at the bottom of each invoice and receipt"}
++                  hint={isAR ? "نص مشترك يظهر في تذييل المستندات التي تستخدم إعدادات الطباعة" : "Shared text displayed in document print footers"}
+                 >
+                   <textarea
+                     value={form.footerText}
+@@ -3400,6 +3194,8 @@
+                     placeholder={isAR ? "مثال: شكراً لتعاملكم معنا · جميع الأسعار شاملة الضريبة" : "e.g. Thank you for your business"}
+                   />
+                 </Field>
++                    {form.footerText && <div className="rounded-lg border border-gray-200 bg-white p-4 text-center text-xs text-gray-500 whitespace-pre-line">{form.footerText}</div>}
++                  </div>
+                 </div>
+               </div>
+             </Section>
+--- a/customs-accounting/src/lib/company-settings-context.tsx
++++ b/customs-accounting/src/lib/company-settings-context.tsx
+@@ -31,6 +31,19 @@
+   loginFooterText: string;
+   loginMessageText: string;
+   loginMessageType: "welcome" | "notice" | "warning" | "quote";
++  receiptTitleAr: string;
++  receiptTitleEn: string;
++  receiptTitleFontSize: number;
++  receiptTitleVisible: boolean;
++  receiptTitleAlign: "left" | "center" | "right";
++  receiptTitleBold: boolean;
++  receiptSubtitleAr: string;
++  receiptSubtitleEn: string;
++  receiptSubtitleFontSize: number;
++  invoiceTitleEnFontSize: number;
++  receiptTitleEnFontSize: number;
++  statementTitleEnFontSize: number;
++  customerLedgerTitleEnFontSize: number;
+   invoiceCashTitleAr: string;
+   invoiceCashTitleEn: string;
+   invoiceCreditTitleAr: string;
+@@ -93,6 +106,19 @@
+   loginFooterText: "",
+   loginMessageText: "",
+   loginMessageType: "welcome",
++  receiptTitleAr: "سند قبض",
++  receiptTitleEn: "RECEIPT VOUCHER",
++  receiptTitleFontSize: 24,
++  receiptTitleVisible: true,
++  receiptTitleAlign: "center",
++  receiptTitleBold: true,
++  receiptSubtitleAr: "",
++  receiptSubtitleEn: "",
++  receiptSubtitleFontSize: 12,
++  invoiceTitleEnFontSize: 14,
++  receiptTitleEnFontSize: 12,
++  statementTitleEnFontSize: 14,
++  customerLedgerTitleEnFontSize: 14,
+   invoiceCashTitleAr: "فاتورة نقداً",
+   invoiceCashTitleEn: "Cash Invoice",
+   invoiceCreditTitleAr: "فاتورة نقداً / على الحساب",
+--- a/customs-accounting/src/components/print-document-parts.tsx
++++ b/customs-accounting/src/components/print-document-parts.tsx
+@@ -20,6 +20,7 @@
+   titleAr,
+   titleEn,
+   titleFontSize = 18,
++  titleEnFontSize = 14,
+   subtitleAr,
+   subtitleEn,
+   subtitleFontSize = 12,
+@@ -31,6 +32,7 @@
+   titleAr?: string | null;
+   titleEn?: string | null;
+   titleFontSize?: number;
++  titleEnFontSize?: number;
+   subtitleAr?: string | null;
+   subtitleEn?: string | null;
+   subtitleFontSize?: number;
+@@ -45,7 +47,7 @@
+       {(titleAr || titleEn) && (
+         <div style={{ textAlign: align, fontWeight: bold ? 700 : 400, fontSize: titleFontSize, lineHeight: 1.15 }}>
+           {titleAr && <div>{titleAr}</div>}
+-          {titleEn && <div className="text-sm font-normal text-gray-600" dir="ltr">{titleEn}</div>}
++          {titleEn && <div className="text-gray-600" style={{ fontSize: titleEnFontSize, fontWeight: bold ? 700 : 400 }} dir="ltr">{titleEn}</div>}
+         </div>
+       )}
+ 
+@@ -126,15 +128,19 @@
+             className="h-20 w-auto object-contain"
+           />
+ 
+-          <div className="text-center">
+-            <div className="font-black text-gray-900 text-2xl leading-tight">
+-              سند قبض
+-            </div>
+-
+-            <div className="text-gray-500 text-xs font-bold tracking-wide">
+-              RECEIPT VOUCHER
+-            </div>
+-          </div>
++          <PrintTitleBlock
++            visible={settings.receiptTitleVisible ?? true}
++            align={settings.receiptTitleAlign || "center"}
++            bold={settings.receiptTitleBold ?? true}
++            titleAr={settings.receiptTitleAr ?? "سند قبض"}
++            titleEn={settings.receiptTitleEn ?? "RECEIPT VOUCHER"}
++            titleFontSize={settings.receiptTitleFontSize ?? 24}
++            titleEnFontSize={settings.receiptTitleEnFontSize ?? 12}
++            subtitleAr={settings.receiptSubtitleAr || ""}
++            subtitleEn={settings.receiptSubtitleEn || ""}
++            subtitleFontSize={settings.receiptSubtitleFontSize ?? 12}
++            className="w-full text-gray-900"
++          />
+         </div>
+ 
+         <div className="text-left" dir="ltr">
+@@ -196,6 +202,7 @@
+   const { settings, logoSrc } = usePrintSettings(override);
+   const resolvedTitleAr = titleAr || settings.statementTitleAr || "كشف حساب";
+   const resolvedTitleEn = titleEn || settings.statementTitleEn || "Statement";
++  const resolvedTitleEnFontSize = (titleAr === settings.customerLedgerTitleAr ? settings.customerLedgerTitleEnFontSize : settings.statementTitleEnFontSize) ?? 14;
+   const resolvedTitleFontSize = titleFontSize || settings.statementTitleFontSize || 18;
+   const resolvedTitleVisible = titleVisible ?? settings.statementTitleVisible ?? true;
+   const resolvedTitleAlign = titleAlign || settings.statementTitleAlign || "center";
+@@ -249,6 +256,7 @@
+             titleAr={resolvedTitleAr}
+             titleEn={resolvedTitleEn}
+             titleFontSize={resolvedTitleFontSize}
++            titleEnFontSize={resolvedTitleEnFontSize}
+             subtitleAr={resolvedSubtitleAr}
+             subtitleEn={resolvedSubtitleEn}
+             subtitleFontSize={resolvedSubtitleFontSize}
+--- a/customs-accounting/src/components/invoice-print-header.tsx
++++ b/customs-accounting/src/components/invoice-print-header.tsx
+@@ -81,6 +81,7 @@
+             titleAr={company.invoiceCreditTitleAr || "فاتورة نقداً / على الحساب"}
+             titleEn={company.invoiceCreditTitleEn || "Cash / Credit Invoice"}
+             titleFontSize={company.invoiceTitleFontSize || 30}
++            titleEnFontSize={company.invoiceTitleEnFontSize ?? 14}
+             subtitleAr={company.invoiceSubtitleAr || ""}
+             subtitleEn={company.invoiceSubtitleEn || ""}
+             subtitleFontSize={company.invoiceSubtitleFontSize || 12}
+--- a/customs-accounting/src/pages/receipts/print.tsx
++++ b/customs-accounting/src/pages/receipts/print.tsx
+@@ -567,16 +567,9 @@
+               </div>
+             )}
+             </div>
+-          {/* <PrintDocumentFooter kind="receipt" reference={receipt.receiptNumber} />
+-          <div className="hidden">
+-            طُبع في{" "}
+-            {new Date().toLocaleDateString("ar-EG-u-nu-latn", {
+-              year: "numeric",
+-              month: "long",
+-              day: "numeric",
+-            })}
+-            {" — "} رقم السند: {receipt.receiptNumber}
+-          </div> */}
++          {settings.footerText && (
++            <div className="px-6 py-1 text-center text-xs text-gray-500 whitespace-pre-line">{settings.footerText}</div>
++          )}
+         </div>
+     </A4PrintShell>
+   );
+--- a/api-server/src/routes/company-settings.ts
++++ b/api-server/src/routes/company-settings.ts
+@@ -7,6 +7,15 @@
+ 
+ const router = Router();
+ 
++function normalizePrintFontSize(value: unknown, fallback: number) {
++  const size = Number(value ?? fallback);
++  return Number.isFinite(size) ? Math.max(8, Math.min(48, size)) : fallback;
++}
++
++function normalizePrintAlign(value: unknown): "left" | "center" | "right" {
++  return value === "left" || value === "right" ? value : "center";
++}
++
+ function ensureCompanySettingsPrintTitleColumns() {
+   if (!sqlite) return;
+   const table = sqlite.prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'company_settings'").get();
+@@ -15,6 +24,20 @@
+   const columns = sqlite.prepare("PRAGMA table_info(company_settings)").all() as Array<{ name: string }>;
+   const existing = new Set(columns.map((column) => column.name));
+   const statements = [
++    ["receipt_title_ar", "ALTER TABLE company_settings ADD COLUMN receipt_title_ar TEXT DEFAULT 'سند قبض'"],
++    ["receipt_title_en", "ALTER TABLE company_settings ADD COLUMN receipt_title_en TEXT DEFAULT 'RECEIPT VOUCHER'"],
++    ["receipt_title_font_size", "ALTER TABLE company_settings ADD COLUMN receipt_title_font_size INTEGER DEFAULT 24"],
++    ["receipt_title_visible", "ALTER TABLE company_settings ADD COLUMN receipt_title_visible INTEGER DEFAULT 1"],
++    ["receipt_title_align", "ALTER TABLE company_settings ADD COLUMN receipt_title_align TEXT DEFAULT 'center'"],
++    ["receipt_title_bold", "ALTER TABLE company_settings ADD COLUMN receipt_title_bold INTEGER DEFAULT 1"],
++    ["receipt_subtitle_ar", "ALTER TABLE company_settings ADD COLUMN receipt_subtitle_ar TEXT DEFAULT ''"],
++    ["receipt_subtitle_en", "ALTER TABLE company_settings ADD COLUMN receipt_subtitle_en TEXT DEFAULT ''"],
++    ["receipt_subtitle_font_size", "ALTER TABLE company_settings ADD COLUMN receipt_subtitle_font_size INTEGER DEFAULT 12"],
++    ["invoice_title_en_font_size", "ALTER TABLE company_settings ADD COLUMN invoice_title_en_font_size INTEGER DEFAULT 14"],
++    ["receipt_title_en_font_size", "ALTER TABLE company_settings ADD COLUMN receipt_title_en_font_size INTEGER DEFAULT 12"],
++    ["statement_title_en_font_size", "ALTER TABLE company_settings ADD COLUMN statement_title_en_font_size INTEGER DEFAULT 14"],
++    ["customer_ledger_title_en_font_size", "ALTER TABLE company_settings ADD COLUMN customer_ledger_title_en_font_size INTEGER DEFAULT 14"],
++
+     ["logo_height", "ALTER TABLE company_settings ADD COLUMN logo_height INTEGER DEFAULT 80"],
+     ["invoice_title_visible", "ALTER TABLE company_settings ADD COLUMN invoice_title_visible INTEGER DEFAULT 1"],
+     ["invoice_title_align", "ALTER TABLE company_settings ADD COLUMN invoice_title_align TEXT DEFAULT 'center'"],
+@@ -66,6 +89,19 @@
+ 
+     return res.json({
+       ...safeSettings,
++      receiptTitleAr: (settings as any).receiptTitleAr ?? "سند قبض",
++      receiptTitleEn: (settings as any).receiptTitleEn ?? "RECEIPT VOUCHER",
++      receiptTitleFontSize: (settings as any).receiptTitleFontSize ?? 24,
++      receiptTitleVisible: (settings as any).receiptTitleVisible ?? true,
++      receiptTitleAlign: (settings as any).receiptTitleAlign ?? "center",
++      receiptTitleBold: (settings as any).receiptTitleBold ?? true,
++      receiptSubtitleAr: (settings as any).receiptSubtitleAr ?? "",
++      receiptSubtitleEn: (settings as any).receiptSubtitleEn ?? "",
++      receiptSubtitleFontSize: (settings as any).receiptSubtitleFontSize ?? 12,
++      invoiceTitleEnFontSize: (settings as any).invoiceTitleEnFontSize ?? 14,
++      receiptTitleEnFontSize: (settings as any).receiptTitleEnFontSize ?? 12,
++      statementTitleEnFontSize: (settings as any).statementTitleEnFontSize ?? 14,
++      customerLedgerTitleEnFontSize: (settings as any).customerLedgerTitleEnFontSize ?? 14,
+       invoiceCashTitleAr: settings.invoiceCashTitleAr,
+       invoiceCashTitleEn: settings.invoiceCashTitleEn,
+       invoiceCreditTitleAr: settings.invoiceCreditTitleAr,
+@@ -143,6 +179,19 @@
+       showStampOnReceipts: body.showStampOnReceipts ?? false,
+       showStampOnStatements: body.showStampOnStatements ?? false,
+       footerText: body.footerText,
++      receiptTitleAr: body.receiptTitleAr ?? "سند قبض",
++      receiptTitleEn: body.receiptTitleEn ?? "RECEIPT VOUCHER",
++      receiptTitleFontSize: normalizePrintFontSize(body.receiptTitleFontSize, 24),
++      receiptTitleVisible: body.receiptTitleVisible ?? true,
++      receiptTitleAlign: normalizePrintAlign(body.receiptTitleAlign),
++      receiptTitleBold: body.receiptTitleBold ?? true,
++      receiptSubtitleAr: body.receiptSubtitleAr ?? "",
++      receiptSubtitleEn: body.receiptSubtitleEn ?? "",
++      receiptSubtitleFontSize: normalizePrintFontSize(body.receiptSubtitleFontSize, 12),
++      invoiceTitleEnFontSize: normalizePrintFontSize(body.invoiceTitleEnFontSize, 14),
++      receiptTitleEnFontSize: normalizePrintFontSize(body.receiptTitleEnFontSize, 12),
++      statementTitleEnFontSize: normalizePrintFontSize(body.statementTitleEnFontSize, 14),
++      customerLedgerTitleEnFontSize: normalizePrintFontSize(body.customerLedgerTitleEnFontSize, 14),
+       invoiceCashTitleAr: body.invoiceCashTitleAr,
+       invoiceCashTitleEn: body.invoiceCashTitleEn,
+       invoiceCreditTitleAr: body.invoiceCreditTitleAr,
+--- a/lib/db/src/schema/company-settings-sqlite.ts
++++ b/lib/db/src/schema/company-settings-sqlite.ts
+@@ -25,6 +25,19 @@
+   showStampOnReceipts: integer("show_stamp_on_receipts", { mode: "boolean" }).default(true),
+   showStampOnStatements: integer("show_stamp_on_statements", { mode: "boolean" }).default(true),
+   footerText: text("footer_text"),
++  receiptTitleAr: text("receipt_title_ar").default("سند قبض"),
++  receiptTitleEn: text("receipt_title_en").default("RECEIPT VOUCHER"),
++  receiptTitleFontSize: integer("receipt_title_font_size").default(24),
++  receiptTitleVisible: integer("receipt_title_visible", { mode: "boolean" }).default(true),
++  receiptTitleAlign: text("receipt_title_align").default("center"),
++  receiptTitleBold: integer("receipt_title_bold", { mode: "boolean" }).default(true),
++  receiptSubtitleAr: text("receipt_subtitle_ar").default(""),
++  receiptSubtitleEn: text("receipt_subtitle_en").default(""),
++  receiptSubtitleFontSize: integer("receipt_subtitle_font_size").default(12),
++  invoiceTitleEnFontSize: integer("invoice_title_en_font_size").default(14),
++  receiptTitleEnFontSize: integer("receipt_title_en_font_size").default(12),
++  statementTitleEnFontSize: integer("statement_title_en_font_size").default(14),
++  customerLedgerTitleEnFontSize: integer("customer_ledger_title_en_font_size").default(14),
+   invoiceCashTitleAr: text("invoice_cash_title_ar"),
+   invoiceCashTitleEn: text("invoice_cash_title_en"),
+   invoiceCreditTitleAr: text("invoice_credit_title_ar"),

@@ -20,6 +20,7 @@ export function PrintTitleBlock({
   titleAr,
   titleEn,
   titleFontSize = 18,
+  titleEnFontSize = 14,
   subtitleAr,
   subtitleEn,
   subtitleFontSize = 12,
@@ -31,6 +32,7 @@ export function PrintTitleBlock({
   titleAr?: string | null;
   titleEn?: string | null;
   titleFontSize?: number;
+  titleEnFontSize?: number;
   subtitleAr?: string | null;
   subtitleEn?: string | null;
   subtitleFontSize?: number;
@@ -45,7 +47,7 @@ export function PrintTitleBlock({
       {(titleAr || titleEn) && (
         <div style={{ textAlign: align, fontWeight: bold ? 700 : 400, fontSize: titleFontSize, lineHeight: 1.15 }}>
           {titleAr && <div>{titleAr}</div>}
-          {titleEn && <div className="text-sm font-normal text-gray-600" dir="ltr">{titleEn}</div>}
+          {titleEn && <div className="text-gray-600" style={{ fontSize: titleEnFontSize, fontWeight: bold ? 700 : 400 }} dir="ltr">{titleEn}</div>}
         </div>
       )}
 
@@ -126,15 +128,19 @@ export function ReceiptPrintHeader({
             className="h-20 w-auto object-contain"
           />
 
-          <div className="text-center">
-            <div className="font-black text-gray-900 text-2xl leading-tight">
-              سند قبض
-            </div>
-
-            <div className="text-gray-500 text-xs font-bold tracking-wide">
-              RECEIPT VOUCHER
-            </div>
-          </div>
+          <PrintTitleBlock
+            visible={settings.receiptTitleVisible ?? true}
+            align={settings.receiptTitleAlign || "center"}
+            bold={settings.receiptTitleBold ?? true}
+            titleAr={settings.receiptTitleAr ?? "سند قبض"}
+            titleEn={settings.receiptTitleEn ?? "RECEIPT VOUCHER"}
+            titleFontSize={settings.receiptTitleFontSize ?? 24}
+            titleEnFontSize={settings.receiptTitleEnFontSize ?? 12}
+            subtitleAr={settings.receiptSubtitleAr || ""}
+            subtitleEn={settings.receiptSubtitleEn || ""}
+            subtitleFontSize={settings.receiptSubtitleFontSize ?? 12}
+            className="w-full text-gray-900"
+          />
         </div>
 
         <div className="text-left" dir="ltr">
@@ -196,6 +202,7 @@ export function StatementPrintHeader({
   const { settings, logoSrc } = usePrintSettings(override);
   const resolvedTitleAr = titleAr || settings.statementTitleAr || "كشف حساب";
   const resolvedTitleEn = titleEn || settings.statementTitleEn || "Statement";
+  const resolvedTitleEnFontSize = (titleAr === settings.customerLedgerTitleAr ? settings.customerLedgerTitleEnFontSize : settings.statementTitleEnFontSize) ?? 14;
   const resolvedTitleFontSize = titleFontSize || settings.statementTitleFontSize || 18;
   const resolvedTitleVisible = titleVisible ?? settings.statementTitleVisible ?? true;
   const resolvedTitleAlign = titleAlign || settings.statementTitleAlign || "center";
@@ -249,6 +256,7 @@ export function StatementPrintHeader({
             titleAr={resolvedTitleAr}
             titleEn={resolvedTitleEn}
             titleFontSize={resolvedTitleFontSize}
+            titleEnFontSize={resolvedTitleEnFontSize}
             subtitleAr={resolvedSubtitleAr}
             subtitleEn={resolvedSubtitleEn}
             subtitleFontSize={resolvedSubtitleFontSize}

@@ -1,0 +1,121 @@
+--- a/customs-accounting/src/pages/settings/developer.tsx
++++ b/customs-accounting/src/pages/settings/developer.tsx
+@@ -421,7 +421,7 @@
+ function InfoRow({ label, value, isAR }: { label: string; value?: string | number | boolean | null; isAR: boolean }) {
+   return (
+     <div className="rounded-lg border border-border bg-background px-3 py-2">
+-      <div className="text-[11px] font-semibold text-muted-foreground">{label}</div>
++      <div className="text-sm font-medium text-muted-foreground">{label}</div>
+       <div className="mt-1 break-all text-sm font-medium">{formatDisplayValue(value, isAR)}</div>
+     </div>
+   );
+@@ -442,7 +442,7 @@
+ function DevField({ label, children }: { label: string; children: React.ReactNode }) {
+   return (
+     <div className="space-y-1">
+-      <Label className="text-xs font-semibold text-muted-foreground">{label}</Label>
++      <Label className="text-sm font-medium text-muted-foreground">{label}</Label>
+       {children}
+     </div>
+   );
+@@ -2038,6 +2038,15 @@
+   }
+ 
+   return (
++    <div className="ledger-developer-settings mx-auto w-full max-w-[1120px]">
++      <style>{`
++        .ledger-developer-settings input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]),
++        .ledger-developer-settings select { min-height: 40px; font-size: 14px; line-height: 20px; border-radius: 8px; }
++        .ledger-developer-settings textarea { font-size: 14px; line-height: 1.6; border-radius: 8px; }
++        .ledger-developer-settings label { font-size: 14px; line-height: 20px; }
++        .ledger-developer-settings button:not([role="switch"]):not([role="checkbox"]):not([role="radio"]) { min-height: 36px; font-size: 14px; }
++        .ledger-developer-settings input[type="number"] { max-width: 160px; }
++      `}</style>
+     <SettingsShell
+       dir={isRTL ? "rtl" : "ltr"}
+       title={isAR ? "إعدادات المطوّر" : "Developer Settings"}
+@@ -2288,7 +2297,7 @@
+                 </div>
+               </div>
+             <div className="rounded-2xl border border-border bg-card p-5 shadow-sm space-y-4">
+-              <div className="flex items-start justify-between gap-4">
++              <div className="flex flex-wrap items-start justify-between gap-4">
+                 <div>
+                   <h3 className="text-lg font-semibold">
+                     {tr("إدارة مسار البيانات", "Data Root Management")}
+@@ -2607,7 +2616,7 @@
+               </div>
+             </div>
+             <div className="rounded-2xl border border-border bg-background/70 p-4 shadow-sm">
+-              <div className="mb-3 flex items-center justify-between gap-3">
++              <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                 <div className="flex items-center gap-2 text-sm font-bold text-foreground">
+                   <RefreshCw className={cn("h-4 w-4 text-primary", isSyncQueueLoading && "animate-spin")} />
+                   <span>{tr("حالة قائمة المزامنة", "Sync queue status")}</span>
+@@ -2653,7 +2662,7 @@
+                 <InfoRow isAR={isAR} label={tr("آخر خطأ", "Last error")} value={syncQueueStatus.lastError || "-"} />
+               </div>
+               <div className="mt-4">
+-                <div className="mb-2 text-xs font-semibold text-muted-foreground">{tr("آخر عناصر القائمة", "Recent Queue Items")}</div>
++                <div className="mb-2 text-sm font-medium text-muted-foreground">{tr("آخر عناصر القائمة", "Recent Queue Items")}</div>
+                 {syncQueueStatus.recent.length === 0 ? (
+                   <div className="rounded-md border border-border bg-background px-3 py-2 text-sm text-muted-foreground">
+                     {tr("لا توجد عناصر في القائمة بعد", "No queue items yet")}
+@@ -2680,7 +2689,7 @@
+                             </td>
+                             <td className="px-3 py-2">{item.operation || "-"}</td>
+                             <td className="px-3 py-2">
+-                              <span className={cn("inline-flex rounded-full border px-2 py-0.5 text-[11px] font-semibold", syncQueueStatusBadgeClass(item.status || ""))}>
++                              <span className={cn("inline-flex rounded-full border px-2 py-0.5 text-sm font-semibold", syncQueueStatusBadgeClass(item.status || ""))}>
+                                 {item.status || "-"}
+                               </span>
+                             </td>
+@@ -2867,8 +2876,8 @@
+ 
+           <Card className="rounded-2xl border-border/70 shadow-sm">
+             <CardHeader>
+-              <div className="flex flex-wrap items-center justify-between gap-3">
+-                <CardTitle className="text-lg">{tr("فحص صحة النظام", "System Diagnostics")}</CardTitle>
++              <div className="flex flex-wrap items-center gap-2">
++                <CardTitle className="w-full pb-2 text-lg">{tr("فحص صحة النظام", "System Diagnostics")}</CardTitle>
+                 <Button type="button" variant="outline" size="sm" onClick={runSystemDiagnostics} disabled={isSystemDiagnosticsRunning} className="gap-2">
+                   <RefreshCw className={cn("h-3.5 w-3.5", isSystemDiagnosticsRunning && "animate-spin")} />
+                   {isSystemDiagnosticsRunning ? tr("جار الفحص...", "Running...") : tr("فحص صحة النظام", "Run System Diagnostics")}
+@@ -2946,10 +2955,10 @@
+                         {systemDiagnostics.checks.map((check) => (
+                           <tr key={check.id} className="border-t border-border align-top">
+                             <td className="px-3 py-2">
+-                              <span className={cn("inline-flex rounded-full border px-2 py-0.5 text-[11px] font-semibold", diagnosticStatusBadgeClass(check.status))}>
++                              <span className={cn("inline-flex rounded-full border px-2 py-0.5 text-sm font-semibold", diagnosticStatusBadgeClass(check.status))}>
+                                 {getDiagnosticStatusLabel(check.status, isAR)}
+                               </span>
+-                              <div className="mt-1 text-[11px] text-muted-foreground">{check.area}</div>
++                              <div className="mt-1 text-sm text-muted-foreground">{check.area}</div>
+                             </td>
+                             <td className="max-w-[220px] break-all px-3 py-2">
+                               <div className="font-medium">{isAR ? check.messageAr : check.messageEn}</div>
+@@ -3015,7 +3024,7 @@
+                   {dataStorageReport && (
+                     <>
+                       <div className="rounded-md border border-border bg-background px-3 py-2 text-sm">
+-                        <div className="mb-2 text-xs font-semibold text-muted-foreground">{isAR ? "التحذيرات" : "warnings"}</div>
++                        <div className="mb-2 text-sm font-medium text-muted-foreground">{isAR ? "التحذيرات" : "warnings"}</div>
+                         {dataStorageReport.warnings.length > 0 ? (
+                           <ul className="list-inside list-disc space-y-1">
+                             {dataStorageReport.warnings.map((warning) => (
+@@ -3089,7 +3098,7 @@
+ 
+                   {backupReadinessReport && (
+                     <div className="rounded-md border border-border bg-background px-3 py-2 text-sm">
+-                      <div className="mb-2 text-xs font-semibold text-muted-foreground">{isAR ? "التحذيرات" : "warnings"}</div>
++                      <div className="mb-2 text-sm font-medium text-muted-foreground">{isAR ? "التحذيرات" : "warnings"}</div>
+                       {backupReadinessReport.warnings.length > 0 ? (
+                         <ul className="list-inside list-disc space-y-1">
+                           {backupReadinessReport.warnings.map((warning) => (
+@@ -3219,5 +3228,6 @@
+         </div>
+       )}
+     </SettingsShell>
++    </div>
+   );
+ }

@@ -1,4 +1,4 @@
-import { printFromPreview } from "@/lib/print-from-preview";
+﻿import { printFromPreview } from "@/lib/print-from-preview";
 import { useAuth } from "@/lib/auth-context";
 import { useState, useEffect } from "react";
 import { useParams, Link } from "wouter";
@@ -36,8 +36,13 @@ function getToken() {
   return sessionStorage.getItem("auth_token");
 }
 
-async function fetchClientStatement(id: number) {
-  const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/clients/${id}/statement`, {
+async function fetchClientStatement(id: number, fromDate = "", toDate = "") {
+  const query = new URLSearchParams();
+  if (fromDate) query.set("from", fromDate);
+  if (toDate) query.set("to", toDate);
+  const queryString = query.toString();
+
+  const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/clients/${id}/statement${queryString ? `?${queryString}` : ""}`, {
     headers: {
       Authorization: `Bearer ${getToken()}`,
     },
@@ -65,9 +70,15 @@ function formatDateYMD(value: string | null) {
 export default function ClientStatement() {
   const { id } = useParams<{ id: string }>();
   const clientId = parseInt(id || "0", 10);
+  const params = new URLSearchParams(
+    window.location.hash.split("?")[1] || ""
+  );
+  const fromDate = params.get("from") || "";
+  const toDate = params.get("to") || "";
+
   const { data: statement, isLoading } = useQuery({
-    queryKey: ["client-statement", clientId],
-    queryFn: () => fetchClientStatement(clientId),
+    queryKey: ["client-statement", clientId, fromDate, toDate],
+    queryFn: () => fetchClientStatement(clientId, fromDate, toDate),
     enabled: Number.isFinite(clientId) && clientId > 0,
   });
   const { lang } = useLanguage();
@@ -111,12 +122,6 @@ export default function ClientStatement() {
   const { client, invoices } = statement;
   const today = new Date().toISOString();
   const statementRef = `ST-${client.id}-${new Date().getFullYear()}`;
-  const params = new URLSearchParams(
-    window.location.hash.split("?")[1] || ""
-  );
-  const fromDate = params.get("from") || "";
-  const toDate = params.get("to") || "";
-
   console.log("[STATEMENT DATE FILTER]", JSON.stringify({ fromDate, toDate }));
 
   const fromDateText = formatDateYMD(fromDate);
@@ -143,8 +148,7 @@ export default function ClientStatement() {
     .filter((inv) => inv.status !== "cancelled")
     .reduce((sum, inv) => sum + Number(inv.total ?? 0), 0);
 
-  const filteredTotalPaid = filteredInvoices
-    .reduce((sum, inv) => sum + Number(inv.advancePayment ?? 0), 0);
+  const filteredTotalPaid = Number(statement.totalPaid ?? 0);
 
   const filteredBalance = filteredTotalDue - filteredTotalPaid;
 
@@ -560,4 +564,3 @@ export default function ClientStatement() {
     </A4PrintShell>
   );
 }
-

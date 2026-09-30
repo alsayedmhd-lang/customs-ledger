@@ -2,6 +2,7 @@ import ResizableScrollArea from "@/components/layout/ResizableScrollArea";
 import InvoicePrintHeader from "@/components/invoice-print-header";
 import {
   PrintDocumentFooter,
+  PrintTitleBlock,
   PrintSignaturesStamp,
   PrintWatermark,
   ReceiptPrintHeader,
@@ -44,121 +45,90 @@ function Section({ icon: Icon, title, color, children, contentClassName }: {
   icon: React.ElementType; title: string; color: string; children: React.ReactNode; contentClassName?: string;
 }) {
   return (
-    <ResizableScrollArea storageKey={`settings-section:${title}`} maxHeight={10000} maxDragHeight={5000} minHeight={120}>
-      <div className="w-full bg-card rounded-2xl border border-border/50 shadow-sm overflow-hidden">
-        <div className={`flex items-center gap-2 px-5 py-3.5 border-b border-border/40 ${color}`}>
-          <Icon className="w-4 h-4 shrink-0" />
-          <h2 className="text-sm font-bold">{title}</h2>
-        </div>
-        <div className={cn("w-full p-5", contentClassName)}>{children}</div>
+    <section className="w-full min-w-0 space-y-4">
+      <div className={`flex items-center gap-2 rounded-xl px-4 py-3 ${color}`}>
+        <Icon className="w-4 h-4 shrink-0" />
+        <h2 className="text-base font-semibold">{title}</h2>
       </div>
-    </ResizableScrollArea>
+      <div className={cn("w-full min-w-0", contentClassName)}>{children}</div>
+    </section>
   );
 }
 
 function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
     <div className="space-y-1">
-      <label className="block text-xs font-semibold text-muted-foreground ">{label}</label>
+      <label className="block text-sm font-medium text-muted-foreground">{label}</label>
       {children}
       {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
     </div>
   );
 }
 
-type TitleDisplayOptions = {
-  enabled: boolean;
-  align: "left" | "center" | "right";
-  bold: boolean;
-  subtitleAr: string;
-  subtitleEn: string;
-  subtitleSize: number;
-};
-
-function TitleOptionsGrid({
-  title,
-  isAR,
-  value,
-  onChange,
-}: {
-  title: string;
-  isAR: boolean;
-  value: TitleDisplayOptions;
-  onChange: (next: TitleDisplayOptions) => void;
+function DocumentTitleEditor({ prefix, titlePrefix = prefix, label, isAR, form, setForm }: {
+  prefix: "invoice" | "receipt" | "statement" | "customerLedger";
+  titlePrefix?: string; label: string; isAR: boolean; form: any;
+  setForm: React.Dispatch<React.SetStateAction<any>>;
 }) {
-  const update = (patch: Partial<TitleDisplayOptions>) => onChange({ ...value, ...patch });
-
+  const defaults = DEFAULT_SETTINGS as any;
+  const read = (suffix: string) => form[prefix + suffix] ?? defaults[prefix + suffix];
+  const titleAr = form[titlePrefix + "TitleAr"] ?? defaults[titlePrefix + "TitleAr"] ?? "";
+  const titleEn = form[titlePrefix + "TitleEn"] ?? defaults[titlePrefix + "TitleEn"] ?? "";
+  const set = (key: string, value: unknown) => setForm((current: any) => ({ ...current, [key]: value }));
+  const size = (value: string) => Math.max(8, Math.min(48, Number(value) || 8));
   return (
-    <div className="space-y-2">
-      <div className="text-xs font-bold text-muted-foreground">{title}</div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-        <div className="space-y-1">
-          <div className="text-[11px] font-medium text-muted-foreground">{isAR ? "تفعيل" : "Toggle"}</div>
-          <label className="flex items-center gap-2 rounded-xl border border-border bg-background px-3 py-2 text-sm">
-            <input
-              type="checkbox"
-              checked={value.enabled}
-              onChange={(e) => update({ enabled: e.target.checked })}
-              className="h-4 w-4 accent-primary"
-            />
-            <span>{isAR ? "إظهار العنوان" : "Show title"}</span>
-          </label>
-        </div>
-
-        <Field label={isAR ? "المحاذاة" : "Align"}>
-          <select
-            value={value.align}
-            onChange={(e) => update({ align: e.target.value as TitleDisplayOptions["align"] })}
-            className={inp}
-            dir="ltr"
-          >
-            <option value="right">right</option>
-            <option value="center">center</option>
-            <option value="left">left</option>
+    <div className="space-y-5">
+      <h3 className="text-base font-semibold">{label}</h3>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <Field label={isAR ? "نص العنوان بالعربية" : "Arabic title text"}>
+          <input value={titleAr} dir="rtl" onChange={e => set(titlePrefix + "TitleAr", e.target.value)} className={inp} />
+        </Field>
+        <Field label={isAR ? "نص العنوان بالإنجليزية" : "English title text"}>
+          <input value={titleEn} dir="ltr" onChange={e => set(titlePrefix + "TitleEn", e.target.value)} className={inp} />
+        </Field>
+        <Field label={isAR ? "حجم خط العنوان العربي" : "Arabic title font size"}>
+          <input type="number" min={8} max={48} value={read("TitleFontSize")} onChange={e => set(prefix + "TitleFontSize", size(e.target.value))} className={inp} />
+        </Field>
+        <Field label={isAR ? "حجم خط العنوان الإنجليزي" : "English title font size"}>
+          <input type="number" min={8} max={48} value={read("TitleEnFontSize")} onChange={e => set(prefix + "TitleEnFontSize", size(e.target.value))} className={inp} />
+        </Field>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <label className="flex min-h-10 items-center gap-2 rounded-lg border border-border bg-background px-3 py-2">
+          <input type="checkbox" checked={!!read("TitleVisible")} onChange={e => set(prefix + "TitleVisible", e.target.checked)} className="h-4 w-4 accent-primary" />
+          {isAR ? "إظهار العنوان" : "Show title"}
+        </label>
+        <Field label={isAR ? "المحاذاة" : "Alignment"}>
+          <select value={read("TitleAlign")} onChange={e => set(prefix + "TitleAlign", e.target.value)} className={inp}>
+            <option value="right">{isAR ? "يمين" : "Right"}</option>
+            <option value="center">{isAR ? "وسط" : "Center"}</option>
+            <option value="left">{isAR ? "يسار" : "Left"}</option>
           </select>
         </Field>
-
-        <div className="space-y-1">
-          <div className="text-[11px] font-medium text-muted-foreground">{isAR ? "عريض" : "Bold"}</div>
-          <label className="flex items-center gap-2 rounded-xl border border-border bg-background px-3 py-2 text-sm">
-            <input
-              type="checkbox"
-              checked={value.bold}
-              onChange={(e) => update({ bold: e.target.checked })}
-              className="h-4 w-4 accent-primary"
-            />
-            <span>{isAR ? "عريض" : "Bold"}</span>
-          </label>
-        </div>
+        <label className="flex min-h-10 items-center gap-2 rounded-lg border border-border bg-background px-3 py-2">
+          <input type="checkbox" checked={!!read("TitleBold")} onChange={e => set(prefix + "TitleBold", e.target.checked)} className="h-4 w-4 accent-primary" />
+          {isAR ? "خط عريض" : "Bold title"}
+        </label>
       </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-        <Field label={isAR ? "العربية" : "Arabic"}>
-          <input
-            value={value.subtitleAr}
-            onChange={(e) => update({ subtitleAr: e.target.value })}
-            className={inp}
-          />
-        </Field>
-
-        <Field label={isAR ? "English" : "English"}>
-          <input
-            value={value.subtitleEn}
-            onChange={(e) => update({ subtitleEn: e.target.value })}
-            className={inp}
-            dir="ltr"
-          />
-        </Field>
-
-        <Field label={isAR ? "الحجم" : "Size"}>
-          <input
-            type="number"
-            value={value.subtitleSize}
-            onChange={(e) => update({ subtitleSize: Number(e.target.value) })}
-            className={inp}
-          />
-        </Field>
+      <details className="rounded-xl border border-border bg-background">
+        <summary className="cursor-pointer px-4 py-3 text-sm font-medium">{isAR ? "سطر إضافي تحت العنوان (اختياري)" : "Additional subtitle (optional)"}</summary>
+        <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_120px] gap-4 p-4 pt-0">
+          <Field label={isAR ? "السطر الإضافي بالعربية" : "Arabic subtitle"}>
+            <input value={read("SubtitleAr") || ""} dir="rtl" onChange={e => set(prefix + "SubtitleAr", e.target.value)} placeholder={isAR ? "لا يظهر عند تركه فارغًا" : "Hidden when empty"} className={inp} />
+          </Field>
+          <Field label={isAR ? "السطر الإضافي بالإنجليزية" : "English subtitle"}>
+            <input value={read("SubtitleEn") || ""} dir="ltr" onChange={e => set(prefix + "SubtitleEn", e.target.value)} placeholder={isAR ? "لا يظهر عند تركه فارغًا" : "Hidden when empty"} className={inp} />
+          </Field>
+          <Field label={isAR ? "حجم الخط" : "Font size"}>
+            <input type="number" min={8} max={48} value={read("SubtitleFontSize")} onChange={e => set(prefix + "SubtitleFontSize", size(e.target.value))} className={inp} />
+          </Field>
+        </div>
+      </details>
+      <div className="rounded-xl border border-border bg-muted/20 p-4">
+        <p className="mb-3 text-sm font-medium text-muted-foreground">{isAR ? "معاينة مباشرة للنص وحجم الخط" : "Live text and font size preview"}</p>
+        <div className="rounded-lg border border-gray-200 bg-white p-5 text-gray-900 overflow-auto">
+          {read("TitleVisible") ? <PrintTitleBlock visible align={read("TitleAlign")} bold={!!read("TitleBold")} titleAr={titleAr} titleEn={titleEn} titleFontSize={Number(read("TitleFontSize"))} titleEnFontSize={Number(read("TitleEnFontSize"))} subtitleAr={read("SubtitleAr")} subtitleEn={read("SubtitleEn")} subtitleFontSize={Number(read("SubtitleFontSize"))} /> : <p className="text-center text-sm text-gray-500">{isAR ? "العنوان مخفي في الطباعة" : "Title hidden in print"}</p>}
+        </div>
       </div>
     </div>
   );
@@ -737,7 +707,7 @@ function PreviewScaleControl({
   );
 }
 
-const inp = "w-full px-3 py-2 text-sm bg-background border border-border rounded-xl outline-none focus:ring-2 focus:ring-primary/20 transition-colors";
+const inp = "w-full min-h-10 px-3 py-2 text-sm bg-background border border-border rounded-lg outline-none focus:ring-2 focus:ring-primary/20 transition-colors";
 const tog = (on: boolean) =>
   `relative w-11 h-6 rounded-full transition-colors cursor-pointer ${on ? "bg-primary" : "bg-muted-foreground/30"}`;
 const previewZoomStorageKeys = {
@@ -818,6 +788,8 @@ export default function SettingsPage() {
   const canEditBrandIdentity = canEditBranding;
   const canUseInvoicesBackupImport = roleCanEdit || allowManagerEditInvoicesBackupImport;
   const [activeTab, setActiveTab] = useState<TabId>("preview");
+  const [appearanceTab, setAppearanceTab] = useState<"theme" | "colors" | "layout">("theme");
+  const [printTab, setPrintTab] = useState<"invoice" | "receipt" | "statement" | "ledger" | "common">("invoice");
   const [invoicePreviewScale, setInvoicePreviewScale] = useState(() =>
     readPreviewZoom(previewZoomStorageKeys.invoice, 0.76)
   );
@@ -1519,10 +1491,6 @@ const decryptBackupData = async (backupFile: any, password: string) => {
             logoHeight: Number((settings as CompanySettings & { logoHeight?: number }).logoHeight ?? 0),
             stampBase64: settings.stampBase64 ?? null,
             watermarkBase64: settings.watermarkBase64 ?? null,
-            showWatermark: settings.showWatermark ?? true,
-            showStampOnInvoices: settings.showStampOnInvoices ?? true,
-            showStampOnReceipts: settings.showStampOnReceipts ?? true,
-            showStampOnStatements: settings.showStampOnStatements ?? true,
           });
         }
 
@@ -1625,8 +1593,15 @@ const decryptBackupData = async (backupFile: any, password: string) => {
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       dir="ltr"
-      className="pb-10"
+      className="ledger-settings pb-10"
     >
+      <style>{`
+        .ledger-settings input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]),
+        .ledger-settings select { min-height: 40px; font-size: 14px; line-height: 20px; border-radius: 8px; }
+        .ledger-settings textarea { font-size: 14px; line-height: 1.6; border-radius: 8px; }
+        .ledger-settings .settings-control-content label { font-size: 14px; line-height: 20px; }
+        .ledger-settings .settings-control-content button:not([role="switch"]) { font-size: 14px; }
+      `}</style>
       <SettingsShell
         dir={isRTL ? "rtl" : "ltr"}
         title={isAR ? "إعدادات البرنامج" : "Settings"}
@@ -1654,7 +1629,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
       >
       {/* ── Content Area ───────────────────────────────────────── */}
       <div
-        className={cn("min-w-0 w-full space-y-5", isRTL ? "md:order-1" : "md:order-2")}
+        className={cn("min-w-0 w-full space-y-5", activeTab !== "preview" && "settings-control-content ms-0 me-auto max-w-[1120px]", isRTL ? "md:order-1" : "md:order-2")}
         dir={isRTL ? "rtl" : "ltr"}
       >
 
@@ -1787,7 +1762,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                         </div>
 
                         {form.footerText && (
-                          <div className="text-center text-[11px] text-slate-500 border-t pt-2">
+                          <div className="text-center text-sm text-slate-500 border-t pt-2">
                             {form.footerText}
                           </div>
                         )}
@@ -1814,7 +1789,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                                 className="h-12 mx-auto object-contain opacity-90"
                               />
                             )}
-                            <div className="text-[11px] text-slate-500">
+                            <div className="text-sm text-slate-500">
                               {isAR ? "الختم" : "Stamp"}
                             </div>
                           </div>
@@ -2540,21 +2515,24 @@ const decryptBackupData = async (backupFile: any, password: string) => {
           );
 
           const SectionCard = ({ icon: Icon, title, color, children }: { icon: React.ElementType; title: string; color: string; children: React.ReactNode }) => (
-            <ResizableScrollArea storageKey={`settings-display:${title}`} maxHeight={10000} maxDragHeight={5000} minHeight={120}>
-              <div className="bg-card rounded-2xl border border-border/50 shadow-sm overflow-hidden">
-                <div className={`flex items-center gap-2 px-5 py-3.5 border-b border-border/40 ${color}`}>
-                  <Icon className="w-3.5 h-3.5" /><h2 className="text-sm font-bold">{title}</h2>
-                </div>
-                <div className="p-5">{children}</div>
-              </div>
-            </ResizableScrollArea>
+            <Section icon={Icon} title={title} color={color}>{children}</Section>
           );
 
           return (
             <>
-            <ResizableScrollArea storageKey="settings-index" maxHeight={520} className="space-y-4 pr-2">
-
-              {/* ─ Theme ─ */}
+            <div className="space-y-5">
+              <div role="tablist" aria-label={isAR ? "أقسام المظهر" : "Appearance sections"} className="flex flex-wrap gap-2 border-b border-border pb-4">
+                {[
+                  { id: "theme" as const, ar: "مظهر الواجهة والخلفية", en: "Theme & Background", icon: Sun },
+                  { id: "colors" as const, ar: "الألوان", en: "Colors", icon: Palette },
+                  { id: "layout" as const, ar: "النصوص وخيارات العرض", en: "Text & Layout", icon: SlidersHorizontal },
+                ].map(tab => (
+                  <button key={tab.id} id={`appearance-tab-${tab.id}`} type="button" role="tab" aria-selected={appearanceTab === tab.id} aria-controls={`appearance-panel-${tab.id}`} onClick={() => setAppearanceTab(tab.id)} className={cn("inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-colors", appearanceTab === tab.id ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background text-muted-foreground hover:bg-muted hover:text-foreground")}>
+                    <tab.icon className="h-4 w-4" />{isAR ? tab.ar : tab.en}
+                  </button>
+                ))}
+              </div>
+              <div id="appearance-panel-theme" role="tabpanel" aria-labelledby="appearance-tab-theme" hidden={appearanceTab !== "theme"} className="space-y-6">
               <SectionCard icon={Sun} title={isAR ? "مظهر الواجهة" : "Interface Theme"} color="bg-yellow-500/5">
                 <div className="grid grid-cols-3 gap-2">
                   {([["light", Sun, isAR ? "فاتح" : "Light"], ["dark", Moon, isAR ? "داكن" : "Dark"], ["system", Monitor, isAR ? "تلقائي" : "System"]] as const).map(([mode, Icon, label]) => (
@@ -2567,84 +2545,6 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                   ))}
                 </div>
               </SectionCard>
-
-              {/* ─ Primary Color ─ */}
-              <SectionCard icon={Palette} title={isAR ? "اللون الأساسي" : "Primary Color"} color="bg-fuchsia-500/5">
-                <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-7 gap-2">
-                  {(Object.entries(COLOR_PRESETS) as [PrimaryColor, typeof COLOR_PRESETS[PrimaryColor]][]).map(([key, preset]) => (
-                    <button key={key} onClick={() => updateDisplay({ primaryColor: key })}
-                      title={isAR ? preset.labelAr : preset.labelEn}
-                      className={cn("flex flex-col items-center gap-2 py-3 rounded-xl border-2 transition-all text-xs font-semibold",
-                        display.primaryColor === key ? "border-current shadow-lg scale-105" : "border-transparent hover:border-border hover:scale-105"
-                      )}
-                      style={{ color: preset.hex }}
-                    >
-                      <span className="w-8 h-8 rounded-full shadow-md border-2 border-white/20 block"
-                        style={{ background: preset.hex }} />
-                      <span className="text-foreground">{isAR ? preset.labelAr : preset.labelEn}</span>
-                    </button>
-                  ))}
-                </div>
-                <div className="mt-3 pt-3 border-t border-border/40 flex items-center gap-3">
-                  <span className="text-xs text-muted-foreground">{isAR ? "معاينة:" : "Preview:"}</span>
-                  <div className="flex items-center gap-2">
-                    <span className="h-6 px-3 rounded-full text-xs font-bold flex items-center"
-                      style={{
-                        background: COLOR_PRESETS[display.primaryColor].hex,
-                        color: `hsl(${COLOR_PRESETS[display.primaryColor].foreground ?? "210 40% 98%"})`,
-                        border: `1px solid hsl(${COLOR_PRESETS[display.primaryColor].border ?? COLOR_PRESETS[display.primaryColor].light})`,
-                      }}>
-                      {isAR ? "زر أساسي" : "Primary Button"}
-                    </span>
-                    <span className="h-6 px-3 rounded-full text-xs font-bold flex items-center border-2"
-                      style={{
-                        borderColor: `hsl(${COLOR_PRESETS[display.primaryColor].border ?? COLOR_PRESETS[display.primaryColor].light})`,
-                        color: `hsl(${COLOR_PRESETS[display.primaryColor].foreground ? "222 47% 11%" : COLOR_PRESETS[display.primaryColor].light})`,
-                      }}>
-                      {isAR ? "حد ملوّن" : "Outline"}
-                    </span>
-                  </div>
-                </div>
-              </SectionCard>
-
-              {/* ─ Sidebar Color ─ */}
-              <SectionCard icon={Layers} title={isAR ? "لون الشريط الجانبي" : "Sidebar Color"} color="bg-slate-500/5">
-                <div className="grid grid-cols-4 gap-2">
-                  {(Object.entries(SIDEBAR_COLOR_PRESETS) as [SidebarColor, typeof SIDEBAR_COLOR_PRESETS[SidebarColor]][]).map(([key, preset]) => (
-                    <button key={key} onClick={() => updateDisplay({ sidebarColor: key })}
-                      title={isAR ? preset.labelAr : preset.labelEn}
-                      className={cn(
-                        "flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all text-xs font-medium",
-                        display.sidebarColor === key
-                          ? "border-primary shadow-md scale-105"
-                          : "border-transparent hover:border-border hover:scale-105"
-                      )}
-                    >
-                      {/* Mini gradient preview */}
-                      <div className="w-full h-10 rounded-lg shadow-inner border border-white/10 overflow-hidden">
-                        <div className="w-full h-full" style={{ background: `linear-gradient(180deg, ${preset.from} 0%, ${preset.to} 100%)` }} />
-                      </div>
-                      <span className="text-foreground text-center leading-tight">{isAR ? preset.labelAr : preset.labelEn}</span>
-                    </button>
-                  ))}
-                </div>
-                {/* Live preview mini sidebar */}
-                <div className="mt-4 pt-4 border-t border-border/40">
-                  <p className="text-xs text-muted-foreground mb-2">{isAR ? "معاينة مصغّرة:" : "Preview:"}</p>
-                  <div className="h-16 rounded-xl overflow-hidden shadow-md flex items-stretch"
-                    style={{ background: `linear-gradient(180deg, ${SIDEBAR_COLOR_PRESETS[display.sidebarColor].from} 0%, ${SIDEBAR_COLOR_PRESETS[display.sidebarColor].to} 100%)` }}>
-                    <div className="flex items-center gap-2 px-4">
-                      <div className="w-6 h-6 rounded-lg bg-white/10" />
-                      <div className="space-y-1">
-                        <div className="w-16 h-2 rounded bg-white/30" />
-                        <div className="w-10 h-1.5 rounded bg-white/15" />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </SectionCard>
-
-              {/* ─ App Background ─ */}
               <SectionCard icon={Wallpaper} title={isAR ? "خلفية التطبيق" : "App Background"}color="bg-primary/5">
                 {/* Type selector */}
                 <div className="grid grid-cols-3 gap-2 mb-5">
@@ -2788,15 +2688,89 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                         className="w-full h-2 rounded-full appearance-none cursor-pointer accent-primary bg-muted"
                       />
                       <div className="flex justify-between mt-1">
-                        <span className="text-[10px] text-muted-foreground">5%</span>
-                        <span className="text-[10px] text-muted-foreground">80%</span>
+                        <span className="text-sm text-muted-foreground">5%</span>
+                        <span className="text-sm text-muted-foreground">80%</span>
                       </div>
                     </div>
                   </div>
                 )}
               </SectionCard>
-
-              {/* ─ Border Radius ─ */}
+              </div>
+              <div id="appearance-panel-colors" role="tabpanel" aria-labelledby="appearance-tab-colors" hidden={appearanceTab !== "colors"} className="space-y-6">
+              <SectionCard icon={Palette} title={isAR ? "اللون الأساسي" : "Primary Color"} color="bg-fuchsia-500/5">
+                <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-7 gap-2">
+                  {(Object.entries(COLOR_PRESETS) as [PrimaryColor, typeof COLOR_PRESETS[PrimaryColor]][]).map(([key, preset]) => (
+                    <button key={key} onClick={() => updateDisplay({ primaryColor: key })}
+                      title={isAR ? preset.labelAr : preset.labelEn}
+                      className={cn("flex flex-col items-center gap-2 py-3 rounded-xl border-2 transition-all text-xs font-semibold",
+                        display.primaryColor === key ? "border-current shadow-lg scale-105" : "border-transparent hover:border-border hover:scale-105"
+                      )}
+                      style={{ color: preset.hex }}
+                    >
+                      <span className="w-8 h-8 rounded-full shadow-md border-2 border-white/20 block"
+                        style={{ background: preset.hex }} />
+                      <span className="text-foreground">{isAR ? preset.labelAr : preset.labelEn}</span>
+                    </button>
+                  ))}
+                </div>
+                <div className="mt-3 pt-3 border-t border-border/40 flex items-center gap-3">
+                  <span className="text-xs text-muted-foreground">{isAR ? "معاينة:" : "Preview:"}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="h-6 px-3 rounded-full text-xs font-bold flex items-center"
+                      style={{
+                        background: COLOR_PRESETS[display.primaryColor].hex,
+                        color: `hsl(${COLOR_PRESETS[display.primaryColor].foreground ?? "210 40% 98%"})`,
+                        border: `1px solid hsl(${COLOR_PRESETS[display.primaryColor].border ?? COLOR_PRESETS[display.primaryColor].light})`,
+                      }}>
+                      {isAR ? "زر أساسي" : "Primary Button"}
+                    </span>
+                    <span className="h-6 px-3 rounded-full text-xs font-bold flex items-center border-2"
+                      style={{
+                        borderColor: `hsl(${COLOR_PRESETS[display.primaryColor].border ?? COLOR_PRESETS[display.primaryColor].light})`,
+                        color: `hsl(${COLOR_PRESETS[display.primaryColor].foreground ? "222 47% 11%" : COLOR_PRESETS[display.primaryColor].light})`,
+                      }}>
+                      {isAR ? "حد ملوّن" : "Outline"}
+                    </span>
+                  </div>
+                </div>
+              </SectionCard>
+              <SectionCard icon={Layers} title={isAR ? "لون الشريط الجانبي" : "Sidebar Color"} color="bg-slate-500/5">
+                <div className="grid grid-cols-4 gap-2">
+                  {(Object.entries(SIDEBAR_COLOR_PRESETS) as [SidebarColor, typeof SIDEBAR_COLOR_PRESETS[SidebarColor]][]).map(([key, preset]) => (
+                    <button key={key} onClick={() => updateDisplay({ sidebarColor: key })}
+                      title={isAR ? preset.labelAr : preset.labelEn}
+                      className={cn(
+                        "flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all text-xs font-medium",
+                        display.sidebarColor === key
+                          ? "border-primary shadow-md scale-105"
+                          : "border-transparent hover:border-border hover:scale-105"
+                      )}
+                    >
+                      {/* Mini gradient preview */}
+                      <div className="w-full h-10 rounded-lg shadow-inner border border-white/10 overflow-hidden">
+                        <div className="w-full h-full" style={{ background: `linear-gradient(180deg, ${preset.from} 0%, ${preset.to} 100%)` }} />
+                      </div>
+                      <span className="text-foreground text-center leading-tight">{isAR ? preset.labelAr : preset.labelEn}</span>
+                    </button>
+                  ))}
+                </div>
+                {/* Live preview mini sidebar */}
+                <div className="mt-4 pt-4 border-t border-border/40">
+                  <p className="text-xs text-muted-foreground mb-2">{isAR ? "معاينة مصغّرة:" : "Preview:"}</p>
+                  <div className="h-16 rounded-xl overflow-hidden shadow-md flex items-stretch"
+                    style={{ background: `linear-gradient(180deg, ${SIDEBAR_COLOR_PRESETS[display.sidebarColor].from} 0%, ${SIDEBAR_COLOR_PRESETS[display.sidebarColor].to} 100%)` }}>
+                    <div className="flex items-center gap-2 px-4">
+                      <div className="w-6 h-6 rounded-lg bg-white/10" />
+                      <div className="space-y-1">
+                        <div className="w-16 h-2 rounded bg-white/30" />
+                        <div className="w-10 h-1.5 rounded bg-white/15" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </SectionCard>
+              </div>
+              <div id="appearance-panel-layout" role="tabpanel" aria-labelledby="appearance-tab-layout" hidden={appearanceTab !== "layout"} className="space-y-6">
               <SectionCard icon={Square} title={isAR ? "حجم الزوايا" : "Border Radius"} color="bg-blue-500/5">
                 <div className="grid grid-cols-3 gap-3">
                   {([
@@ -2814,8 +2788,6 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                   ))}
                 </div>
               </SectionCard>
-
-              {/* ─ Density ─ */}
               <SectionCard icon={AlignVerticalSpaceAround} title={isAR ? "كثافة العرض (حجم النص)" : "Display Density (Font Size)"} color="bg-teal-500/5">
                 <div className="grid grid-cols-3 gap-3">
                   {([
@@ -2829,13 +2801,11 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                       )}>
                       <Icon className="w-3.5 h-3.5" />
                       <span>{isAR ? labelAr : labelEn}</span>
-                      <span className="font-mono text-[10px] opacity-60">{hint}</span>
+                      <span className="font-mono text-sm opacity-60">{hint}</span>
                     </button>
                   ))}
                 </div>
               </SectionCard>
-
-              {/* ─ Toggles ─ */}
               <SectionCard icon={Layers} title={isAR ? "خيارات إضافية" : "Extra Options"} color="bg-slate-500/5">
                 <div className="space-y-1">
                   {[
@@ -2873,7 +2843,8 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                   ))}
                 </div>
               </SectionCard>
-            </ResizableScrollArea>
+              </div>
+            </div>
             </>
           );
         })()}
@@ -3017,7 +2988,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                     }
                     className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm"
                   />
-                </div>   
+                </div>
 
               </div>}
               {/* Stamp */}
@@ -3127,47 +3098,37 @@ const decryptBackupData = async (backupFile: any, password: string) => {
 
           {/* ── Print Tab ── */}
           {activeTab === "print" && canEditPrintSettings && (
-            <Section icon={Printer} title={isAR ? "خيارات الطباعة" : "Print Options"} color="bg-rose-500/5">
+            <Section icon={Printer} title={isAR ? "خيارات الطباعة" : "Print Options"} color="bg-rose-500/5" contentClassName="ledger-print-tools ms-0 me-auto max-w-[960px]">
+              <style>{`
+                .ledger-print-tools label { font-size: 14px; line-height: 20px; }
+                .ledger-print-tools input:not([type="checkbox"]), .ledger-print-tools select { min-height: 40px; font-size: 14px; border-radius: 8px; }
+                .ledger-print-tools input[type="number"] { width: 120px; max-width: 100%; }
+                .ledger-print-tools textarea { font-size: 14px; line-height: 1.6; border-radius: 8px; }
+              `}</style>
               <div className="space-y-4">
 
-                {/* Invoice Preview */}
-                <div
-                  className="bg-white rounded-xl shadow-inner border border-gray-200 overflow-hidden mb-4 p-4 space-y-4"
-                  style={{ fontFamily: "'Cairo', sans-serif" }}
-                >
-                  <InvoicePrintHeader
-                    company={form}
-                    logoSrc={currentLogoSrc}
-                    isAR={isAR}
-                    invoiceNumber="INV-PREVIEW"
-                    statusText={isAR ? "مسودة" : "Draft"}
-                  />
-
-                  {/* Footer preview */}
-                  {form.footerText && (
-                    <div className="text-center text-xs text-gray-500 border-t pt-2">
-                      {form.footerText}
-                    </div>
-                  )}
-
-                  {/* Stamp preview */}
-                  {form.showStampOnInvoices && currentStampSrc && (
-                    <div className="flex justify-center pt-3">
-                      <img
-                        src={currentStampSrc}
-                        alt="stamp"
-                        className="h-16 opacity-90 object-contain drop-shadow-sm"
-                      />
-                    </div>
-                  )}
+                <div role="tablist" aria-label={isAR ? "أقسام أدوات الطباعة" : "Print tools sections"} className="flex flex-wrap gap-2 border-b border-border pb-4">
+                  {[
+                    { id: "invoice" as const, ar: "الفواتير", en: "Invoices" },
+                    { id: "receipt" as const, ar: "سندات القبض", en: "Receipts" },
+                    { id: "statement" as const, ar: "كشف الحساب", en: "Statement" },
+                    { id: "ledger" as const, ar: "ملخص العميل", en: "Customer Summary" },
+                    { id: "common" as const, ar: "إعدادات مشتركة", en: "Shared Settings" },
+                  ].map(tab => (
+                    <button key={tab.id} id={`print-tab-${tab.id}`} type="button" role="tab" aria-selected={printTab === tab.id} aria-controls={`print-panel-${tab.id}`} onClick={() => setPrintTab(tab.id)} className={cn("rounded-lg border px-4 py-2 text-sm font-medium transition-colors", printTab === tab.id ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background text-muted-foreground hover:bg-muted hover:text-foreground")}>
+                      {isAR ? tab.ar : tab.en}
+                    </button>
+                  ))}
                 </div>
-
                 {[
-                  { field: "showWatermark" as const, labelAr: "إظهار العلامة المائية في صفحات الطباعة", labelEn: "Show watermark on print pages", icon: Eye },
                   { field: "showStampOnInvoices" as const, labelAr: "إظهار الختم على الفواتير", labelEn: "Show stamp on invoices", icon: Stamp },
                   { field: "showStampOnReceipts" as const, labelAr: "إظهار الختم على سندات القبض", labelEn: "Show stamp on receipts", icon: Stamp },
                   { field: "showStampOnStatements" as const, labelAr: "إظهار الختم على كشوف الحساب", labelEn: "Show stamp on statements", icon: Stamp },
-                ].map(({ field, labelAr, labelEn, icon: Icon }) => (
+                ].filter(({ field }) =>
+                  (printTab === "invoice" && field === "showStampOnInvoices") ||
+                  (printTab === "receipt" && field === "showStampOnReceipts") ||
+                  (printTab === "statement" && field === "showStampOnStatements")
+                ).map(({ field, labelAr, labelEn, icon: Icon }) => (
                   <div key={field} className="flex items-center justify-between gap-4 p-3 rounded-xl hover:bg-muted/30 transition-colors">
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center">
@@ -3179,170 +3140,46 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                   </div>
                 ))}
 
-                <Field label={isAR ? "عنوان الفاتورة الأساسي" : "Main Invoice Title"}>
-                  <input
-                    value={form.invoiceCreditTitleAr}
-                    onChange={e => setForm(p => ({ ...p, invoiceCreditTitleAr: e.target.value }))}
-                    className={inp}
-                  />
-                </Field>
-
-                <Field label={isAR ? "عنوان الفاتورة الفرعي" : "Sub Invoice Title"}>
-                  <input
-                    value={form.invoiceCreditTitleEn}
-                    onChange={e => setForm(p => ({ ...p, invoiceCreditTitleEn: e.target.value }))}
-                    className={inp}
-                  />
-                </Field>
-
-                <Field label={isAR ? "حجم عنوان الفاتورة" : "Invoice Title Font Size"}>
-                  <input
-                    type="number"
-                    value={form.invoiceTitleFontSize}
-                    onChange={e => setForm(p => ({ ...p, invoiceTitleFontSize: Number(e.target.value) }))}
-                    className={inp}
-                  />
-                </Field>
-
-                <TitleOptionsGrid
-                  title={isAR ? "خصائص عنوان الفاتورة" : "Invoice Title Properties"}
-                  isAR={isAR}
-                  value={{
-                    enabled: !!form.invoiceTitleVisible,
-                    align: form.invoiceTitleAlign || "center",
-                    bold: !!form.invoiceTitleBold,
-                    subtitleAr: form.invoiceSubtitleAr || "",
-                    subtitleEn: form.invoiceSubtitleEn || "",
-                    subtitleSize: Number(form.invoiceSubtitleFontSize ?? 12),
-                  }}
-                  onChange={(next) =>
-                    setForm((p) => ({
-                      ...p,
-                      invoiceTitleVisible: next.enabled,
-                      invoiceTitleAlign: next.align,
-                      invoiceTitleBold: next.bold,
-                      invoiceSubtitleAr: next.subtitleAr,
-                      invoiceSubtitleEn: next.subtitleEn,
-                      invoiceSubtitleFontSize: next.subtitleSize,
-                    }))
-                  }
-                />
-
-                <div className="space-y-2">
-                  <div className="text-xs font-bold text-muted-foreground">
-                    {isAR ? "عنوان كشف الحساب" : "Statement Title"}
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                    <Field label={isAR ? "عربي" : "Arabic"}>
-                      <input
-                        value={form.statementTitleAr}
-                        onChange={e => setForm(p => ({ ...p, statementTitleAr: e.target.value }))}
-                        className={inp}
-                      />
-                    </Field>
-
-                    <Field label="English">
-                      <input
-                        value={form.statementTitleEn}
-                        onChange={e => setForm(p => ({ ...p, statementTitleEn: e.target.value }))}
-                        className={inp}
-                      />
-                    </Field>
-
-                    <Field label={isAR ? "الحجم" : "Size"}>
-                      <input
-                        type="number"
-                        value={form.statementTitleFontSize}
-                        onChange={e => setForm(p => ({ ...p, statementTitleFontSize: Number(e.target.value) }))}
-                        className={inp}
-                      />
-                    </Field>
-                  </div>
+                <div id="print-panel-invoice" role="tabpanel" aria-labelledby="print-tab-invoice" hidden={printTab !== "invoice"} className="space-y-5">
+                  <DocumentTitleEditor prefix="invoice" titlePrefix="invoiceCredit" label={isAR ? "عنوان الفاتورة" : "Invoice title"} isAR={isAR} form={form} setForm={setForm} />
+                  <details className="rounded-xl border border-border bg-background">
+                    <summary className="cursor-pointer px-4 py-3 text-sm font-medium">{isAR ? "معاينة رأس الفاتورة" : "Invoice header preview"}</summary>
+                    <div className="overflow-auto rounded-b-xl bg-white p-4 text-gray-900"><InvoicePrintHeader company={form} logoSrc={currentLogoSrc} isAR={isAR} invoiceNumber="INV-PREVIEW" statusText={isAR ? "مسودة" : "Draft"} /></div>
+                  </details>
                 </div>
-
-                <TitleOptionsGrid
-                  title={isAR ? "خصائص عنوان كشف الحساب" : "Statement Title Properties"}
-                  isAR={isAR}
-                  value={{
-                    enabled: !!form.statementTitleVisible,
-                    align: form.statementTitleAlign || "center",
-                    bold: !!form.statementTitleBold,
-                    subtitleAr: form.statementSubtitleAr || "",
-                    subtitleEn: form.statementSubtitleEn || "",
-                    subtitleSize: Number(form.statementSubtitleFontSize ?? 12),
-                  }}
-                  onChange={(next) =>
-                    setForm((p) => ({
-                      ...p,
-                      statementTitleVisible: next.enabled,
-                      statementTitleAlign: next.align,
-                      statementTitleBold: next.bold,
-                      statementSubtitleAr: next.subtitleAr,
-                      statementSubtitleEn: next.subtitleEn,
-                      statementSubtitleFontSize: next.subtitleSize,
-                    }))
-                  }
-                />
-
-                <div className="space-y-2">
-                  <div className="text-xs font-bold text-muted-foreground">
-                    {isAR ? "عنوان ملخص العميل المالي" : "Customer Financial Summary Title"}
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                    <Field label={isAR ? "عربي" : "Arabic"}>
-                      <input
-                        value={form.customerLedgerTitleAr}
-                        onChange={e => setForm(p => ({ ...p, customerLedgerTitleAr: e.target.value }))}
-                        className={inp}
-                      />
-                    </Field>
-
-                    <Field label="English">
-                      <input
-                        value={form.customerLedgerTitleEn}
-                        onChange={e => setForm(p => ({ ...p, customerLedgerTitleEn: e.target.value }))}
-                        className={inp}
-                      />
-                    </Field>
-
-                    <Field label={isAR ? "الحجم" : "Size"}>
-                      <input
-                        type="number"
-                        value={form.customerLedgerTitleFontSize}
-                        onChange={e => setForm(p => ({ ...p, customerLedgerTitleFontSize: Number(e.target.value) }))}
-                        className={inp}
-                      />
-                    </Field>
-                  </div>
+                <div id="print-panel-receipt" role="tabpanel" aria-labelledby="print-tab-receipt" hidden={printTab !== "receipt"} className="space-y-5">
+                  <DocumentTitleEditor prefix="receipt" titlePrefix="receipt" label={isAR ? "عنوان سند القبض" : "Receipt title"} isAR={isAR} form={form} setForm={setForm} />
+                  <details className="rounded-xl border border-border bg-background">
+                    <summary className="cursor-pointer px-4 py-3 text-sm font-medium">{isAR ? "معاينة رأس سند القبض" : "Receipt header preview"}</summary>
+                    <div className="overflow-auto rounded-b-xl bg-white text-gray-900"><ReceiptPrintHeader receiptNumber="RCP-PREVIEW" override={{ settings: form, logoSrc: currentLogoSrc }} /></div>
+                  </details>
                 </div>
-
-                <TitleOptionsGrid
-                  title={isAR ? "خصائص عنوان ملخص العميل المالي" : "Customer Financial Summary Title Properties"}
-                  isAR={isAR}
-                  value={{
-                    enabled: !!form.customerLedgerTitleVisible,
-                    align: form.customerLedgerTitleAlign || "center",
-                    bold: !!form.customerLedgerTitleBold,
-                    subtitleAr: form.customerLedgerSubtitleAr || "",
-                    subtitleEn: form.customerLedgerSubtitleEn || "",
-                    subtitleSize: Number(form.customerLedgerSubtitleFontSize ?? 12),
-                  }}
-                  onChange={(next) =>
-                    setForm((p) => ({
-                      ...p,
-                      customerLedgerTitleVisible: next.enabled,
-                      customerLedgerTitleAlign: next.align,
-                      customerLedgerTitleBold: next.bold,
-                      customerLedgerSubtitleAr: next.subtitleAr,
-                      customerLedgerSubtitleEn: next.subtitleEn,
-                      customerLedgerSubtitleFontSize: next.subtitleSize,
-                    }))
-                  }
-                />
+                <div id="print-panel-statement" role="tabpanel" aria-labelledby="print-tab-statement" hidden={printTab !== "statement"} className="space-y-5">
+                  <DocumentTitleEditor prefix="statement" titlePrefix="statement" label={isAR ? "عنوان كشف الحساب" : "Statement title"} isAR={isAR} form={form} setForm={setForm} />
+                </div>
+                <div id="print-panel-ledger" role="tabpanel" aria-labelledby="print-tab-ledger" hidden={printTab !== "ledger"} className="space-y-5">
+                  <DocumentTitleEditor prefix="customerLedger" titlePrefix="customerLedger" label={isAR ? "عنوان ملخص العميل المالي" : "Customer summary title"} isAR={isAR} form={form} setForm={setForm} />
+                </div>
+                <div id="print-panel-common" role="tabpanel" aria-labelledby="print-tab-common" hidden={printTab !== "common"} className="space-y-5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="rounded-xl border border-border bg-muted/20 p-4 space-y-3">
+                      <h3 className="text-base font-semibold">{isAR ? "العلامة المائية" : "Watermark"}</h3>
+                      <div className="flex items-center justify-between gap-3"><span className="text-sm">{isAR ? "إظهارها في صفحات الطباعة" : "Show on print pages"}</span><Toggle field="showWatermark" /></div>
+                      <p className="text-sm text-muted-foreground">{isAR ? "تؤثر في الفواتير وسندات القبض والكشوف. تُرفع الصورة من تبويب الشعارات." : "Applies to invoices, receipts and statements. Upload the image in Branding."}</p>
+                    </div>
+                    <div className="rounded-xl border border-border bg-muted/20 p-4 space-y-3">
+                      <h3 className="text-base font-semibold">{isAR ? "التوقيعات" : "Signatures"}</h3>
+                      {canEditAccountantSignature && <div className="flex items-center justify-between gap-3"><span className="text-sm">{isAR ? "إظهار توقيع المحاسب" : "Show accountant signature"}</span><Toggle field="showAccountantSignature" /></div>}
+                      <div className="flex items-center justify-between gap-3"><span className="text-sm">{isAR ? "إظهار توقيع المستلم" : "Show receiver signature"}</span><Toggle field="showReceiverSignature" /></div>
+                      <p className="text-sm text-muted-foreground">{isAR ? "تؤثر في المستندات التي تعرض التوقيعات، مع مراعاة خيار إظهار التوقيعات داخل معاينة الطباعة." : "Applies where signatures are supported, subject to the signature toggle in print preview."}</p>
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-border bg-muted/20 p-4 space-y-4">
+                    <h3 className="text-base font-semibold">{isAR ? "تذييل المستندات" : "Document footer"}</h3>
 
                 <Field
                   label={isAR ? "نص التذييل في صفحات الطباعة" : "Footer text on print pages"}
-                  hint={isAR ? "يظهر في أسفل كل فاتورة وسند" : "Appears at the bottom of each invoice and receipt"}
+                  hint={isAR ? "نص مشترك يظهر في تذييل المستندات التي تستخدم إعدادات الطباعة" : "Shared text displayed in document print footers"}
                 >
                   <textarea
                     value={form.footerText}
@@ -3352,6 +3189,9 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                     placeholder={isAR ? "مثال: شكراً لتعاملكم معنا · جميع الأسعار شاملة الضريبة" : "e.g. Thank you for your business"}
                   />
                 </Field>
+                    {form.footerText && <div className="rounded-lg border border-gray-200 bg-white p-4 text-center text-xs text-gray-500 whitespace-pre-line">{form.footerText}</div>}
+                  </div>
+                </div>
               </div>
             </Section>
           )}
