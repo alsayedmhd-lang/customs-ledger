@@ -394,6 +394,30 @@ function getSyncQueueDisplayStatus(status: SyncQueueStatus, isAR: boolean) {
   return isAR ? "خامل" : "Idle";
 }
 
+function SectionNavigation({ options, value, onChange, label }: {
+  options: Array<{ id: string; label: string; hint: string; icon: React.ElementType }>;
+  value: string;
+  onChange: (value: string) => void;
+  label: string;
+}) {
+  return (
+    <nav aria-label={label} className="grid gap-3 md:grid-cols-3">
+      {options.map((option) => (
+        <button key={option.id} type="button" aria-pressed={value === option.id}
+          onClick={() => onChange(option.id)}
+          className={cn("flex items-start gap-3 rounded-xl border p-4 text-start transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
+            value === option.id ? "border-primary bg-primary/5 text-primary" : "border-border bg-card text-foreground hover:bg-muted/50")}>
+          <option.icon className="mt-0.5 h-5 w-5 shrink-0" />
+          <span className="min-w-0">
+            <span className="block text-sm font-semibold">{option.label}</span>
+            <span className="mt-1 block text-xs font-normal text-muted-foreground">{option.hint}</span>
+          </span>
+        </button>
+      ))}
+    </nav>
+  );
+}
+
 function InfoRow({ label, value, isAR }: { label: string; value?: string | number | boolean | null; isAR: boolean }) {
   return (
     <div className="rounded-lg border border-border bg-background px-3 py-2">
@@ -433,6 +457,8 @@ export default function DeveloperSettingsPage() {
   const [password, setPassword] = useState("");
   const [unlocked, setUnlocked] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>("security");
+  const [databaseSection, setDatabaseSection] = useState("local");
+  const [diagnosticsSection, setDiagnosticsSection] = useState("system");
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -1467,10 +1493,6 @@ export default function DeveloperSettingsPage() {
     }
   }
 
-  function showLocalDatabasePreviewMessage() {
-    setDatabaseMessage(tr("هذا الزر لا ينشئ قاعدة فعلية حالياً", "This button does not create an actual database right now"));
-  }
-
   async function analyzeDataStorage() {
     setIsDataStorageAnalyzing(true);
     try {
@@ -2019,7 +2041,7 @@ export default function DeveloperSettingsPage() {
     <SettingsShell
       dir={isRTL ? "rtl" : "ltr"}
       title={isAR ? "إعدادات المطوّر" : "Developer Settings"}
-      description={isAR ? "إعدادات حماية وتشخيص لا تعرض أسرار النظام أو كلمات المرور." : "System protection, diagnostics, database, and release controls."}
+      description={tr("إدارة الحماية والصلاحيات وقواعد البيانات وأدوات صيانة النظام.", "Manage security, permissions, databases, and system maintenance tools.")}
       tabs={developerTabs}
       activeTab={activeTab}
       onTabChange={setActiveTab}
@@ -2035,17 +2057,17 @@ export default function DeveloperSettingsPage() {
       {savedMessage && <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{savedMessage}</div>}
 
       {activeTab === "security" && (
-        <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+        <div className="grid items-start gap-4 xl:grid-cols-[1.2fr_0.8fr]">
           <div className="grid gap-4">
-          <Card className="rounded-lg">
-            <CardHeader><CardTitle className="text-lg">{tr("الحماية والترخيص", "Security & License")}</CardTitle></CardHeader>
+          <Card className="rounded-2xl border-border/70 shadow-sm">
+            <CardHeader><CardTitle className="text-lg">{tr("إعدادات الحماية", "Security Settings")}</CardTitle></CardHeader>
             <CardContent className="space-y-3">
               {securityToggles.map(([key, labelAr, labelEn, hintAr, hintEn]) => (
                 <ToggleRow key={key} label={tr(labelAr, labelEn)} hint={tr(hintAr, hintEn)} checked={!!settings[key]} onChange={(checked) => setBool(key, checked)} />
               ))}
             </CardContent>
           </Card>
-          <Card className="rounded-lg">
+          <Card className="rounded-2xl border-border/70 shadow-sm">
             <CardHeader><CardTitle className="text-lg">{tr("رسالة صفحة تسجيل الدخول", "Login Page Message")}</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
@@ -2081,7 +2103,7 @@ export default function DeveloperSettingsPage() {
             </CardContent>
           </Card>
           </div>
-          <Card className="rounded-lg">
+          <Card className="rounded-2xl border-border/70 shadow-sm">
             <CardHeader><CardTitle className="text-lg">{tr("بيانات الترخيص", "License Details")}</CardTitle></CardHeader>
             <CardContent className="grid gap-3">
               <div className="space-y-1">
@@ -2201,7 +2223,7 @@ export default function DeveloperSettingsPage() {
 
        {activeTab === "manager" && (
         <div className="grid gap-4">
-        <Card className="rounded-lg">
+        <Card className="rounded-2xl border-border/70 shadow-sm">
           <CardHeader><CardTitle className="text-lg">{tr("صلاحيات المدير", "Manager Access")}</CardTitle></CardHeader>
           <CardContent className="grid gap-3 md:grid-cols-2">
             {managerToggles.map(([key, labelAr, labelEn, hintAr, hintEn]) => (
@@ -2213,14 +2235,19 @@ export default function DeveloperSettingsPage() {
       )}
 
       {activeTab === "database" && (
-        <Card className="rounded-lg">
+        <Card className="rounded-2xl border-border/70 shadow-sm">
           <CardHeader><CardTitle className="text-lg">{tr("قاعدة البيانات", "Database")}</CardTitle></CardHeader>
           <CardContent className="space-y-4">
-            <details className="group rounded-2xl border border-border bg-card shadow-sm" open>
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-5 text-base font-semibold text-foreground [&::-webkit-details-marker]:hidden">
+            <SectionNavigation label={tr("أقسام قواعد البيانات", "Database sections")} value={databaseSection} onChange={setDatabaseSection} options={[
+              { id: "local", label: tr("المحلية", "Local"), hint: tr("SQLite ومسار البيانات", "SQLite and data location"), icon: Database },
+              { id: "online", label: tr("الأونلاين", "Online"), hint: tr("الاتصال والمزامنة عبر الإنترنت", "Internet connection and sync"), icon: Cloud },
+              { id: "internal", label: tr("الخادم الداخلي", "Internal Server"), hint: tr("اتصال الشبكة والمزامنة الداخلية", "Network connection and internal sync"), icon: Database },
+            ]} />
+
+            <section hidden={databaseSection !== "local"} className="rounded-xl border border-border bg-background">
+              <div className="flex items-center gap-3 px-5 py-4 text-base font-semibold text-foreground">
                 <span className="flex items-center gap-2"><Database className="h-5 w-5 text-primary" />{tr("قاعدة البيانات المحلية (SQLite)", "Local database (SQLite)")}</span>
-                <span aria-hidden="true" className="text-muted-foreground transition-transform group-open:rotate-180">⌄</span>
-              </summary>
+              </div>
               <div className="space-y-4 border-t border-border p-5">
             <div className="grid gap-3 md:grid-cols-2">
               <InfoRow isAR={isAR} label={tr("مسار SQLite", "SQLite path")} value={settings.sqlitePath} />
@@ -2232,7 +2259,6 @@ export default function DeveloperSettingsPage() {
             <div className="flex flex-wrap gap-2">
               <Button type="button" variant="outline" onClick={() => { void checkDatabase(); void loadReadinessStatus(); }} disabled={isReadinessLoading} className="gap-2"><RefreshCw className={cn("h-4 w-4", isReadinessLoading && "animate-spin")} />{tr("فحص الاتصال", "Check connection")}</Button>
               <Button type="button" variant="outline" onClick={copyDatabasePath} className="gap-2"><Copy className="h-4 w-4" />{tr("نسخ مسار قاعدة البيانات", "Copy database path")}</Button>
-              <Button type="button" variant="outline" onClick={createSqlFile} className="gap-2"><FileText className="h-4 w-4" />{tr("إنشاء ملف SQL", "Create SQL file")}</Button>
             </div>
 
               <div className="rounded-2xl border border-border bg-background/70 p-4 shadow-sm">
@@ -2258,7 +2284,6 @@ export default function DeveloperSettingsPage() {
                   </DevField>
                 </div>
                 <div className="mt-4 flex flex-wrap gap-2">
-                  <Button type="button" onClick={showLocalDatabasePreviewMessage} size="sm">{tr("إنشاء قاعدة جديدة", "Create new database")}</Button>
                   <Button type="button" variant="outline" onClick={createSqlFile} size="sm">{tr("تحميل ملف SQL لإنشاء قاعدة جديدة", "Download SQL file to create a new database")}</Button>
                 </div>
               </div>
@@ -2292,7 +2317,7 @@ export default function DeveloperSettingsPage() {
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <button
                   type="button"
                   onClick={async () => {
@@ -2439,29 +2464,15 @@ export default function DeveloperSettingsPage() {
                   {tr("فتح مجلد البيانات", "Open Data Folder")}
                 </button>
 
-                <button
-                  type="button"
-                  disabled
-                  className="px-4 py-2 rounded-xl border bg-muted text-muted-foreground cursor-not-allowed text-sm font-medium"
-                >
-                  {tr("النقل الآمن", "Safe Migration")}
-                </button>
               </div>
 
-              <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
-                {tr(
-                  "سيبقى النقل معطلاً حتى يتم ربط اختبار الكتابة وفحص المسار ومنع العمليات الحساسة.",
-                  "Migration will stay disabled until write-test, health validation, and operation-lock checks are connected."
-                )}
-              </div>
             </div>
               </div>
-            </details>
-            <details className="group rounded-2xl border border-border bg-card shadow-sm">
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-5 text-base font-semibold text-foreground [&::-webkit-details-marker]:hidden">
+            </section>
+            <section hidden={databaseSection !== "online"} className="rounded-xl border border-border bg-background">
+              <div className="flex items-center gap-3 px-5 py-4 text-base font-semibold text-foreground">
                 <span className="flex items-center gap-2"><Cloud className="h-5 w-5 text-primary" />{tr("قاعدة البيانات عبر الإنترنت (PostgreSQL)", "Online database (PostgreSQL)")}</span>
-                <span aria-hidden="true" className="text-muted-foreground transition-transform group-open:rotate-180">⌄</span>
-              </summary>
+              </div>
               <div className="space-y-4 border-t border-border p-5">
               <div className="rounded-2xl border border-border bg-background/70 p-4 shadow-sm">
                 <div className="mb-4 flex items-center gap-2 text-sm font-bold text-foreground">
@@ -2687,12 +2698,11 @@ export default function DeveloperSettingsPage() {
               </div>
             </div>
               </div>
-            </details>
-            <details className="group rounded-2xl border border-border bg-card shadow-sm">
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-5 text-base font-semibold text-foreground [&::-webkit-details-marker]:hidden">
+            </section>
+            <section hidden={databaseSection !== "internal"} className="rounded-xl border border-border bg-background">
+              <div className="flex items-center gap-3 px-5 py-4 text-base font-semibold text-foreground">
                 <span className="flex items-center gap-2"><Database className="h-5 w-5 text-primary" />{tr("قاعدة بيانات الخادم الداخلي", "Internal server database")}</span>
-                <span aria-hidden="true" className="text-muted-foreground transition-transform group-open:rotate-180">⌄</span>
-              </summary>
+              </div>
               <div className="space-y-4 border-t border-border p-5">
                 <p className="text-sm text-muted-foreground">
                   {tr("احفظ إعدادات PostgreSQL الخاصة بالشبكة الداخلية، ثم اختبر الاتصال أو تابع حالة المزامنة أدناه.", "Save the internal PostgreSQL settings, then test the connection or review sync status below.")}
@@ -2829,7 +2839,7 @@ export default function DeveloperSettingsPage() {
                   </div>
                 )}
               </div>
-            </details>
+            </section>
             {databaseMessage && <div role="status" className="text-sm text-muted-foreground">{databaseMessage}</div>}
           </CardContent>
         </Card>
@@ -2837,7 +2847,13 @@ export default function DeveloperSettingsPage() {
 
       {activeTab === "diagnostics" && (
         <div className="space-y-4">
-          <Card className="rounded-lg">
+          <SectionNavigation label={tr("أقسام الصيانة", "Maintenance sections")} value={diagnosticsSection} onChange={setDiagnosticsSection} options={[
+            { id: "system", label: tr("صحة النظام", "System Health"), hint: tr("حالة الخدمات وتقارير الفحص", "Service status and diagnostic reports"), icon: Activity },
+            { id: "storage", label: tr("التخزين", "Storage"), hint: tr("مسارات الملفات وتحليل التخزين", "File locations and storage analysis"), icon: Database },
+            { id: "backup", label: tr("النسخ الاحتياطي", "Backup"), hint: tr("الجاهزية والوصف والتحقق", "Readiness, manifest, and verification"), icon: PackageCheck },
+          ]} />
+          <div hidden={diagnosticsSection !== "system"} className="space-y-4">
+          <Card className="rounded-2xl border-border/70 shadow-sm">
             <CardHeader><CardTitle className="text-lg">{tr("النظام والتشخيص", "Diagnostics")}</CardTitle></CardHeader>
             <CardContent className="grid gap-3 md:grid-cols-2">
               <InfoRow isAR={isAR} label={tr("مسار الواجهة", "Frontend path")} value={settings.frontendPath} />
@@ -2848,24 +2864,8 @@ export default function DeveloperSettingsPage() {
             </CardContent>
           </Card>
 
-          <Card className="rounded-lg">
-            <CardHeader>
-              <CardTitle className="text-lg">
-                {tr("مسارات تخزين البيانات", "Data Storage Paths")}
-              </CardTitle>
-            </CardHeader>
 
-            <CardContent className="grid gap-3 md:grid-cols-2">
-              <InfoRow isAR={isAR} label={tr("مسار البيانات", "Data Root")} value={storageInfo?.dataRoot} />
-              <InfoRow isAR={isAR} label={tr("مصدر المسار", "Source")} value={storageInfo?.source} />
-              <InfoRow isAR={isAR} label={tr("قاعدة البيانات", "Database Dir")} value={storageInfo?.databaseDir} />
-              <InfoRow isAR={isAR} label={tr("النسخ الاحتياطية", "Backups Dir")} value={storageInfo?.backupsDir} />
-              <InfoRow isAR={isAR} label={tr("المرفقات", "Attachments Dir")} value={storageInfo?.attachmentsDir} />
-              <InfoRow isAR={isAR} label={tr("السجلات", "Logs Dir")} value={storageInfo?.logsDir} />
-            </CardContent>
-          </Card>
-
-          <Card className="rounded-lg">
+          <Card className="rounded-2xl border-border/70 shadow-sm">
             <CardHeader>
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <CardTitle className="text-lg">{tr("فحص صحة النظام", "System Diagnostics")}</CardTitle>
@@ -2967,8 +2967,26 @@ export default function DeveloperSettingsPage() {
             </CardContent>
           </Card>
 
+          </div>
+          <div hidden={diagnosticsSection !== "storage"} className="space-y-4">
+          <Card className="rounded-2xl border-border/70 shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-lg">
+                {tr("مسارات تخزين البيانات", "Data Storage Paths")}
+              </CardTitle>
+            </CardHeader>
+
+            <CardContent className="grid gap-3 md:grid-cols-2">
+              <InfoRow isAR={isAR} label={tr("مسار البيانات", "Data Root")} value={storageInfo?.dataRoot} />
+              <InfoRow isAR={isAR} label={tr("مصدر المسار", "Source")} value={storageInfo?.source} />
+              <InfoRow isAR={isAR} label={tr("قاعدة البيانات", "Database Dir")} value={storageInfo?.databaseDir} />
+              <InfoRow isAR={isAR} label={tr("النسخ الاحتياطية", "Backups Dir")} value={storageInfo?.backupsDir} />
+              <InfoRow isAR={isAR} label={tr("المرفقات", "Attachments Dir")} value={storageInfo?.attachmentsDir} />
+              <InfoRow isAR={isAR} label={tr("السجلات", "Logs Dir")} value={storageInfo?.logsDir} />
+            </CardContent>
+          </Card>
             <div className="rounded-2xl border border-border bg-background/70 p-4 shadow-sm">
-              <div className="mb-4 flex items-center justify-between gap-3">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-2 text-sm font-bold text-foreground">
                   <Database className="h-4 w-4 text-primary" />
                   <span>{isAR ? "تحليل تخزين البيانات" : "Data Storage Analysis"}</span>
@@ -3035,8 +3053,10 @@ export default function DeveloperSettingsPage() {
               )}
             </div>
 
+          </div>
+          <div hidden={diagnosticsSection !== "backup"} className="space-y-4">
             <div className="rounded-2xl border border-border bg-background/70 p-4 shadow-sm">
-              <div className="mb-4 flex items-center justify-between gap-3">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-2 text-sm font-bold text-foreground">
                   <Database className="h-4 w-4 text-primary" />
                   <span>{isAR ? "جاهزية النسخ الاحتياطي" : "Backup Readiness"}</span>
@@ -3086,7 +3106,7 @@ export default function DeveloperSettingsPage() {
             </div>
 
             <div className="rounded-2xl border border-border bg-background/70 p-4 shadow-sm">
-              <div className="mb-4 flex items-center justify-between gap-3">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-2 text-sm font-bold text-foreground">
                   <FileText className="h-4 w-4 text-primary" />
                   <span>{isAR ? "ملف وصف النسخة الاحتياطية" : "Backup Manifest"}</span>
@@ -3151,7 +3171,7 @@ export default function DeveloperSettingsPage() {
             </div>
 
             <div className="rounded-2xl border border-border bg-background/70 p-4 shadow-sm">
-              <div className="mb-4 flex items-center justify-between gap-3">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-2 text-sm font-bold text-foreground">
                   <PackageCheck className="h-4 w-4 text-primary" />
                   <span>{isAR ? "التحقق من النسخة الاحتياطية" : "Backup Verification"}</span>
@@ -3195,6 +3215,7 @@ export default function DeveloperSettingsPage() {
               )}
             </div>
 
+          </div>
         </div>
       )}
     </SettingsShell>
