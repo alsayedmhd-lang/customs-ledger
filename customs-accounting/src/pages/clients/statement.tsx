@@ -85,7 +85,7 @@ export default function ClientStatement() {
   const { user } = useAuth();
   const isAR = lang === "ar";
   const isClient = user?.role === "client";
-  const { settings, logoSrc, stampSrc, watermarkSrc, currentUser } = useCompanySettings();
+  const { settings, logoSrc, stampSrc, watermarkSrc } = useCompanySettings();
   const currencySymbol = lang === "en" ? "QAR" : "ر.ق";
   const canCustomize = user?.permissions?.canCustomizePrintContact;
   const printPhone = canCustomize && user?.phone ? user.phone : settings.phone;
@@ -448,7 +448,7 @@ export default function ClientStatement() {
                 rows.map((inv, idx) => (
                   <tr key={inv.id} className="border-b border-dashed border-gray-300 hover:bg-gray-50">
                     <td className="py-2 px-2 text-gray-500 text-center font-mono text-xs">
-                      {arabicNums(String(idx + 1).padStart(3, "0"))}
+                      {arabicNums(String(idx + 1).padStart(3, "0"), lang)}
                     </td>
                     <td className="py-2 px-3 text-gray-600">
                         {(inv as any).invoiceNumber || (inv as any).invoiceNo || "—"}
@@ -467,15 +467,15 @@ export default function ClientStatement() {
                       </span>
                     </td>
                     <td className="py-2 px-2 text-left font-mono font-bold text-gray-800">
-                      {formatNumber(((inv as any).subtotal ?? 0) + ((inv as any).taxAmount ?? 0) || inv.total, 2)}
+                      {formatNumber(((inv as any).subtotal ?? 0) + ((inv as any).taxAmount ?? 0) || inv.total, 2, lang)}
                     </td>
                     <td className="py-2 px-2 text-left font-mono font-bold text-green-700">
                       {(inv as any).advancePayment > 0
-                        ? formatNumber((inv as any).advancePayment, 2)
+                        ? formatNumber((inv as any).advancePayment, 2, lang)
                         : <span className="text-gray-300">—</span>}
                     </td>
                     <td className="py-2 px-2 text-left font-mono text-gray-700">
-                      {formatNumber(inv.runningBalance, 2)}
+                      {formatNumber(inv.runningBalance, 2, lang)}
                     </td>
                   </tr>
                 ))
@@ -557,7 +557,7 @@ export default function ClientStatement() {
           <div className="text-center text-xs text-gray-400 mt-1">
             طُبعت في: {new Date().toLocaleDateString(lang === "ar" ? "ar-EG-u-nu-latn" : "en-US", { year: "numeric", month: "long", day: "numeric" })}
             {" — "}المرجع: {statementRef}
-            {" — "}عدد الفواتير: {arabicNums(invoices.length)}
+            {" — "}عدد الفواتير: {arabicNums(invoices.length, lang)}
           </div>
           </div>
         </footer>
