@@ -1,4 +1,4 @@
-﻿export {};
+export {};
 
 declare global {
   interface Window {
@@ -44,6 +44,7 @@ declare global {
         error?: string;
       }>;
 
+      openExternalPrintWindow?: (url: string) => Promise<unknown>;
       openExternalFile?: (relativePath: string) => Promise<unknown>;
     };
   }

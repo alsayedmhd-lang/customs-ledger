@@ -29,6 +29,7 @@ import {
   useGetInvoice,
   useUpdateInvoice,
   getListInvoicesQueryKey,
+  getGetInvoiceQueryKey,
   CreateInvoiceRequestStatus,
 } from "@workspace/api-client-react";
 import { formatCurrency } from "@/lib/utils";
@@ -187,7 +188,7 @@ function readSuggestions(storageKey: string) {
   try {
     const parsed = JSON.parse(localStorage.getItem(storageKey) || "[]");
     return Array.isArray(parsed)
-      ? parsed.filter((item): item is string => typeof item === "string" && item.trim()).slice(0, 10)
+      ? parsed.filter((item): item is string => typeof item === "string" && item.trim().length > 0).slice(0, 10)
       : [];
   } catch {
     return [];
@@ -393,7 +394,7 @@ function SortableRow({
       </td>
 
       <td className="px-4 py-2 text-end font-mono text-sm font-semibold text-foreground">
-        {formatCurrency(qty * price)}
+        {formatCurrency(qty * price, undefined, isAR ? "ar" : "en")}
       </td>
 
       <td className="px-2 py-2 text-center">
@@ -451,7 +452,7 @@ function DuplicateInvoiceWarning({ matches, kind, isAR }: {
               {" — "}{isAR ? "وقت الإنشاء" : "Created at"}: {match.createdAt && !Number.isNaN(new Date(match.createdAt).getTime())
                 ? new Date(match.createdAt).toLocaleString(isAR ? "ar-QA" : "en-GB")
                 : (isAR ? "غير متوفر" : "Unavailable")}
-              {" — "}{isAR ? "إجمالي الفاتورة" : "Invoice total"}: {formatCurrency(match.invoiceTotal)}
+              {" — "}{isAR ? "إجمالي الفاتورة" : "Invoice total"}: {formatCurrency(match.invoiceTotal, undefined, isAR ? "ar" : "en")}
             </div>
           </li>
         ))}
@@ -483,7 +484,7 @@ export default function InvoiceForm() {
   const { data: clients } = useListClients();
   const { data: templates } = useListInvoiceItemTemplates();
   const { data: existingInvoice } = useGetInvoice(invoiceId, {
-    query: { enabled: hasInvoiceId },
+    query: { queryKey: getGetInvoiceQueryKey(invoiceId), enabled: hasInvoiceId },
   });
 
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
@@ -1759,7 +1760,7 @@ export default function InvoiceForm() {
               <div className="flex justify-between items-center text-sm text-muted-foreground">
                 <span>{isAR ? "المجموع الجزئي" : "Subtotal"}</span>
                 <span className="font-mono font-medium text-foreground">
-                  {formatCurrency(subtotal)}
+                  {formatCurrency(subtotal, undefined, lang)}
                 </span>
               </div>
 
@@ -1776,7 +1777,7 @@ export default function InvoiceForm() {
                   />
                 </div>
                 <span className="font-mono text-muted-foreground">
-                  {formatCurrency(taxAmount)}
+                  {formatCurrency(taxAmount, undefined, lang)}
                 </span>
               </div>
 
@@ -1795,7 +1796,7 @@ export default function InvoiceForm() {
                   />
                 </div>
                 <span className="font-mono text-green-600 font-medium">
-                  − {formatCurrency(Number(advancePaymentWatch))}
+                  − {formatCurrency(Number(advancePaymentWatch), undefined, lang)}
                 </span>
               </div>
 
@@ -1804,7 +1805,7 @@ export default function InvoiceForm() {
                   {isAR ? "الصافي المستحق" : "Net Due"}
                 </span>
                 <span className="text-lg font-bold font-mono text-primary">
-                  {formatCurrency(total)}
+                  {formatCurrency(total, undefined, lang)}
                 </span>
               </div>
             </div>
@@ -2232,5 +2233,3 @@ export default function InvoiceForm() {
     </motion.div>
   );
 }
-
-
