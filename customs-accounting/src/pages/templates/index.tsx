@@ -133,7 +133,7 @@ export default function TemplatesList() {
                 >
                   {tmpl.description}
                 </p>
-                <p className="text-sm font-mono font-black text-primary mt-auto">{formatCurrency(tmpl.defaultUnitPrice)}</p>
+                <p className="text-sm font-mono font-black text-primary mt-auto">{formatCurrency(tmpl.defaultUnitPrice, undefined, lang)}</p>
                 <div className="flex gap-1 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button onClick={() => setEditingTemplate(tmpl)}
                     className="flex-1 py-1 text-xs bg-muted hover:bg-primary/10 hover:text-primary rounded-lg transition-colors text-center"
@@ -201,7 +201,7 @@ export default function TemplatesList() {
                           {tmpl.description}
                         </span>
                       </td>
-                      <td className="px-4 py-3 font-mono font-bold text-primary">{formatCurrency(tmpl.defaultUnitPrice)}</td>
+                      <td className="px-4 py-3 font-mono font-bold text-primary">{formatCurrency(tmpl.defaultUnitPrice, undefined, lang)}</td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-2">
                           <button
@@ -265,6 +265,8 @@ function TemplateCard({
   onDelete: (id: number) => void;
   t: (k: string) => string;
 }) {
+  const { lang } = useLanguage();
+
   return (
     <div className="bg-card border border-border/50 rounded-2xl p-5 shadow-sm hover:shadow-md transition-all flex flex-col justify-between group hover:-translate-y-0.5">
       <div>
@@ -280,7 +282,7 @@ function TemplateCard({
         >
           {tmpl.description}
         </h3>
-        <p className="text-2xl font-mono font-black text-primary mt-3">{formatCurrency(tmpl.defaultUnitPrice)}</p>
+        <p className="text-2xl font-mono font-black text-primary mt-3">{formatCurrency(tmpl.defaultUnitPrice, undefined, lang)}</p>
       </div>
       <div className="flex justify-end gap-2 mt-4 opacity-0 group-hover:opacity-100 transition-opacity">
         <button
