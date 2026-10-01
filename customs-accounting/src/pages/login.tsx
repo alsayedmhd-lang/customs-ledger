@@ -136,7 +136,7 @@ export default function LoginPage() {
   const [developerUnlockMessage, setDeveloperUnlockMessage] = useState("");
   const [isDeveloperUnlocking, setIsDeveloperUnlocking] = useState(false);
   const versionClickCountRef = useRef(0);
-  const versionClickResetTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
+  const versionClickResetTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     let active = true;
