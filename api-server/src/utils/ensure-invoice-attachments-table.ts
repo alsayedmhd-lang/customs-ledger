@@ -3,6 +3,9 @@ import { sqlite } from "@workspace/db";
 let ensured = false;
 
 const attachmentColumns = [
+  ["sync_id", "ALTER TABLE invoice_attachments ADD COLUMN sync_id TEXT"],
+  ["file_hash", "ALTER TABLE invoice_attachments ADD COLUMN file_hash TEXT"],
+  ["updated_at", "ALTER TABLE invoice_attachments ADD COLUMN updated_at INTEGER"],
   ["invoice_id", "ALTER TABLE invoice_attachments ADD COLUMN invoice_id INTEGER"],
   ["declaration_number", "ALTER TABLE invoice_attachments ADD COLUMN declaration_number TEXT NOT NULL DEFAULT ''"],
   ["declaration_base_number", "ALTER TABLE invoice_attachments ADD COLUMN declaration_base_number TEXT NOT NULL DEFAULT ''"],
@@ -24,6 +27,9 @@ export function ensureInvoiceAttachmentsTable() {
   sqlite.exec(`
     CREATE TABLE IF NOT EXISTS invoice_attachments (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
+      sync_id TEXT,
+      file_hash TEXT,
+      updated_at INTEGER,
       invoice_id INTEGER,
       declaration_number TEXT NOT NULL,
       declaration_base_number TEXT NOT NULL,

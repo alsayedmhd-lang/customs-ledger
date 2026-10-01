@@ -2,6 +2,9 @@ import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 export const invoiceAttachmentsTableSqlite = sqliteTable("invoice_attachments", {
   id: integer("id").primaryKey({ autoIncrement: true }),
+  syncId: text("sync_id"),
+  fileHash: text("file_hash"),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" }),
   invoiceId: integer("invoice_id"),
   declarationNumber: text("declaration_number").notNull(),
   declarationBaseNumber: text("declaration_base_number").notNull(),
