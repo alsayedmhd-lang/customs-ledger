@@ -46,7 +46,7 @@ function scheduleLoginSync() {
     const settings = sqlite.prepare(
       "SELECT sync_auto_sync AS autoSync, sync_timing AS timing, sync_mode AS mode, database_mode AS databaseMode, internal_sync_auto_sync AS internalAutoSync FROM company_settings LIMIT 1"
     ).get() as { autoSync: number; timing: string; mode: string; databaseMode: string; internalAutoSync: number } | undefined;
-    if (!settings?.autoSync || settings.databaseMode !== "online" || settings.internalAutoSync || settings.timing !== "startup") return;
+    if (!settings?.autoSync || settings.databaseMode !== "online" || settings.internalAutoSync || !["startup", "interval"].includes(settings.timing)) return;
     setImmediate(() => {
       void runConfiguredSyncOnce(settings.mode).then((result) => {
         sqlite.prepare("UPDATE company_settings SET sync_status = ?, sync_last_sync_time = ?")
