@@ -21,6 +21,7 @@ export interface CompanySettings {
   taxNumber: string;
   logoBase64: string | null;
   logoSize?: number;
+  logoHeight?: number;
   stampBase64: string | null;
   watermarkBase64: string | null;
   showWatermark: boolean;

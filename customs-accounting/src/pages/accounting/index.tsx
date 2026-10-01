@@ -285,15 +285,18 @@ export default function AccountingPage() {
   );
 
   const setField = (
-    rowId: number,
+    row: AccountingRow,
     field: keyof RowEdit,
     value: string | boolean,
   ) => {
     setEdits((prev) => ({
       ...prev,
-      [rowId]: { ...(prev[rowId] ?? {}), [field]: value },
+      [row.id]: {
+        ...(prev[row.id] ?? rowToEdit(row)),
+        [field]: value,
+      },
     }));
-    setSaved((prev) => ({ ...prev, [rowId]: false }));
+    setSaved((prev) => ({ ...prev, [row.id]: false }));
   };
 
   const saveRow = useCallback(
@@ -934,7 +937,7 @@ export default function AccountingPage() {
                       <td className="px-1.5 py-1.5 border-r border-border/40">
                         <NumInput
                           value={e.payments}
-                          onChange={(v) => setField(row.id, "payments", v)}
+                          onChange={(v) => setField(row, "payments", v)}
                         />
                       </td>
 
@@ -943,7 +946,7 @@ export default function AccountingPage() {
                         <NumInput
                           value={e.transportation}
                           onChange={(v) =>
-                            setField(row.id, "transportation", v)
+                            setField(row, "transportation", v)
                           }
                           paid={e.transportationPaid}
                         />
@@ -952,8 +955,7 @@ export default function AccountingPage() {
                         <PaidToggle
                           checked={e.transportationPaid}
                           onChange={() =>
-                            setField(
-                              row.id,
+                            setField(row,
                               "transportationPaid",
                               !e.transportationPaid,
                             )
@@ -964,7 +966,7 @@ export default function AccountingPage() {
                       <td className="px-1.5 py-1.5">
                         <TxtInput
                           value={e.driverName}
-                          onChange={(v) => setField(row.id, "driverName", v)}
+                          onChange={(v) => setField(row, "driverName", v)}
                           placeholder={t("driver")}
                         />
                       </td>
@@ -972,7 +974,7 @@ export default function AccountingPage() {
                         <TxtInput
                           value={e.unloadLocation}
                           onChange={(v) =>
-                            setField(row.id, "unloadLocation", v)
+                            setField(row, "unloadLocation", v)
                           }
                           placeholder={t("Location")}
                         />
@@ -982,7 +984,7 @@ export default function AccountingPage() {
                       <td className="px-1.5 py-1.5 border-r border-border/40">
                         <NumInput
                           value={e.labor}
-                          onChange={(v) => setField(row.id, "labor", v)}
+                          onChange={(v) => setField(row, "labor", v)}
                           paid={e.laborPaid}
                         />
                       </td>
@@ -990,7 +992,7 @@ export default function AccountingPage() {
                         <PaidToggle
                           checked={e.laborPaid}
                           onChange={() =>
-                            setField(row.id, "laborPaid", !e.laborPaid)
+                            setField(row, "laborPaid", !e.laborPaid)
                           }
                           color="bg-purple-500 border-purple-500"
                         />
@@ -1000,7 +1002,7 @@ export default function AccountingPage() {
                       <td className="px-1.5 py-1.5 border-r border-border/40">
                         <NumInput
                           value={e.otherExpenses}
-                          onChange={(v) => setField(row.id, "otherExpenses", v)}
+                          onChange={(v) => setField(row, "otherExpenses", v)}
                           paid={e.otherExpensesPaid}
                         />
                       </td>
@@ -1008,8 +1010,7 @@ export default function AccountingPage() {
                         <PaidToggle
                           checked={e.otherExpensesPaid}
                           onChange={() =>
-                            setField(
-                              row.id,
+                            setField(row,
                               "otherExpensesPaid",
                               !e.otherExpensesPaid,
                             )
