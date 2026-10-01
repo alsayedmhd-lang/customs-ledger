@@ -466,7 +466,7 @@ export default function ReceiptPrint() {
                   </span>
                 </td>
                 <td className="py-2.5 px-3 text-left font-mono font-bold text-gray-800 border-r border-gray-300" dir="ltr">
-                  {formatNumber(receipt.amount, 2)}
+                  {formatNumber(receipt.amount, 2, lang)}
                 </td>
               </tr>
             </tbody>
@@ -475,7 +475,7 @@ export default function ReceiptPrint() {
           <div className="flex justify-between items-center border-t-2 border-double border-gray-700 pt-1.5 mt-0">
             <span className="font-black text-sm text-gray-800">Grand Total / الإجمالي الكلي</span>
             <span className="font-black font-mono text-lg text-gray-900">
-              {formatNumber(receipt.amount, 2)} {currencySymbol}
+              {formatNumber(receipt.amount, 2, lang)} {currencySymbol}
             </span>
           </div>
 
