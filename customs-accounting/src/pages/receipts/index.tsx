@@ -183,7 +183,7 @@ const getClientName = (receipt: { clientName?: string | null; clientId?: number 
         <div>
           <p className="text-sm text-muted-foreground">{t("totalCollected")}</p>
           <p className="text-2xl font-bold text-foreground">
-            {showAmounts ? formatCurrency(totalAmount) : hidden}
+            {showAmounts ? formatCurrency(totalAmount, undefined, lang) : hidden}
           </p>
         </div>
 
@@ -298,7 +298,7 @@ const getClientName = (receipt: { clientName?: string | null; clientId?: number 
                     </td>
 
                     <td className="px-4 py-3 font-bold text-green-700">
-                      {showAmounts ? formatCurrency(receipt.amount) : hidden}
+                      {showAmounts ? formatCurrency(receipt.amount, undefined, lang) : hidden}
                     </td>
 
                     <td className="px-4 py-3">
