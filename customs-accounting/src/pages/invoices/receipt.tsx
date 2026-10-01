@@ -593,15 +593,15 @@ const impExpValue =
               {invoice.items.map((item, idx) => (
                 <tr key={item.id} className="border-b border-dashed border-slate-300">
                   <td className="py-1 px-2 text-gray-500 text-center font-mono text-xs">
-                    {arabicNums(String(idx + 1).padStart(4, "0"))}
+                    {arabicNums(String(idx + 1).padStart(4, "0"), lang)}
                   </td>
                   <td className="py-1 px-2 text-gray-800">{item.description}</td>
-                  <td className="py-1 px-2 text-center text-gray-700">{arabicNums(item.quantity)}</td>
+                  <td className="py-1 px-2 text-center text-gray-700">{arabicNums(item.quantity, lang)}</td>
                   <td className="py-1 px-2 text-center font-mono text-gray-700">
-                    {formatNumber(item.unitPrice, 2)}
+                    {formatNumber(item.unitPrice, 2, lang)}
                   </td>
                   <td className="py-1 px-2 text-left font-mono font-bold text-gray-800">
-                    {formatNumber(item.total, 2)}
+                    {formatNumber(item.unitPrice * item.quantity, 2, lang)}
                   </td>
                 </tr>
               ))}
@@ -623,18 +623,18 @@ const impExpValue =
         {/* ══ TOTALS ══════════════════════════════════════════════════════ */}
         <div className="w-full max-w-none pb-2 pl-[5mm]">
           <div className="border-t border-slate-700 pt-2 space-y-1">
-            <TotalRow label="إجمالي الفاتورة / Invoice Amount" value={invoice.subtotal} />
+            <TotalRow label="إجمالي الفاتورة / Invoice Amount" value={invoice.subtotal} lang={lang} />
             {invoice.taxRate > 0 && (
-              <TotalRow label={`ضريبة / Tax (${arabicNums(invoice.taxRate)}%)`} value={invoice.taxAmount} />
+              <TotalRow label={`ضريبة / Tax (${arabicNums(invoice.taxRate, lang)}%)`} value={invoice.taxAmount} lang={lang} />
             )}
             {(invoice as any).advancePayment > 0 && (
-              <TotalRow label="الدفعة المقدمة / Advance Payment" value={(invoice as any).advancePayment} negative />
+              <TotalRow label="الدفعة المقدمة / Advance Payment" value={(invoice as any).advancePayment} negative lang={lang} />
             )}
 
             <div className="flex justify-between items-center border-t border-slate-700 pt-2 mt-1 px-2">
               <span className="font-black text-base text-gray-800">الإجمالي الكلي / Grand Total</span>
               <span className="font-black font-mono text-base text-gray-900">
-                {formatNumber(invoice.total, 2)} {currencySymbol}
+                {formatNumber(invoice.total, 2, lang)} {currencySymbol}
               </span>
             </div>
           </div>
@@ -728,7 +728,7 @@ const impExpValue =
           <div className="flex items-center justify-between text-xs text-gray-600">
             <span>✉ {printEmail}</span>
             <span className="font-bold text-gray-800">
-              {company.nameAr} · {company.nameEn.split(" ").slice(0, 3).join(" ")} C.C
+              {company.nameAr} - {company.nameEn}
             </span>
             <span>
               {company.poBox} {company.address} · ☎ {printPhone}
@@ -758,17 +758,19 @@ function TotalRow({
   label,
   value,
   negative,
+  lang,
 }: {
   label: string;
   value: number;
   negative?: boolean;
+  lang: Parameters<typeof formatNumber>[2];
 }) {
   return (
     <div className="flex justify-between items-center text-sm px-2">
       <span className="text-gray-700">{label}</span>
       <span className={`font-mono font-bold ${negative ? "text-green-700" : "text-gray-800"}`}>
         {negative ? "- " : ""}
-        {formatNumber(value, 2)}
+        {formatNumber(value, 2, lang)}
       </span>
     </div>
   );

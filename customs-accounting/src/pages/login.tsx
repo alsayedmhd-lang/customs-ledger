@@ -557,11 +557,11 @@ export default function LoginPage() {
               <h1
                 className="text-3xl font-black leading-tight tracking-wide"
                 style={{ color: loginTheme.textMain }}
-              >{isAR ? settings.nameAr || "اسم الشركة " : settings.nameEn || "Around The World"}</h1>
+              >{isAR ? settings.nameAr || "اسم الشركة " : settings.nameEn || "Company Name"}</h1>
               <p
               className="font-semibold mt-0.5 text-sm tracking-widest uppercase"
               style={{ color: loginTheme.textMuted }}
-            > {isAR ? settings.subtitleAr || "نشاط الشركة" : settings.subtitleEn || "Customs Clearance"}</p>
+            > {isAR ? settings.subtitleAr || "نشاط الشركة" : settings.subtitleEn || "Company Subtitle"}</p>
             </div>
           </div>
         </div>
