@@ -23,6 +23,24 @@ async function start() {
     console.log(`🌍 Access it at: http://0.0.0.0:${port}`);
     console.log(`📡 Listening on port: ${port}`);
 
+    if (
+      process.env.DB_PROVIDER === "sqlite" &&
+      process.env.APP_DATA_ROOT?.trim()
+    ) {
+      const dataRoot = process.env.APP_DATA_ROOT.trim();
+
+      void import("./utils/backfill-invoice-attachment-hashes")
+        .then(({ backfillInvoiceAttachmentHashes }) =>
+          backfillInvoiceAttachmentHashes(dataRoot)
+        )
+        .catch((error) => {
+          console.error(
+            "[ATTACHMENT_HASH_BACKFILL] Background task failed:",
+            error
+          );
+        });
+    }
+
     try {
       console.log("⏳ Starting admin seeding...");
       await seedAdminUser();
