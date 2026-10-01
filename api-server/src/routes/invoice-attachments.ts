@@ -88,6 +88,10 @@ router.get("/invoice-attachments/:declarationBaseNumber", async (req, res) => {
 
 router.post("/invoice-attachments", async (req, res) => {
   try {
+    const suppliedHash = optionalTrimmedString(req.body.fileHash);
+    if (suppliedHash && !/^[a-fA-F0-9]{64}$/.test(suppliedHash)) {
+      return res.status(400).json({ error: "Invalid SHA-256 fileHash" });
+    }
     const validationError = validateCreateBody(req.body);
     if (validationError) {
       return res.status(400).json({ error: validationError });
@@ -117,6 +121,7 @@ router.post("/invoice-attachments", async (req, res) => {
         mimeType: optionalTrimmedString(req.body.mimeType),
         fileSize,
         category: optionalTrimmedString(req.body.category) || "other",
+        fileHash: optionalTrimmedString(req.body.fileHash)?.toLowerCase() ?? null,
         storageProvider: "local",
         createdBy: req.user?.userId ?? null,
         createdAt: new Date(),

@@ -1856,10 +1856,20 @@ ipcMain.handle("attachment:save-file", async (_event, payload = {}) => {
     fs.mkdirSync(targetDir, { recursive: true });
     fs.copyFileSync(sourcePath, targetPath);
 
+    const fileHash = await new Promise((resolve, reject) => {
+      const hash = crypto.createHash("sha256");
+      const stream = fs.createReadStream(targetPath);
+
+      stream.on("data", (chunk) => hash.update(chunk));
+      stream.on("error", reject);
+      stream.on("end", () => resolve(hash.digest("hex")));
+    });
+
     return {
       ok: true,
       relativePath: getAttachmentRelativePath("declarations", declarationBaseNumber, storedName),
       fullPath: targetPath,
+      fileHash,
     };
   } catch (error) {
     console.error("Attachment save error:", error);

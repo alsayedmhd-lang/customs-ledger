@@ -144,6 +144,7 @@ type InvoiceAttachment = {
 type AttachmentSaveResult = {
   ok: boolean;
   relativePath?: string;
+  fileHash?: string;
   fullPath?: string;
   error?: string;
 };
@@ -1051,6 +1052,7 @@ export default function InvoiceForm() {
           fileName: selected.fileName,
           storedName,
           relativePath: saveResult.relativePath,
+          fileHash: saveResult.fileHash,
           mimeType: extension || null,
           fileSize: selected.size ?? null,
           category,
