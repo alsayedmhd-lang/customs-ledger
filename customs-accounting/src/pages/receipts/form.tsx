@@ -13,6 +13,7 @@ import {
   useUpdateReceipt,
   getListReceiptsQueryKey,
   getListInvoicesQueryKey,
+  getGetInvoiceQueryKey,
 } from "@workspace/api-client-react";
 import { formatCurrency } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
@@ -66,7 +67,7 @@ export default function ReceiptForm() {
   const { data: clients } = useListClients();
   const { data: invoices } = useListInvoices();
   const { data: linkedInvoice } = useGetInvoice(invoiceIdFromUrlNumber, {
-    query: { enabled: !isEdit && invoiceIdFromUrlNumber > 0 },
+    query: { queryKey: getGetInvoiceQueryKey(invoiceIdFromUrlNumber), enabled: !isEdit && invoiceIdFromUrlNumber > 0 },
   });
   const { data: existing } = useGetReceipt(receiptId);
   const queryClient = useQueryClient();
@@ -438,7 +439,7 @@ export default function ReceiptForm() {
                 <SelectItem value="none">{tr("بدون فاتورة (دفعة مستقلة)", "No invoice (independent payment)")}</SelectItem>
                 {clientInvoices.map((inv) => (
                   <SelectItem key={inv.id} value={String(inv.id)}>
-                    {inv.invoiceNumber} - {formatCurrency(inv.total)} ({inv.status === "paid" ? tr("مدفوعة", "Paid") : inv.status === "issued" ? tr("صادرة", "Issued") : tr("مسودة", "Draft")})
+                    {inv.invoiceNumber} - {formatCurrency(inv.total, undefined, lang)} ({inv.status === "paid" ? tr("مدفوعة", "Paid") : inv.status === "issued" ? tr("صادرة", "Issued") : tr("مسودة", "Draft")})
                   </SelectItem>
                 ))}
               </SelectContent>
