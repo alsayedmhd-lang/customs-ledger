@@ -296,13 +296,13 @@ export default function TrashPage() {
                       <td className={`${tdCls} font-mono font-bold text-primary`}>{inv.invoiceNumber}</td>
                       <td className={`${tdCls} font-medium`}>{inv.clientName}</td>
                       <td className={`${tdCls} text-muted-foreground`}>{formatDate(inv.issueDate, lang)}</td>
-                      <td className={`${tdCls} font-semibold`}>{formatCurrency(inv.total, lang)}</td>
+                      <td className={`${tdCls} font-semibold`}>{formatCurrency(inv.total, undefined, lang)}</td>
                       <td className={tdCls}>
                         <span className={cn("inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold", statusColors[inv.status])}>
                           {statusLabels[inv.status] ?? inv.status}
                         </span>
                       </td>
-                      <td className={`${tdCls} text-muted-foreground text-xs`}>{timeSince(inv.deletedAt, lang)}</td>
+                      <td className={`${tdCls} text-muted-foreground text-xs`}>{timeSince(inv.deletedAt)}</td>
                       <td className={tdCls}>
                         <div className="flex items-center justify-center gap-2">
                           <Button size="sm" variant="outline"
@@ -360,9 +360,9 @@ export default function TrashPage() {
                       <td className={`${tdCls} font-mono font-bold text-primary`}>{rec.receiptNumber}</td>
                       <td className={`${tdCls} font-medium`}>{rec.clientName}</td>
                       <td className={`${tdCls} text-muted-foreground`}>{formatDate(rec.receivedAt, lang)}</td>
-                      <td className={`${tdCls} font-semibold`}>{formatCurrency(rec.amount, lang)}</td>
+                      <td className={`${tdCls} font-semibold`}>{formatCurrency(rec.amount, undefined, lang)}</td>
                       <td className={`${tdCls} text-muted-foreground`}>{methodLabels[rec.paymentMethod] ?? rec.paymentMethod}</td>
-                      <td className={`${tdCls} text-muted-foreground text-xs`}>{timeSince(rec.deletedAt, lang)}</td>
+                      <td className={`${tdCls} text-muted-foreground text-xs`}>{timeSince(rec.deletedAt)}</td>
                       <td className={tdCls}>
                         <div className="flex items-center justify-center gap-2">
                           <Button size="sm" variant="outline"
