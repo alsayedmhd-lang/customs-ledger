@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { sqlite } from "@workspace/db";
 
 let ensured = false;
@@ -53,6 +54,32 @@ export function ensureInvoiceAttachmentsTable() {
     if (!existing.has(column)) sqlite.exec(sql);
   }
 
+  const backfilledCount = sqlite.transaction(() => {
+    const rows = sqlite.prepare(`
+      SELECT id
+      FROM invoice_attachments
+      WHERE sync_id IS NULL OR TRIM(sync_id) = ''
+    `).all() as Array<{ id: number }>;
+
+    const update = sqlite.prepare(`
+      UPDATE invoice_attachments
+      SET sync_id = ?,
+          updated_at = COALESCE(updated_at, NULLIF(deleted_at, 0), NULLIF(created_at, 0), ?)
+      WHERE id = ? AND (sync_id IS NULL OR TRIM(sync_id) = '')
+    `);
+
+    const now = Date.now();
+
+    for (const row of rows) {
+      update.run(randomUUID(), now, row.id);
+    }
+
+    return rows.length;
+  })();
+
   ensured = true;
   console.log("Ensured invoice_attachments table");
+  if (backfilledCount > 0) {
+    console.log(`Backfilled invoice attachment sync IDs: ${backfilledCount}`);
+  }
 }
