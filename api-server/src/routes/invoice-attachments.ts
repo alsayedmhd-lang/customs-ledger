@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { Router, type IRouter } from "express";
 import { and, desc, eq, isNull, or } from "drizzle-orm";
 import { db, invoiceAttachmentsTable, invoicesTable } from "@workspace/db";
@@ -105,6 +106,8 @@ router.post("/invoice-attachments", async (req, res) => {
     const [attachment] = await db
       .insert(invoiceAttachmentsTable)
       .values({
+        syncId: randomUUID(),
+        updatedAt: new Date(),
         invoiceId,
         declarationNumber: String(req.body.declarationNumber).trim(),
         declarationBaseNumber: String(req.body.declarationBaseNumber).trim(),
@@ -150,7 +153,7 @@ router.delete("/invoice-attachments/:id", async (req, res) => {
 
     const [attachment] = await db
       .update(invoiceAttachmentsTable)
-      .set({ deletedAt: new Date() })
+      .set({ deletedAt: new Date(), updatedAt: new Date() })
       .where(and(eq(invoiceAttachmentsTable.id, id), isNull(invoiceAttachmentsTable.deletedAt)))
       .returning();
 
