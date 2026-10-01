@@ -7,9 +7,9 @@ import { formatCurrency, formatDate } from "@/lib/utils";
 import { BookOpen, FileText, TrendingDown, TrendingUp, User, Printer, Eye, EyeOff } from "lucide-react";
 import { useLanguage } from "@/lib/language-context";
 
-type Client = NonNullable<ReturnType<typeof useListClients>["data"]>[number];
-type Invoice = NonNullable<ReturnType<typeof useListInvoices>["data"]>[number];
-type Receipt = NonNullable<ReturnType<typeof useListReceipts>["data"]>[number];
+import type { Client, Invoice } from "@workspace/api-client-react";
+
+
 interface ClientSummary {
   client: Client;
   totalInvoiced: number;
