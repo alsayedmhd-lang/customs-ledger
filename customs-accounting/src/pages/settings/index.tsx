@@ -907,7 +907,7 @@ const base64ToBuffer = (base64: string) =>
     return () => off?.();
   }, [isAR]);
 
-const deriveBackupKey = async (password: string, salt: Uint8Array) => {
+const deriveBackupKey = async (password: string, salt: Uint8Array<ArrayBuffer>) => {
   const keyMaterial = await crypto.subtle.importKey(
     "raw",
     textEncoder.encode(password),
@@ -1547,7 +1547,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
   const currentStampSrc = stampPreview || stampSrc;
   const currentWatermarkSrc = watermarkPreview || watermarkSrc;
 
-  const TABS = [
+  const TABS: Array<{ id: TabId; icon: typeof Eye; labelAr: string; labelEn: string; color: string }> = [
   { id: "preview", icon: Eye, labelAr: "المعاينة", labelEn: "Preview", color: "text-indigo-500" },
 
   { id: "company", icon: Building2, labelAr: "بيانات الشركة", labelEn: "Company", color: "text-blue-500" },
@@ -1602,7 +1602,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
         .ledger-settings .settings-control-content label { font-size: 14px; line-height: 20px; }
         .ledger-settings .settings-control-content button:not([role="switch"]) { font-size: 14px; }
       `}</style>
-      <SettingsShell
+      <SettingsShell<TabId>
         dir={isRTL ? "rtl" : "ltr"}
         title={isAR ? "إعدادات البرنامج" : "Settings"}
         description={isAR ? "إدارة إعدادات الشركة والطباعة والنسخ الاحتياطي ومظهر التطبيق" : "Manage company, print, backup, and appearance settings"}
