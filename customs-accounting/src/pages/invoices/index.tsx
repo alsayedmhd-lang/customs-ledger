@@ -2,7 +2,7 @@ import ResizableScrollArea from "@/components/layout/ResizableScrollArea";
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { motion } from "framer-motion";
-import { useListInvoices, useDeleteInvoice, getListInvoicesQueryKey, useGetInvoice } from "@workspace/api-client-react";
+import { useListInvoices, useDeleteInvoice, getListInvoicesQueryKey, getGetInvoiceQueryKey, useGetInvoice } from "@workspace/api-client-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { StatusBadge } from "../dashboard";
 import { Plus, Search, Edit2, Trash2, Printer, FileText, Send, CheckCircle2, XCircle, Eye, EyeOff } from "lucide-react";
@@ -54,19 +54,24 @@ export default function InvoicesList() {
   const [copyId, setCopyId] = useState<number | null>(null);
 
   const { data: invoiceToCopy } = useGetInvoice(copyId || 0, {
-    query: { enabled: copyId !== null },
+    query: { queryKey: getGetInvoiceQueryKey(copyId || 0), enabled: copyId !== null },
   });
 
   useEffect(() => {
     if (!invoiceToCopy) return;
+
+    const copySource: typeof invoiceToCopy & {
+      advancePayment?: number | null;
+      importerExporterName?: string | null;
+    } = invoiceToCopy;
 
     sessionStorage.setItem(
       "copy_invoice",
       JSON.stringify({
         clientId: invoiceToCopy.clientId,
         taxRate: invoiceToCopy.taxRate,
-        advancePayment: invoiceToCopy.advancePayment ?? 0,
-        importerExporterName: invoiceToCopy.importerExporterName ?? "",
+        advancePayment: copySource.advancePayment ?? 0,
+        importerExporterName: copySource.importerExporterName ?? "",
         portOfEntry: invoiceToCopy.portOfEntry ?? "",
         shipmentRef: invoiceToCopy.shipmentRef ?? "",
         billOfLading: invoiceToCopy.billOfLading ?? "",
@@ -99,7 +104,7 @@ export default function InvoicesList() {
     "";
 
   const salesmanOptions = isClient
-    ? [user?.displayName || user?.displayNameAr || user?.displayNameEn || user?.username || user?.name].filter(Boolean)
+    ? [user?.displayName || user?.displayNameAr || user?.displayNameEn || user?.username].filter(Boolean)
     : [
         ...new Set(
           invoices
@@ -250,7 +255,7 @@ export default function InvoicesList() {
               <div className="ms-auto text-end min-w-0">
                 <p className="text-sm text-muted-foreground">{t("total")}</p>
                 <p className="text-lg font-bold text-foreground truncate">
-                  {showAmounts ? formatCurrency(stat.total) : hiddenAmount}
+                  {showAmounts ? formatCurrency(stat.total, undefined, lang) : hiddenAmount}
                 </p>
               </div>
             </motion.div>
@@ -415,7 +420,7 @@ export default function InvoicesList() {
                     </td>
 
                     <td className="px-4 py-3 text-end">
-                      <span className="font-mono font-bold text-sm">{formatCurrency(inv.total)}</span>
+                      <span className="font-mono font-bold text-sm">{formatCurrency(inv.total, undefined, lang)}</span>
                     </td>
 
                     <td className="px-4 py-3 text-end">

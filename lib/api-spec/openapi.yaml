@@ -452,6 +452,12 @@ components:
           type: number
         total:
           type: number
+        advancePayment:
+          type: number
+          nullable: true
+        importerExporterName:
+          type: string
+          nullable: true
         notes:
           type: string
           nullable: true
