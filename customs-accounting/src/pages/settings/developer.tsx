@@ -260,10 +260,10 @@ type BackupVerificationResult =
       error: string;
     };
 type BoolKey = {
-  [K in keyof DeveloperSettings]: DeveloperSettings[K] extends boolean ? K : never;
+  [K in keyof DeveloperSettings]-?: NonNullable<DeveloperSettings[K]> extends boolean ? K : never;
 }[keyof DeveloperSettings];
 type TextKey = {
-  [K in keyof DeveloperSettings]: DeveloperSettings[K] extends string ? K : never;
+  [K in keyof DeveloperSettings]-?: NonNullable<DeveloperSettings[K]> extends string ? K : never;
 }[keyof DeveloperSettings];
 
 const securityToggles: Array<[BoolKey, string, string, string, string]> = [
@@ -2047,7 +2047,7 @@ export default function DeveloperSettingsPage() {
         .ledger-developer-settings button:not([role="switch"]):not([role="checkbox"]):not([role="radio"]) { min-height: 36px; font-size: 14px; }
         .ledger-developer-settings input[type="number"] { max-width: 160px; }
       `}</style>
-    <SettingsShell
+    <SettingsShell<TabId>
       dir={isRTL ? "rtl" : "ltr"}
       title={isAR ? "إعدادات المطوّر" : "Developer Settings"}
       description={tr("إدارة الحماية والصلاحيات وقواعد البيانات وأدوات صيانة النظام.", "Manage security, permissions, databases, and system maintenance tools.")}

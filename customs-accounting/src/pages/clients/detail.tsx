@@ -269,12 +269,12 @@ function EditClientModal({ client, isOpen, onClose }: any) {
     }
   });
 
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<z.infer<typeof clientSchema>>({
+  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<z.infer<ReturnType<typeof createClientSchema>>>({
     resolver: zodResolver(createClientSchema(t)),
     defaultValues: client
   });
 
-  const onSubmit = (data: z.infer<typeof clientSchema>) => {
+  const onSubmit = (data: z.infer<ReturnType<typeof createClientSchema>>) => {
     updateClient.mutate({ id: client.id, data });
   };
 
