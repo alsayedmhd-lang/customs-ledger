@@ -395,7 +395,7 @@ export function PrintDocumentFooter({
       <div className="flex items-center justify-between text-xs text-gray-600">
         <span>✉ {settings.email}</span>
         <span className="font-bold text-gray-800">
-          {settings.nameAr} · {kind === "invoice" ? `${settings.nameEn.split(" ").slice(0, 3).join(" ")} C.C` : settings.nameEn}
+          {settings.nameAr} {kind === "invoice" ? "-" : "·"} {settings.nameEn}
         </span>
         <span>
           {settings.poBox} {settings.address} · ☎ {settings.phone}
