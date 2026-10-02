@@ -1,6 +1,6 @@
 {
   "name": "ledger",
-  "version": "2.2.86",
+  "version": "2.2.87",
   "author": "Mohamed sayed - 60020446",
   "type": "module",
   "private": true,
@@ -12,7 +12,7 @@
     "preview": "vite preview",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "electron:start": "electron .",
-    "dist": "node bump-version.cjs && pnpm --dir customs-accounting build && electron-builder --win"
+    "dist": "electron-rebuild --version 41.3.0 --module-dir . --which-module better-sqlite3 --force && node bump-version.cjs && pnpm --dir customs-accounting build && electron-builder --win"
   },
   "devDependencies": {
     "@hookform/resolvers": "^3.10.0",

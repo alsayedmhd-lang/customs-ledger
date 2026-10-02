@@ -13,6 +13,7 @@ import { useState, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useLocation } from "wouter";
 import SettingsShell from "@/components/layout/SettingsShell";
+import DeviceIdentitySettings from "@/components/DeviceIdentitySettings";
 import { useAuth } from "@/lib/auth-context";
 import { useLanguage } from "@/lib/language-context";
 import { useCompanySettings, DEFAULT_SETTINGS, type CompanySettings } from "@/lib/company-settings-context";
@@ -27,7 +28,7 @@ import {
 } from "lucide-react";
 import { useDisplaySettings, COLOR_PRESETS, SIDEBAR_COLOR_PRESETS, type PrimaryColor, type BorderRadius, type Density, type SidebarColor, type BgType } from "@/lib/display-settings-context";
 
-type TabId = "preview" | "backup" | "company" | "branding" | "print" | "display" | "update";
+type TabId = "preview" | "backup" | "company" | "branding" | "print" | "display" | "update" | "devices";
 const API_BASE = `${import.meta.env.VITE_API_BASE_URL}/api`;
 
 const formatDateYMD = (value: Date | string | null | undefined = new Date()) => {
@@ -1556,10 +1557,12 @@ const decryptBackupData = async (backupFile: any, password: string) => {
   { id: "backup", icon: Shield, labelAr: "استيراد وتصدير البيانات", labelEn: "Data Import & Export", color: "text-emerald-500" },
   { id: "update", icon: RefreshCw, labelAr: "تحديث البرنامج", labelEn: "Software Update", color: "text-cyan-500" },
 
+  { id: "devices", icon: Shield, labelAr: "الأجهزة الموثوقة", labelEn: "Trusted Devices", color: "text-teal-500" },
   { id: "display", icon: Palette, labelAr: "المظهر", labelEn: "Display", color: "text-fuchsia-500" }, // آخر واحد
 ];
 
   const canViewSettingsTab = (tabId: TabId) => {
+    if (tabId === "devices") return user?.role === "admin";
     if (canViewAllSettingsTabs) return true;
     if (tabId === "preview") return true;
     if (tabId === "display") return true;
@@ -1644,6 +1647,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
               {activeTab === "backup" && (isAR ? "استيراد وتصدير البيانات" : "Data Import & Export")}
               {activeTab === "update" && (isAR ? "تحديث البرنامج" : "Software Update")}
               {activeTab === "display" && (isAR ? "المظهر" : "Display")}
+              {activeTab === "devices" && (isAR ? "الأجهزة الموثوقة" : "Trusted Devices")}
             </h2>
             <p className="text-sm text-muted-foreground mt-0.5">
               {activeTab === "preview" && (isAR ? "معاينة مباشرة لشكل المستندات قبل الطباعة" : "Live preview of documents before printing")}
@@ -1653,10 +1657,15 @@ const decryptBackupData = async (backupFile: any, password: string) => {
               {activeTab === "backup" && (isAR ? "تصدير واستيراد بيانات البرنامج بشكل آمن" : "Securely export and import application data")}
               {activeTab === "update" && (isAR ? "البحث عن تحديثات البرنامج وتثبيتها من داخل التطبيق" : "Check and install application updates from inside the app")}
               {activeTab === "display" && (isAR ? "ضبط ألوان ومظهر واجهة البرنامج" : "Customize application colors and appearance")}
+              {activeTab === "devices" && (isAR ? "عرض هوية الجهاز وإدارة الأجهزة الموثوقة" : "Device identity and trusted devices")}
             </p>
           </div>
         </div>
 
+
+          {activeTab === "devices" && user?.role === "admin" && (
+            <DeviceIdentitySettings isAR={isAR} />
+          )}
 
           {/* ── Preview Tab Content ── */}
 

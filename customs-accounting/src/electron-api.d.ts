@@ -3,6 +3,13 @@ export {};
 declare global {
   interface Window {
     electronAPI?: {
+      getDeviceIdentity?: () => Promise<{
+        deviceId: string;
+        publicKey: string;
+        fingerprint: string;
+        createdAt: string;
+      }>;
+
       getLicenseDeviceId?: () => Promise<string>;
 
       getLicenseStatus?: () => Promise<{
