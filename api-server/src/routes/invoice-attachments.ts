@@ -346,6 +346,12 @@ router.get("/invoice-attachments/:declarationBaseNumber", async (req, res) => {
 
 router.post("/invoice-attachments", async (req, res) => {
   try {
+    if (req.user?.role === "client") {
+      return res.status(403).json({
+        error: "Client users have read-only access to attachments",
+      });
+    }
+
     const suppliedHash = optionalTrimmedString(req.body.fileHash);
     if (suppliedHash && !/^[a-fA-F0-9]{64}$/.test(suppliedHash)) {
       return res.status(400).json({ error: "Invalid SHA-256 fileHash" });
@@ -409,6 +415,12 @@ router.post("/invoice-attachments", async (req, res) => {
 
 router.delete("/invoice-attachments/:id", async (req, res) => {
   try {
+    if (req.user?.role === "client") {
+      return res.status(403).json({
+        error: "Client users have read-only access to attachments",
+      });
+    }
+
     const id = Number(req.params.id);
     if (!Number.isInteger(id) || id <= 0) {
       return res.status(400).json({ error: "Invalid attachment id" });
