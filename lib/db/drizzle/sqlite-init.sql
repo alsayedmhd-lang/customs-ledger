@@ -125,6 +125,9 @@ CREATE TABLE IF NOT EXISTS invoice_items (
 
 CREATE TABLE IF NOT EXISTS invoice_attachments (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
+  sync_id TEXT,
+  file_hash TEXT,
+  updated_at INTEGER,
   invoice_id INTEGER,
   declaration_number TEXT NOT NULL,
   declaration_base_number TEXT NOT NULL,
