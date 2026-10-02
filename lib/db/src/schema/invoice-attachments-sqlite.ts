@@ -1,4 +1,5 @@
-import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { sql } from "drizzle-orm";
 
 export const invoiceAttachmentsTableSqlite = sqliteTable("invoice_attachments", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -18,4 +19,8 @@ export const invoiceAttachmentsTableSqlite = sqliteTable("invoice_attachments", 
   createdBy: integer("created_by"),
   createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
   deletedAt: integer("deleted_at", { mode: "timestamp_ms" }),
-});
+}, (table) => [
+  uniqueIndex("invoice_attachments_sync_id_unique")
+    .on(table.syncId)
+    .where(sql`${table.syncId} IS NOT NULL AND TRIM(${table.syncId}) <> ''`),
+]);
