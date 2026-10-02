@@ -77,6 +77,13 @@ export function ensureInvoiceAttachmentsTable() {
     return rows.length;
   })();
 
+  sqlite.exec(`
+    CREATE UNIQUE INDEX IF NOT EXISTS
+      invoice_attachments_sync_id_unique
+    ON invoice_attachments(sync_id)
+    WHERE sync_id IS NOT NULL AND TRIM(sync_id) <> '';
+  `);
+
   ensured = true;
   console.log("Ensured invoice_attachments table");
   if (backfilledCount > 0) {

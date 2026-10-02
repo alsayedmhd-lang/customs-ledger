@@ -143,6 +143,10 @@ CREATE TABLE IF NOT EXISTS invoice_attachments (
   deleted_at INTEGER
 );
 
+CREATE UNIQUE INDEX IF NOT EXISTS invoice_attachments_sync_id_unique
+ON invoice_attachments(sync_id)
+WHERE sync_id IS NOT NULL AND TRIM(sync_id) <> '';
+
 CREATE TABLE IF NOT EXISTS invoice_item_templates (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   description TEXT NOT NULL,
