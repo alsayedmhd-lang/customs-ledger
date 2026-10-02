@@ -29,6 +29,20 @@ async function buildAll() {
     logLevel: "info",
   });
 
+  await build({
+    entryPoints: [
+      path.resolve(__dirname, "src/utils/device-identity/electron-entry.ts"),
+    ],
+    platform: "node",
+    bundle: true,
+    format: "cjs",
+    target: "node22",
+    outfile: path.resolve(distDir, "device-identity.cjs"),
+    minify: false,
+    sourcemap: true,
+    logLevel: "info",
+  });
+
   console.log("✅ Build complete!");
 }
 

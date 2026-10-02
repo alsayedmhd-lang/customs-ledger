@@ -41,6 +41,9 @@ window.addEventListener(
 contextBridge.exposeInMainWorld("electronAPI", {
   getAppVersion: () => ipcRenderer.invoke("app:get-version"),
 
+  getDeviceIdentity: () =>
+    ipcRenderer.invoke("device:get-identity"),
+
   developerUnlock: (password) =>
     ipcRenderer.invoke("developer:unlock", password),
 

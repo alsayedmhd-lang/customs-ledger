@@ -1434,6 +1434,34 @@ autoUpdater.on("error", (error) => {
   });
 });
 
+ipcMain.handle("device:get-identity", async (event) => {
+  if (
+    !mainWindow ||
+    mainWindow.isDestroyed() ||
+    event.sender !== mainWindow.webContents ||
+    event.senderFrame !== mainWindow.webContents.mainFrame
+  ) {
+    throw new Error("Device identity access denied");
+  }
+
+  const basePath = app.isPackaged ? process.resourcesPath : __dirname;
+
+  const {
+    getDeviceIdentity,
+    getPairingFingerprint,
+  } = require(
+    path.join(basePath, "api-server", "dist", "device-identity.cjs")
+  );
+
+  const identity = await getDeviceIdentity(app);
+
+  return {
+    deviceId: identity.deviceId,
+    publicKey: identity.publicKey,
+    fingerprint: getPairingFingerprint(identity.publicKey),
+    createdAt: identity.createdAt,
+  };
+});
 ipcMain.handle("app:get-version", () => app.getVersion());
 
 console.log("Electron app.getVersion():", app.getVersion());
