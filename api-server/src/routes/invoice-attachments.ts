@@ -1,8 +1,12 @@
-import { randomUUID } from "node:crypto";
+﻿import { randomUUID } from "node:crypto";
+import { drizzle as drizzleSqlite } from "drizzle-orm/better-sqlite3";
 import { Router, type IRouter } from "express";
 import { and, desc, eq, isNull, or } from "drizzle-orm";
-import { db, invoiceAttachmentsTable, invoicesTable } from "@workspace/db";
+import { db, invoiceAttachmentsTable, invoicesTable, usersTable } from "@workspace/db";
+import { openVerifiedAttachment } from "../utils/attachment-storage";
 import { invoiceAuditLogsTableSqlite } from "../../../lib/db/src/schema/invoices-sqlite";
+
+type LedgerSqliteDb = ReturnType<typeof drizzleSqlite>;
 
 const router: IRouter = Router();
 
@@ -24,7 +28,7 @@ async function resolveAttachmentInvoiceId(input: {
   if (declarationNumber) shipmentFilters.push(eq(invoicesTable.shipmentRef, declarationNumber));
   if (declarationBaseNumber) shipmentFilters.push(eq(invoicesTable.shipmentRef, declarationBaseNumber));
 
-  const [invoice] = await db
+  const [invoice] = await (db as LedgerSqliteDb)
     .select({ id: invoicesTable.id })
     .from(invoicesTable)
     .where(and(...filters, shipmentFilters.length === 1 ? shipmentFilters[0] : or(...shipmentFilters)))
@@ -42,7 +46,7 @@ async function createAttachmentAuditLog(input: {
 }) {
   if (!input.invoiceId) return;
 
-  await db.insert(invoiceAuditLogsTableSqlite).values({
+  await (db as LedgerSqliteDb).insert(invoiceAuditLogsTableSqlite).values({
     invoiceId: input.invoiceId,
     action: "attachments_updated",
     userId: input.req.user?.userId ?? null,
@@ -60,6 +64,160 @@ async function createAttachmentAuditLog(input: {
   });
 }
 
+router.get("/invoice-attachments/file/:syncId", async (req, res) => {
+  const attachmentDb = db as LedgerSqliteDb;
+  let handle: Awaited<ReturnType<typeof openVerifiedAttachment>> = null;
+
+  try {
+    const syncId = String(req.params.syncId ?? "").trim();
+
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(syncId)) {
+      return res.status(400).json({ error: "Invalid attachment syncId" });
+    }
+
+    const [attachment] = await attachmentDb
+      .select()
+      .from(invoiceAttachmentsTable)
+      .where(
+        and(
+          eq(invoiceAttachmentsTable.syncId, syncId),
+          isNull(invoiceAttachmentsTable.deletedAt)
+        )
+      )
+      .limit(1);
+
+    if (!attachment || !attachment.invoiceId) {
+      return res.status(404).json({ error: "Attachment not found" });
+    }
+
+    const [invoice] = await attachmentDb
+      .select({
+        id: invoicesTable.id,
+        clientId: invoicesTable.clientId,
+      })
+      .from(invoicesTable)
+      .where(
+        and(
+          eq(invoicesTable.id, attachment.invoiceId),
+          isNull(invoicesTable.deletedAt)
+        )
+      )
+      .limit(1);
+
+    if (!invoice) {
+      return res.status(404).json({ error: "Invoice not found" });
+    }
+
+    if (req.user?.role === "client") {
+      const [user] = await attachmentDb
+        .select({
+          clientId: usersTable.clientId,
+          clientViewPermissions: usersTable.clientViewPermissions,
+        })
+        .from(usersTable)
+        .where(eq(usersTable.id, req.user.userId))
+        .limit(1);
+
+      const permissions = user?.clientViewPermissions as
+        | { canViewInvoices?: boolean }
+        | null
+        | undefined;
+
+      if (
+        !user?.clientId ||
+        Number(user.clientId) !== invoice.clientId ||
+        permissions?.canViewInvoices === false
+      ) {
+        return res.status(403).json({
+          error: "Invoice is not allowed for this client user",
+        });
+      }
+    }
+
+    if (
+      !attachment.fileHash ||
+      !/^[a-fA-F0-9]{64}$/.test(attachment.fileHash) ||
+      attachment.fileSize === null ||
+      !Number.isSafeInteger(attachment.fileSize) ||
+      attachment.fileSize < 0
+    ) {
+      return res.status(409).json({
+        error: "Attachment integrity metadata is incomplete",
+      });
+    }
+
+    handle = await openVerifiedAttachment({
+      declarationBaseNumber: attachment.declarationBaseNumber,
+      storedName: attachment.storedName,
+      fileHash: attachment.fileHash,
+      fileSize: attachment.fileSize,
+    });
+
+    if (!handle) {
+      return res.status(404).json({
+        error: "Verified attachment file is not available locally",
+      });
+    }
+
+    res.setHeader("Content-Type", "application/octet-stream");
+    res.setHeader("Content-Length", String(attachment.fileSize));
+    res.setHeader("Cache-Control", "no-store");
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="ledger-attachment-${syncId}"`
+    );
+
+    const stream = handle.createReadStream({
+      autoClose: false,
+      start: 0,
+    });
+
+    res.on("close", () => {
+      if (!res.writableFinished) {
+        stream.destroy();
+      }
+    });
+
+    stream.on("error", (error) => {
+      console.error("Attachment download stream failed:", error);
+      if (!res.headersSent) {
+        res.status(500).json({ error: "Attachment download failed" });
+      } else {
+        res.destroy(error);
+      }
+    });
+
+    const closeAttachmentHandle = () => {
+      const currentHandle = handle;
+      handle = null;
+
+      if (currentHandle) {
+        void currentHandle.close().catch((error) => {
+          console.error("Attachment file close failed:", error);
+        });
+      }
+    };
+
+    stream.once("end", closeAttachmentHandle);
+    stream.once("close", closeAttachmentHandle);
+
+    stream.pipe(res);
+    return;
+  } catch (error) {
+    console.error("Attachment download failed:", error);
+
+    if (handle) {
+      await handle.close().catch(() => undefined);
+    }
+
+    if (!res.headersSent) {
+      return res.status(500).json({ error: "Internal server error" });
+    }
+
+    return res.destroy();
+  }
+});
 router.get("/invoice-attachments/:declarationBaseNumber", async (req, res) => {
   try {
     const declarationBaseNumber = String(req.params.declarationBaseNumber || "").trim();
@@ -68,7 +226,7 @@ router.get("/invoice-attachments/:declarationBaseNumber", async (req, res) => {
       return res.status(400).json({ error: "declarationBaseNumber is required" });
     }
 
-    const attachments = await db
+    const attachments = await (db as LedgerSqliteDb)
       .select()
       .from(invoiceAttachmentsTable)
       .where(
@@ -107,7 +265,7 @@ router.post("/invoice-attachments", async (req, res) => {
       return res.status(400).json({ error: "fileSize must be a number or null" });
     }
 
-    const [attachment] = await db
+    const [attachment] = await (db as LedgerSqliteDb)
       .insert(invoiceAttachmentsTable)
       .values({
         syncId: randomUUID(),
@@ -156,7 +314,7 @@ router.delete("/invoice-attachments/:id", async (req, res) => {
       return res.status(400).json({ error: "Invalid attachment id" });
     }
 
-    const [attachment] = await db
+    const [attachment] = await (db as LedgerSqliteDb)
       .update(invoiceAttachmentsTable)
       .set({ deletedAt: new Date(), updatedAt: new Date() })
       .where(and(eq(invoiceAttachmentsTable.id, id), isNull(invoiceAttachmentsTable.deletedAt)))
