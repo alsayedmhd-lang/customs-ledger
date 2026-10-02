@@ -1,4 +1,4 @@
-import { sqliteTable, integer, text } from "drizzle-orm/sqlite-core";
+import { sqliteTable, integer, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 export interface UserPermissions {
   canEditInvoices: boolean;
@@ -42,6 +42,7 @@ export const DEFAULT_CLIENT_VIEW_PERMISSIONS: ClientViewPermissions = {
 
 export const usersTableSqlite = sqliteTable("users", {
   id: integer("id").primaryKey({ autoIncrement: true }),
+  userSyncId: text("user_sync_id"),
   username: text("username").notNull(),
   passwordHash: text("password_hash").notNull(),
   displayName: text("display_name").notNull(),
@@ -60,7 +61,9 @@ export const usersTableSqlite = sqliteTable("users", {
   twoFactorEmail: integer("two_factor_email", { mode: "boolean" }).default(false),
   twoFactorWhatsapp: integer("two_factor_whatsapp", { mode: "boolean" }).default(false),
   createdAt: integer("created_at", { mode: "timestamp_ms" }),
-});
+}, (table) => [
+  uniqueIndex("users_user_sync_id_unique").on(table.userSyncId),
+]);
 export const otpCodesTable = sqliteTable("otp_codes", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   userId: integer("user_id").notNull(),

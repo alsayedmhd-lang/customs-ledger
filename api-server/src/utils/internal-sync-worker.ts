@@ -160,6 +160,32 @@ function applyInternalSource(source: Array<{
       for (const remote of table.rows) {
         const id = remote.id;
         const local = select.get(id) as Record<string, unknown> | undefined;
+        if (table.name === "users") {
+          const remoteUsername = String(remote.username ?? "").trim().toLowerCase();
+          const remoteSyncId = remote.user_sync_id == null ? "" : String(remote.user_sync_id).trim();
+
+          if (!remoteUsername || !remoteSyncId) {
+            throw new Error(`Internal user identity is incomplete: id ${id}`);
+          }
+
+          if (local) {
+            const localUsername = String(local.username ?? "").trim().toLowerCase();
+            const localSyncId = local.user_sync_id == null ? "" : String(local.user_sync_id).trim();
+
+            if (localUsername !== remoteUsername ||
+                (localSyncId && localSyncId !== remoteSyncId)) {
+              throw new Error(`Internal user identity conflict: id ${id}`);
+            }
+          }
+
+          const existingIdentity = sqlite!.prepare(
+            `SELECT id, username FROM users WHERE user_sync_id = ? OR LOWER(TRIM(username)) = ?`,
+          ).all(remoteSyncId, remoteUsername) as Array<{ id: number; username: string }>;
+
+          if (existingIdentity.some((user) => Number(user.id) !== Number(id))) {
+            throw new Error(`Internal user identity belongs to another local id: ${id}`);
+          }
+        }
         const mapped = table.columns.map(({ name, type }) => {
           if (local && table.name === "customer_ledger" && name === "created_at") return local[name];
           const received = fromInternalValue(table.name, name, type, remote[name]);
@@ -298,12 +324,45 @@ async function performInternalPush(connectionString: string, bidirectional = fal
       for (const { row } of table.rows) {
         if (!row) continue;
         const values = table.columns.map((column) => convertInternalValue(table.name, column, row[column]));
+        if (table.name === "users") {
+          const localUsername = String(row.username ?? "").trim().toLowerCase();
+          const localSyncId = row.user_sync_id == null ? "" : String(row.user_sync_id).trim();
+
+          if (!localUsername || !localSyncId) {
+            throw new Error(`Local user identity is incomplete: id ${row.id}`);
+          }
+
+          const identity = await client.query(
+            `SELECT id, username, user_sync_id FROM public.users
+             WHERE id = $1 OR LOWER(TRIM(username)) = $2 OR user_sync_id = $3
+             FOR UPDATE`,
+            [row.id, localUsername, localSyncId],
+          );
+
+          for (const remote of identity.rows) {
+            const remoteUsername = String(remote.username ?? "").trim().toLowerCase();
+            const remoteSyncId = remote.user_sync_id == null ? "" : String(remote.user_sync_id).trim();
+
+            if (Number(remote.id) !== Number(row.id) ||
+                remoteUsername !== localUsername ||
+                (remoteSyncId && remoteSyncId !== localSyncId)) {
+              throw new Error(`Internal user identity conflict: id ${row.id}`);
+            }
+          }
+        }
         const updates = table.columns.filter((column) => column !== "id")
-          .map((column) => `${quote(column)} = EXCLUDED.${quote(column)}`).join(", ");
+          .map((column) => table.name === "users" && column === "user_sync_id"
+            ? `"user_sync_id" = COALESCE(public."users"."user_sync_id", EXCLUDED."user_sync_id")`
+            : `${quote(column)} = EXCLUDED.${quote(column)}`).join(", ");
+        const identityGuard = table.name === "users"
+          ? ` WHERE public."users"."user_sync_id" IS NULL ` +
+            `OR EXCLUDED."user_sync_id" IS NULL ` +
+            `OR public."users"."user_sync_id" = EXCLUDED."user_sync_id"`
+          : "";
         await client.query(
           `INSERT INTO public.${quote(table.name)} (${table.columns.map(quote).join(", ")}) ` +
           `VALUES (${table.columns.map((_, index) => `$${index + 1}`).join(", ")}) ` +
-          `ON CONFLICT (id) DO UPDATE SET ${updates}`,
+          `ON CONFLICT (id) DO UPDATE SET ${updates}${identityGuard}`,
           values,
         );
       }

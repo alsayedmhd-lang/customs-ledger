@@ -22,6 +22,25 @@ if (provider === "sqlite") {
   }
 
   sqlite = new Database(sqlitePath);
+
+  // Startup migration: globally unique user identity.
+  // Existing users remain unchanged until identity reconciliation.
+  const usersTableExists = sqlite.prepare(
+    "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'users'"
+  ).get();
+
+  if (usersTableExists) {
+    const userColumns = sqlite.prepare("PRAGMA table_info(users)").all() as Array<{ name: string }>;
+
+    if (!userColumns.some((column) => column.name === "user_sync_id")) {
+      sqlite.exec("ALTER TABLE users ADD COLUMN user_sync_id TEXT");
+    }
+
+    sqlite.exec(
+      "CREATE UNIQUE INDEX IF NOT EXISTS users_user_sync_id_unique ON users(user_sync_id)"
+    );
+  }
+
   dbInstance = drizzleSqlite(sqlite, { schema: sqliteSchema });
 } else {
   if (!process.env.DATABASE_URL) {

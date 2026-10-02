@@ -1,5 +1,6 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
+import { randomUUID } from "node:crypto";
 import { db, sqlite } from "@workspace/db";
 import {
   clientsTable,
@@ -60,6 +61,12 @@ function ensureUserClientColumns() {
   if (!sqlite) return;
   const columns = sqlite.prepare("PRAGMA table_info(users)").all() as Array<{ name: string }>;
   const existing = new Set(columns.map((column) => column.name));
+  if (!existing.has("user_sync_id")) {
+    sqlite.exec("ALTER TABLE users ADD COLUMN user_sync_id TEXT");
+  }
+  sqlite.exec(
+    "CREATE UNIQUE INDEX IF NOT EXISTS users_user_sync_id_unique ON users(user_sync_id)"
+  );
   if (!existing.has("client_id")) sqlite.exec("ALTER TABLE users ADD COLUMN client_id INTEGER");
   if (!existing.has("client_view_permissions")) {
     sqlite.exec(`ALTER TABLE users ADD COLUMN client_view_permissions TEXT DEFAULT '${JSON.stringify(DEFAULT_CLIENT_VIEW_PERMISSIONS)}'`);
@@ -153,6 +160,7 @@ router.post("/users", requireUsersManagementAccess, async (req, res) => {
   const [user] = await db
     .insert(usersTable)
     .values({
+      userSyncId: randomUUID(),
       username: username.trim().toLowerCase(),
       passwordHash,
       displayName: displayName.trim(),

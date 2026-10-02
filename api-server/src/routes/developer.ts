@@ -19,6 +19,7 @@ import { ensureInternalSyncJournal, getInternalSyncJournalStatus } from "../util
 import { runInternalLocalToServerOnce, runInternalServerToLocalOnce, runInternalBidirectionalOnce } from "../utils/internal-sync-worker";
 import { checkInternalSyncScheduleNow, getInternalAutoSyncStatus, startInternalSyncScheduler } from "../utils/internal-sync-scheduler";
 import { startOnlineSyncScheduler } from "../utils/online-sync-scheduler";
+import { pushAttachmentMetadataToInternalServer } from "../utils/internal-attachment-metadata-sync";
 
 function getRuntimeAppVersion(): string {
   const resourcesPath = (process as NodeJS.Process & { resourcesPath?: string }).resourcesPath;
@@ -1775,6 +1776,36 @@ router.get("/developer/internal-database/server-journal-status", async (_req, re
     return res.status(400).json({ ok: false, error: sanitizeDatabaseError(error) });
   } finally {
     if (client) await client.end().catch(() => undefined);
+  }
+});
+
+router.post("/developer/internal-database/attachment-metadata/push", requireAdmin, async (_req, res) => {
+  try {
+    const saved = mapInternalDatabaseSettings(await getSettingsRow());
+    let connectionString = saved.connectionString.trim();
+
+    if (!connectionString) {
+      if (!saved.host.trim() || !saved.databaseName.trim() || !saved.username.trim()) {
+        return res.status(400).json({ ok: false, error: "Internal server settings are incomplete" });
+      }
+
+      const url = new URL("postgresql://localhost");
+      url.hostname = saved.host.trim();
+      url.port = saved.port;
+      url.pathname = `/${encodeURIComponent(saved.databaseName.trim())}`;
+      url.username = saved.username.trim();
+      url.password = saved.password;
+      connectionString = url.toString();
+    }
+
+    if (!isPostgresConnectionString(connectionString)) {
+      return res.status(400).json({ ok: false, error: "Only PostgreSQL connection strings are supported" });
+    }
+
+    const result = await pushAttachmentMetadataToInternalServer(connectionString);
+    return res.json({ ok: true, ...result });
+  } catch (error) {
+    return res.status(400).json({ ok: false, error: sanitizeDatabaseError(error) });
   }
 });
 

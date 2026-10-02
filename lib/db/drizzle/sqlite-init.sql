@@ -1,5 +1,6 @@
 CREATE TABLE IF NOT EXISTS users (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_sync_id TEXT UNIQUE,
   username TEXT NOT NULL,
   password_hash TEXT NOT NULL,
   display_name TEXT NOT NULL,
