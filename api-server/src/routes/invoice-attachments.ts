@@ -1,9 +1,9 @@
-﻿import { randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { drizzle as drizzleSqlite } from "drizzle-orm/better-sqlite3";
 import { Router, type IRouter } from "express";
 import { and, desc, eq, isNull, or } from "drizzle-orm";
 import { db, invoiceAttachmentsTable, invoicesTable, usersTable } from "@workspace/db";
-import { openVerifiedAttachment } from "../utils/attachment-storage";
+import { openVerifiedAttachment, receiveVerifiedAttachment } from "../utils/attachment-storage";
 import { invoiceAuditLogsTableSqlite } from "../../../lib/db/src/schema/invoices-sqlite";
 
 type LedgerSqliteDb = ReturnType<typeof drizzleSqlite>;
@@ -64,6 +64,106 @@ async function createAttachmentAuditLog(input: {
   });
 }
 
+router.post("/invoice-attachments/file/:syncId", async (req, res) => {
+  try {
+    if (req.user?.role !== "admin") {
+      return res.status(403).json({
+        error: "Attachment receiving requires administrator permission",
+      });
+    }
+
+    const syncId = String(req.params.syncId ?? "").trim();
+
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(syncId)) {
+      return res.status(400).json({ error: "Invalid attachment syncId" });
+    }
+
+    const attachmentDb = db as LedgerSqliteDb;
+
+    const [attachment] = await attachmentDb
+      .select()
+      .from(invoiceAttachmentsTable)
+      .where(
+        and(
+          eq(invoiceAttachmentsTable.syncId, syncId),
+          isNull(invoiceAttachmentsTable.deletedAt)
+        )
+      )
+      .limit(1);
+
+    if (!attachment) {
+      return res.status(404).json({ error: "Attachment metadata not found" });
+    }
+
+    if (
+      !attachment.fileHash ||
+      !/^[a-fA-F0-9]{64}$/.test(attachment.fileHash) ||
+      attachment.fileSize === null ||
+      !Number.isSafeInteger(attachment.fileSize) ||
+      attachment.fileSize < 0
+    ) {
+      return res.status(409).json({
+        error: "Attachment integrity metadata is incomplete",
+      });
+    }
+
+    const contentType = String(req.headers["content-type"] ?? "").toLowerCase();
+
+    if (
+      !contentType.startsWith("application/octet-stream") &&
+      !contentType.startsWith("application/x-binary")
+    ) {
+      return res.status(415).json({
+        error: "Attachment upload requires binary content",
+      });
+    }
+
+    const savedPath = await receiveVerifiedAttachment(
+      {
+        declarationBaseNumber: attachment.declarationBaseNumber,
+        storedName: attachment.storedName,
+        fileHash: attachment.fileHash,
+        fileSize: attachment.fileSize,
+      },
+      req
+    );
+
+    return res.json({
+      ok: true,
+      syncId: attachment.syncId,
+      fileHash: attachment.fileHash,
+      fileSize: attachment.fileSize,
+      storedName: attachment.storedName,
+      declarationBaseNumber: attachment.declarationBaseNumber,
+      savedPath,
+    });
+  } catch (error) {
+    console.error("Attachment receive failed:", error);
+
+    if (error instanceof Error) {
+      const message = error.message;
+
+      if (
+        message === "Received attachment size mismatch" ||
+        message === "Received attachment SHA-256 mismatch" ||
+        message === "Attachment exceeds expected size"
+      ) {
+        return res.status(422).json({ error: message });
+      }
+
+      if (
+        message === "Invalid declaration base number" ||
+        message === "Invalid stored attachment name" ||
+        message === "Invalid SHA-256 hash" ||
+        message === "Invalid attachment size"
+      ) {
+        return res.status(400).json({ error: message });
+      }
+    }
+
+    return res.status(500).json({ error: "Attachment receive failed" });
+  }
+});
 router.get("/invoice-attachments/file/:syncId", async (req, res) => {
   const attachmentDb = db as LedgerSqliteDb;
   let handle: Awaited<ReturnType<typeof openVerifiedAttachment>> = null;
