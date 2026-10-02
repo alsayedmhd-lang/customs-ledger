@@ -202,3 +202,58 @@ export async function receiveVerifiedAttachment(
   }
 }
 
+
+export async function openVerifiedAttachment(
+  item: AttachmentIdentity
+): Promise<fs.FileHandle | null> {
+  const { root, filePath } = getAttachmentPath(item);
+
+  let handle: fs.FileHandle | undefined;
+
+  try {
+    const realRoot = await fs.realpath(root);
+    const realFile = await fs.realpath(filePath);
+    const relative = path.relative(realRoot, realFile);
+
+    if (
+      !relative ||
+      relative === ".." ||
+      relative.startsWith(`..${path.sep}`) ||
+      path.isAbsolute(relative)
+    ) {
+      return null;
+    }
+
+    handle = await fs.open(realFile, "r");
+
+    const stat = await handle.stat();
+
+    if (!stat.isFile() || stat.size !== item.fileSize) {
+      return null;
+    }
+
+    const hash = createHash("sha256");
+
+    for await (const chunk of handle.createReadStream({
+      autoClose: false,
+      start: 0,
+    })) {
+      hash.update(chunk);
+    }
+
+    if (hash.digest("hex") !== item.fileHash.toLowerCase()) {
+      return null;
+    }
+
+    const verifiedHandle = handle;
+    handle = undefined;
+
+    return verifiedHandle;
+  } catch {
+    return null;
+  } finally {
+    if (handle) {
+      await handle.close().catch(() => undefined);
+    }
+  }
+}
