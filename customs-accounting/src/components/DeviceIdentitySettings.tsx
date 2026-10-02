@@ -118,6 +118,54 @@ export default function DeviceIdentitySettings({
           ? "هذه الهوية مستقلة عن الترخيص وقاعدة البيانات. لا تتم مشاركة المفتاح الخاص."
           : "This identity is independent of licensing and databases. The private key is never shared."}
       </p>
+      {/* pairing-ui-placeholder: presentation only; no pairing actions yet */}
+      <div className="space-y-4 border-t border-border pt-5">
+        <div>
+          <h3 className="font-semibold">
+            {isAR ? "ربط جهاز جديد" : "Pair a New Device"}
+          </h3>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {isAR
+              ? "سيتم ربط الأجهزة بعد التحقق المتبادل من البصمة الأمنية وموافقة المستخدم."
+              : "Devices will be paired after mutual fingerprint verification and user approval."}
+          </p>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <button
+            type="button"
+            disabled
+            className="rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm opacity-60"
+          >
+            {isAR ? "إنشاء طلب ربط" : "Create Pairing Request"}
+          </button>
+
+          <button
+            type="button"
+            disabled
+            className="rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm opacity-60"
+          >
+            {isAR ? "استقبال طلب ربط" : "Receive Pairing Request"}
+          </button>
+        </div>
+
+        <div className="rounded-lg border border-dashed border-border p-4">
+          <h4 className="text-sm font-medium">
+            {isAR ? "الأجهزة الموثوقة" : "Trusted Devices"}
+          </h4>
+          <p className="mt-2 text-sm text-muted-foreground">
+            {isAR
+              ? "سيظهر هنا سجل الأجهزة المرتبطة بعد تفعيل الربط الآمن."
+              : "Paired devices will appear here once secure pairing is enabled."}
+          </p>
+        </div>
+
+        <p className="text-xs text-muted-foreground">
+          {isAR
+            ? "الربط غير مفعّل حاليًا. لا يتم إرسال أي بيانات أو مرفقات."
+            : "Pairing is not enabled yet. No data or attachments are transmitted."}
+        </p>
+      </div>
     </section>
   );
 }

@@ -1,4 +1,4 @@
-﻿export {
+export {
   getDeviceIdentity,
   getDeviceIdentityPath,
 } from "./device-identity";
@@ -6,6 +6,7 @@
 export {
   getPairingFingerprint,
   createPairingRequest,
+  createPairingResponse,
   createSignedPairingProof,
   completeApprovedPairing,
 } from "./device-pairing";
