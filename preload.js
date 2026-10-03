@@ -44,6 +44,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   getDeviceIdentity: () =>
     ipcRenderer.invoke("device:get-identity"),
 
+  mutualDevicePairing: (action, payload, fingerprint, name) => ipcRenderer.invoke("device:mutual-pairing", action, payload, fingerprint, name),
   exportDevicePairingFile: (transfer) => ipcRenderer.invoke("device:pairing-export-file", transfer),
   importDevicePairingFile: () => ipcRenderer.invoke("device:pairing-import-file"),
   createDevicePairingRequest: () =>
@@ -154,5 +155,3 @@ contextBridge.exposeInMainWorld("electronAPI", {
     };
   },
 });
-
-

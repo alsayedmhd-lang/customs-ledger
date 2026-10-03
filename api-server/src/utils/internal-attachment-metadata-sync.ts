@@ -484,6 +484,12 @@ export function applyInternalAttachmentMetadata(
     const findLocal = sqlite!.prepare(`
       SELECT
         id,
+        file_hash AS fileHash,
+        relative_path AS relativePath,
+        file_size AS fileSize,
+        declaration_base_number AS declarationBaseNumber,
+        stored_name AS storedName,
+        file_name AS fileName,
         updated_at AS updatedAt,
         deleted_at AS deletedAt,
         created_at AS createdAt
@@ -492,14 +498,72 @@ export function applyInternalAttachmentMetadata(
     `);
 
     for (const row of rows) {
-      const existing = findLocal.get(row.syncId) as
+      let existing = findLocal.get(row.syncId) as
         | {
             id: number;
+            fileHash: string | null;
+            relativePath: string;
+            fileSize: number | null;
+            declarationBaseNumber: string;
+            storedName: string;
+            fileName: string;
             updatedAt: number | null;
             deletedAt: number | null;
             createdAt: number;
           }
         | undefined;
+
+      if (!existing) {
+        // Legacy copies created independent UUIDs before shared metadata was
+        // introduced. Only reconcile an un-hashed copy of the exact stored
+        // object, never attachments merely sharing a displayed filename.
+        const normalizedPath = row.relativePath.replace(/\\/g, "/");
+        const candidates = sqlite!.prepare(`
+          SELECT id,file_hash AS fileHash,updated_at AS updatedAt,
+                 deleted_at AS deletedAt,created_at AS createdAt
+          FROM invoice_attachments
+          WHERE REPLACE(relative_path, char(92), '/') = ?
+            AND declaration_base_number = ? AND stored_name = ?
+            AND file_name = ? AND file_size = ?
+        `).all(normalizedPath, row.declarationBaseNumber, row.storedName, row.fileName, row.fileSize) as Array<{
+          id:number;fileHash:string|null;updatedAt:number|null;deletedAt:number|null;createdAt:number;
+        }>;
+        const canonicalCandidates = rows.filter(candidate =>
+          candidate.relativePath.replace(/\\/g, "/") === normalizedPath &&
+          candidate.declarationBaseNumber === row.declarationBaseNumber &&
+          candidate.storedName === row.storedName && candidate.fileName === row.fileName &&
+          candidate.fileSize === row.fileSize);
+        if (candidates.length) {
+          // Deleted legacy objects may have no file left to hash. Reconcile
+          // only when both copies record the exact same deletion and creation.
+          const matchingUnhashedDeletion = candidates.length === 1 &&
+            row.fileHash === null && row.deletedAt !== null &&
+            candidates[0].deletedAt === row.deletedAt &&
+            candidates[0].createdAt === row.createdAt;
+          if (candidates.length !== 1 || canonicalCandidates.length !== 1 ||
+              candidates[0].fileHash !== null ||
+              (!row.fileHash && !matchingUnhashedDeletion)) {
+            throw new Error(
+              `Ambiguous legacy attachment identity: ${row.fileName} ` +
+              `(declaration ${row.declarationBaseNumber}, sync ID ${row.syncId})`,
+            );
+          }
+          sqlite!.prepare("UPDATE invoice_attachments SET sync_id=?,file_hash=? WHERE id=? AND file_hash IS NULL")
+            .run(row.syncId,row.fileHash,candidates[0].id);
+          existing = findLocal.get(row.syncId) as NonNullable<typeof existing>;
+          updated++;
+        }
+      }
+
+      if (existing && existing.fileHash === null && row.fileHash &&
+          existing.relativePath.replace(/\\/g, "/") === row.relativePath.replace(/\\/g, "/") &&
+          existing.declarationBaseNumber === row.declarationBaseNumber &&
+          existing.storedName === row.storedName && existing.fileName === row.fileName &&
+          existing.fileSize === row.fileSize) {
+        sqlite!.prepare("UPDATE invoice_attachments SET file_hash=? WHERE id=? AND file_hash IS NULL")
+          .run(row.fileHash,existing.id);
+        updated++;
+      }
 
       if (!existing) {
         const localCreatorId = resolveLocalAttachmentCreator(row);

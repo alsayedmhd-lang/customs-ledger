@@ -1739,7 +1739,7 @@ router.get("/developer/internal-database/settings", async (_req, res) => {
 });
 
 router.get("/developer/internal-database/journal-status", (_req, res) => {
-  
+
   try {
     return res.json({ ok: true, ...getInternalSyncJournalStatus() });
   } catch (error) {
@@ -1864,7 +1864,10 @@ router.post("/developer/internal-database/sync-bidirectional", async (_req, res)
     if (!isPostgresConnectionString(connectionString)) {
       return res.status(400).json({ ok: false, error: "Only PostgreSQL connection strings are supported" });
     }
-    return res.json({ ok: true, ...await runInternalBidirectionalOnce(connectionString) });
+    const result = await runInternalBidirectionalOnce(connectionString);
+    const attachmentsPulled = await pullAttachmentMetadataFromInternalServer(connectionString);
+    const attachmentsPushed = await pushAttachmentMetadataToInternalServer(connectionString);
+    return res.json({ ok: true, ...result, attachments: {pulled: attachmentsPulled, pushed: attachmentsPushed} });
   } catch (error) {
     return res.status(400).json({ ok: false, error: sanitizeDatabaseError(error) });
   }
@@ -1892,7 +1895,9 @@ router.post("/developer/internal-database/sync-local-to-server", async (_req, re
     if (!isPostgresConnectionString(connectionString)) {
       return res.status(400).json({ ok: false, error: "Only PostgreSQL connection strings are supported" });
     }
-    return res.json({ ok: true, ...await runInternalLocalToServerOnce(connectionString) });
+    const result = await runInternalLocalToServerOnce(connectionString);
+    const attachments = await pushAttachmentMetadataToInternalServer(connectionString);
+    return res.json({ ok: true, ...result, attachments });
   } catch (error) {
     return res.status(400).json({ ok: false, error: sanitizeDatabaseError(error) });
   }
@@ -1920,7 +1925,9 @@ router.post("/developer/internal-database/sync-server-to-local", async (_req, re
     if (!isPostgresConnectionString(connectionString)) {
       return res.status(400).json({ ok: false, error: "Only PostgreSQL connection strings are supported" });
     }
-    return res.json({ ok: true, ...await runInternalServerToLocalOnce(connectionString) });
+    const result = await runInternalServerToLocalOnce(connectionString);
+    const attachments = await pullAttachmentMetadataFromInternalServer(connectionString);
+    return res.json({ ok: true, ...result, attachments });
   } catch (error) {
     return res.status(400).json({ ok: false, error: sanitizeDatabaseError(error) });
   }

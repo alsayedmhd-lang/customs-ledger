@@ -57,7 +57,8 @@ export function runInternalLocalToServerOnce(connectionString: string) {
 
 // The server is authoritative only when this direction is selected. The
 // journal gate prevents overwriting local changes that have not been sent.
-// Hard deletes on the server are deliberately not inferred from absence.
+// Complete invoice line lists include removals; absence in other business
+// tables is not treated as a deletion.
 export async function runInternalServerToLocalOnce(connectionString: string) {
   if (inFlight || pullInFlight) throw new Error("An internal sync is already in progress");
   pullInFlight = true;
@@ -130,14 +131,14 @@ async function performInternalPull(connectionString: string) {
     await client.end().catch(() => undefined);
   }
 
-  return applyInternalSource(source);
+  return applyInternalSource(source, true);
 }
 
 function applyInternalSource(source: Array<{
   name: string;
   columns: Array<{ name: string; type: string }>;
   rows: Array<Record<string, unknown>>;
-}>) {
+}>, fullSnapshot = false) {
   if (!sqlite) throw new Error("SQLite database is unavailable");
   // better-sqlite3 transactions are synchronous. This second check closes
   // the gap between fetching the server snapshot and writing to SQLite.
@@ -147,6 +148,20 @@ function applyInternalSource(source: Array<{
     let inserted = 0;
     let updated = 0;
     sqlite!.prepare("UPDATE internal_sync_control SET capture_enabled = 0 WHERE id = 1").run();
+    if (fullSnapshot) {
+      const items = source.find(table => table.name === "invoice_items");
+      const invoices = source.find(table => table.name === "invoices");
+      if (!items || !invoices) throw new Error("Incomplete internal invoice snapshot");
+      const remoteIds = new Set(items.rows.map(row => Number(row.id)));
+      const invoiceIds = new Set(invoices.rows.map(row => Number(row.id)));
+      // A complete server invoice owns its complete line list. An absent line
+      // is a deletion, not an invitation to merge an older Online ID batch.
+      for (const local of sqlite!.prepare("SELECT id,invoice_id FROM invoice_items").all() as Array<{id:number;invoice_id:number}>) {
+        if (invoiceIds.has(local.invoice_id) && !remoteIds.has(local.id)) {
+          sqlite!.prepare("DELETE FROM invoice_items WHERE id=?").run(local.id);
+        }
+      }
+    }
     for (const table of source) {
       const names = table.columns.map(({ name }) => name);
       const select = sqlite!.prepare(`SELECT * FROM ${quote(table.name)} WHERE id = ?`);
@@ -160,6 +175,12 @@ function applyInternalSource(source: Array<{
       for (const remote of table.rows) {
         const id = remote.id;
         const local = select.get(id) as Record<string, unknown> | undefined;
+        if (local && table.name === "invoice_items" && Number(local.invoice_id) !== Number(remote.invoice_id)) {
+          throw new Error(`Internal invoice item ID collision: ${id}; no local changes applied`);
+        }
+        if (local && table.name === "invoices" && String(local.invoice_number) !== String(remote.invoice_number)) {
+          throw new Error(`Internal invoice ID collision: ${id}; no local changes applied`);
+        }
         if (table.name === "users") {
           const remoteUsername = String(remote.username ?? "").trim().toLowerCase();
           const remoteSyncId = remote.user_sync_id == null ? "" : String(remote.user_sync_id).trim();
@@ -238,6 +259,7 @@ async function performInternalJournalPull(connectionString: string) {
         ids.get(change.table_name)!.add(change.row_id);
       }
       for (const table of TABLES) {
+        if (table === "invoice_items") continue;
         const columns = sqlite.prepare(`PRAGMA table_info(${quote(table)})`).all() as Array<{ name: string; type: string }>;
         const rows: Array<Record<string, unknown>> = [];
         for (const id of ids.get(table) || []) {
@@ -272,9 +294,9 @@ async function performInternalPush(connectionString: string, bidirectional = fal
   if (!sqlite) throw new Error("SQLite database is unavailable");
   const sqliteDb = sqlite;
   const changes = sqliteDb.prepare(`
-    SELECT id, table_name AS tableName, row_id AS rowId
+    SELECT id, table_name AS tableName, row_id AS rowId, invoice_id AS invoiceId
     FROM internal_sync_journal ORDER BY id LIMIT 500
-  `).all() as Array<{ id: number; tableName: string; rowId: number }>;
+  `).all() as Array<{ id: number; tableName: string; rowId: number; invoiceId: number | null }>;
   if (!changes.length) return { processed: 0, changedRows: 0 };
   const watermark = changes[changes.length - 1].id;
   const validTables = new Set<string>(TABLES);
@@ -308,7 +330,28 @@ async function performInternalPush(connectionString: string, bidirectional = fal
       await client.query(`LOCK TABLE ${TABLES.map((table) => `public.${quote(table)}`).join(", ")} IN SHARE ROW EXCLUSIVE MODE`);
       const remote = await client.query("SELECT table_name, row_id FROM public.internal_sync_journal");
       const localKeys = new Set(changes.map(({ tableName, rowId }) => `${tableName}:${rowId}`));
-      const conflicts = remote.rows.filter((row) => localKeys.has(`${row.table_name}:${row.row_id}`));
+      const conflicts: Array<Record<string, unknown>> = [];
+      for (const change of remote.rows.filter(row => localKeys.has(`${row.table_name}:${row.row_id}`))) {
+        const table = snapshot.find(table => table.name === change.table_name);
+        if (!table) throw new Error("Unknown internal conflict table");
+        const local = table.rows.find(row => row.id === Number(change.row_id))?.row;
+        const columns = sqliteDb.prepare(`PRAGMA table_info(${quote(table.name)})`).all() as Array<{name:string;type:string}>;
+        const server = await client.query(`SELECT ${columns.map(({name}) =>
+          TIMESTAMP_COLUMNS.has(`${table.name}.${name}`) ? `${quote(name)}::text AS ${quote(name)}` : quote(name)
+        ).join(", ")} FROM public.${quote(table.name)} WHERE id=$1`, [change.row_id]);
+        const remoteRow = server.rows[0];
+        // The same repair/delete may have been applied on both devices and
+        // the server. Converged records are acknowledgements, not conflicts.
+        const identical = !local && !remoteRow || Boolean(local && remoteRow && columns.every(({name,type}) => {
+          const value = fromInternalValue(table.name,name,type,remoteRow[name]);
+          if (local![name] === value) return true;
+          if (name === "permissions" || name === "client_view_permissions") {
+            try { return canonicalJson(JSON.parse(String(local![name]))) === canonicalJson(remoteRow[name]); } catch { return false; }
+          }
+          return false;
+        }));
+        if (!identical) conflicts.push(change);
+      }
       if (conflicts.length) throw new Error(`Internal sync conflict in ${conflicts.length} record(s); no local changes were sent`);
     }
     // PostgreSQL's journal must record independent server edits, not changes
@@ -317,13 +360,32 @@ async function performInternalPush(connectionString: string, bidirectional = fal
     // Children are removed first; parent rows are inserted first.
     for (const table of [...snapshot].reverse()) {
       for (const { id, row } of table.rows) {
-        if (!row) await client.query(`DELETE FROM public.${quote(table.name)} WHERE id = $1`, [id]);
+        if (!row) {
+          if (table.name === "invoice_items") {
+            const existing = await client.query("SELECT invoice_id FROM public.invoice_items WHERE id=$1 FOR UPDATE", [id]);
+            if (!existing.rows.length) continue;
+            const event = [...changes].reverse().find(change => change.tableName === table.name && change.rowId === id);
+            if (event?.invoiceId == null || Number(existing.rows[0].invoice_id) !== Number(event.invoiceId)) {
+              throw new Error(`Invoice item deletion identity is unresolved: ${id}; no changes sent`);
+            }
+            await client.query("DELETE FROM public.invoice_items WHERE id=$1 AND invoice_id=$2", [id,event.invoiceId]);
+          } else {
+            await client.query(`DELETE FROM public.${quote(table.name)} WHERE id = $1`, [id]);
+          }
+        }
       }
     }
     for (const table of snapshot) {
       for (const { row } of table.rows) {
         if (!row) continue;
         const values = table.columns.map((column) => convertInternalValue(table.name, column, row[column]));
+        if (table.name === "invoice_items" || table.name === "invoices") {
+          const identityColumn = table.name === "invoice_items" ? "invoice_id" : "invoice_number";
+          const existing = await client.query(`SELECT ${quote(identityColumn)} FROM public.${quote(table.name)} WHERE id=$1 FOR UPDATE`, [row.id]);
+          if (existing.rows.length && String(existing.rows[0][identityColumn]) !== String(row[identityColumn])) {
+            throw new Error(`Internal ${table.name} ID collision: ${row.id}; no local changes sent`);
+          }
+        }
         if (table.name === "users") {
           const localUsername = String(row.username ?? "").trim().toLowerCase();
           const localSyncId = row.user_sync_id == null ? "" : String(row.user_sync_id).trim();

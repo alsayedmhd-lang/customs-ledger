@@ -20,3 +20,7 @@ export {
 } from "./trusted-devices";
 
 export { validatePairingTransfer } from "./pairing-transfer";
+
+export { MutualPairingStore, validateMutualTransfer } from "./mutual-pairing";
+
+export { CompactPairingStore, validateCompactTransfer } from "./mutual-pairing";

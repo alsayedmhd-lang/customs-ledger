@@ -10,8 +10,9 @@ declare global {
         createdAt: string;
       }>;
 
-      exportDevicePairingFile?: (transfer: { format: "ledger-device-pairing"; version: 1; kind: "request" | "response" | "proof"; payload: unknown }) => Promise<{ canceled: boolean }>;
-      importDevicePairingFile?: () => Promise<{ format: "ledger-device-pairing"; version: 1; kind: "request" | "response" | "proof"; payload: unknown } | null>;
+      mutualDevicePairing?: (action: "create" | "receive" | "prove" | "approve" | "finish" | "create-simple" | "approve-request" | "approve-response", payload?: unknown, fingerprint?: string, name?: string) => Promise<unknown>;
+      exportDevicePairingFile?: (transfer: { format: "ledger-device-pairing"; version: 1 | 2 | 3; kind: "request" | "response" | "proof" | "confirmation"; payload: unknown }) => Promise<{ canceled: boolean }>;
+      importDevicePairingFile?: () => Promise<{ format: "ledger-device-pairing"; version: 1 | 2 | 3; kind: "request" | "response" | "proof" | "confirmation"; payload: unknown } | null>;
       createDevicePairingRequest?: () => Promise<unknown>;
       receiveDevicePairingRequest?: (request: unknown) => Promise<unknown>;
       signDevicePairingResponse?: (response: unknown) => Promise<unknown>;

@@ -98,8 +98,8 @@ async function runConfiguredWithAttachments(settings: Settings) {
   } else if (settings.mode === "internal-to-local") {
     await pullAttachmentMetadataFromInternalServer(connectionString);
   } else if (settings.mode === "bidirectional") {
-    await pushAttachmentMetadataToInternalServer(connectionString);
     await pullAttachmentMetadataFromInternalServer(connectionString);
+    await pushAttachmentMetadataToInternalServer(connectionString);
   }
 }
 async function tick() {

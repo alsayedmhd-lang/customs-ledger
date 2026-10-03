@@ -1,3 +1,4 @@
+import { reconcileInvoiceItems } from "./reconcile-invoice-items";
 import { sqlite } from "@workspace/db";
 import { createRequire } from "module";
 import { ensureSyncQueueTable } from "./ensure-sync-queue-table";
@@ -1560,38 +1561,15 @@ async function pullInvoiceItemsFromOnline(
     const invoiceItems =
       itemsByOnlineInvoiceId.get(Number(onlineInvoiceId)) || [];
 
-    // Online هو المصدر المقبول لهذه الفاتورة في هذه الدورة.
-    // نحذف الأصناف المحلية أولًا حتى يتم أيضًا تمثيل حالة
-    // أن الفاتورة Online لا تحتوي على أي أصناف.
-    sqlite
-      .prepare(`
-        DELETE FROM invoice_items
-        WHERE invoice_id = ?
-      `)
-      .run(localInvoiceId);
-
-    const insertItem = sqlite.prepare(`
-      INSERT INTO invoice_items (
-        invoice_id,
-        description,
-        quantity,
-        unit_price,
-        total
-      )
-      VALUES (?, ?, ?, ?, ?)
-    `);
-
-    for (const onlineItem of invoiceItems) {
-      insertItem.run(
-        localInvoiceId,
-        String(onlineItem.description || ""),
-        Number(onlineItem.quantity ?? 0),
-        Number(onlineItem.unit_price ?? 0),
-        Number(onlineItem.total ?? 0)
-      );
-
-      inserted += 1;
-    }
+    // Reuse local identities for matching occurrences. Repeated Online pulls
+    // must not create a new batch of IDs that internal sync would merge back.
+    const reconciled = reconcileInvoiceItems(sqlite, localInvoiceId, invoiceItems.map(item => ({
+      description: String(item.description || ""),
+      quantity: Number(item.quantity ?? 0),
+      unit_price: Number(item.unit_price ?? 0),
+      total: Number(item.total ?? 0),
+    })));
+    inserted += reconciled.inserted;
 
     invoicesProcessed += 1;
 

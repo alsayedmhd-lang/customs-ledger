@@ -46,7 +46,7 @@ function createInternalUpdateHandoff() {
 
   fs.mkdirSync(path.dirname(handoffPath), { recursive: true });
   fs.writeFileSync(handoffPath, JSON.stringify(handoff, null, 2), "utf8");
-  
+
   return token;
 }
 
@@ -1622,6 +1622,54 @@ ipcMain.handle(
     );
   }
 );
+
+let ledgerMutualPairing = null;
+let ledgerCompactPairing = null;
+ipcMain.handle("device:mutual-pairing", async (event, action, payload, approvedFingerprint, name) => {
+  assertLedgerDeviceIPC(event);
+  const { MutualPairingStore, validateMutualTransfer, getPairingFingerprint } = getLedgerDeviceModule();
+  if (["create-simple", "approve-request", "approve-response"].includes(action)) {
+    const { CompactPairingStore, validateCompactTransfer } = getLedgerDeviceModule();
+    ledgerCompactPairing ??= new CompactPairingStore();
+    if (action === "create-simple") return ledgerCompactPairing.create(app);
+    validateCompactTransfer({ format: "ledger-device-pairing", version: 3, kind: action === "approve-request" ? "request" : "response", payload });
+    const fingerprint = getPairingFingerprint(payload.publicKey);
+    if (typeof approvedFingerprint !== "string" || approvedFingerprint.trim().toUpperCase() !== fingerprint) throw new Error("Device fingerprint approval does not match");
+    if (name != null && (typeof name !== "string" || name.length > 100)) throw new Error("Invalid device name");
+    const result = await dialog.showMessageBox(mainWindow, {
+      type: "warning", buttons: ["إلغاء / Cancel", "اعتماد الجهاز / Approve Device"], defaultId: 0, cancelId: 0, noLink: true,
+      title: "Ledger — توثيق الأجهزة / Device Pairing",
+      message: "قارن بصمة الجهاز الآخر من شاشة هويته قبل الموافقة. / Independently compare the other device fingerprint before approval.",
+      detail: `Device: ${payload.deviceId}\nFingerprint: ${fingerprint}`,
+    });
+    if (result.response !== 1) throw new Error("Device pairing was not approved");
+    return action === "approve-request"
+      ? ledgerCompactPairing.receive(app, payload, approvedFingerprint, name ?? null)
+      : ledgerCompactPairing.finish(app, payload, approvedFingerprint, name ?? null);
+  }
+  ledgerMutualPairing ??= new MutualPairingStore();
+  if (action === "create") return ledgerMutualPairing.create(app);
+  const expected = { receive: "request", prove: "response", approve: "proof", finish: "confirmation" }[action];
+  if (!expected) throw new Error("Invalid mutual pairing action");
+  validateMutualTransfer({ format: "ledger-device-pairing", version: 2, kind: expected, payload });
+  if (action === "prove" || action === "approve") {
+    const peer = action === "prove" ? payload : payload.response.request;
+    const fingerprint = getPairingFingerprint(peer.publicKey);
+    if (typeof approvedFingerprint !== "string" || approvedFingerprint.trim().toUpperCase() !== fingerprint) throw new Error("Device fingerprint approval does not match");
+    const result = await dialog.showMessageBox(mainWindow, {
+      type: "warning", buttons: ["إلغاء / Cancel", "اعتماد الجهاز / Approve Device"], defaultId: 0, cancelId: 0, noLink: true,
+      title: "Ledger — توثيق الأجهزة / Device Pairing",
+      message: "قارن بصمة الجهاز الآخر من شاشة هويته قبل الموافقة. / Independently compare the other device fingerprint before approval.",
+      detail: `Device: ${peer.deviceId}\nFingerprint: ${fingerprint}`,
+    });
+    if (result.response !== 1) throw new Error("Device pairing was not approved");
+  }
+  if (name != null && (typeof name !== "string" || name.length > 100)) throw new Error("Invalid device name");
+  if (action === "receive") return ledgerMutualPairing.receive(app, payload);
+  if (action === "prove") return ledgerMutualPairing.prove(app, payload, approvedFingerprint, name ?? null);
+  if (action === "approve") return ledgerMutualPairing.approve(app, payload, approvedFingerprint, name ?? null);
+  return ledgerMutualPairing.finish(app, payload);
+});
 
 ipcMain.handle("device:trusted-list", async (event) => {
   assertLedgerDeviceIPC(event);

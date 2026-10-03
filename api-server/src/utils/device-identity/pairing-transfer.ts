@@ -1,3 +1,4 @@
+import { validateMutualTransfer, type MutualTransfer, validateCompactTransfer, type CompactTransfer } from "./mutual-pairing";
 import { getPairingFingerprint, createPairingResponse } from "./device-pairing";
 
 export type PairingTransferKind = "request" | "response" | "proof";
@@ -35,8 +36,10 @@ function windowDates(issued: unknown, expires: unknown, now: Date) {
 }
 
 /** Strict allowlist: public protocol fields only, never private keys or database credentials. */
-export function validatePairingTransfer(value: unknown, now = new Date()): PairingTransfer {
+export function validatePairingTransfer(value: unknown, now = new Date()): PairingTransfer | MutualTransfer | CompactTransfer {
   const file = record(value);
+  if (file.version === 3) return validateCompactTransfer(value, now);
+  if (file.version === 2) return validateMutualTransfer(value, now);
   exactKeys(file, ["format", "version", "kind", "payload"]);
   if (file.format !== "ledger-device-pairing" || file.version !== 1 || !["request", "response", "proof"].includes(String(file.kind))) {
     throw new Error("Unsupported Ledger pairing file");

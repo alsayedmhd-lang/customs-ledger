@@ -50,7 +50,7 @@ export async function bootstrapInternalDatabase(connectionString: string) {
   // Freeze the source in memory before the first write to PostgreSQL.
   const source = COPY_TABLES.map((table) => ({
     name: table,
-    rows: sqlite.prepare(`SELECT * FROM ${quote(table)} ORDER BY id`).all() as Array<Record<string, unknown>>,
+    rows: sqlite!.prepare(`SELECT * FROM ${quote(table)} ORDER BY id`).all() as Array<Record<string, unknown>>,
   }));
   const client = new Client({ connectionString, connectionTimeoutMillis: 5000 });
   let inTransaction = false;
