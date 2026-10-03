@@ -1,3 +1,6 @@
+import CompactSettingsStyle from "@/components/layout/CompactSettingsStyle";
+import { PasswordInput } from "@/components/ui/password-input";
+import DeviceIdentitySettings from "@/components/DeviceIdentitySettings";
 import ResizableScrollArea from "@/components/layout/ResizableScrollArea";
 import { useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -125,6 +128,7 @@ const defaultSettings: DeveloperSettings = {
 
 const tabs = [
   { id: "security", labelAr: "الحماية والترخيص", labelEn: "Security & License", icon: Shield },
+  { id: "devices", labelAr: "توثيق الأجهزة", labelEn: "Device Pairing", icon: Shield },
   { id: "manager", labelAr: "صلاحيات المدير", labelEn: "Manager Access", icon: Users },
   { id: "database", labelAr: "قاعدة البيانات", labelEn: "Database", icon: Database },
   { id: "diagnostics", labelAr: "النظام والتشخيص", labelEn: "Diagnostics", icon: Activity },
@@ -401,15 +405,15 @@ function SectionNavigation({ options, value, onChange, label }: {
   label: string;
 }) {
   return (
-    <nav aria-label={label} className="grid gap-3 md:grid-cols-3">
+    <nav aria-label={label} className="grid gap-2.5 md:grid-cols-3">
       {options.map((option) => (
         <button key={option.id} type="button" aria-pressed={value === option.id}
           onClick={() => onChange(option.id)}
-          className={cn("flex items-start gap-3 rounded-xl border p-4 text-start transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
+          className={cn("flex items-start gap-2.5 rounded-xl border p-3 text-start transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
             value === option.id ? "border-primary bg-primary/5 text-primary" : "border-border bg-card text-foreground hover:bg-muted/50")}>
           <option.icon className="mt-0.5 h-5 w-5 shrink-0" />
           <span className="min-w-0">
-            <span className="block text-sm font-semibold">{option.label}</span>
+            <span className="block text-[13px] font-semibold">{option.label}</span>
             <span className="mt-1 block text-xs font-normal text-muted-foreground">{option.hint}</span>
           </span>
         </button>
@@ -421,17 +425,17 @@ function SectionNavigation({ options, value, onChange, label }: {
 function InfoRow({ label, value, isAR }: { label: string; value?: string | number | boolean | null; isAR: boolean }) {
   return (
     <div className="rounded-lg border border-border bg-background px-3 py-2">
-      <div className="text-sm font-medium text-muted-foreground">{label}</div>
-      <div className="mt-1 break-all text-sm font-medium">{formatDisplayValue(value, isAR)}</div>
+      <div className="text-[13px] font-medium text-muted-foreground">{label}</div>
+      <div className="mt-1 break-all text-[13px] font-medium">{formatDisplayValue(value, isAR)}</div>
     </div>
   );
 }
 
 function ToggleRow({ label, hint, checked, onChange }: { label: string; hint: string; checked: boolean; onChange: (checked: boolean) => void }) {
   return (
-    <div className="flex items-center justify-between gap-4 rounded-lg border border-border bg-background px-4 py-3">
+    <div data-settings-toggle-row className="flex min-w-0 items-center justify-between gap-2.5 border-b border-border/60 px-1 py-1.5">
       <div>
-        <div className="text-sm font-semibold">{label}</div>
+        <div className="text-[13px] font-semibold">{label}</div>
         <div className="mt-1 text-xs text-muted-foreground">{hint}</div>
       </div>
       <Switch checked={checked} onCheckedChange={onChange} />
@@ -441,9 +445,9 @@ function ToggleRow({ label, hint, checked, onChange }: { label: string; hint: st
 
 function DevField({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="space-y-1">
-      <Label className="text-sm font-medium text-muted-foreground">{label}</Label>
-      {children}
+    <div data-settings-field className="min-w-0">
+      <Label className="text-[13px] font-medium text-muted-foreground">{label}</Label>
+      <div className="min-w-0">{children}</div>
     </div>
   );
 }
@@ -558,6 +562,22 @@ export default function DeveloperSettingsPage() {
     status: "idle",
   });
   const syncWorkerRunningRef = useRef(false);
+  const databaseViewportRef = useRef<HTMLDivElement>(null);
+  const [databaseViewportHeight, setDatabaseViewportHeight] = useState<number | null>(null);
+  useEffect(() => {
+    if (!unlocked || activeTab !== "database") return;
+    const viewport = databaseViewportRef.current;
+    if (!viewport) return;
+    const measure = () => {
+      const top = viewport.getBoundingClientRect().top;
+      setDatabaseViewportHeight(Math.max(160, Math.floor(window.innerHeight - Math.max(0, top) - 32)));
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    const observer = new ResizeObserver(measure);
+    if (viewport.parentElement) observer.observe(viewport.parentElement);
+    return () => { window.removeEventListener("resize", measure); observer.disconnect(); };
+  }, [unlocked, activeTab, databaseSection]);
 
   const developerTabs = tabs.map((tab) => ({
     ...tab,
@@ -2017,18 +2037,19 @@ export default function DeveloperSettingsPage() {
 
   if (!unlocked) {
     return (
-      <div className="mx-auto flex min-h-[70vh] max-w-md items-center justify-center px-4">
-        <Card className="w-full rounded-lg">
-          <CardHeader>
-            <CardTitle className="text-xl">{tr("دخول المطوّر", "Developer Login")}</CardTitle>
+      <div data-compact-settings dir={isRTL ? "rtl" : "ltr"} className="mx-auto flex min-h-[70vh] w-full max-w-sm items-center justify-center">
+        <CompactSettingsStyle />
+        <Card data-settings-controls className="w-full rounded-lg">
+          <CardHeader className="px-3 py-3">
+            <CardTitle className="text-[16px]">{tr("دخول المطوّر", "Developer Login")}</CardTitle>
           </CardHeader>
           <CardContent>
             <form onSubmit={unlockDeveloper} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="developer-password">{tr("كلمة المرور", "Password")}</Label>
-                <Input id="developer-password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" />
+                <PasswordInput isAR={isAR} id="developer-password"  value={password} onChange={(event) => setPassword(event.target.value)} autoComplete="current-password" />
               </div>
-              {error && <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</div>}
+              {error && <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-[13px] text-destructive">{error}</div>}
               <Button type="submit" className="w-full" disabled={isSubmitting}>{isSubmitting ? tr("جارٍ الدخول...", "Signing in...") : tr("دخول", "Sign in")}</Button>
             </form>
           </CardContent>
@@ -2038,14 +2059,38 @@ export default function DeveloperSettingsPage() {
   }
 
   return (
-    <div dir={isRTL ? "rtl" : "ltr"} className="ledger-developer-settings ms-0 me-auto w-full max-w-[1120px]">
+    <div dir={isRTL ? "rtl" : "ltr"} className="ledger-developer-settings ms-0 me-auto w-full min-w-0">
       <style>{`
         .ledger-developer-settings input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]),
-        .ledger-developer-settings select { min-height: 40px; font-size: 14px; line-height: 20px; border-radius: 8px; }
-        .ledger-developer-settings textarea { font-size: 14px; line-height: 1.6; border-radius: 8px; }
-        .ledger-developer-settings label { font-size: 14px; line-height: 20px; }
-        .ledger-developer-settings button:not([role="switch"]):not([role="checkbox"]):not([role="radio"]) { min-height: 36px; font-size: 14px; }
+        .ledger-developer-settings select { min-height: 34px; height: 34px; font-size: 13px; line-height: 18px; border-radius: 8px; }
+        .ledger-developer-settings textarea { font-size: 13px; line-height: 1.6; border-radius: 8px; }
+        .ledger-developer-settings label { font-size: 13px; line-height: 18px; }
+        .ledger-developer-settings button:not([role="switch"]):not([role="checkbox"]):not([role="radio"]) { min-height: 32px; font-size: 13px; }
         .ledger-developer-settings input[type="number"] { max-width: 160px; }
+        .ledger-developer-settings .relative > button[aria-pressed] { min-height: 28px; }
+        [data-settings-database] { min-width: 0; max-width: 100%; }
+        [data-database-viewport] { max-width: 100%; scrollbar-gutter: stable; }
+        [data-database-section] > div:first-child { padding: 6px 10px; }
+        [data-database-section] > div:last-child { padding: 8px; }
+        [data-database-section] :is(.mb-4, .mb-3) { margin-bottom: 8px; }
+        [data-database-section] :is(.mt-4, .mt-3) { margin-top: 8px; }
+        [data-database-section] .shadow-sm { padding: 8px; }
+        [data-database-section="online"] > div:last-child { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; align-items: start; }
+        [data-database-section="online"] > div:last-child > div:last-child { grid-column: 1 / -1; }
+        [data-database-section="local"] > div:last-child { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; align-items: start; }
+        [data-database-section="local"] > div:last-child > :nth-child(-n+2) { grid-column: 1 / -1; }
+        [data-database-section] > div:last-child > * { min-width: 0; margin-block: 0 !important; }
+        [data-database-section] .grid > * { min-width: 0; }
+        @container (max-width: 800px) {
+          [data-database-section="online"] > div:last-child,
+          [data-database-section="local"] > div:last-child { grid-template-columns: minmax(0, 1fr); }
+        }
+
+        [data-settings-database] .flex:has(> button) { flex-wrap: wrap; gap: 8px; }
+        [data-settings-database] button { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+        [data-settings-database] .grid:has(> [data-settings-field]) { grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); }
+        [data-settings-database] [class~="md:grid-cols-5"] { grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); }
+
       `}</style>
     <SettingsShell<TabId>
       dir={isRTL ? "rtl" : "ltr"}
@@ -2062,29 +2107,32 @@ export default function DeveloperSettingsPage() {
       }
     >
 
-      {error && <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">{error}</div>}
-      {savedMessage && <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{savedMessage}</div>}
+      {error && <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-[13px] text-destructive">{error}</div>}
+      {savedMessage && <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-[13px] text-emerald-700">{savedMessage}</div>}
+
+      {activeTab === "devices" && (
+        <DeviceIdentitySettings isAR={isAR} pairingEnabled={onlineDatabaseConnected || internalDatabaseConnectionStatus === "connected"} />
+      )}
 
       {activeTab === "security" && (
-        <div className="grid items-start gap-4 xl:grid-cols-[1.2fr_0.8fr]">
-          <div className="grid gap-4">
-          <Card className="rounded-2xl border-border/70 shadow-sm">
-            <CardHeader><CardTitle className="text-lg">{tr("إعدادات الحماية", "Security Settings")}</CardTitle></CardHeader>
-            <CardContent className="space-y-3">
+        <div data-settings-security className="flex min-w-0 flex-col gap-3">
+<details data-settings-fold className="rounded-xl border-border/70 shadow-sm">
+            <summary className="flex cursor-pointer items-center gap-2 px-3 py-2 text-[13px] font-semibold">{tr("إعدادات الحماية", "Security Settings")}<span aria-hidden="true" className="ms-auto text-muted-foreground">⌄</span></summary>
+            <CardContent className="grid gap-2.5 px-3 pb-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 300px), 1fr))", alignItems: "start" }}>
               {securityToggles.map(([key, labelAr, labelEn, hintAr, hintEn]) => (
                 <ToggleRow key={key} label={tr(labelAr, labelEn)} hint={tr(hintAr, hintEn)} checked={!!settings[key]} onChange={(checked) => setBool(key, checked)} />
               ))}
             </CardContent>
-          </Card>
-          <Card className="rounded-2xl border-border/70 shadow-sm">
-            <CardHeader><CardTitle className="text-lg">{tr("رسالة صفحة تسجيل الدخول", "Login Page Message")}</CardTitle></CardHeader>
-            <CardContent className="space-y-4">
+          </details>
+<details data-settings-fold className="rounded-xl border-border/70 shadow-sm">
+            <summary className="flex cursor-pointer items-center gap-2 px-3 py-2 text-[13px] font-semibold">{tr("رسالة صفحة تسجيل الدخول", "Login Page Message")}<span aria-hidden="true" className="ms-auto text-muted-foreground">⌄</span></summary>
+            <CardContent className="grid gap-2.5 px-3 pb-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 300px), 1fr))", alignItems: "start" }}>
               <div className="space-y-2">
                 <Label>{tr("نص الرسالة", "Message text")}</Label>
                 <Textarea
                   value={settings.loginMessageText}
                   onChange={(event) => setText("loginMessageText", event.target.value)}
-                  className="min-h-28"
+                  className="min-h-[68px]"
                   placeholder={tr("اتركها فارغة لإخفاء الرسالة", "Leave empty to hide the message")}
                 />
               </div>
@@ -2096,7 +2144,7 @@ export default function DeveloperSettingsPage() {
                   className="grid gap-2 md:grid-cols-2"
                 >
                   {loginMessageTypeOptions.map((option) => (
-                    <Label key={option.value} className="flex cursor-pointer items-center gap-3 rounded-lg border border-border bg-background px-3 py-2 text-sm font-medium">
+                    <Label key={option.value} className="flex cursor-pointer items-center gap-2.5 rounded-lg border border-border bg-background px-3 py-2 text-[13px] font-medium">
                       <RadioGroupItem value={option.value} />
                       <span>{tr(option.labelAr, option.labelEn)}</span>
                     </Label>
@@ -2110,17 +2158,16 @@ export default function DeveloperSettingsPage() {
                 </Button>
               </div>
             </CardContent>
-          </Card>
-          </div>
-          <Card className="rounded-2xl border-border/70 shadow-sm">
-            <CardHeader><CardTitle className="text-lg">{tr("بيانات الترخيص", "License Details")}</CardTitle></CardHeader>
-            <CardContent className="grid gap-3">
+          </details>
+<details data-settings-fold className="rounded-xl border-border/70 shadow-sm">
+            <summary className="flex cursor-pointer items-center gap-2 px-3 py-2 text-[13px] font-semibold">{tr("بيانات الترخيص", "License Details")}<span aria-hidden="true" className="ms-auto text-muted-foreground">⌄</span></summary>
+            <CardContent className="grid gap-2.5 px-3 pb-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 300px), 1fr))", alignItems: "start" }}>
               <div className="space-y-1">
                 <Label>{tr("نص أسفل صفحة الدخول", "Login footer text")}</Label>
                 <Textarea
                   value={settings.loginFooterText || DEFAULT_LOGIN_FOOTER_TEXT}
                   onChange={(event) => setText("loginFooterText", event.target.value)}
-                  className="min-h-20"
+                  className="min-h-[68px]"
                 />
               </div>
               {licenseFields.map(([key, labelAr, labelEn]) => (
@@ -2162,7 +2209,7 @@ export default function DeveloperSettingsPage() {
                 </p>
               </div>
               <div className="rounded-xl border border-border bg-muted/30 p-3 space-y-3">
-                <div className="font-semibold text-sm">
+                <div className="font-semibold text-[13px]">
                   {tr("مولد ترخيص العميل", "Client License Generator")}
                 </div>
 
@@ -2212,7 +2259,7 @@ export default function DeveloperSettingsPage() {
                       value={generatedLicenseText}
                       readOnly
                       dir="ltr"
-                      className="min-h-40 font-mono text-xs"
+                      className="min-h-[96px] font-mono text-xs"
                     />
                     <Button
                       type="button"
@@ -2226,39 +2273,40 @@ export default function DeveloperSettingsPage() {
                 )}
               </div>
             </CardContent>
-          </Card>
-        </div>
+          </details>
+</div>
        )}
 
        {activeTab === "manager" && (
-        <div className="grid gap-4">
-        <Card className="rounded-2xl border-border/70 shadow-sm">
-          <CardHeader><CardTitle className="text-lg">{tr("صلاحيات المدير", "Manager Access")}</CardTitle></CardHeader>
-          <CardContent className="grid gap-3 md:grid-cols-2">
+        <div className="grid gap-2.5">
+        <details data-settings-fold className="rounded-xl border-border/70 shadow-sm">
+          <summary className="flex cursor-pointer items-center gap-2 px-3 py-2 text-[13px] font-semibold">{tr("صلاحيات المدير", "Manager Access")}<span aria-hidden="true" className="ms-auto text-muted-foreground">⌄</span></summary>
+          <CardContent className="px-3 pb-3 grid gap-2.5 md:grid-cols-2">
             {managerToggles.map(([key, labelAr, labelEn, hintAr, hintEn]) => (
               <ToggleRow key={key} label={tr(labelAr, labelEn)} hint={tr(hintAr, hintEn)} checked={!!settings[key]} onChange={(checked) => setBool(key, checked)} />
             ))}
           </CardContent>
-        </Card>
+        </details>
         </div>
       )}
 
       {activeTab === "database" && (
-        <Card className="rounded-2xl border-border/70 shadow-sm">
-          <CardHeader><CardTitle className="text-lg">{tr("قاعدة البيانات", "Database")}</CardTitle></CardHeader>
-          <CardContent className="space-y-4">
+        <Card data-settings-database className="rounded-xl border-border/70 shadow-sm">
+          <CardHeader className="px-3 py-3"><CardTitle className="text-[16px]">{tr("قاعدة البيانات", "Database")}</CardTitle></CardHeader>
+          <CardContent className="px-3 pb-3 space-y-4">
             <SectionNavigation label={tr("أقسام قواعد البيانات", "Database sections")} value={databaseSection} onChange={setDatabaseSection} options={[
               { id: "local", label: tr("المحلية", "Local"), hint: tr("SQLite ومسار البيانات", "SQLite and data location"), icon: Database },
               { id: "online", label: tr("الأونلاين", "Online"), hint: tr("الاتصال والمزامنة عبر الإنترنت", "Internet connection and sync"), icon: Cloud },
               { id: "internal", label: tr("الخادم الداخلي", "Internal Server"), hint: tr("اتصال الشبكة والمزامنة الداخلية", "Network connection and internal sync"), icon: Database },
             ]} />
 
-            <section hidden={databaseSection !== "local"} className="rounded-xl border border-border bg-background">
-              <div className="flex items-center gap-3 px-5 py-4 text-base font-semibold text-foreground">
+            <div ref={databaseViewportRef} data-database-viewport className="min-w-0 overflow-y-auto overscroll-contain pe-1" style={{ height: databaseViewportHeight ?? "calc(100dvh - 340px)" }}>
+            <section data-database-section="local" hidden={databaseSection !== "local"} className="rounded-xl border border-border bg-background">
+              <div className="flex items-center gap-2.5 px-3 py-3 text-[13px] font-semibold text-foreground">
                 <span className="flex items-center gap-2"><Database className="h-5 w-5 text-primary" />{tr("قاعدة البيانات المحلية (SQLite)", "Local database (SQLite)")}</span>
               </div>
-              <div className="space-y-4 border-t border-border p-5">
-            <div className="grid gap-3 md:grid-cols-2">
+              <div className="space-y-4 border-t border-border p-3">
+            <div className="grid gap-2.5 md:grid-cols-2">
               <InfoRow isAR={isAR} label={tr("مسار SQLite", "SQLite path")} value={settings.sqlitePath} />
               <InfoRow isAR={isAR} label={tr("حالة قاعدة البيانات", "Database status")} value={settings.databaseStatus} />
               <InfoRow isAR={isAR} label={tr("حجم قاعدة البيانات", "Database size")} value={formatBytes(settings.databaseSize, isAR)} />
@@ -2270,12 +2318,12 @@ export default function DeveloperSettingsPage() {
               <Button type="button" variant="outline" onClick={copyDatabasePath} className="gap-2"><Copy className="h-4 w-4" />{tr("نسخ مسار قاعدة البيانات", "Copy database path")}</Button>
             </div>
 
-              <div className="rounded-2xl border border-border bg-background/70 p-4 shadow-sm">
-                <div className="mb-4 flex items-center gap-2 text-sm font-bold text-foreground">
+              <div className="rounded-2xl border border-border bg-background/70 p-3 shadow-sm">
+                <div className="mb-4 flex items-center gap-2 text-[13px] font-bold text-foreground">
                   <Database className="h-4 w-4 text-emerald-600" />
                   <span>{tr("قاعدة البيانات المحلية", "Local database")}</span>
                 </div>
-                <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                <div className="grid grid-cols-1 gap-2.5 lg:grid-cols-2">
                   <DevField label={tr("مسار قاعدة البيانات", "Database path")}>
                     <Input
                       value={databaseConfig.localPath}
@@ -2284,7 +2332,7 @@ export default function DeveloperSettingsPage() {
                     />
                   </DevField>
                   <DevField label={tr("حالة قاعدة SQLite المحلية", "Local SQLite database status")}>
-                    <div className="flex h-10 items-center justify-between rounded-md border border-border bg-background px-3 text-sm">
+                    <div className="flex h-[34px] items-center justify-between rounded-md border border-border bg-background px-3 text-[13px]">
                       <span className={cn("font-semibold", databaseConfig.connectionStatus === "connected" ? "text-emerald-600" : databaseConfig.connectionStatus === "untested" ? "text-muted-foreground" : "text-red-600")}>
                         {formatDisplayValue(databaseConfig.connectionStatus, isAR)}
                       </span>
@@ -2296,14 +2344,14 @@ export default function DeveloperSettingsPage() {
                   <Button type="button" variant="outline" onClick={createSqlFile} size="sm">{tr("تحميل ملف SQL لإنشاء قاعدة جديدة", "Download SQL file to create a new database")}</Button>
                 </div>
               </div>
-            <div className="rounded-2xl border border-border bg-card p-5 shadow-sm space-y-4">
-              <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="rounded-2xl border border-border bg-card p-3 shadow-sm space-y-4">
+              <div className="flex flex-wrap items-start justify-between gap-2.5">
                 <div>
-                  <h3 className="text-lg font-semibold">
+                  <h3 className="text-[16px] font-semibold">
                     {tr("إدارة مسار البيانات", "Data Root Management")}
                   </h3>
 
-                  <p className="text-sm text-muted-foreground mt-1">
+                  <p className="text-[13px] text-muted-foreground mt-1">
                     {tr(
                       "إدارة مكان تخزين قاعدة البيانات والمرفقات والنسخ الاحتياطية والسجلات وملفات النظام.",
                       "Manage where the application stores database, attachments, backups, logs, and configuration files."
@@ -2312,8 +2360,8 @@ export default function DeveloperSettingsPage() {
                 </div>
               </div>
 
-              <div className="rounded-xl border border-border/70 bg-muted/30 p-4 space-y-2">
-                <p className="text-sm font-medium">
+              <div className="rounded-xl border border-border/70 bg-muted/30 p-3 space-y-2">
+                <p className="text-[13px] font-medium">
                   {tr("مسار البيانات الحالي", "Current Data Root")}
                 </p>
 
@@ -2326,7 +2374,7 @@ export default function DeveloperSettingsPage() {
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <details data-settings-fold className="rounded-lg border border-border"><summary className="flex cursor-pointer items-center gap-2 px-3 py-2 text-[13px] font-semibold">{tr("خيارات تغيير مسار البيانات", "Data location actions")}<span aria-hidden="true" className="ms-auto text-muted-foreground">⌄</span></summary><div className="p-3">
                 <button
                   type="button"
                   onClick={async () => {
@@ -2388,7 +2436,7 @@ export default function DeveloperSettingsPage() {
                         result.path
                     );
                   }}
-                  className="px-4 py-2 rounded-xl border bg-background hover:bg-muted transition text-sm font-medium"
+                  className="px-3 py-2 rounded-xl border bg-background hover:bg-muted transition text-[13px] font-medium"
                 >
                   {tr("اختيار مجلد جديد", "Choose New Folder")}
                 </button>
@@ -2396,7 +2444,7 @@ export default function DeveloperSettingsPage() {
                   type="button"
                   onClick={saveCurrentDataRoot}
                   disabled={isSavingCurrentDataRoot}
-                  className="px-4 py-2 rounded-xl border bg-background hover:bg-muted disabled:opacity-60 disabled:cursor-not-allowed transition text-sm font-medium"
+                  className="px-3 py-2 rounded-xl border bg-background hover:bg-muted disabled:opacity-60 disabled:cursor-not-allowed transition text-[13px] font-medium"
                 >
                   {isSavingCurrentDataRoot
                     ? tr("جاري التثبيت...", "Saving...")
@@ -2442,7 +2490,7 @@ export default function DeveloperSettingsPage() {
                       );
                     }
                   }}
-                  className="px-4 py-2 rounded-xl border bg-background hover:bg-muted transition text-sm font-medium"
+                  className="px-3 py-2 rounded-xl border bg-background hover:bg-muted transition text-[13px] font-medium"
                 >
                   {tr("اختبار الكتابة", "Test Write")}
                 </button>
@@ -2468,33 +2516,33 @@ export default function DeveloperSettingsPage() {
 
                     await window.electronAPI?.openExternalFile?.(dataRoot);
                   }}
-                  className="px-4 py-2 rounded-xl bg-primary text-primary-foreground hover:opacity-90 transition text-sm font-medium"
+                  className="px-3 py-2 rounded-xl bg-primary text-primary-foreground hover:opacity-90 transition text-[13px] font-medium"
                 >
                   {tr("فتح مجلد البيانات", "Open Data Folder")}
                 </button>
 
-              </div>
+              </div></details>
 
             </div>
               </div>
             </section>
-            <section hidden={databaseSection !== "online"} className="rounded-xl border border-border bg-background">
-              <div className="flex items-center gap-3 px-5 py-4 text-base font-semibold text-foreground">
+            <section data-database-section="online" hidden={databaseSection !== "online"} className="rounded-xl border border-border bg-background">
+              <div className="flex items-center gap-2.5 px-3 py-3 text-[13px] font-semibold text-foreground">
                 <span className="flex items-center gap-2"><Cloud className="h-5 w-5 text-primary" />{tr("قاعدة البيانات عبر الإنترنت (PostgreSQL)", "Online database (PostgreSQL)")}</span>
               </div>
-              <div className="space-y-4 border-t border-border p-5">
-              <div className="rounded-2xl border border-border bg-background/70 p-4 shadow-sm">
-                <div className="mb-4 flex items-center gap-2 text-sm font-bold text-foreground">
+              <div className="space-y-4 border-t border-border p-3">
+              <div className="rounded-2xl border border-border bg-background/70 p-3 shadow-sm">
+                <div className="mb-4 flex items-center gap-2 text-[13px] font-bold text-foreground">
                   <Cloud className="h-4 w-4 text-blue-600" />
                   <span>{tr("إعدادات قاعدة البيانات عبر الإنترنت", "Online database settings")}</span>
                 </div>
-                <div className="mb-4 flex h-10 items-center justify-between rounded-md border border-border bg-background px-3 text-sm">
+                <div className="mb-4 flex h-[34px] items-center justify-between rounded-md border border-border bg-background px-3 text-[13px]">
                   <span className="text-muted-foreground">{tr("تفعيل مزامنة الأونلاين", "Online sync setting")}</span>
                   <span className={cn("font-semibold", onlineDatabaseConnected ? "text-emerald-600" : "text-red-600")}>
                     {onlineDatabaseConnected ? tr("مزامنة الأونلاين مفعّلة", "Online sync enabled") : tr("متوقفة على هذا الجهاز", "Off on this device")}
                   </span>
                 </div>
-                <label className="mb-4 flex items-center gap-2 text-sm font-semibold text-foreground">
+                <label className="mb-4 flex items-center gap-2 text-[13px] font-semibold text-foreground">
                   <input
                     type="checkbox"
                     checked={databaseConfig.useConnectionString}
@@ -2506,8 +2554,8 @@ export default function DeveloperSettingsPage() {
 
                 {databaseConfig.useConnectionString ? (
                   <DevField label={tr("رابط الاتصال", "Connection string")}>
-                    <Input
-                      type="password"
+                    <PasswordInput isAR={isAR}
+
                       value={databaseConfig.connectionString}
                       onChange={(event) => setDatabaseConfig((current) => ({ ...current, connectionString: event.target.value }))}
                       placeholder="postgresql://user:password@host:5432/database"
@@ -2515,7 +2563,7 @@ export default function DeveloperSettingsPage() {
                     />
                   </DevField>
                 ) : (
-                  <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+                  <div className="grid grid-cols-1 gap-2.5 md:grid-cols-2 xl:grid-cols-3">
                     <DevField label={tr("عنوان الخادم", "Host")}>
                       <Input value={databaseConfig.host} onChange={(event) => setDatabaseConfig((current) => ({ ...current, host: event.target.value }))} dir="ltr" />
                     </DevField>
@@ -2529,12 +2577,12 @@ export default function DeveloperSettingsPage() {
                       <Input value={databaseConfig.username} onChange={(event) => setDatabaseConfig((current) => ({ ...current, username: event.target.value }))} dir="ltr" />
                     </DevField>
                     <DevField label={tr("كلمة المرور", "Password")}>
-                      <Input type="password" value={databaseConfig.password} onChange={(event) => setDatabaseConfig((current) => ({ ...current, password: event.target.value }))} dir="ltr" />
+                      <PasswordInput isAR={isAR}  value={databaseConfig.password} onChange={(event) => setDatabaseConfig((current) => ({ ...current, password: event.target.value }))} dir="ltr" />
                     </DevField>
                   </div>
                 )}
               </div>
-            <div className="rounded-2xl border border-border bg-background/70 p-4 shadow-sm">
+            <div className="rounded-2xl border border-border bg-background/70 p-3 shadow-sm">
               <div className="mb-4 flex flex-wrap gap-2">
                 <Button type="button" variant="outline" onClick={testPreparedConnection} size="sm" disabled={isTestingConnection}>
                   {isTestingConnection ? tr("جارٍ الاختبار...", "Testing...") : tr("اختبار الاتصال", "Test connection")}
@@ -2549,9 +2597,9 @@ export default function DeveloperSettingsPage() {
                 )}
               </div>
 
-              <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+              <div className="grid grid-cols-1 gap-2.5 xl:grid-cols-2">
                 <div>
-                  <div className="mb-3 flex items-center gap-2 text-sm font-bold text-foreground">
+                  <div className="mb-3 flex items-center gap-2 text-[13px] font-bold text-foreground">
                     <RefreshCw className="h-4 w-4 text-primary" />
                     <span>{tr("خيارات المزامنة", "Sync options")}</span>
                   </div>
@@ -2561,7 +2609,7 @@ export default function DeveloperSettingsPage() {
                       { id: "online-to-local" as SyncMode, label: tr("مزامنة الأونلاين إلى المحلي", "Sync online to local") },
                       { id: "bidirectional" as SyncMode, label: tr("مزامنة ثنائية الاتجاه", "Bidirectional sync") },
                     ].map((mode) => (
-                      <label key={mode.id} className="flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-sm">
+                      <label key={mode.id} className="flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-[13px]">
                         <input
                           type="radio"
                           checked={syncConfig.mode === mode.id}
@@ -2575,11 +2623,11 @@ export default function DeveloperSettingsPage() {
                 </div>
 
                 <div className="space-y-3">
-                  <div className="mb-3 flex items-center gap-2 text-sm font-bold text-foreground">
+                  <div className="mb-3 flex items-center gap-2 text-[13px] font-bold text-foreground">
                     <Activity className="h-4 w-4 text-primary" />
                     <span>{tr("الجدولة والحالة", "Schedule and status")}</span>
                   </div>
-                  <label className="flex items-center justify-between rounded-lg border border-border bg-background px-3 py-2 text-sm">
+                  <label className="flex items-center justify-between rounded-lg border border-border bg-background px-3 py-2 text-[13px]">
                     <span>{tr("مزامنة تلقائية", "Auto sync")}</span>
                     <input
                       type="checkbox"
@@ -2593,7 +2641,7 @@ export default function DeveloperSettingsPage() {
                       <select
                         value={syncConfig.timing}
                         onChange={(event) => setSyncConfig((current) => ({ ...current, timing: event.target.value as AutoSyncTiming }))}
-                        className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm"
+                        className="h-[34px] w-full rounded-md border border-border bg-background px-3 text-[13px]"
                       >
                         <option value="startup">{tr("عند بدء التشغيل", "On startup")}</option>
                         <option value="interval">{tr("كل فترة", "Interval")}</option>
@@ -2615,9 +2663,9 @@ export default function DeveloperSettingsPage() {
                 </div>
               </div>
             </div>
-            <div className="rounded-2xl border border-border bg-background/70 p-4 shadow-sm">
-              <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-2 text-sm font-bold text-foreground">
+            <div className="rounded-2xl border border-border bg-background/70 p-3 shadow-sm">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2.5">
+                <div className="flex items-center gap-2 text-[13px] font-bold text-foreground">
                   <RefreshCw className={cn("h-4 w-4 text-primary", isSyncQueueLoading && "animate-spin")} />
                   <span>{tr("حالة قائمة المزامنة", "Sync queue status")}</span>
                   {isSyncQueueLoading && <span className="text-xs font-medium text-muted-foreground">{tr("جارٍ التحميل...", "Loading...")}</span>}
@@ -2650,21 +2698,21 @@ export default function DeveloperSettingsPage() {
                   : tr("المزامنة التلقائية متوقفة على هذا الجهاز.", "Automatic sync is off on this device.")}
               </div>
               {syncWorkerMessage && (
-                <div className="mb-3 rounded-md border border-border bg-background px-3 py-2 text-sm text-muted-foreground">
+                <div className="mb-3 rounded-md border border-border bg-background px-3 py-2 text-[13px] text-muted-foreground">
                   {syncWorkerMessage}
                 </div>
               )}
-              <div className="grid gap-3 md:grid-cols-5">
+              <div className="grid gap-2.5 md:grid-cols-5">
                 <InfoRow isAR={isAR} label={tr("المزامنة المنتظرة", "Pending sync")} value={syncQueueStatus.pending} />
                 <InfoRow isAR={isAR} label={tr("المزامنة الناجحة", "Synced")} value={syncQueueStatus.synced} />
                 <InfoRow isAR={isAR} label={tr("المزامنة الفاشلة", "Failed sync")} value={syncQueueStatus.failed} />
                 <InfoRow isAR={isAR} label={tr("آخر مزامنة", "Last sync")} value={formatSyncQueueDate(syncQueueStatus.lastSync, isAR)} />
                 <InfoRow isAR={isAR} label={tr("آخر خطأ", "Last error")} value={syncQueueStatus.lastError || "-"} />
               </div>
-              <div className="mt-4">
-                <div className="mb-2 text-sm font-medium text-muted-foreground">{tr("آخر عناصر القائمة", "Recent Queue Items")}</div>
+              <details data-settings-fold className="rounded-lg border border-border"><summary className="flex cursor-pointer items-center gap-2 px-3 py-2 text-[13px] font-semibold">{tr("تفاصيل سجل المزامنة", "Sync queue details")}<span aria-hidden="true" className="ms-auto text-muted-foreground">⌄</span></summary><div className="p-3">
+
                 {syncQueueStatus.recent.length === 0 ? (
-                  <div className="rounded-md border border-border bg-background px-3 py-2 text-sm text-muted-foreground">
+                  <div className="rounded-md border border-border bg-background px-3 py-2 text-[13px] text-muted-foreground">
                     {tr("لا توجد عناصر في القائمة بعد", "No queue items yet")}
                   </div>
                 ) : (
@@ -2689,7 +2737,7 @@ export default function DeveloperSettingsPage() {
                             </td>
                             <td className="px-3 py-2">{item.operation || "-"}</td>
                             <td className="px-3 py-2">
-                              <span className={cn("inline-flex rounded-full border px-2 py-0.5 text-sm font-semibold", syncQueueStatusBadgeClass(item.status || ""))}>
+                              <span className={cn("inline-flex rounded-full border px-2 py-0.5 text-[13px] font-semibold", syncQueueStatusBadgeClass(item.status || ""))}>
                                 {item.status || "-"}
                               </span>
                             </td>
@@ -2704,19 +2752,19 @@ export default function DeveloperSettingsPage() {
                     </table>
                   </ResizableScrollArea>
                 )}
-              </div>
+              </div></details>
             </div>
               </div>
             </section>
-            <section hidden={databaseSection !== "internal"} className="rounded-xl border border-border bg-background">
-              <div className="flex items-center gap-3 px-5 py-4 text-base font-semibold text-foreground">
+            <section data-database-section="internal" hidden={databaseSection !== "internal"} className="rounded-xl border border-border bg-background">
+              <div className="flex items-center gap-2.5 px-3 py-3 text-[13px] font-semibold text-foreground">
                 <span className="flex items-center gap-2"><Database className="h-5 w-5 text-primary" />{tr("قاعدة بيانات الخادم الداخلي", "Internal server database")}</span>
               </div>
-              <div className="space-y-4 border-t border-border p-5">
-                <p className="text-sm text-muted-foreground">
+              <div className="space-y-4 border-t border-border p-3">
+                <p className="text-[13px] text-muted-foreground">
                   {tr("احفظ إعدادات PostgreSQL الخاصة بالشبكة الداخلية، ثم اختبر الاتصال أو تابع حالة المزامنة أدناه.", "Save the internal PostgreSQL settings, then test the connection or review sync status below.")}
                 </p>
-                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-3">
                   <DevField label={tr("عنوان الخادم الداخلي", "Internal server address")}>
                     <Input value={internalDatabaseConfig.host} onChange={(event) => setInternalDatabaseConfig((current) => ({ ...current, host: event.target.value }))} placeholder="192.168.1.10" dir="ltr" />
                   </DevField>
@@ -2730,27 +2778,27 @@ export default function DeveloperSettingsPage() {
                     <Input value={internalDatabaseConfig.username} onChange={(event) => setInternalDatabaseConfig((current) => ({ ...current, username: event.target.value }))} dir="ltr" />
                   </DevField>
                   <DevField label={tr("كلمة المرور", "Password")}>
-                    <Input value={internalDatabaseConfig.password} onChange={(event) => setInternalDatabaseConfig((current) => ({ ...current, password: event.target.value }))} type="password" dir="ltr" />
+                    <PasswordInput isAR={isAR} value={internalDatabaseConfig.password} onChange={(event) => setInternalDatabaseConfig((current) => ({ ...current, password: event.target.value }))}  dir="ltr" />
                   </DevField>
                   <DevField label={tr("رابط الاتصال البديل", "Alternative connection string")}>
-                    <Input value={internalDatabaseConfig.connectionString} onChange={(event) => setInternalDatabaseConfig((current) => ({ ...current, connectionString: event.target.value }))} type="password" placeholder="postgresql://..." dir="ltr" />
+                    <PasswordInput isAR={isAR} value={internalDatabaseConfig.connectionString} onChange={(event) => setInternalDatabaseConfig((current) => ({ ...current, connectionString: event.target.value }))}  placeholder="postgresql://..." dir="ltr" />
                   </DevField>
                 </div>
-                <div className="grid gap-3 md:grid-cols-2">
+                <div className="grid gap-2.5 md:grid-cols-2">
                   <InfoRow isAR={isAR} label={tr("آخر فحص للخادم الداخلي", "Last internal server check")} value={internalDatabaseConnectionStatus === "connected" ? tr("نجح الاتصال", "Connection succeeded") : internalDatabaseConnectionStatus === "failed" ? tr("فشل الاتصال", "Connection failed") : tr("لم يُختبر بعد", "Not tested yet")} />
                   <InfoRow isAR={isAR} label={tr("حالة المزامنة الداخلية", "Internal sync status")} value={!internalDatabaseConfig.autoSync ? tr("التشغيل التلقائي متوقف", "Automatic sync is off") : internalAutoStatus?.running ? tr("المزامنة جارية", "Sync in progress") : internalAutoStatus?.lastError ? tr("آخر محاولة فشلت", "Last attempt failed") : internalAutoStatus?.lastSuccessAt ? tr("آخر محاولة نجحت", "Last attempt succeeded") : tr("بانتظار أول تشغيل", "Waiting for first run")} />
                   <InfoRow isAR={isAR} label={tr("التغييرات المحلية المنتظرة للخادم الداخلي", "Local changes pending for internal server")} value={internalJournalCount ?? tr("لم تُفحص", "Not checked")} />
                   <InfoRow isAR={isAR} label={tr("تعديلات الخادم المباشرة في السجل", "Direct server edits in journal")} value={serverJournalCount ?? tr("تعذر الفحص", "Unavailable")} />
                 </div>
-                <div className="grid gap-4 rounded-xl border border-border bg-background/70 p-4 xl:grid-cols-2">
+                <div className="grid gap-2.5 rounded-xl border border-border bg-background/70 p-3 xl:grid-cols-2">
                   <div className="space-y-3">
-                    <h4 className="text-sm font-bold">{tr("اتجاه المزامنة الداخلية", "Internal sync direction")}</h4>
+                    <h4 className="text-[16px] font-bold">{tr("اتجاه المزامنة الداخلية", "Internal sync direction")}</h4>
                     {[
                       { id: "local-to-internal", ar: "من المحلي إلى الخادم الداخلي", en: "Local to internal server" },
                       { id: "internal-to-local", ar: "من الخادم الداخلي إلى المحلي", en: "Internal server to local" },
                       { id: "bidirectional", ar: "مزامنة ثنائية الاتجاه", en: "Bidirectional sync" },
                     ].map((option) => (
-                      <label key={option.id} className="flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-sm">
+                      <label key={option.id} className="flex items-center gap-2 rounded-lg border border-border bg-background px-3 py-2 text-[13px]">
                         <input type="radio" name="internal-sync-mode" className="h-4 w-4 accent-primary"
                           checked={internalDatabaseConfig.syncMode === option.id}
                           onChange={() => setInternalDatabaseConfig((current) => ({ ...current, syncMode: option.id }))} />
@@ -2759,15 +2807,15 @@ export default function DeveloperSettingsPage() {
                     ))}
                   </div>
                   <div className="space-y-3">
-                    <h4 className="text-sm font-bold">{tr("جدولة المزامنة الداخلية", "Internal sync schedule")}</h4>
-                    <label className="flex items-center justify-between rounded-lg border border-border bg-background px-3 py-2 text-sm">
+                    <h4 className="text-[16px] font-bold">{tr("جدولة المزامنة الداخلية", "Internal sync schedule")}</h4>
+                    <label className="flex items-center justify-between rounded-lg border border-border bg-background px-3 py-2 text-[13px]">
                       <span>{tr("تشغيل تلقائي عند تفعيل المزامنة", "Auto sync when available")}</span>
                       <input type="checkbox" className="h-4 w-4 accent-primary" checked={internalDatabaseConfig.autoSync}
                         onChange={(event) => setInternalDatabaseConfig((current) => ({ ...current, autoSync: event.target.checked }))} />
                     </label>
                     <div className="grid grid-cols-2 gap-2">
                       <DevField label={tr("التوقيت", "Timing")}>
-                        <select className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm"
+                        <select className="h-[34px] w-full rounded-md border border-border bg-background px-3 text-[13px]"
                           value={internalDatabaseConfig.timing}
                           onChange={(event) => setInternalDatabaseConfig((current) => ({ ...current, timing: event.target.value }))}>
                           <option value="startup">{tr("عند بدء التشغيل", "On startup")}</option>
@@ -2828,10 +2876,10 @@ export default function DeveloperSettingsPage() {
                   "تغييرات الأجهزة الأخرى لا تظهر في عدّاد تعديلات الخادم المباشرة؛ تلتقطها المزامنة الثنائية بفحص السجلات.",
                   "Edits from other devices are not counted as direct server edits; bidirectional sync finds them by checking the records.",
                 )}</p>
-                {internalDatabaseMessage && <p role="status" className="text-sm text-muted-foreground">{internalDatabaseMessage}</p>}
+                {internalDatabaseMessage && <p role="status" className="text-[13px] text-muted-foreground">{internalDatabaseMessage}</p>}
                 {internalReadiness && (
                   <div className="overflow-x-auto rounded-xl border border-border">
-                    <table className="w-full text-sm">
+                    <table className="w-full text-[13px]">
                       <thead className="bg-muted/50"><tr>
                         <th className="p-2 text-start">{tr("الجدول", "Table")}</th>
                         <th className="p-2 text-start">{tr("المحلي", "Local")}</th>
@@ -2849,7 +2897,8 @@ export default function DeveloperSettingsPage() {
                 )}
               </div>
             </section>
-            {databaseMessage && <div role="status" className="text-sm text-muted-foreground">{databaseMessage}</div>}
+            </div>
+            {databaseMessage && <div role="status" className="text-[13px] text-muted-foreground">{databaseMessage}</div>}
           </CardContent>
         </Card>
       )}
@@ -2862,22 +2911,22 @@ export default function DeveloperSettingsPage() {
             { id: "backup", label: tr("النسخ الاحتياطي", "Backup"), hint: tr("الجاهزية والوصف والتحقق", "Readiness, manifest, and verification"), icon: PackageCheck },
           ]} />
           <div hidden={diagnosticsSection !== "system"} className="space-y-4">
-          <Card className="rounded-2xl border-border/70 shadow-sm">
-            <CardHeader><CardTitle className="text-lg">{tr("النظام والتشخيص", "Diagnostics")}</CardTitle></CardHeader>
-            <CardContent className="grid gap-3 md:grid-cols-2">
+          <details data-settings-fold className="rounded-xl border-border/70 shadow-sm">
+            <summary className="flex cursor-pointer items-center gap-2 px-3 py-2 text-[13px] font-semibold">{tr("النظام والتشخيص", "Diagnostics")}<span aria-hidden="true" className="ms-auto text-muted-foreground">⌄</span></summary>
+            <CardContent className="px-3 pb-3 grid gap-2.5 md:grid-cols-2">
               <InfoRow isAR={isAR} label={tr("مسار الواجهة", "Frontend path")} value={settings.frontendPath} />
               <InfoRow isAR={isAR} label={tr("مسار الخادم", "Backend path")} value={settings.backendPath} />
               <InfoRow isAR={isAR} label={tr("حالة API", "API status")} value={settings.apiStatus} />
               <InfoRow isAR={isAR} label={tr("حالة ملف env", "env file status")} value={settings.envFileStatus} />
               <InfoRow isAR={isAR} label={tr("حالة الموارد", "Resources status")} value={settings.resourcesStatus} />
             </CardContent>
-          </Card>
+          </details>
 
 
-          <Card className="rounded-2xl border-border/70 shadow-sm">
-            <CardHeader>
+          <details data-settings-fold className="rounded-xl border-border/70 shadow-sm">
+            <summary className="flex cursor-pointer items-center gap-2 px-3 py-2 text-[13px] font-semibold">{tr("فحص صحة النظام", "System Diagnostics")}<span aria-hidden="true" className="ms-auto text-muted-foreground">⌄</span></summary><CardHeader className="px-3 py-3">
               <div className="flex flex-wrap items-center gap-2">
-                <CardTitle className="w-full pb-2 text-lg">{tr("فحص صحة النظام", "System Diagnostics")}</CardTitle>
+                <CardTitle className="w-full pb-2 text-[16px]">{tr("فحص صحة النظام", "System Diagnostics")}</CardTitle>
                 <Button type="button" variant="outline" size="sm" onClick={runSystemDiagnostics} disabled={isSystemDiagnosticsRunning} className="gap-2">
                   <RefreshCw className={cn("h-3.5 w-3.5", isSystemDiagnosticsRunning && "animate-spin")} />
                   {isSystemDiagnosticsRunning ? tr("جار الفحص...", "Running...") : tr("فحص صحة النظام", "Run System Diagnostics")}
@@ -2919,22 +2968,22 @@ export default function DeveloperSettingsPage() {
                 </Button>
               </div>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="px-3 pb-3 space-y-4">
               {systemDiagnosticsError && (
-                <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-[13px] text-destructive">
                   {systemDiagnosticsError}
                 </div>
               )}
 
               {isSystemDiagnosticsRunning && !systemDiagnostics && (
-                <div className="rounded-md border border-border bg-background px-3 py-2 text-sm text-muted-foreground">
+                <div className="rounded-md border border-border bg-background px-3 py-2 text-[13px] text-muted-foreground">
                   {tr("يتم تشغيل فحوصات القراءة فقط الآن.", "Read-only checks are running now.")}
                 </div>
               )}
 
               {systemDiagnostics && (
                 <>
-                  <div className="grid gap-3 md:grid-cols-4">
+                  <div className="grid gap-2.5 md:grid-cols-4">
                     <InfoRow isAR={isAR} label={tr("آخر فحص", "Checked at")} value={systemDiagnostics.checkedAt} />
                     <InfoRow isAR={isAR} label={tr("ناجح", "Passed")} value={systemDiagnostics.summary.passed} />
                     <InfoRow isAR={isAR} label={tr("تحذيرات", "Warnings")} value={systemDiagnostics.summary.warnings} />
@@ -2955,10 +3004,10 @@ export default function DeveloperSettingsPage() {
                         {systemDiagnostics.checks.map((check) => (
                           <tr key={check.id} className="border-t border-border align-top">
                             <td className="px-3 py-2">
-                              <span className={cn("inline-flex rounded-full border px-2 py-0.5 text-sm font-semibold", diagnosticStatusBadgeClass(check.status))}>
+                              <span className={cn("inline-flex rounded-full border px-2 py-0.5 text-[13px] font-semibold", diagnosticStatusBadgeClass(check.status))}>
                                 {getDiagnosticStatusLabel(check.status, isAR)}
                               </span>
-                              <div className="mt-1 text-sm text-muted-foreground">{check.area}</div>
+                              <div className="mt-1 text-[13px] text-muted-foreground">{check.area}</div>
                             </td>
                             <td className="max-w-[220px] break-all px-3 py-2">
                               <div className="font-medium">{isAR ? check.messageAr : check.messageEn}</div>
@@ -2974,18 +3023,14 @@ export default function DeveloperSettingsPage() {
                 </>
               )}
             </CardContent>
-          </Card>
+          </details>
 
           </div>
           <div hidden={diagnosticsSection !== "storage"} className="space-y-4">
-          <Card className="rounded-2xl border-border/70 shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-lg">
-                {tr("مسارات تخزين البيانات", "Data Storage Paths")}
-              </CardTitle>
-            </CardHeader>
+          <details data-settings-fold className="rounded-xl border-border/70 shadow-sm">
+            <summary className="flex cursor-pointer items-center gap-2 px-3 py-2 text-[13px] font-semibold">{tr("مسارات تخزين البيانات", "Data Storage Paths")}<span aria-hidden="true" className="ms-auto text-muted-foreground">⌄</span></summary>
 
-            <CardContent className="grid gap-3 md:grid-cols-2">
+            <CardContent className="px-3 pb-3 grid gap-2.5 md:grid-cols-2">
               <InfoRow isAR={isAR} label={tr("مسار البيانات", "Data Root")} value={storageInfo?.dataRoot} />
               <InfoRow isAR={isAR} label={tr("مصدر المسار", "Source")} value={storageInfo?.source} />
               <InfoRow isAR={isAR} label={tr("قاعدة البيانات", "Database Dir")} value={storageInfo?.databaseDir} />
@@ -2993,10 +3038,10 @@ export default function DeveloperSettingsPage() {
               <InfoRow isAR={isAR} label={tr("المرفقات", "Attachments Dir")} value={storageInfo?.attachmentsDir} />
               <InfoRow isAR={isAR} label={tr("السجلات", "Logs Dir")} value={storageInfo?.logsDir} />
             </CardContent>
-          </Card>
-            <div className="rounded-2xl border border-border bg-background/70 p-4 shadow-sm">
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-2 text-sm font-bold text-foreground">
+          </details>
+            <div className="rounded-2xl border border-border bg-background/70 p-3 shadow-sm">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-2.5">
+                <div className="flex items-center gap-2 text-[13px] font-bold text-foreground">
                   <Database className="h-4 w-4 text-primary" />
                   <span>{isAR ? "تحليل تخزين البيانات" : "Data Storage Analysis"}</span>
                 </div>
@@ -3008,7 +3053,7 @@ export default function DeveloperSettingsPage() {
 
               {dataStorageAnalysis && (
                 <div className="space-y-3">
-                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                  <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-4">
                     <InfoRow isAR={isAR} label={isAR ? "الحالة" : "ok"} value={dataStorageAnalysis.ok} />
                     <InfoRow isAR={isAR} label={isAR ? "مسار المصدر" : "sourceRoot"} value={dataStorageReport?.sourceRoot} />
                     <InfoRow isAR={isAR} label={isAR ? "مسار الهدف" : "targetRoot"} value={dataStorageReport?.targetRoot} />
@@ -3016,15 +3061,15 @@ export default function DeveloperSettingsPage() {
                   </div>
 
                   {!dataStorageAnalysis.ok && (
-                    <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                    <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-[13px] text-destructive">
                       {dataStorageAnalysis.error}
                     </div>
                   )}
 
                   {dataStorageReport && (
                     <>
-                      <div className="rounded-md border border-border bg-background px-3 py-2 text-sm">
-                        <div className="mb-2 text-sm font-medium text-muted-foreground">{isAR ? "التحذيرات" : "warnings"}</div>
+                      <div className="rounded-md border border-border bg-background px-3 py-2 text-[13px]">
+                        <div className="mb-2 text-[13px] font-medium text-muted-foreground">{isAR ? "التحذيرات" : "warnings"}</div>
                         {dataStorageReport.warnings.length > 0 ? (
                           <ul className="list-inside list-disc space-y-1">
                             {dataStorageReport.warnings.map((warning) => (
@@ -3064,9 +3109,9 @@ export default function DeveloperSettingsPage() {
 
           </div>
           <div hidden={diagnosticsSection !== "backup"} className="space-y-4">
-            <div className="rounded-2xl border border-border bg-background/70 p-4 shadow-sm">
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-2 text-sm font-bold text-foreground">
+            <div className="rounded-2xl border border-border bg-background/70 p-3 shadow-sm">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-2.5">
+                <div className="flex items-center gap-2 text-[13px] font-bold text-foreground">
                   <Database className="h-4 w-4 text-primary" />
                   <span>{isAR ? "جاهزية النسخ الاحتياطي" : "Backup Readiness"}</span>
                 </div>
@@ -3078,7 +3123,7 @@ export default function DeveloperSettingsPage() {
 
               {backupReadinessAnalysis && (
                 <div className="space-y-3">
-                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                  <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-4">
                     <InfoRow isAR={isAR} label={isAR ? "الحالة" : "ok"} value={backupReadinessAnalysis.ok} />
                     <InfoRow isAR={isAR} label={isAR ? "مسار البيانات" : "dataRoot"} value={backupReadinessReport?.dataRoot} />
                     <InfoRow isAR={isAR} label={isAR ? "مسار قاعدة البيانات" : "databasePath"} value={backupReadinessReport?.databasePath} />
@@ -3091,14 +3136,14 @@ export default function DeveloperSettingsPage() {
                   </div>
 
                   {!backupReadinessAnalysis.ok && (
-                    <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                    <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-[13px] text-destructive">
                       {backupReadinessAnalysis.error}
                     </div>
                   )}
 
                   {backupReadinessReport && (
-                    <div className="rounded-md border border-border bg-background px-3 py-2 text-sm">
-                      <div className="mb-2 text-sm font-medium text-muted-foreground">{isAR ? "التحذيرات" : "warnings"}</div>
+                    <div className="rounded-md border border-border bg-background px-3 py-2 text-[13px]">
+                      <div className="mb-2 text-[13px] font-medium text-muted-foreground">{isAR ? "التحذيرات" : "warnings"}</div>
                       {backupReadinessReport.warnings.length > 0 ? (
                         <ul className="list-inside list-disc space-y-1">
                           {backupReadinessReport.warnings.map((warning) => (
@@ -3114,9 +3159,9 @@ export default function DeveloperSettingsPage() {
               )}
             </div>
 
-            <div className="rounded-2xl border border-border bg-background/70 p-4 shadow-sm">
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-2 text-sm font-bold text-foreground">
+            <div className="rounded-2xl border border-border bg-background/70 p-3 shadow-sm">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-2.5">
+                <div className="flex items-center gap-2 text-[13px] font-bold text-foreground">
                   <FileText className="h-4 w-4 text-primary" />
                   <span>{isAR ? "ملف وصف النسخة الاحتياطية" : "Backup Manifest"}</span>
                 </div>
@@ -3135,7 +3180,7 @@ export default function DeveloperSettingsPage() {
               {(backupManifestResult || backupDirectoryResult) && (
                 <div className="space-y-3">
                   {backupManifestResult && (
-                    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                    <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-4">
                       <InfoRow isAR={isAR} label={isAR ? "معرف النسخة" : "backupId"} value={backupManifest?.backupId} />
                       <InfoRow isAR={isAR} label={isAR ? "تاريخ الإنشاء" : "createdAt"} value={backupManifest?.createdAt} />
                       <InfoRow isAR={isAR} label={isAR ? "إصدار التطبيق" : "appVersion"} value={backupManifest?.appVersion} />
@@ -3152,18 +3197,18 @@ export default function DeveloperSettingsPage() {
 
                   {backupDirectoryResult && (
                     <div className="space-y-3">
-                      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                      <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-4">
                         <InfoRow isAR={isAR} label={isAR ? "الحالة" : "ok"} value={backupDirectoryResult.ok} />
                         <InfoRow isAR={isAR} label={isAR ? "مجلد النسخة" : "backupDir"} value={backupDirectoryResult.ok ? backupDirectoryResult.backupDir : null} />
                         <InfoRow isAR={isAR} label={isAR ? "مسار ملف الوصف" : "manifestPath"} value={backupDirectoryResult.ok ? backupDirectoryResult.manifestPath : null} />
                       </div>
 
                       {backupDirectoryResult.ok ? (
-                        <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+                        <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-[13px] text-emerald-700">
                           {isAR ? "تم إنشاء مجلد النسخة الاحتياطية بنجاح." : "Backup folder created successfully."}
                         </div>
                       ) : (
-                        <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                        <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-[13px] text-destructive">
                           {backupDirectoryResult.error}
                         </div>
                       )}
@@ -3171,7 +3216,7 @@ export default function DeveloperSettingsPage() {
                   )}
 
                   {backupManifestResult && !backupManifestResult.ok && (
-                    <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                    <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-[13px] text-destructive">
                       {backupManifestResult.error}
                     </div>
                   )}
@@ -3179,9 +3224,9 @@ export default function DeveloperSettingsPage() {
               )}
             </div>
 
-            <div className="rounded-2xl border border-border bg-background/70 p-4 shadow-sm">
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                <div className="flex items-center gap-2 text-sm font-bold text-foreground">
+            <div className="rounded-2xl border border-border bg-background/70 p-3 shadow-sm">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-2.5">
+                <div className="flex items-center gap-2 text-[13px] font-bold text-foreground">
                   <PackageCheck className="h-4 w-4 text-primary" />
                   <span>{isAR ? "التحقق من النسخة الاحتياطية" : "Backup Verification"}</span>
                 </div>
@@ -3200,7 +3245,7 @@ export default function DeveloperSettingsPage() {
 
               {backupVerificationResult && (
                 <div className="space-y-3">
-                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                  <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-4">
                     <InfoRow isAR={isAR} label={isAR ? "تم التحقق" : "verified"} value={backupVerificationResult.verified} />
                     <InfoRow
                       isAR={isAR}
@@ -3212,11 +3257,11 @@ export default function DeveloperSettingsPage() {
                   </div>
 
                   {backupVerificationResult.ok && backupVerificationResult.verified ? (
-                    <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+                    <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-[13px] text-emerald-700">
                       {isAR ? "تم التحقق من النسخة الاحتياطية بنجاح." : "Backup verified successfully."}
                     </div>
                   ) : (
-                    <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                    <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-[13px] text-destructive">
                       {backupVerificationResult.error}
                     </div>
                   )}

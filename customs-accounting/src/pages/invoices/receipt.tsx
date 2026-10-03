@@ -1,3 +1,4 @@
+import { getInvoicePrintNetTotal } from "@/lib/invoice-print-totals";
 import { printFromPreview } from "@/lib/print-from-preview";
 import { useState, useEffect } from "react";
 import { useParams, Link } from "wouter";
@@ -221,8 +222,9 @@ export default function InvoiceReceipt() {
   }
 
   const invNum = invoice.invoiceNumber;
-  const amountWords = numberToArabicWords(invoice.total);
-  const amountWordsEn = numberToEnglishWords(invoice.total);
+  const printedGrandTotal = getInvoicePrintNetTotal(invoice);
+  const amountWords = numberToArabicWords(printedGrandTotal);
+  const amountWordsEn = numberToEnglishWords(printedGrandTotal);
 
 const salesManName =
   (invoice as any).salesMan ||
@@ -634,7 +636,7 @@ const impExpValue =
             <div className="flex justify-between items-center border-t border-slate-700 pt-2 mt-1 px-2">
               <span className="font-black text-base text-gray-800">الإجمالي الكلي / Grand Total</span>
               <span className="font-black font-mono text-base text-gray-900">
-                {formatNumber(invoice.total, 2, lang)} {currencySymbol}
+                {formatNumber(printedGrandTotal, 2, lang)} {currencySymbol}
               </span>
             </div>
           </div>

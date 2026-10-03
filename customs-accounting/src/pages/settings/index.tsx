@@ -12,8 +12,9 @@ import {
 import { useState, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useLocation } from "wouter";
+import PreviewShell from "@/components/layout/SettingsDocumentPreview";
 import SettingsShell from "@/components/layout/SettingsShell";
-import DeviceIdentitySettings from "@/components/DeviceIdentitySettings";
+
 import { useAuth } from "@/lib/auth-context";
 import { useLanguage } from "@/lib/language-context";
 import { useCompanySettings, DEFAULT_SETTINGS, type CompanySettings } from "@/lib/company-settings-context";
@@ -28,7 +29,7 @@ import {
 } from "lucide-react";
 import { useDisplaySettings, COLOR_PRESETS, SIDEBAR_COLOR_PRESETS, type PrimaryColor, type BorderRadius, type Density, type SidebarColor, type BgType } from "@/lib/display-settings-context";
 
-type TabId = "preview" | "backup" | "company" | "branding" | "print" | "display" | "update" | "devices";
+type TabId = "preview" | "backup" | "company" | "branding" | "print" | "display" | "update";
 const API_BASE = `${import.meta.env.VITE_API_BASE_URL}/api`;
 
 const formatDateYMD = (value: Date | string | null | undefined = new Date()) => {
@@ -42,26 +43,28 @@ const formatDateYMD = (value: Date | string | null | undefined = new Date()) => 
   return Number.isNaN(parsed.getTime()) ? normalized : parsed.toISOString().slice(0, 10);
 };
 
-function Section({ icon: Icon, title, color, children, contentClassName }: {
-  icon: React.ElementType; title: string; color: string; children: React.ReactNode; contentClassName?: string;
+function Section({ icon: Icon, title, color, children, contentClassName, defaultOpen = false }: {
+  icon: React.ElementType; title: string; color: string; children: React.ReactNode; contentClassName?: string; defaultOpen?: boolean;
 }) {
   return (
-    <section className="w-full min-w-0 space-y-4">
-      <div className={`flex items-center gap-2 rounded-xl px-4 py-3 ${color}`}>
+    <details data-settings-fold open={defaultOpen} className="w-full min-w-0 rounded-lg border border-border">
+      <summary className={`flex cursor-pointer items-center gap-2 px-3 py-2 ${color}`}>
         <Icon className="w-4 h-4 shrink-0" />
-        <h2 className="text-base font-semibold">{title}</h2>
-      </div>
-      <div className={cn("w-full min-w-0", contentClassName)}>{children}</div>
-    </section>
+        <h2 className="text-[16px] font-semibold">{title}</h2><span aria-hidden="true" className="ms-auto text-muted-foreground">⌄</span>
+      </summary>
+      <div className={cn("w-full min-w-0 border-t border-border p-3", contentClassName)}>{children}</div>
+    </details>
   );
 }
 
 function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
-    <div className="space-y-1">
-      <label className="block text-sm font-medium text-muted-foreground">{label}</label>
-      {children}
-      {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
+    <div data-settings-field className="min-w-0">
+      <label className="text-[13px] font-medium text-muted-foreground">{label}</label>
+      <div className="min-w-0">
+        {children}
+        {hint && <p className="mt-1 text-xs text-muted-foreground">{hint}</p>}
+      </div>
     </div>
   );
 }
@@ -79,8 +82,8 @@ function DocumentTitleEditor({ prefix, titlePrefix = prefix, label, isAR, form, 
   const size = (value: string) => Math.max(8, Math.min(48, Number(value) || 8));
   return (
     <div className="space-y-5">
-      <h3 className="text-base font-semibold">{label}</h3>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <h3 className="text-[16px] font-semibold">{label}</h3>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
         <Field label={isAR ? "نص العنوان بالعربية" : "Arabic title text"}>
           <input value={titleAr} dir="rtl" onChange={e => set(titlePrefix + "TitleAr", e.target.value)} className={inp} />
         </Field>
@@ -94,7 +97,7 @@ function DocumentTitleEditor({ prefix, titlePrefix = prefix, label, isAR, form, 
           <input type="number" min={8} max={48} value={read("TitleEnFontSize")} onChange={e => set(prefix + "TitleEnFontSize", size(e.target.value))} className={inp} />
         </Field>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
         <label className="flex min-h-10 items-center gap-2 rounded-lg border border-border bg-background px-3 py-2">
           <input type="checkbox" checked={!!read("TitleVisible")} onChange={e => set(prefix + "TitleVisible", e.target.checked)} className="h-4 w-4 accent-primary" />
           {isAR ? "إظهار العنوان" : "Show title"}
@@ -112,8 +115,8 @@ function DocumentTitleEditor({ prefix, titlePrefix = prefix, label, isAR, form, 
         </label>
       </div>
       <details className="rounded-xl border border-border bg-background">
-        <summary className="cursor-pointer px-4 py-3 text-sm font-medium">{isAR ? "سطر إضافي تحت العنوان (اختياري)" : "Additional subtitle (optional)"}</summary>
-        <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_120px] gap-4 p-4 pt-0">
+        <summary className="cursor-pointer px-3 py-3 text-[13px] font-medium">{isAR ? "سطر إضافي تحت العنوان (اختياري)" : "Additional subtitle (optional)"}</summary>
+        <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_120px] gap-2.5 p-3 pt-0">
           <Field label={isAR ? "السطر الإضافي بالعربية" : "Arabic subtitle"}>
             <input value={read("SubtitleAr") || ""} dir="rtl" onChange={e => set(prefix + "SubtitleAr", e.target.value)} placeholder={isAR ? "لا يظهر عند تركه فارغًا" : "Hidden when empty"} className={inp} />
           </Field>
@@ -125,9 +128,9 @@ function DocumentTitleEditor({ prefix, titlePrefix = prefix, label, isAR, form, 
           </Field>
         </div>
       </details>
-      <div className="rounded-xl border border-border bg-muted/20 p-4">
-        <p className="mb-3 text-sm font-medium text-muted-foreground">{isAR ? "معاينة مباشرة للنص وحجم الخط" : "Live text and font size preview"}</p>
-        <div className="rounded-lg border border-gray-200 bg-white p-5 text-gray-900 overflow-auto">
+      <div className="rounded-xl border border-border bg-muted/20 p-3">
+        <p className="mb-3 text-[13px] font-medium text-muted-foreground">{isAR ? "معاينة مباشرة للنص وحجم الخط" : "Live text and font size preview"}</p>
+        <div data-settings-preview className="rounded-lg border border-gray-200 bg-white p-5 text-gray-900 overflow-auto">
           {read("TitleVisible") ? <PrintTitleBlock visible align={read("TitleAlign")} bold={!!read("TitleBold")} titleAr={titleAr} titleEn={titleEn} titleFontSize={Number(read("TitleFontSize"))} titleEnFontSize={Number(read("TitleEnFontSize"))} subtitleAr={read("SubtitleAr")} subtitleEn={read("SubtitleEn")} subtitleFontSize={Number(read("SubtitleFontSize"))} /> : <p className="text-center text-sm text-gray-500">{isAR ? "العنوان مخفي في الطباعة" : "Title hidden in print"}</p>}
         </div>
       </div>
@@ -135,164 +138,6 @@ function DocumentTitleEditor({ prefix, titlePrefix = prefix, label, isAR, form, 
   );
 }
 
-function PreviewShell({
-  id,
-  title,
-  fitLabel,
-  size,
-  scale,
-  activePreview,
-  savedWidth,
-  savedHeight,
-  onSelect,
-  onWidthChange,
-  onHeightChange,
-  onFitHeight,
-  children,
-}: {
-  id?: string;
-  title: string;
-  fitLabel: string;
-  size: "large" | "medium" | "small";
-  scale: number;
-  activePreview?: string;
-  savedWidth?: number;
-  savedHeight?: number;
-  onSelect?: (id: string) => void;
-  onWidthChange?: (id: string, width: number) => void;
-  onHeightChange?: (id: string, height: number) => void;
-  onFitHeight?: (id: string) => void;
-  children: React.ReactNode;
-}) {
-  const shellRef = useRef<HTMLDivElement>(null);
-  const documentRef = useRef<HTMLDivElement>(null);
-  const startSizeRef = useRef<{ width: number; height: number } | null>(null);
-  const isInteractive = !!id && !!activePreview;
-  const isMain = isInteractive ? id === activePreview : size === "large";
-  const preview = {
-    large: {
-      sourceWidth: 1120,
-      sourceHeight: 900,
-    },
-    medium: {
-      sourceWidth: 840,
-      sourceHeight: 700,
-    },
-    small: {
-      sourceWidth: 840,
-      sourceHeight: 720,
-    },
-  }[size];
-  const scaledWidth = Math.ceil(preview.sourceWidth * scale);
-  const [contentHeight, setContentHeight] = useState(preview.sourceHeight);
-  useEffect(() => {
-    const document = documentRef.current;
-    if (!document) return;
-    const measure = () => setContentHeight(document.scrollHeight || preview.sourceHeight);
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(document);
-    return () => observer.disconnect();
-  }, [preview.sourceHeight]);
-  const scaledHeight = Math.ceil(contentHeight * scale);
-  const fittedHeight = Math.min(1200, Math.max(isMain ? 360 : 260, scaledHeight + 47));
-  const handleSaveSize = () => {
-    if (!shellRef.current || !id) return;
-    const width = Math.round(shellRef.current.offsetWidth);
-    const height = Math.round(shellRef.current.offsetHeight);
-    const start = startSizeRef.current;
-    startSizeRef.current = null;
-    if (!start || (width === start.width && height === start.height)) return;
-    if (width !== start.width) onWidthChange?.(id, width);
-    if (height !== start.height) onHeightChange?.(id, height);
-  };
-
-  return (
-    <div
-      ref={shellRef}
-      title="Drag the bottom corner to resize the preview"
-      draggable={isInteractive && !isMain}
-      onClick={() => id && !isMain && onSelect?.(id)}
-      onDragStart={(e) => id && e.dataTransfer.setData("text/plain", id)}
-      onDragOver={(e) => isMain && e.preventDefault()}
-      onDrop={(e) => {
-        if (!isMain) return;
-        const next = e.dataTransfer.getData("text/plain");
-        if (next) onSelect?.(next);
-      }}
-      onMouseUp={handleSaveSize}
-      onTouchEnd={handleSaveSize}
-      onPointerDown={() => {
-        if (shellRef.current) {
-          startSizeRef.current = {
-            width: Math.round(shellRef.current.offsetWidth),
-            height: Math.round(shellRef.current.offsetHeight),
-          };
-        }
-      }}
-      className={cn(
-        "min-w-[320px] min-h-[260px] rounded-xl border border-border bg-muted/20 overflow-hidden",
-        isInteractive && !isMain && "cursor-pointer transition hover:border-primary/60 hover:shadow-md",
-        isMain && "shadow-sm"
-      )}
-      style={{
-        order: isMain ? 0 : 1,
-        flex: "0 0 auto",
-        width: savedWidth ? savedWidth : isMain ? "100%" : "min(100%, 420px)",
-        maxWidth: "none",
-        resize: "both",
-        height: savedHeight ?? fittedHeight,
-        minHeight: isMain ? 360 : 260,
-      }}
-    >
-      <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-card">
-        <h3 className="text-sm font-bold text-foreground">{title}</h3>
-        <div className="flex items-center gap-2 text-[11px] font-semibold text-muted-foreground">
-          {savedHeight && id && (
-            <button
-              type="button"
-              className="rounded border border-border px-2 py-0.5 hover:text-foreground"
-              onClick={(event) => { event.stopPropagation(); onFitHeight?.(id); }}
-            >
-              {fitLabel}
-            </button>
-          )}
-          <span>↔ ↕ {savedWidth ? `${Math.round(savedWidth)} px` : "Resize"}</span>
-        </div>
-      </div>
-      <div
-        className="overflow-auto bg-slate-100 p-1"
-        style={{
-          height: "calc(100% - 37px)",
-          minHeight: 0,
-          maxHeight: "none",
-        }}
-      >
-        <div
-          className="relative mx-auto"
-          style={{
-            width: scaledWidth,
-            minWidth: scaledWidth,
-            minHeight: scaledHeight,
-          }}
-        >
-          <div
-            ref={documentRef}
-            className="absolute top-0"
-            style={{
-              left: (scaledWidth - preview.sourceWidth) / 2,
-              width: preview.sourceWidth,
-              transform: `scale(${scale})`,
-              transformOrigin: "top center",
-            }}
-          >
-            {children}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function SettingsPrintPreviews({
   settings,
@@ -304,6 +149,7 @@ function SettingsPrintPreviews({
   receiptPreviewScale,
   statementPreviewScale,
   customerLedgerPreviewScale,
+  onPreviewScaleChange,
 }: {
   settings: CompanySettings;
   logoSrc: string;
@@ -314,6 +160,7 @@ function SettingsPrintPreviews({
   receiptPreviewScale: number;
   statementPreviewScale: number;
   customerLedgerPreviewScale: number;
+  onPreviewScaleChange: (id: string, value: number) => void;
 }) {
   const override = { settings, logoSrc, stampSrc, watermarkSrc };
   const receiverSignature = settings.receiverSignatureBase64;
@@ -386,6 +233,8 @@ function SettingsPrintPreviews({
   };
   const previewShellProps = (id: string) => ({
     id,
+    isAR,
+    onScaleChange: (value: number) => onPreviewScaleChange(id, value),
     fitLabel: isAR ? "ملاءمة الارتفاع" : "Fit height",
     activePreview,
     savedWidth: documentWidths[id],
@@ -398,9 +247,9 @@ function SettingsPrintPreviews({
 
   return (
     <div className="w-full max-w-none space-y-4">
-      <div className="flex w-full flex-wrap items-start gap-4 overflow-x-auto pb-2">
+      <div className="flex w-full flex-wrap items-start gap-2.5 overflow-x-auto pb-2">
       <PreviewShell {...previewShellProps("invoice")} title={isAR ? "معاينة الفاتورة" : "Invoice Preview"} size="large" scale={invoicePreviewScale}>
-        <div
+        <div data-settings-preview
           className="bg-white shadow-xl border border-gray-200 relative overflow-hidden"
           style={{ fontFamily: "'Cairo', 'Arial', sans-serif" }}
         >
@@ -466,7 +315,7 @@ function SettingsPrintPreviews({
       </PreviewShell>
 
         <PreviewShell {...previewShellProps("receipt")} title={isAR ? "معاينة سند القبض" : "Receipt Preview"} size="medium" scale={receiptPreviewScale}>
-          <div
+          <div data-settings-preview
             className="bg-white shadow-lg border border-gray-200 relative overflow-hidden"
             style={{ fontFamily: "'Cairo', 'Arial', sans-serif" }}
           >
@@ -516,7 +365,7 @@ function SettingsPrintPreviews({
         </PreviewShell>
 
         <PreviewShell {...previewShellProps("statement")} title={isAR ? "معاينة كشف الحساب" : "Customer Statement Preview"} size="small" scale={statementPreviewScale}>
-          <div
+          <div data-settings-preview
             className="bg-white shadow-xl border border-gray-200 relative overflow-hidden"
             style={{ fontFamily: "'Cairo', 'Arial', sans-serif" }}
           >
@@ -589,7 +438,7 @@ function SettingsPrintPreviews({
         </PreviewShell>
 
         <PreviewShell {...previewShellProps("summary")} title={isAR ? "معاينة ملخص العميل المالي" : "Customer Financial Summary Preview"} size="small" scale={customerLedgerPreviewScale}>
-          <div
+          <div data-settings-preview
             className="bg-white shadow-xl border border-gray-200 relative overflow-hidden"
             style={{ fontFamily: "'Cairo', 'Arial', sans-serif" }}
           >
@@ -677,7 +526,7 @@ function PreviewScaleControl({
 }) {
   return (
     <label className="min-w-0 space-y-1">
-      <div className="flex items-center justify-between gap-3 text-xs font-semibold text-muted-foreground">
+      <div className="flex items-center justify-between gap-2.5 text-xs font-semibold text-muted-foreground">
         <span>{label}</span>
         <span className="font-mono text-foreground">{Math.round(value * 100)}%</span>
       </div>
@@ -721,7 +570,7 @@ const previewZoomStorageKeys = {
 const readPreviewZoom = (key: string, fallback: number) => {
   try {
     const saved = Number(localStorage.getItem(key));
-    return Number.isFinite(saved) && saved > 0 ? saved : fallback;
+    return Number.isFinite(saved) && saved > 0 ? Math.min(3, Math.max(0.5, saved)) : fallback;
   } catch {
     return fallback;
   }
@@ -1332,9 +1181,9 @@ const decryptBackupData = async (backupFile: any, password: string) => {
 
   if (!["admin", "manager", "supervisor"].includes(user?.role || "") && !isDeveloperSupportMode) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 text-muted-foreground">
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-2.5 text-muted-foreground">
         <Shield className="w-16 h-16 opacity-20" />
-        <p className="text-lg font-semibold">{isAR ? "هذه الصفحة للمدير فقط" : "Admin access only"}</p>
+        <p className="text-[16px] font-semibold">{isAR ? "هذه الصفحة للمدير فقط" : "Admin access only"}</p>
       </div>
     );
   }
@@ -1557,12 +1406,10 @@ const decryptBackupData = async (backupFile: any, password: string) => {
   { id: "backup", icon: Shield, labelAr: "استيراد وتصدير البيانات", labelEn: "Data Import & Export", color: "text-emerald-500" },
   { id: "update", icon: RefreshCw, labelAr: "تحديث البرنامج", labelEn: "Software Update", color: "text-cyan-500" },
 
-  { id: "devices", icon: Shield, labelAr: "الأجهزة الموثوقة", labelEn: "Trusted Devices", color: "text-teal-500" },
   { id: "display", icon: Palette, labelAr: "المظهر", labelEn: "Display", color: "text-fuchsia-500" }, // آخر واحد
 ];
 
   const canViewSettingsTab = (tabId: TabId) => {
-    if (tabId === "devices") return user?.role === "admin";
     if (canViewAllSettingsTabs) return true;
     if (tabId === "preview") return true;
     if (tabId === "display") return true;
@@ -1584,9 +1431,9 @@ const decryptBackupData = async (backupFile: any, password: string) => {
 
   if (visibleTabs.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4 text-muted-foreground">
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-2.5 text-muted-foreground">
         <Shield className="w-16 h-16 opacity-20" />
-        <p className="text-lg font-semibold">{isAR ? "لا توجد صلاحيات إعدادات مفعلة لهذا المستخدم" : "No settings permissions are enabled for this user"}</p>
+        <p className="text-[16px] font-semibold">{isAR ? "لا توجد صلاحيات إعدادات مفعلة لهذا المستخدم" : "No settings permissions are enabled for this user"}</p>
       </div>
     );
   }
@@ -1596,14 +1443,14 @@ const decryptBackupData = async (backupFile: any, password: string) => {
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       dir="ltr"
-      className="ledger-settings pb-10"
+      className="ledger-settings pb-6"
     >
       <style>{`
         .ledger-settings input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]),
-        .ledger-settings select { min-height: 40px; font-size: 14px; line-height: 20px; border-radius: 8px; }
-        .ledger-settings textarea { font-size: 14px; line-height: 1.6; border-radius: 8px; }
-        .ledger-settings .settings-control-content label { font-size: 14px; line-height: 20px; }
-        .ledger-settings .settings-control-content button:not([role="switch"]) { font-size: 14px; }
+        .ledger-settings select { min-height: 34px; height: 34px; font-size: 13px; line-height: 18px; border-radius: 8px; }
+        .ledger-settings textarea { font-size: 13px; line-height: 1.6; border-radius: 8px; }
+        .ledger-settings .settings-control-content label { font-size: 13px; line-height: 18px; }
+        .ledger-settings .settings-control-content button:not([role="switch"]) { font-size: 13px; }
       `}</style>
       <SettingsShell<TabId>
         dir={isRTL ? "rtl" : "ltr"}
@@ -1622,7 +1469,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
             <button
               onClick={handleSave}
               disabled={saving}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition hover:bg-primary/90 disabled:opacity-60"
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-3 py-2.5 text-[13px] font-semibold text-primary-foreground shadow-sm transition hover:bg-primary/90 disabled:opacity-60"
             >
               {saving ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
               {saving ? (isAR ? "جارٍ الحفظ..." : "Saving...") : (isAR ? "حفظ التغييرات" : "Save Changes")}
@@ -1632,14 +1479,14 @@ const decryptBackupData = async (backupFile: any, password: string) => {
       >
       {/* ── Content Area ───────────────────────────────────────── */}
       <div
-        className={cn("min-w-0 w-full space-y-5", activeTab !== "preview" && "settings-control-content ms-0 me-auto max-w-[1120px]", isRTL ? "md:order-1" : "md:order-2")}
+        className={cn("min-w-0 w-full space-y-5", activeTab !== "preview" && "settings-control-content ms-0 me-auto", isRTL ? "md:order-1" : "md:order-2")}
         dir={isRTL ? "rtl" : "ltr"}
       >
 
         {/* Section title */}
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-2.5">
           <div>
-            <h2 className="text-lg font-semibold">
+            <h2 className="text-[16px] font-semibold">
               {activeTab === "preview" && (isAR ? "المعاينة" : "Preview")}
               {activeTab === "company" && (isAR ? "بيانات الشركة" : "Company")}
               {activeTab === "branding" && (isAR ? "الشعارات" : "Branding")}
@@ -1647,9 +1494,8 @@ const decryptBackupData = async (backupFile: any, password: string) => {
               {activeTab === "backup" && (isAR ? "استيراد وتصدير البيانات" : "Data Import & Export")}
               {activeTab === "update" && (isAR ? "تحديث البرنامج" : "Software Update")}
               {activeTab === "display" && (isAR ? "المظهر" : "Display")}
-              {activeTab === "devices" && (isAR ? "الأجهزة الموثوقة" : "Trusted Devices")}
             </h2>
-            <p className="text-sm text-muted-foreground mt-0.5">
+            <p className="text-[13px] text-muted-foreground mt-0.5">
               {activeTab === "preview" && (isAR ? "معاينة مباشرة لشكل المستندات قبل الطباعة" : "Live preview of documents before printing")}
               {activeTab === "company" && (isAR ? "إدارة بيانات الشركة الأساسية ومعلومات التواصل" : "Manage company identity and contact details")}
               {activeTab === "branding" && (isAR ? "إدارة الشعار والختم والعلامة المائية والتوقيعات" : "Manage logo, stamp, watermark, and signatures")}
@@ -1657,58 +1503,55 @@ const decryptBackupData = async (backupFile: any, password: string) => {
               {activeTab === "backup" && (isAR ? "تصدير واستيراد بيانات البرنامج بشكل آمن" : "Securely export and import application data")}
               {activeTab === "update" && (isAR ? "البحث عن تحديثات البرنامج وتثبيتها من داخل التطبيق" : "Check and install application updates from inside the app")}
               {activeTab === "display" && (isAR ? "ضبط ألوان ومظهر واجهة البرنامج" : "Customize application colors and appearance")}
-              {activeTab === "devices" && (isAR ? "عرض هوية الجهاز وإدارة الأجهزة الموثوقة" : "Device identity and trusted devices")}
             </p>
           </div>
         </div>
 
 
-          {activeTab === "devices" && user?.role === "admin" && (
-            <DeviceIdentitySettings isAR={isAR} />
-          )}
 
           {/* ── Preview Tab Content ── */}
 
           {activeTab === "preview" && (
               <div className="w-full max-w-none bg-gradient-to-br from-primary/5 to-transparent p-2 rounded-2xl border border-primary/10">
                 <Section
+                  defaultOpen
                   icon={Eye}
                   title={isAR ? "المعاينة" : "Preview"}
                   color="bg-primary/5"
                   contentClassName="p-3"
                 >
                 <div className="mb-4 w-full rounded-xl border border-border/60 bg-background/80 p-3">
-                  <div className="mb-3 flex items-center gap-2 text-sm font-bold text-foreground">
+                  <div className="mb-3 flex items-center gap-2 text-[13px] font-bold text-foreground">
                     <SlidersHorizontal className="h-4 w-4 text-primary" />
                     <span>{isAR ? "تكبير وتصغير المستندات" : "Document Zoom"}</span>
                   </div>
-                  <div className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3">
+                  <div className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-2.5">
                     <PreviewScaleControl
                       label={isAR ? "تكبير الفاتورة" : "Invoice zoom"}
                       value={invoicePreviewScale}
-                      min={0.55}
-                      max={1.1}
+                      min={0.5}
+                      max={3}
                       onChange={setInvoicePreviewScale}
                     />
                     <PreviewScaleControl
                       label={isAR ? "تكبير سند القبض" : "Receipt zoom"}
                       value={receiptPreviewScale}
-                      min={0.55}
-                      max={1.1}
+                      min={0.5}
+                      max={3}
                       onChange={setReceiptPreviewScale}
                     />
                     <PreviewScaleControl
                       label={isAR ? "تكبير كشف الحساب" : "Statement zoom"}
                       value={statementPreviewScale}
-                      min={0.55}
-                      max={1.1}
+                      min={0.5}
+                      max={3}
                       onChange={setStatementPreviewScale}
                     />
                     <PreviewScaleControl
                       label={isAR ? "تكبير ملخص العميل المالي" : "Customer ledger zoom"}
                       value={customerLedgerPreviewScale}
-                      min={0.55}
-                      max={1.1}
+                      min={0.5}
+                      max={3}
                       onChange={setCustomerLedgerPreviewScale}
                     />
                   </div>
@@ -1731,9 +1574,18 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                   receiptPreviewScale={receiptPreviewScale}
                   statementPreviewScale={statementPreviewScale}
                   customerLedgerPreviewScale={customerLedgerPreviewScale}
+                  onPreviewScaleChange={(id, value) => {
+                    const setters: Record<string, (value: number) => void> = {
+                      invoice: setInvoicePreviewScale,
+                      receipt: setReceiptPreviewScale,
+                      statement: setStatementPreviewScale,
+                      summary: setCustomerLedgerPreviewScale,
+                    };
+                    setters[id]?.(value);
+                  }}
                 />
                 <div className="hidden">
-                  <h3 className="text-sm font-bold mb-3 text-primary">
+                  <h3 className="text-[16px] font-bold mb-3 text-primary">
                     {isAR ? "🔍 معاينة مباشرة للمستندات" : "🔍 Live Document Preview"}
                   </h3>
 
@@ -1743,7 +1595,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
 
                     {/* Invoice Preview */}
 
-                    <div className="border rounded-lg p-3 bg-white shadow-sm">
+                    <div data-settings-preview className="border rounded-lg p-3 bg-white shadow-sm">
                       <InvoicePrintHeader
                         company={form}
                         logoSrc={currentLogoSrc}
@@ -1820,9 +1672,9 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                     </div>
 
                     {/* Small previews row */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
                       {/* Receipt Preview */}
-                      <div className="border rounded-lg p-3 bg-white shadow-sm text-xs">
+                      <div data-settings-preview className="border rounded-lg p-3 bg-white shadow-sm text-xs">
                         <div className="font-bold mb-2">
                           {isAR ? "سند قبض" : "Receipt"}
                         </div>
@@ -1839,7 +1691,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                       </div>
 
                       {/* Statement Preview */}
-                      <div className="border rounded-lg p-3 bg-white shadow-sm text-xs">
+                      <div data-settings-preview className="border rounded-lg p-3 bg-white shadow-sm text-xs">
                         <div className="font-bold mb-2">
                           {isAR ? "كشف حساب" : "Statement"}
                         </div>
@@ -1870,7 +1722,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
             >
               <div className="space-y-4">
                 <div className={`${isAR ? "text-right" : "text-left"}`}>
-                  <h3 className="text-sm font-bold text-foreground">
+                  <h3 className="text-[16px] font-bold text-foreground">
                     {isAR ? "بيانات البرنامج" : "Program Data"}
                   </h3>
                   <p className="text-xs text-muted-foreground mt-1">
@@ -1883,13 +1735,13 @@ const decryptBackupData = async (backupFile: any, password: string) => {
 
                 {/* الإطار الكبير Big frame */}
                 <div
-                  className="rounded-2xl border border-border bg-card p-4 shadow-sm"
+                  className="rounded-2xl border border-border bg-card p-3 shadow-sm"
                   dir={isAR ? "rtl" : "ltr"}
                 >
                   {/* All Data Row "كل البيانات" */}
                   <div className="border border-border bg-background rounded-lg p-3 mb-3">
-                    <div className="flex flex-wrap items-center justify-between gap-3 w-full">
-                      <span className="text-sm font-medium whitespace-nowrap">
+                    <div className="flex flex-wrap items-center justify-between gap-2.5 w-full">
+                      <span className="text-[13px] font-medium whitespace-nowrap">
                         {isAR ? "كل البيانات" : "All Data"}
                       </span>
 
@@ -2017,11 +1869,11 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                  </div>
 
                  <div
-                  className="flex flex-wrap items-center justify-between gap-3 border border-border bg-card rounded-xl p-4 mt-4 w-full"
+                  className="flex flex-wrap items-center justify-between gap-2.5 border border-border bg-card rounded-xl p-3 mt-4 w-full"
                   dir={isAR ? "rtl" : "ltr"}
                 >
                   <div className="space-y-1">
-                    <h3 className="text-sm font-semibold">{isAR ? "كلمة مرور الطوارئ (الماستر)" : "Master Emergency Password"}</h3>
+                    <h3 className="text-[16px] font-semibold">{isAR ? "كلمة مرور الطوارئ (الماستر)" : "Master Emergency Password"}</h3>
                     <p className="text-xs text-muted-foreground">{isAR ? "اتركها فارغة للإبقاء على كلمة المرور الحالية، ثم اضغط حفظ التغييرات عند تعديلها." : "Leave empty to keep the current password. Click Save Changes after editing."}</p>
                   </div>
 
@@ -2031,7 +1883,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                       value={form.masterPassword || ""}
                       onChange={(e) => setForm((f) => ({ ...f, masterPassword: e.target.value }))}
                       placeholder={isAR ? "اتركها فارغة لعدم التغيير" : "Leave empty to keep unchanged"}
-                      className={`h-10 w-full sm:w-64 rounded-md border border-border bg-background text-sm text-foreground ${
+                      className={`h-[34px] w-full sm:w-64 rounded-md border border-border bg-background text-[13px] text-foreground ${
                         isAR ? "pl-8 pr-2" : "pr-8 pl-2"
                       }`}
                     />
@@ -2211,10 +2063,10 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                     }}
                   />
 
-                  <div className="grid grid-cols-1 gap-3 mt-4 xl:grid-cols-2">
+                  <div className="grid grid-cols-1 gap-2.5 mt-4 xl:grid-cols-2">
                     {/* البنود */}
-                    <div className="flex flex-wrap justify-between items-center gap-3 border border-border bg-background rounded-xl p-3">
-                      <span className="text-sm">{isAR ? "البنود" : "Items"}</span>
+                    <div className="flex flex-wrap justify-between items-center gap-2.5 border border-border bg-background rounded-xl p-3">
+                      <span className="text-[13px]">{isAR ? "البنود" : "Items"}</span>
                       <div className="flex gap-2">
                         <button type="button" onClick={exportItems} className="h-8 px-3 text-xs bg-muted/30 border border-border text-foreground rounded-md hover:bg-muted/50 transition">
                           {isAR ? "تصدير" : "Export"}
@@ -2233,8 +2085,8 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                       </div>
                     </div>
                     {/* العملاء */}
-                    <div className="flex flex-wrap justify-between items-center gap-3 border border-border bg-background rounded-xl p-3">
-                      <span className="text-sm">{isAR ? "العملاء" : "Clients"}</span>
+                    <div className="flex flex-wrap justify-between items-center gap-2.5 border border-border bg-background rounded-xl p-3">
+                      <span className="text-[13px]">{isAR ? "العملاء" : "Clients"}</span>
                       <div className="flex gap-2">
                         <button type="button" onClick={exportClients} className="h-8 px-3 text-xs bg-muted/30 border border-border text-foreground rounded-md hover:bg-muted/50 transition">
                           {isAR ? "تصدير" : "Export"}
@@ -2254,8 +2106,8 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                     </div>
 
                     {/* الفواتير */}
-                    <div className="flex flex-wrap justify-between items-center gap-3 border border-border bg-background rounded-xl p-3">
-                      <span className="text-sm">{isAR ? "الفواتير" : "Invoices"}</span>
+                    <div className="flex flex-wrap justify-between items-center gap-2.5 border border-border bg-background rounded-xl p-3">
+                      <span className="text-[13px]">{isAR ? "الفواتير" : "Invoices"}</span>
                       <div className="flex gap-2">
 
                         <button type="button" onClick={exportInvoices} disabled={!canUseInvoicesBackupImport} className={cn("h-8 px-3 text-xs bg-muted/30 border border-border text-foreground rounded-md hover:bg-muted/50 transition", !canUseInvoicesBackupImport && "cursor-not-allowed opacity-50 hover:bg-muted/30")}>
@@ -2281,8 +2133,8 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                     </div>
 
                     {/* سندات القبض */}
-                    <div className="flex flex-wrap justify-between items-center gap-3 border border-border bg-background rounded-xl p-3">
-                      <span className="text-sm">{isAR ? "سندات القبض" : "Receipts"}</span>
+                    <div className="flex flex-wrap justify-between items-center gap-2.5 border border-border bg-background rounded-xl p-3">
+                      <span className="text-[13px]">{isAR ? "سندات القبض" : "Receipts"}</span>
                       <div className="flex gap-2">
                         <button type="button" onClick={exportReceipts} className="h-8 px-3 text-xs bg-muted/30 border border-border text-foreground rounded-md hover:bg-muted/50 transition">
                           {isAR ? "تصدير" : "Export"}
@@ -2315,7 +2167,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
             >
               <div className="space-y-4" dir={isAR ? "rtl" : "ltr"}>
                 <div className={`${isAR ? "text-right" : "text-left"}`}>
-                  <h3 className="text-sm font-bold text-foreground">
+                  <h3 className="text-[16px] font-bold text-foreground">
                     {isAR ? "التحديث التلقائي" : "Automatic Updates"}
                   </h3>
                   <p className="mt-1 text-xs text-muted-foreground">
@@ -2325,8 +2177,8 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                   </p>
                 </div>
 
-                <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-                  <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                <div className="rounded-2xl border border-border bg-card p-3 shadow-sm">
+                  <div className="grid grid-cols-1 gap-2.5 md:grid-cols-3">
                     <div className="rounded-xl border border-border bg-background p-3">
                       <div className="text-xs font-semibold uppercase text-muted-foreground">
                         {isAR ? "الإصدار الحالي" : "Current Version"}
@@ -2341,7 +2193,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                             handleVersionClick();
                           }
                         }}
-                        className="mt-1 font-mono text-sm font-bold text-foreground"
+                        className="mt-1 font-mono text-[13px] font-bold text-foreground"
                       >
                         {import.meta.env.VITE_APP_VERSION || "v2.0.0"}
                       </div>
@@ -2351,7 +2203,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                       <div className="text-xs font-semibold uppercase text-muted-foreground">
                         {isAR ? "حالة التحديث" : "Update Status"}
                       </div>
-                      <div className="mt-1 text-sm font-semibold text-foreground">{updateStatus}</div>
+                      <div className="mt-1 text-[13px] font-semibold text-foreground">{updateStatus}</div>
                       {updateVersion && (
                         <div className="mt-1 text-xs text-muted-foreground">
                           {isAR ? "الإصدار المتاح:" : "Available version:"} <span className="font-mono">{updateVersion}</span>
@@ -2523,20 +2375,18 @@ const decryptBackupData = async (backupFile: any, password: string) => {
             </button>
           );
 
-          const SectionCard = ({ icon: Icon, title, color, children }: { icon: React.ElementType; title: string; color: string; children: React.ReactNode }) => (
-            <Section icon={Icon} title={title} color={color}>{children}</Section>
-          );
+          const SectionCard = Section;
 
           return (
             <>
-            <div className="space-y-5">
-              <div role="tablist" aria-label={isAR ? "أقسام المظهر" : "Appearance sections"} className="flex flex-wrap gap-2 border-b border-border pb-4">
+            <div data-settings-appearance className="space-y-3">
+              <div role="tablist" aria-label={isAR ? "أقسام المظهر" : "Appearance sections"} className="flex flex-wrap gap-2 border-b border-border pb-3">
                 {[
                   { id: "theme" as const, ar: "مظهر الواجهة والخلفية", en: "Theme & Background", icon: Sun },
                   { id: "colors" as const, ar: "الألوان", en: "Colors", icon: Palette },
                   { id: "layout" as const, ar: "النصوص وخيارات العرض", en: "Text & Layout", icon: SlidersHorizontal },
                 ].map(tab => (
-                  <button key={tab.id} id={`appearance-tab-${tab.id}`} type="button" role="tab" aria-selected={appearanceTab === tab.id} aria-controls={`appearance-panel-${tab.id}`} onClick={() => setAppearanceTab(tab.id)} className={cn("inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium transition-colors", appearanceTab === tab.id ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background text-muted-foreground hover:bg-muted hover:text-foreground")}>
+                  <button key={tab.id} id={`appearance-tab-${tab.id}`} type="button" role="tab" aria-selected={appearanceTab === tab.id} aria-controls={`appearance-panel-${tab.id}`} onClick={() => setAppearanceTab(tab.id)} className={cn("inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-[13px] font-medium transition-colors", appearanceTab === tab.id ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background text-muted-foreground hover:bg-muted hover:text-foreground")}>
                     <tab.icon className="h-4 w-4" />{isAR ? tab.ar : tab.en}
                   </button>
                 ))}
@@ -2546,7 +2396,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                 <div className="grid grid-cols-3 gap-2">
                   {([["light", Sun, isAR ? "فاتح" : "Light"], ["dark", Moon, isAR ? "داكن" : "Dark"], ["system", Monitor, isAR ? "تلقائي" : "System"]] as const).map(([mode, Icon, label]) => (
                     <button key={mode} onClick={() => { toggleTheme(mode); }}
-                      className={cn("flex flex-col items-center gap-2 py-4 px-2 rounded-xl text-xs font-semibold border-2 transition-all",
+                      className={cn("flex flex-col items-center gap-2 py-3 px-2 rounded-xl text-xs font-semibold border-2 transition-all",
                         currentTheme === mode ? "border-primary bg-primary/10 text-primary" : "border-border bg-background text-muted-foreground hover:border-primary/40 hover:text-foreground"
                       )}>
                       <Icon className="w-3.5 h-3.5" />{label}
@@ -2564,7 +2414,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                   ]).map(({ v, Icon: Ic, labelAr, labelEn }) => (
                     <button key={v} onClick={() => updateDisplay({ bgType: v })}
                       className={cn(
-                        "flex flex-col items-center gap-2 py-4 rounded-xl border-2 text-xs font-semibold transition-all",
+                        "flex flex-col items-center gap-2 py-3 rounded-xl border-2 text-xs font-semibold transition-all",
                         display.bgType === v
                           ? "border-primary bg-primary/10 text-primary"
                           : "border-border bg-background text-muted-foreground hover:border-primary/40 hover:text-foreground"
@@ -2578,11 +2428,11 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                 {/* Color picker */}
                 {display.bgType === "color" && (
                   <div className="space-y-4">
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2.5">
                       <label className="text-xs font-semibold text-muted-foreground  shrink-0">
                         {isAR ? "اختر اللون" : "Pick color"}
                       </label>
-                      <div className="flex items-center gap-3 flex-1">
+                      <div className="flex items-center gap-2.5 flex-1">
                         <input
                           type="color"
                           value={display.bgColor}
@@ -2617,10 +2467,10 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                   const bgImgRef = { current: null as HTMLInputElement | null };
                   return (
                     <div className="space-y-4">
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-2.5">
                         <button
                           onClick={() => bgImgRef.current?.click()}
-                          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary text-primary-foreground text-sm font-semibold shadow hover:bg-primary/90 transition-colors"
+                          className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-primary text-primary-foreground text-[13px] font-semibold shadow hover:bg-primary/90 transition-colors"
                         >
                           <Upload className="w-3.5 h-3.5" />
                           {isAR ? "رفع صورة" : "Upload Image"}
@@ -2686,7 +2536,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                           {isAR ? "درجة الشفافية" : "Opacity"}
                         </span>
                       </div>
-                      <span className="text-sm font-bold text-primary tabular-nums">{display.bgOpacity}%</span>
+                      <span className="text-[13px] font-bold text-primary tabular-nums">{display.bgOpacity}%</span>
                     </div>
                     <div className="relative">
                       <input
@@ -2697,8 +2547,8 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                         className="w-full h-2 rounded-full appearance-none cursor-pointer accent-primary bg-muted"
                       />
                       <div className="flex justify-between mt-1">
-                        <span className="text-sm text-muted-foreground">5%</span>
-                        <span className="text-sm text-muted-foreground">80%</span>
+                        <span className="text-[13px] text-muted-foreground">5%</span>
+                        <span className="text-[13px] text-muted-foreground">80%</span>
                       </div>
                     </div>
                   </div>
@@ -2722,7 +2572,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                     </button>
                   ))}
                 </div>
-                <div className="mt-3 pt-3 border-t border-border/40 flex items-center gap-3">
+                <div className="mt-3 pt-3 border-t border-border/40 flex items-center gap-2.5">
                   <span className="text-xs text-muted-foreground">{isAR ? "معاينة:" : "Preview:"}</span>
                   <div className="flex items-center gap-2">
                     <span className="h-6 px-3 rounded-full text-xs font-bold flex items-center"
@@ -2756,7 +2606,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                       )}
                     >
                       {/* Mini gradient preview */}
-                      <div className="w-full h-10 rounded-lg shadow-inner border border-white/10 overflow-hidden">
+                      <div className="w-full h-[34px] rounded-lg shadow-inner border border-white/10 overflow-hidden">
                         <div className="w-full h-full" style={{ background: `linear-gradient(180deg, ${preset.from} 0%, ${preset.to} 100%)` }} />
                       </div>
                       <span className="text-foreground text-center leading-tight">{isAR ? preset.labelAr : preset.labelEn}</span>
@@ -2768,11 +2618,11 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                   <p className="text-xs text-muted-foreground mb-2">{isAR ? "معاينة مصغّرة:" : "Preview:"}</p>
                   <div className="h-16 rounded-xl overflow-hidden shadow-md flex items-stretch"
                     style={{ background: `linear-gradient(180deg, ${SIDEBAR_COLOR_PRESETS[display.sidebarColor].from} 0%, ${SIDEBAR_COLOR_PRESETS[display.sidebarColor].to} 100%)` }}>
-                    <div className="flex items-center gap-2 px-4">
-                      <div className="w-6 h-6 rounded-lg bg-white/10" />
+                    <div className="flex items-center gap-2 px-3">
+                      <div data-settings-preview className="w-6 h-6 rounded-lg bg-white/10" />
                       <div className="space-y-1">
-                        <div className="w-16 h-2 rounded bg-white/30" />
-                        <div className="w-10 h-1.5 rounded bg-white/15" />
+                        <div data-settings-preview className="w-16 h-2 rounded bg-white/30" />
+                        <div data-settings-preview className="w-10 h-1.5 rounded bg-white/15" />
                       </div>
                     </div>
                   </div>
@@ -2781,14 +2631,14 @@ const decryptBackupData = async (backupFile: any, password: string) => {
               </div>
               <div id="appearance-panel-layout" role="tabpanel" aria-labelledby="appearance-tab-layout" hidden={appearanceTab !== "layout"} className="space-y-6">
               <SectionCard icon={Square} title={isAR ? "حجم الزوايا" : "Border Radius"} color="bg-blue-500/5">
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-3 gap-2.5">
                   {([
                     { v: "sharp"   as BorderRadius, labelAr: "حادة",    labelEn: "Sharp",   radius: "rounded-sm",  Icon: Minus },
                     { v: "normal"  as BorderRadius, labelAr: "متوسطة",  labelEn: "Normal",  radius: "rounded-xl",  Icon: RectangleHorizontal },
                     { v: "rounded" as BorderRadius, labelAr: "ناعمة",   labelEn: "Rounded", radius: "rounded-full", Icon: Square },
                   ]).map(({ v, labelAr, labelEn, radius, Icon }) => (
                     <button key={v} onClick={() => updateDisplay({ borderRadius: v })}
-                      className={cn("flex flex-col items-center gap-2 py-4 rounded-xl border-2 text-xs font-semibold transition-all",
+                      className={cn("flex flex-col items-center gap-2 py-3 rounded-xl border-2 text-xs font-semibold transition-all",
                         display.borderRadius === v ? "border-primary bg-primary/10 text-primary" : "border-border bg-background text-muted-foreground hover:border-primary/40"
                       )}>
                       <div className={`w-10 h-6 border-2 ${display.borderRadius === v ? "border-primary" : "border-current"} ${radius}`} />
@@ -2798,19 +2648,19 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                 </div>
               </SectionCard>
               <SectionCard icon={AlignVerticalSpaceAround} title={isAR ? "كثافة العرض (حجم النص)" : "Display Density (Font Size)"} color="bg-teal-500/5">
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-3 gap-2.5">
                   {([
                     { v: "compact"     as Density, labelAr: "مضغوط",   labelEn: "Compact",     Icon: AlignVerticalJustifyStart,  hint: "12.5px" },
                     { v: "normal"      as Density, labelAr: "عادي",    labelEn: "Normal",      Icon: AlignVerticalJustifyCenter, hint: "14px"   },
                     { v: "comfortable" as Density, labelAr: "مريح",    labelEn: "Comfortable", Icon: AlignVerticalSpaceAround,   hint: "15.5px" },
                   ]).map(({ v, labelAr, labelEn, Icon, hint }) => (
                     <button key={v} onClick={() => updateDisplay({ density: v })}
-                      className={cn("flex flex-col items-center gap-1.5 py-4 rounded-xl border-2 text-xs font-semibold transition-all",
+                      className={cn("flex flex-col items-center gap-1.5 py-3 rounded-xl border-2 text-xs font-semibold transition-all",
                         display.density === v ? "border-primary bg-primary/10 text-primary" : "border-border bg-background text-muted-foreground hover:border-primary/40"
                       )}>
                       <Icon className="w-3.5 h-3.5" />
                       <span>{isAR ? labelAr : labelEn}</span>
-                      <span className="font-mono text-sm opacity-60">{hint}</span>
+                      <span className="font-mono text-[13px] opacity-60">{hint}</span>
                     </button>
                   ))}
                 </div>
@@ -2835,13 +2685,13 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                       hintEn: "Enable or disable UI transitions and motion effects",
                     },
                   ].map(({ field, Icon, labelAr, labelEn, hintAr, hintEn }) => (
-                    <div key={field} className="flex items-center justify-between gap-4 p-3 rounded-xl hover:bg-muted/30 transition-colors">
-                      <div className="flex items-center gap-3">
+                    <div key={field} className="flex items-center justify-between gap-2.5 p-3 rounded-xl hover:bg-muted/30 transition-colors">
+                      <div className="flex items-center gap-2.5">
                         <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center shrink-0">
                           <Icon className="w-3.5 h-3.5 text-muted-foreground" />
                         </div>
                         <div>
-                          <p className="text-sm font-medium">{isAR ? labelAr : labelEn}</p>
+                          <p className="text-[13px] font-medium">{isAR ? labelAr : labelEn}</p>
                           <p className="text-xs text-muted-foreground">{isAR ? hintAr : hintEn}</p>
                         </div>
                       </div>
@@ -2861,7 +2711,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
         {/* ── Identity Tab ── */}
         {activeTab === "company" && canEditBranding && (
           <Section icon={Building2} title={isAR ? "هوية الشركة" : "Company Identity"} color="bg-blue-500/5">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
             <Field label={isAR ? "اسم الشركة (عربي)" : "Company Name (Arabic)"}>
               <input value={form.nameAr} onChange={e => setForm(p => ({ ...p, nameAr: e.target.value }))} className={inp} placeholder="اسم الشركة بالعربي" />
             </Field>
@@ -2892,7 +2742,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
         {/* ── Contact Tab ── */}
         {activeTab === "company" && canEditLegalInfo &&(
           <Section icon={Phone} title={isAR ? "معلومات التواصل" : "Contact Information"} color="bg-green-500/5">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
               <Field label={isAR ? "البريد الإلكتروني" : "Email"}>
                 <div className="relative">
                   <Mail className="absolute top-2.5 start-3 w-3.5 h-3.5 text-muted-foreground" />
@@ -2927,7 +2777,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
         {/* ── Legal Tab ── */}
         {activeTab === "company" && canEditLegalInfo && (
           <Section icon={Hash} title={isAR ? "القانونية والنسخ" : "Legal & Backup"} color="bg-amber-500/5">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
               <Field label={isAR ? "رقم السجل التجاري" : "Commercial Registration No."}>
                 <div className="relative">
                   <Hash className="absolute top-2.5 start-3 w-3.5 h-3.5 text-muted-foreground" />
@@ -2948,11 +2798,11 @@ const decryptBackupData = async (backupFile: any, password: string) => {
         {/* ── Branding Tab ── */}
         {activeTab === "branding" && (canEditLogo || canEditStamp || canEditAccountantSignature || canEditBranding) && (
           <Section icon={Image} title={isAR ? "الشعار والختم والعلامة المائية" : "Logo, Stamp & Watermark"} color="bg-purple-500/5">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               {/* Logo */}
               {canEditLogo && <div className="space-y-3">
                 <p className="text-xs font-semibold text-muted-foreground ">{isAR ? "شعار الشركة" : "Company Logo"}</p>
-                <div className="flex flex-col items-center justify-center gap-3 p-4 border-2 border-dashed border-border rounded-xl bg-muted/20 hover:bg-muted/30 transition-colors min-h-[160px]">
+                <div className="flex flex-col items-center justify-center gap-2.5 p-3 border-2 border-dashed border-border rounded-xl bg-muted/20 hover:bg-muted/30 transition-colors min-h-[112px]">
                   <img src={currentLogoSrc} alt="logo" className="h-16 w-auto object-contain" onError={(e) => { e.currentTarget.style.display = "none"; }} />
                   <div className="flex gap-2 flex-wrap justify-center">
                     <button type="button" onClick={() => logoRef.current?.click()} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition">
@@ -2980,7 +2830,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                     onChange={(e) =>
                       setForm((p) => ({ ...p, logoSize: Number(e.target.value) }))
                     }
-                    className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm"
+                    className="w-full px-3 py-2 rounded-lg border border-border bg-background text-[13px]"
                   />
                 </div>
                                 <div className="space-y-2">
@@ -2995,7 +2845,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                     onChange={(e) =>
                       setForm((p) => ({ ...p, logoHeight: Number(e.target.value) }))
                     }
-                    className="w-full px-3 py-2 rounded-lg border border-border bg-background text-sm"
+                    className="w-full px-3 py-2 rounded-lg border border-border bg-background text-[13px]"
                   />
                 </div>
 
@@ -3003,7 +2853,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
               {/* Stamp */}
               {canEditStamp && <div className="space-y-3">
                 <p className="text-xs font-semibold text-muted-foreground ">{isAR ? "ختم الشركة" : "Company Stamp"}</p>
-                <div className="flex flex-col items-center justify-center gap-3 p-4 border-2 border-dashed border-border rounded-xl bg-muted/20 hover:bg-muted/30 transition-colors min-h-[160px]">
+                <div className="flex flex-col items-center justify-center gap-2.5 p-3 border-2 border-dashed border-border rounded-xl bg-muted/20 hover:bg-muted/30 transition-colors min-h-[112px]">
                   <img src={currentStampSrc} alt="stamp" className="h-16 w-auto object-contain" onError={(e) => { e.currentTarget.style.display = "none"; }} />
                   <div className="flex gap-2 flex-wrap justify-center">
                     <button type="button" onClick={() => stampRef.current?.click()} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition">
@@ -3026,7 +2876,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                   {isAR ? "توقيع المحاسب" : "Accountant Signature"}
                 </p>
 
-                <div className="flex flex-col items-center justify-center gap-3 p-4 border-2 border-dashed border-border rounded-xl bg-muted/20 hover:bg-muted/30 transition-colors min-h-[160px]">
+                <div className="flex flex-col items-center justify-center gap-2.5 p-3 border-2 border-dashed border-border rounded-xl bg-muted/20 hover:bg-muted/30 transition-colors min-h-[112px]">
                   <img
                     src={accountantSignaturePreview || ""}
                     alt="accountant-signature"
@@ -3075,8 +2925,8 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                 />
               </div>}
 
-              {canEditAccountantSignature && <div className="flex items-center justify-between gap-4 p-3 rounded-xl hover:bg-muted/30 transition-colors">
-                <span className="text-sm font-medium">
+              {canEditAccountantSignature && <div className="flex items-center justify-between gap-2.5 p-3 rounded-xl hover:bg-muted/30 transition-colors">
+                <span className="text-[13px] font-medium">
                   {isAR ? "إظهار توقيع المحاسب" : "Show Accountant Signature"}
                 </span>
                 <Toggle field="showAccountantSignature" />
@@ -3085,7 +2935,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
               {/* Watermark */}
               {canEditBranding && <div className="space-y-3">
                 <p className="text-xs font-semibold text-muted-foreground ">{isAR ? "العلامة المائية" : "Watermark"}</p>
-                <div className="flex flex-col items-center justify-center gap-3 p-4 border-2 border-dashed border-purple-400/40 rounded-xl bg-purple-500/5 hover:bg-purple-500/10 transition-colors min-h-[160px]">
+                <div className="flex flex-col items-center justify-center gap-2.5 p-3 border-2 border-dashed border-purple-400/40 rounded-xl bg-purple-500/5 hover:bg-purple-500/10 transition-colors min-h-[112px]">
                   <img src={currentWatermarkSrc} alt="watermark" className="h-16 w-auto object-contain opacity-40" onError={(e) => { e.currentTarget.style.display = "none"; }} />
                   <div className="flex gap-2 flex-wrap justify-center">
                     <button type="button" onClick={() => watermarkRef.current?.click()} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-purple-600 text-white rounded-lg hover:opacity-90 transition">
@@ -3107,16 +2957,16 @@ const decryptBackupData = async (backupFile: any, password: string) => {
 
           {/* ── Print Tab ── */}
           {activeTab === "print" && canEditPrintSettings && (
-            <Section icon={Printer} title={isAR ? "خيارات الطباعة" : "Print Options"} color="bg-rose-500/5" contentClassName="ledger-print-tools ms-0 me-auto max-w-[960px]">
+            <Section icon={Printer} title={isAR ? "خيارات الطباعة" : "Print Options"} color="bg-rose-500/5" contentClassName="ledger-print-tools ms-0 me-auto">
               <style>{`
-                .ledger-print-tools label { font-size: 14px; line-height: 20px; }
-                .ledger-print-tools input:not([type="checkbox"]), .ledger-print-tools select { min-height: 40px; font-size: 14px; border-radius: 8px; }
+                .ledger-print-tools label { font-size: 13px; line-height: 18px; }
+                .ledger-print-tools input:not([type="checkbox"]), .ledger-print-tools select { min-height: 34px; font-size: 13px; border-radius: 8px; }
                 .ledger-print-tools input[type="number"] { width: 120px; max-width: 100%; }
-                .ledger-print-tools textarea { font-size: 14px; line-height: 1.6; border-radius: 8px; }
+                .ledger-print-tools textarea { font-size: 13px; line-height: 1.6; border-radius: 8px; }
               `}</style>
               <div className="space-y-4">
 
-                <div role="tablist" aria-label={isAR ? "أقسام أدوات الطباعة" : "Print tools sections"} className="flex flex-wrap gap-2 border-b border-border pb-4">
+                <div role="tablist" aria-label={isAR ? "أقسام أدوات الطباعة" : "Print tools sections"} className="flex flex-wrap gap-2 border-b border-border pb-3">
                   {[
                     { id: "invoice" as const, ar: "الفواتير", en: "Invoices" },
                     { id: "receipt" as const, ar: "سندات القبض", en: "Receipts" },
@@ -3124,7 +2974,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                     { id: "ledger" as const, ar: "ملخص العميل", en: "Customer Summary" },
                     { id: "common" as const, ar: "إعدادات مشتركة", en: "Shared Settings" },
                   ].map(tab => (
-                    <button key={tab.id} id={`print-tab-${tab.id}`} type="button" role="tab" aria-selected={printTab === tab.id} aria-controls={`print-panel-${tab.id}`} onClick={() => setPrintTab(tab.id)} className={cn("rounded-lg border px-4 py-2 text-sm font-medium transition-colors", printTab === tab.id ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background text-muted-foreground hover:bg-muted hover:text-foreground")}>
+                    <button key={tab.id} id={`print-tab-${tab.id}`} type="button" role="tab" aria-selected={printTab === tab.id} aria-controls={`print-panel-${tab.id}`} onClick={() => setPrintTab(tab.id)} className={cn("rounded-lg border px-3 py-2 text-[13px] font-medium transition-colors", printTab === tab.id ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background text-muted-foreground hover:bg-muted hover:text-foreground")}>
                       {isAR ? tab.ar : tab.en}
                     </button>
                   ))}
@@ -3138,12 +2988,12 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                   (printTab === "receipt" && field === "showStampOnReceipts") ||
                   (printTab === "statement" && field === "showStampOnStatements")
                 ).map(({ field, labelAr, labelEn, icon: Icon }) => (
-                  <div key={field} className="flex items-center justify-between gap-4 p-3 rounded-xl hover:bg-muted/30 transition-colors">
-                    <div className="flex items-center gap-3">
+                  <div key={field} className="flex items-center justify-between gap-2.5 p-3 rounded-xl hover:bg-muted/30 transition-colors">
+                    <div className="flex items-center gap-2.5">
                       <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center">
                         <Icon className="w-3.5 h-3.5 text-muted-foreground" />
                       </div>
-                      <span className="text-sm font-medium">{isAR ? labelAr : labelEn}</span>
+                      <span className="text-[13px] font-medium">{isAR ? labelAr : labelEn}</span>
                     </div>
                     <Toggle field={field} />
                   </div>
@@ -3152,15 +3002,15 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                 <div id="print-panel-invoice" role="tabpanel" aria-labelledby="print-tab-invoice" hidden={printTab !== "invoice"} className="space-y-5">
                   <DocumentTitleEditor prefix="invoice" titlePrefix="invoiceCredit" label={isAR ? "عنوان الفاتورة" : "Invoice title"} isAR={isAR} form={form} setForm={setForm} />
                   <details className="rounded-xl border border-border bg-background">
-                    <summary className="cursor-pointer px-4 py-3 text-sm font-medium">{isAR ? "معاينة رأس الفاتورة" : "Invoice header preview"}</summary>
-                    <div className="overflow-auto rounded-b-xl bg-white p-4 text-gray-900"><InvoicePrintHeader company={form} logoSrc={currentLogoSrc} isAR={isAR} invoiceNumber="INV-PREVIEW" statusText={isAR ? "مسودة" : "Draft"} /></div>
+                    <summary className="cursor-pointer px-3 py-3 text-[13px] font-medium">{isAR ? "معاينة رأس الفاتورة" : "Invoice header preview"}</summary>
+                    <div data-settings-preview className="overflow-auto rounded-b-xl bg-white p-4 text-gray-900"><InvoicePrintHeader company={form} logoSrc={currentLogoSrc} isAR={isAR} invoiceNumber="INV-PREVIEW" statusText={isAR ? "مسودة" : "Draft"} /></div>
                   </details>
                 </div>
                 <div id="print-panel-receipt" role="tabpanel" aria-labelledby="print-tab-receipt" hidden={printTab !== "receipt"} className="space-y-5">
                   <DocumentTitleEditor prefix="receipt" titlePrefix="receipt" label={isAR ? "عنوان سند القبض" : "Receipt title"} isAR={isAR} form={form} setForm={setForm} />
                   <details className="rounded-xl border border-border bg-background">
-                    <summary className="cursor-pointer px-4 py-3 text-sm font-medium">{isAR ? "معاينة رأس سند القبض" : "Receipt header preview"}</summary>
-                    <div className="overflow-auto rounded-b-xl bg-white text-gray-900"><ReceiptPrintHeader receiptNumber="RCP-PREVIEW" override={{ settings: form, logoSrc: currentLogoSrc }} /></div>
+                    <summary className="cursor-pointer px-3 py-3 text-[13px] font-medium">{isAR ? "معاينة رأس سند القبض" : "Receipt header preview"}</summary>
+                    <div data-settings-preview className="overflow-auto rounded-b-xl bg-white text-gray-900"><ReceiptPrintHeader receiptNumber="RCP-PREVIEW" override={{ settings: form, logoSrc: currentLogoSrc }} /></div>
                   </details>
                 </div>
                 <div id="print-panel-statement" role="tabpanel" aria-labelledby="print-tab-statement" hidden={printTab !== "statement"} className="space-y-5">
@@ -3170,21 +3020,21 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                   <DocumentTitleEditor prefix="customerLedger" titlePrefix="customerLedger" label={isAR ? "عنوان ملخص العميل المالي" : "Customer summary title"} isAR={isAR} form={form} setForm={setForm} />
                 </div>
                 <div id="print-panel-common" role="tabpanel" aria-labelledby="print-tab-common" hidden={printTab !== "common"} className="space-y-5">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="rounded-xl border border-border bg-muted/20 p-4 space-y-3">
-                      <h3 className="text-base font-semibold">{isAR ? "العلامة المائية" : "Watermark"}</h3>
-                      <div className="flex items-center justify-between gap-3"><span className="text-sm">{isAR ? "إظهارها في صفحات الطباعة" : "Show on print pages"}</span><Toggle field="showWatermark" /></div>
-                      <p className="text-sm text-muted-foreground">{isAR ? "تؤثر في الفواتير وسندات القبض والكشوف. تُرفع الصورة من تبويب الشعارات." : "Applies to invoices, receipts and statements. Upload the image in Branding."}</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <div className="rounded-xl border border-border bg-muted/20 p-3 space-y-3">
+                      <h3 className="text-[16px] font-semibold">{isAR ? "العلامة المائية" : "Watermark"}</h3>
+                      <div className="flex items-center justify-between gap-2.5"><span className="text-[13px]">{isAR ? "إظهارها في صفحات الطباعة" : "Show on print pages"}</span><Toggle field="showWatermark" /></div>
+                      <p className="text-[13px] text-muted-foreground">{isAR ? "تؤثر في الفواتير وسندات القبض والكشوف. تُرفع الصورة من تبويب الشعارات." : "Applies to invoices, receipts and statements. Upload the image in Branding."}</p>
                     </div>
-                    <div className="rounded-xl border border-border bg-muted/20 p-4 space-y-3">
-                      <h3 className="text-base font-semibold">{isAR ? "التوقيعات" : "Signatures"}</h3>
-                      {canEditAccountantSignature && <div className="flex items-center justify-between gap-3"><span className="text-sm">{isAR ? "إظهار توقيع المحاسب" : "Show accountant signature"}</span><Toggle field="showAccountantSignature" /></div>}
-                      <div className="flex items-center justify-between gap-3"><span className="text-sm">{isAR ? "إظهار توقيع المستلم" : "Show receiver signature"}</span><Toggle field="showReceiverSignature" /></div>
-                      <p className="text-sm text-muted-foreground">{isAR ? "تؤثر في المستندات التي تعرض التوقيعات، مع مراعاة خيار إظهار التوقيعات داخل معاينة الطباعة." : "Applies where signatures are supported, subject to the signature toggle in print preview."}</p>
+                    <div className="rounded-xl border border-border bg-muted/20 p-3 space-y-3">
+                      <h3 className="text-[16px] font-semibold">{isAR ? "التوقيعات" : "Signatures"}</h3>
+                      {canEditAccountantSignature && <div className="flex items-center justify-between gap-2.5"><span className="text-[13px]">{isAR ? "إظهار توقيع المحاسب" : "Show accountant signature"}</span><Toggle field="showAccountantSignature" /></div>}
+                      <div className="flex items-center justify-between gap-2.5"><span className="text-[13px]">{isAR ? "إظهار توقيع المستلم" : "Show receiver signature"}</span><Toggle field="showReceiverSignature" /></div>
+                      <p className="text-[13px] text-muted-foreground">{isAR ? "تؤثر في المستندات التي تعرض التوقيعات، مع مراعاة خيار إظهار التوقيعات داخل معاينة الطباعة." : "Applies where signatures are supported, subject to the signature toggle in print preview."}</p>
                     </div>
                   </div>
-                  <div className="rounded-xl border border-border bg-muted/20 p-4 space-y-4">
-                    <h3 className="text-base font-semibold">{isAR ? "تذييل المستندات" : "Document footer"}</h3>
+                  <div className="rounded-xl border border-border bg-muted/20 p-3 space-y-4">
+                    <h3 className="text-[16px] font-semibold">{isAR ? "تذييل المستندات" : "Document footer"}</h3>
 
                 <Field
                   label={isAR ? "نص التذييل في صفحات الطباعة" : "Footer text on print pages"}
@@ -3198,7 +3048,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                     placeholder={isAR ? "مثال: شكراً لتعاملكم معنا · جميع الأسعار شاملة الضريبة" : "e.g. Thank you for your business"}
                   />
                 </Field>
-                    {form.footerText && <div className="rounded-lg border border-gray-200 bg-white p-4 text-center text-xs text-gray-500 whitespace-pre-line">{form.footerText}</div>}
+                    {form.footerText && <div data-settings-preview className="rounded-lg border border-gray-200 bg-white p-4 text-center text-xs text-gray-500 whitespace-pre-line">{form.footerText}</div>}
                   </div>
                 </div>
               </div>
@@ -3206,7 +3056,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
           )}
           {/* Info banner */}
           {["company", "branding", "print"].includes(activeTab) && (
-            <div className="flex items-start gap-3 p-4 bg-blue-500/5 border border-blue-500/20 rounded-2xl text-sm text-blue-700 dark:text-blue-300">
+            <div className="flex items-start gap-2.5 p-3 bg-blue-500/5 border border-blue-500/20 rounded-2xl text-[13px] text-blue-700 dark:text-blue-300">
               <Info className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
               <p>
                 {isAR

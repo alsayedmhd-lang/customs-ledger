@@ -44,6 +44,30 @@ contextBridge.exposeInMainWorld("electronAPI", {
   getDeviceIdentity: () =>
     ipcRenderer.invoke("device:get-identity"),
 
+  exportDevicePairingFile: (transfer) => ipcRenderer.invoke("device:pairing-export-file", transfer),
+  importDevicePairingFile: () => ipcRenderer.invoke("device:pairing-import-file"),
+  createDevicePairingRequest: () =>
+    ipcRenderer.invoke("device:pairing-create-request"),
+
+  receiveDevicePairingRequest: (request) =>
+    ipcRenderer.invoke("device:pairing-receive-request", request),
+
+  signDevicePairingResponse: (response) =>
+    ipcRenderer.invoke("device:pairing-sign-response", response),
+
+  completeDevicePairing: (response, proof, fingerprint, name) =>
+    ipcRenderer.invoke(
+      "device:pairing-complete",
+      response,
+      proof,
+      fingerprint,
+      name
+    ),
+
+  listTrustedLedgerDevices: () =>
+    ipcRenderer.invoke("device:trusted-list"),
+  listPeerEndpoints: () => ipcRenderer.invoke("device:peer-endpoints"),
+  setPeerEndpoint: (deviceId, address) => ipcRenderer.invoke("device:peer-set-endpoint", deviceId, address),
   developerUnlock: (password) =>
     ipcRenderer.invoke("developer:unlock", password),
 

@@ -129,6 +129,8 @@ const PRESET_ATTACHMENT_CATEGORY_KEYS = new Set(PRESET_ATTACHMENT_CATEGORIES.map
 
 type InvoiceAttachment = {
   id: number;
+  syncId?: string | null;
+  fileHash?: string | null;
   fileName: string;
   mimeType?: string | null;
   fileSize?: number | null;
@@ -1092,6 +1094,9 @@ export default function InvoiceForm() {
 
     const result: AttachmentSaveResult = await api.openAttachmentFile({
       relativePath: attachment.relativePath,
+      syncId: attachment.syncId,
+      fileHash: attachment.fileHash,
+      fileSize: attachment.fileSize,
       storedName: attachment.storedName,
       declarationBaseNumber: attachment.declarationBaseNumber,
     });

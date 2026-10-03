@@ -1,3 +1,4 @@
+import { PasswordInput } from "@/components/ui/password-input";
 import { useCompanySettings } from "@/lib/company-settings-context";
 import { COLOR_PRESETS, useDisplaySettings } from "@/lib/display-settings-context";
 import { useState, FormEvent, useRef, KeyboardEvent, useEffect, ChangeEvent } from "react";
@@ -105,7 +106,7 @@ export default function LoginPage() {
         inputPlaceholder: "#94a3b8",
       };
 
-  
+
   // Login state
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -1156,8 +1157,9 @@ export default function LoginPage() {
 
             <div className="space-y-2">
               <label className="block text-xs font-semibold text-white/70">كلمة المرور</label>
-              <input
-                type="password"
+              <PasswordInput
+                isAR={isAR}
+                toggleClassName="border-white/15 bg-white/5 text-white/80 hover:bg-white/10"
                 value={developerPassword}
                 onChange={(event) => setDeveloperPassword(event.target.value)}
                 className={inputCls}

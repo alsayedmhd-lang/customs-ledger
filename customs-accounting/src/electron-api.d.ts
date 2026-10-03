@@ -10,6 +10,26 @@ declare global {
         createdAt: string;
       }>;
 
+      exportDevicePairingFile?: (transfer: { format: "ledger-device-pairing"; version: 1; kind: "request" | "response" | "proof"; payload: unknown }) => Promise<{ canceled: boolean }>;
+      importDevicePairingFile?: () => Promise<{ format: "ledger-device-pairing"; version: 1; kind: "request" | "response" | "proof"; payload: unknown } | null>;
+      createDevicePairingRequest?: () => Promise<unknown>;
+      receiveDevicePairingRequest?: (request: unknown) => Promise<unknown>;
+      signDevicePairingResponse?: (response: unknown) => Promise<unknown>;
+      completeDevicePairing?: (
+        response: unknown,
+        proof: unknown,
+        fingerprint: string,
+        name?: string
+      ) => Promise<unknown>;
+      listTrustedLedgerDevices?: () => Promise<Array<{
+        deviceId: string;
+        publicKey: string;
+        name: string | null;
+        trustedAt: string;
+        revokedAt: string | null;
+      }>>;
+      listPeerEndpoints?: () => Promise<Array<{ deviceId: string; name: string | null; address: string }>>;
+      setPeerEndpoint?: (deviceId: string, address: string) => Promise<{ ok: boolean }>;
       getLicenseDeviceId?: () => Promise<string>;
 
       getLicenseStatus?: () => Promise<{

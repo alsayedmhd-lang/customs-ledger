@@ -11,12 +11,14 @@ import accountingRouter from "./accounting";
 import companySettingsRouter from "./company-settings";
 import developerRouter from "./developer";
 import invoiceAttachmentsRouter from "./invoice-attachments";
+import peerAttachmentsRouter from "./peer-attachments";
 import { requireAuth } from "../middleware/auth";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
 router.use(authRouter);
+router.use(peerAttachmentsRouter); // signed trusted-device access; before user JWT gate
 router.use(developerRouter);
 router.use(usersManagementRouter);
 

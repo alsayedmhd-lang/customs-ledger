@@ -8,6 +8,8 @@ dotenv.config({
 });
 
 async function start() {
+  const { getJwtSecret } = await import("./utils/jwt-secret");
+  getJwtSecret();
   const { default: app } = await import("./app");
   const { seedAdminUser } = await import("./seed-admin");
 

@@ -1,5 +1,9 @@
 import { sqlite } from "@workspace/db";
 import {
+  pushAttachmentMetadataToInternalServer,
+  pullAttachmentMetadataFromInternalServer,
+} from "./internal-attachment-metadata-sync";
+import {
   runInternalBidirectionalOnce,
   runInternalLocalToServerOnce,
   runInternalServerToLocalOnce,
@@ -83,6 +87,21 @@ async function runConfigured(settings: Settings) {
   throw new Error("Internal sync batch limit reached; run again to finish remaining changes");
 }
 
+async function runConfiguredWithAttachments(settings: Settings) {
+  // Complete regular data synchronization first.
+  await runConfigured(settings);
+
+  const connectionString = connectionFor(settings);
+
+  if (settings.mode === "local-to-internal") {
+    await pushAttachmentMetadataToInternalServer(connectionString);
+  } else if (settings.mode === "internal-to-local") {
+    await pullAttachmentMetadataFromInternalServer(connectionString);
+  } else if (settings.mode === "bidirectional") {
+    await pushAttachmentMetadataToInternalServer(connectionString);
+    await pullAttachmentMetadataFromInternalServer(connectionString);
+  }
+}
 async function tick() {
   lastCheck = Date.now();
   if (running) return;
@@ -112,7 +131,7 @@ async function tick() {
   running = true;
   lastAttempt = Date.now();
   try {
-    await runConfigured(settings);
+    await runConfiguredWithAttachments(settings);
     lastSuccess = Date.now();
     lastError = "";
     console.info("[INTERNAL_SYNC][AUTO] Completed", { mode: settings.mode });

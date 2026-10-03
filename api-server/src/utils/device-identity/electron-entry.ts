@@ -18,3 +18,5 @@ export {
   getTrustedDevice,
   revokeTrustedDevice,
 } from "./trusted-devices";
+
+export { validatePairingTransfer } from "./pairing-transfer";

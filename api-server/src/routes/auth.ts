@@ -9,8 +9,11 @@ import { signToken, requireAuth, requireAdmin } from "../middleware/auth";
 import { comparePassword } from "../utils/password";
 import { ensureMasterPasswordHashColumn } from "../utils/ensure-company-settings-columns";
 
+import { getJwtSecret } from "../utils/jwt-secret";
+
 const router = Router();
-const JWT_SECRET = process.env.JWT_SECRET || "atw-customs-secret-2026";
+
+const JWT_SECRET = getJwtSecret();
 
 function isDeveloperSupportModeRequest(req: Parameters<typeof requireAdmin>[0]) {
   return (

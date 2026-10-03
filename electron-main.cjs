@@ -284,6 +284,9 @@ function normalizeAttachmentOpenPayload(input) {
       relativePath: input,
       storedName: null,
       declarationBaseNumber: null,
+      syncId: null,
+      fileHash: null,
+      fileSize: null,
     };
   }
 
@@ -292,6 +295,9 @@ function normalizeAttachmentOpenPayload(input) {
       relativePath: "",
       storedName: null,
       declarationBaseNumber: null,
+      syncId: null,
+      fileHash: null,
+      fileSize: null,
     };
   }
 
@@ -299,6 +305,10 @@ function normalizeAttachmentOpenPayload(input) {
     relativePath: String(input.relativePath || ""),
     storedName: safeStoredAttachmentName(input.storedName),
     declarationBaseNumber: safeDeclarationBaseNumber(input.declarationBaseNumber),
+    syncId: typeof input.syncId === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(input.syncId)
+      ? input.syncId.toLowerCase() : null,
+    fileHash: typeof input.fileHash === "string" && /^[a-f0-9]{64}$/i.test(input.fileHash) ? input.fileHash.toLowerCase() : null,
+    fileSize: Number.isSafeInteger(input.fileSize) && input.fileSize >= 0 ? input.fileSize : null,
   };
 }
 
@@ -414,6 +424,7 @@ function startBackend({ apiPath, serverFile, appDataDbPath }) {
       SQLITE_DB_PATH: appDataDbPath,
       DB_PROVIDER: "sqlite",
       APP_DATA_ROOT: path.dirname(path.dirname(appDataDbPath)),
+      LEDGER_ELECTRON_USER_DATA: app.getPath("userData"),
     },
     detached: false,
   });
@@ -1462,6 +1473,298 @@ ipcMain.handle("device:get-identity", async (event) => {
     createdAt: identity.createdAt,
   };
 });
+let ledgerPairingSessions = null;
+
+function getLedgerDeviceModule() {
+  const basePath = app.isPackaged ? process.resourcesPath : __dirname;
+
+  return require(
+    path.join(basePath, "api-server", "dist", "device-identity.cjs")
+  );
+}
+
+function assertLedgerDeviceIPC(event) {
+  if (
+    !mainWindow ||
+    mainWindow.isDestroyed() ||
+    event.sender !== mainWindow.webContents ||
+    event.senderFrame !== mainWindow.webContents.mainFrame
+  ) {
+    throw new Error("Device pairing access denied");
+  }
+}
+
+function getLedgerPairingSessions() {
+  if (!ledgerPairingSessions) {
+    const { PairingSessionStore } = getLedgerDeviceModule();
+    ledgerPairingSessions = new PairingSessionStore();
+  }
+
+  return ledgerPairingSessions;
+}
+
+ipcMain.handle("device:pairing-export-file", async (event, transfer) => {
+  assertLedgerDeviceIPC(event);
+  const { validatePairingTransfer } = getLedgerDeviceModule();
+  const file = validatePairingTransfer(transfer);
+  const result = await dialog.showSaveDialog(mainWindow, {
+    title: "Ledger — تصدير ملف توثيق الجهاز / Export pairing file",
+    defaultPath: `Ledger-device-${file.kind}.ledger-pairing`,
+    filters: [{ name: "Ledger Device Pairing", extensions: ["ledger-pairing"] }],
+  });
+  if (result.canceled || !result.filePath) return { canceled: true };
+  validatePairingTransfer(file); // It may have expired while the dialog was open.
+  await fs.promises.writeFile(result.filePath, JSON.stringify(file, null, 2), { mode: 0o600 });
+  return { canceled: false };
+});
+
+ipcMain.handle("device:pairing-import-file", async (event) => {
+  assertLedgerDeviceIPC(event);
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: "Ledger — استيراد ملف توثيق الجهاز / Import pairing file",
+    properties: ["openFile"],
+    filters: [{ name: "Ledger Device Pairing", extensions: ["ledger-pairing"] }],
+  });
+  if (result.canceled || !result.filePaths[0]) return null;
+  const handle = await fs.promises.open(result.filePaths[0], "r");
+  try {
+    const stat = await handle.stat();
+    if (!stat.isFile() || stat.size > 32768) throw new Error("ملف التوثيق غير صالح أو حجمه كبير / Invalid pairing file");
+    const bytes = Buffer.alloc(32769);
+    const { bytesRead } = await handle.read(bytes, 0, bytes.length, 0);
+    if (bytesRead > 32768) throw new Error("ملف التوثيق كبير / Pairing file too large");
+    const { validatePairingTransfer } = getLedgerDeviceModule();
+    return validatePairingTransfer(JSON.parse(bytes.subarray(0, bytesRead).toString("utf8")));
+  } finally {
+    await handle.close();
+  }
+});
+
+ipcMain.handle("device:pairing-create-request", async (event) => {
+  assertLedgerDeviceIPC(event);
+
+  const { createPairingRequest } = getLedgerDeviceModule();
+  return createPairingRequest(app);
+});
+
+ipcMain.handle("device:pairing-receive-request", async (event, request) => {
+  assertLedgerDeviceIPC(event);
+
+  const {
+    createPairingResponse,
+  } = getLedgerDeviceModule();
+
+  // Validate the request before retaining a pairing session.
+  const response = createPairingResponse(request);
+
+  const session = getLedgerPairingSessions().create(
+    response.pairingId,
+    response.deviceId,
+    response.publicKey
+  );
+
+  // The response MUST contain the saved single-use challenge.
+  return {
+    ...response,
+    challenge: session.challenge,
+  };
+});
+
+ipcMain.handle("device:pairing-sign-response", async (event, response) => {
+  assertLedgerDeviceIPC(event);
+
+  const { createSignedPairingProof } = getLedgerDeviceModule();
+
+  return createSignedPairingProof(app, response);
+});
+
+ipcMain.handle(
+  "device:pairing-complete",
+  async (event, response, proof, approvedFingerprint, name) => {
+    assertLedgerDeviceIPC(event);
+
+    const {
+      completeApprovedPairing,
+      getPairingFingerprint,
+    } = getLedgerDeviceModule();
+
+    const fingerprint = getPairingFingerprint(response.publicKey);
+
+    if (
+      typeof approvedFingerprint !== "string" ||
+      approvedFingerprint.trim().toUpperCase() !== fingerprint
+    ) {
+      throw new Error("Device fingerprint approval does not match");
+    }
+
+    const confirmation = await dialog.showMessageBox(mainWindow, {
+      type: "warning",
+      buttons: ["إلغاء / Cancel", "اعتماد الجهاز / Approve Device"],
+      defaultId: 0,
+      cancelId: 0,
+      noLink: true,
+      title: "Ledger — توثيق الأجهزة / Device Pairing",
+      message: "اعتمد الجهاز بعد مقارنة بصمته من شاشة هويته. / Compare the fingerprint independently before approval.",
+      detail: `Device: ${response.deviceId}\nFingerprint: ${fingerprint}`,
+    });
+
+    if (confirmation.response !== 1) {
+      throw new Error("Device pairing was not approved");
+    }
+
+    return completeApprovedPairing(
+      app,
+      getLedgerPairingSessions(),
+      response,
+      proof,
+      approvedFingerprint,
+      name ?? null
+    );
+  }
+);
+
+ipcMain.handle("device:trusted-list", async (event) => {
+  assertLedgerDeviceIPC(event);
+
+  const { listTrustedDevices } = getLedgerDeviceModule();
+
+  const devices = await listTrustedDevices(app);
+
+  return devices.map(({ deviceId, publicKey, name, trustedAt, revokedAt }) => ({
+    deviceId,
+    publicKey,
+    name,
+    trustedAt,
+    revokedAt,
+  }));
+});
+
+// Pairing remains manual. A private LAN endpoint is saved separately from trust.
+function normalizePeerEndpoint(input) {
+  if (typeof input !== "string" || input.length > 64) throw new Error("Invalid peer address");
+  const raw = input.trim();
+  const match = /^((?:10|127|192\.168|172\.(?:1[6-9]|2\d|3[01]))(?:\.\d{1,3}){1,3}):(\d{1,5})$/.exec(raw);
+  if (!match) throw new Error("Use a private IPv4 address and port, e.g. 192.168.1.20:3000");
+  const [host, portText] = raw.split(":");
+  const parts = host.split(".").map(Number);
+  if (parts.length !== 4 || parts.some(x => !Number.isInteger(x) || x < 0 || x > 255)) throw new Error("Invalid IP address");
+  const privateIP = parts[0] === 10 || parts[0] === 127 ||
+    (parts[0] === 192 && parts[1] === 168) ||
+    (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31);
+  const port = Number(portText);
+  if (!privateIP || port < 1 || port > 65535) throw new Error("Private LAN address required");
+  return `${host}:${port}`;
+}
+function peerEndpointFile() { return path.join(app.getPath("userData"), "peer-endpoints.json"); }
+function readPeerEndpoints() {
+  try { return JSON.parse(fs.readFileSync(peerEndpointFile(), "utf8")); }
+  catch (error) { if (error.code === "ENOENT") return {}; throw error; }
+}
+ipcMain.handle("device:peer-endpoints", async event => {
+  assertLedgerDeviceIPC(event);
+  const { listTrustedDevices } = getLedgerDeviceModule();
+  const peers = await listTrustedDevices(app);
+  const saved = readPeerEndpoints();
+  return peers.filter(d => !d.revokedAt).map(d => ({
+    deviceId: d.deviceId, name: d.name, address: saved[d.deviceId] || "",
+  }));
+});
+ipcMain.handle("device:peer-set-endpoint", async (event, deviceId, address) => {
+  assertLedgerDeviceIPC(event);
+  const { getTrustedDevice } = getLedgerDeviceModule();
+  const trusted = await getTrustedDevice(app, deviceId);
+  if (!trusted || trusted.revokedAt) throw new Error("Device is not trusted");
+  const normalized = address?.trim() ? normalizePeerEndpoint(address) : "";
+  const saved = readPeerEndpoints();
+  if (normalized) saved[trusted.deviceId] = normalized;
+  else delete saved[trusted.deviceId];
+  const file = peerEndpointFile();
+  const tmp = `${file}.${crypto.randomBytes(6).toString("hex")}.tmp`;
+  fs.writeFileSync(tmp, JSON.stringify(saved, null, 2), { mode: 0o600 });
+  fs.renameSync(tmp, file);
+  return { ok: true };
+});
+
+async function tryTrustedPeerAttachment(payload, root) {
+  if (!payload.syncId || !/^[a-f0-9]{64}$/i.test(payload.fileHash || "") ||
+      !Number.isSafeInteger(payload.fileSize) || payload.fileSize < 0 ||
+      !payload.storedName || !payload.declarationBaseNumber) return null;
+  const { getDeviceIdentity, listTrustedDevices } = getLedgerDeviceModule();
+  const identity = await getDeviceIdentity(app);
+  const peers = (await listTrustedDevices(app)).filter(d => !d.revokedAt);
+  const endpoints = readPeerEndpoints();
+  const { Readable } = require("node:stream");
+  const { pipeline } = require("node:stream/promises");
+  const fsp = fs.promises;
+  const attachmentRoot = path.resolve(root, "attachments");
+  const dir = path.resolve(attachmentRoot, "declarations", payload.declarationBaseNumber);
+  const destination = path.resolve(dir, payload.storedName);
+  if (!isPathInside(attachmentRoot, destination) ||
+      !/^[a-z0-9]+$/i.test(payload.declarationBaseNumber) ||
+      safeStoredAttachmentName(payload.storedName) !== payload.storedName) return null;
+
+  for (const peer of peers) {
+    const address = endpoints[peer.deviceId];
+    if (!address) continue;
+    let temp = null;
+    try {
+      const endpoint = normalizePeerEndpoint(address);
+      const time = String(Date.now());
+      const nonce = crypto.randomBytes(16).toString("hex");
+      const canonical = ["LEDGER_PEER_ATTACHMENT_V1", identity.deviceId,
+        peer.deviceId, payload.syncId, time, nonce].join("|");
+      const signature = crypto.sign(null, Buffer.from(canonical), identity.privateKey).toString("base64");
+      const reply = await fetch(`http://${endpoint}/api/peer-attachments/${payload.syncId}`, {
+        headers: {
+          "X-Ledger-Device-Id": identity.deviceId,
+          "X-Ledger-Target-Id": peer.deviceId,
+          "X-Ledger-Timestamp": time,
+          "X-Ledger-Nonce": nonce,
+          "X-Ledger-Signature": signature,
+        },
+        signal: AbortSignal.timeout(15000),
+      });
+      if (!reply.ok || !reply.body ||
+          reply.headers.get("content-length") !== String(payload.fileSize) ||
+          reply.headers.get("x-ledger-file-hash")?.toLowerCase() !== payload.fileHash.toLowerCase()) continue;
+      const signedReply = ["LEDGER_PEER_ATTACHMENT_REPLY_V1", peer.deviceId,
+        identity.deviceId, payload.syncId, nonce, payload.fileHash.toLowerCase(),
+        String(payload.fileSize)].join("|");
+      if (!crypto.verify(null, Buffer.from(signedReply), peer.publicKey,
+            Buffer.from(reply.headers.get("x-ledger-reply-signature") || "", "base64"))) continue;
+      await fsp.mkdir(dir, { recursive: true });
+      const realRoot = await fsp.realpath(attachmentRoot);
+      const realDir = await fsp.realpath(dir);
+      if (!isPathInside(realRoot, realDir)) continue;
+      temp = path.join(realDir, `.ledger-peer-${crypto.randomBytes(8).toString("hex")}.tmp`);
+      let bytes = 0;
+      const hash = crypto.createHash("sha256");
+      const { Transform } = require("node:stream");
+      const guard = new Transform({ transform(chunk, _enc, cb) {
+        bytes += chunk.length;
+        if (bytes > payload.fileSize) return cb(new Error("Peer attachment exceeds expected size"));
+        hash.update(chunk); cb(null, chunk);
+      }});
+      await pipeline(Readable.fromWeb(reply.body), guard, fs.createWriteStream(temp, { flags: "wx" }));
+      if (bytes !== payload.fileSize || hash.digest("hex") !== payload.fileHash.toLowerCase()) continue;
+      // Do not overwrite an existing mismatched file.
+      try { await fsp.link(temp, destination); }
+      catch (error) { if (error.code !== "EEXIST") throw error; }
+      const stat = await fsp.stat(destination);
+      if (!stat.isFile() || stat.size !== payload.fileSize) continue;
+      const check = crypto.createHash("sha256");
+      for await (const chunk of fs.createReadStream(destination)) check.update(chunk);
+      if (check.digest("hex") !== payload.fileHash.toLowerCase()) continue;
+      return destination;
+    } catch (error) {
+      console.warn("Trusted peer attachment unavailable:", peer.deviceId, error.message);
+    } finally {
+      if (temp) await fsp.rm(temp, { force: true }).catch(() => undefined);
+    }
+  }
+  return null;
+}
+
 ipcMain.handle("app:get-version", () => app.getVersion());
 
 console.log("Electron app.getVersion():", app.getVersion());
@@ -1963,9 +2266,16 @@ ipcMain.handle("attachment:open-file", async (_event, input) => {
       return { ok: true, fullPath: targetPath };
     }
 
+    if (!outsideRootSeen && payload.syncId) {
+      const downloaded = await tryTrustedPeerAttachment(payload, dataRoot);
+      if (downloaded) {
+        const openError = await shell.openPath(downloaded);
+        return openError ? { ok: false, error: openError } : { ok: true, fullPath: downloaded, fromPeer: true };
+      }
+    }
     return {
       ok: false,
-      error: outsideRootSeen ? "Attachment path is outside storage root" : "Attachment file not found",
+      error: outsideRootSeen ? "Attachment path is outside storage root" : "Attachment file not found locally or on linked devices",
     };
   } catch (error) {
     logContext.rejectedReason = error?.message || String(error);

@@ -484,6 +484,8 @@ function optionalTrimmedString(value: unknown) {
 function formatAttachment(attachment: typeof invoiceAttachmentsTable.$inferSelect) {
   return {
     id: attachment.id,
+    syncId: attachment.syncId,
+    fileHash: attachment.fileHash,
     fileName: attachment.fileName,
     mimeType: attachment.mimeType,
     fileSize: attachment.fileSize,

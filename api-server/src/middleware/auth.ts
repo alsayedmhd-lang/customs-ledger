@@ -1,7 +1,9 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 
-const JWT_SECRET = process.env.JWT_SECRET || "atw-customs-secret-2026";
+import { getJwtSecret } from "../utils/jwt-secret";
+
+const JWT_SECRET = getJwtSecret();
 
 export interface AuthPayload {
   userId: number;
