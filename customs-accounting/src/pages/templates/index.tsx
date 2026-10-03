@@ -192,7 +192,19 @@ export default function TemplatesList() {
                         i % 2 === 0 ? "" : "bg-muted/10"
                       )}
                     >
-                      <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{(tmpl as InvoiceItemTemplate & { itemCode?: string | null }).itemCode ?? i + 1}</td>
+                      <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
+                        {(() => {
+                          const code = (tmpl as InvoiceItemTemplate & {
+                            itemCode?: string | null;
+                          }).itemCode;
+
+                          if (code && /^\d+$/.test(code.trim())) {
+                            return code.trim();
+                          }
+
+                          return 101 + i;
+                        })()}
+                      </td>
                       <td className="px-4 py-3 font-medium text-foreground">
                         <span
                           onClick={() => setEditingTemplate(tmpl)}
