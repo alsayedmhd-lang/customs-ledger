@@ -919,7 +919,7 @@ export default function AccountingPage() {
                         </Link>
                       </td>
                       <td className="px-3 py-1.5 whitespace-nowrap font-semibold text-foreground">
-                        {formatCurrency(row.total, currencySymbol, lang)}
+                        {showAmounts ? formatCurrency(row.total, currencySymbol, lang) : "••••••"}
                       </td>
                       <td
                         className="px-3 py-1.5 whitespace-nowrap max-w-[120px] truncate"
@@ -1059,7 +1059,7 @@ export default function AccountingPage() {
                     {t("total")} ({filtered.length})
                   </td>
                   <td className="px-3 py-2.5 text-foreground">
-                    {formatCurrency(totalInvoices, currencySymbol, lang)}
+                    {showAmounts ? formatCurrency(totalInvoices, currencySymbol, lang) : "••••••"}
                   </td>
                   <td colSpan={2} />
                   <td className="px-2 py-2.5 text-blue-500 border-r border-border/40">

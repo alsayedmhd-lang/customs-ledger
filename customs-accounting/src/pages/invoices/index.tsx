@@ -420,7 +420,7 @@ export default function InvoicesList() {
                     </td>
 
                     <td className="px-4 py-3 text-end">
-                      <span className="font-mono font-bold text-sm">{formatCurrency(inv.total, undefined, lang)}</span>
+                      <span className="font-mono font-bold text-sm">{showAmounts ? formatCurrency(inv.total, undefined, lang) : hiddenAmount}</span>
                     </td>
 
                     <td className="px-4 py-3 text-end">
