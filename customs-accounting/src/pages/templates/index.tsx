@@ -125,7 +125,7 @@ export default function TemplatesList() {
                 className="bg-card border border-border/50 rounded-xl p-3 shadow-sm hover:shadow-md transition-all group hover:-translate-y-0.5 flex flex-col gap-1"
               >
                 <span className="text-xs font-mono text-muted-foreground">
-                  {(tmpl as InvoiceItemTemplate & { itemCode?: string | null }).itemCode}
+                  {(tmpl as InvoiceItemTemplate & { itemCode?: string | null }).itemCode || (lang === "ar" ? "قيد الترقيم" : "Pending number")}
                 </span>
                 <p
                   onClick={() => setEditingTemplate(tmpl)}
@@ -193,17 +193,7 @@ export default function TemplatesList() {
                       )}
                     >
                       <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
-                        {(() => {
-                          const code = (tmpl as InvoiceItemTemplate & {
-                            itemCode?: string | null;
-                          }).itemCode;
-
-                          if (code && /^\d+$/.test(code.trim())) {
-                            return code.trim();
-                          }
-
-                          return 101 + i;
-                        })()}
+                        {(tmpl as InvoiceItemTemplate & { itemCode?: string | null }).itemCode?.trim() || (isAR ? "قيد الترقيم" : "Pending number")}
                       </td>
                       <td className="px-4 py-3 font-medium text-foreground">
                         <span
@@ -286,7 +276,7 @@ function TemplateCard({
           <PackageSearch className="w-4 h-4 text-primary" />
         </div>
         <span className="text-xs font-mono text-muted-foreground">
-          {(tmpl as InvoiceItemTemplate & { itemCode?: string | null }).itemCode}
+          {(tmpl as InvoiceItemTemplate & { itemCode?: string | null }).itemCode || (lang === "ar" ? "قيد الترقيم" : "Pending number")}
         </span>
         <h3
           onClick={() => onEdit(tmpl)}

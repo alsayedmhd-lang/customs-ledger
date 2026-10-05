@@ -1,19 +1,31 @@
 import { Router, type IRouter } from "express";
 import { randomUUID } from "node:crypto";
-import { db, invoiceItemTemplatesTable } from "@workspace/db";
-import { eq, asc } from "drizzle-orm";
+import { sqlite, invoiceItemTemplatesTable } from "@workspace/db";
+import { eq, asc, sql } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/better-sqlite3";
+
+import { ensureLocalTemplateNumbers } from "../utils/template-numbering";
+
+function templateDb() {
+  if (!sqlite) throw new Error("SQLite database is unavailable");
+  return drizzle(sqlite);
+}
 
 const router: IRouter = Router();
+router.use((_req, _res, next) => {
+  try { ensureLocalTemplateNumbers(); next(); } catch (error) { next(error); }
+});
 
 router.get("/invoice-item-templates", async (req, res) => {
   try {
     if ((req as any).user?.role === "client") {
-      return res.status(403).json({ error: "Templates are not allowed for client users" });
+      res.status(403).json({ error: "Templates are not allowed for client users" });
+      return;
     }
-    const templates = await db
+    const templates = await templateDb()
       .select()
       .from(invoiceItemTemplatesTable)
-      .orderBy(asc(invoiceItemTemplatesTable.itemCode));
+      .orderBy(sql`${invoiceItemTemplatesTable.displayCode} IS NULL`, asc(invoiceItemTemplatesTable.displayCode), asc(invoiceItemTemplatesTable.createdAt), asc(invoiceItemTemplatesTable.itemCode));
     res.json(templates.map(formatTemplate));
   } catch (err) {
     console.error(err);
@@ -23,18 +35,22 @@ router.get("/invoice-item-templates", async (req, res) => {
 
 router.post("/invoice-item-templates", async (req, res) => {
   try {
-    if ((req as any).user?.role === "client") return res.status(403).json({ error: "Client users have read-only access" });
+    if ((req as any).user?.role === "client") {
+      res.status(403).json({ error: "Client users have read-only access" });
+      return;
+    }
     const { description, defaultUnitPrice } = req.body;
     if (!description) {
       res.status(400).json({ error: "description is required" });
       return;
     }
-    const [template] = await db
+    const [template] = await templateDb()
       .insert(invoiceItemTemplatesTable)
       .values({
         description,
         itemCode: `X-${randomUUID()}`,
-        defaultUnitPrice: parseFloat(defaultUnitPrice ?? "0").toFixed(2),
+        createdAt: new Date(),
+        defaultUnitPrice: Number(parseFloat(defaultUnitPrice ?? "0").toFixed(2)),
       })
       .returning();
     res.status(201).json(formatTemplate(template));
@@ -46,18 +62,21 @@ router.post("/invoice-item-templates", async (req, res) => {
 
 router.put("/invoice-item-templates/:id", async (req, res) => {
   try {
-    if ((req as any).user?.role === "client") return res.status(403).json({ error: "Client users have read-only access" });
-    const id = parseInt(req.params.id);
+    if ((req as any).user?.role === "client") {
+      res.status(403).json({ error: "Client users have read-only access" });
+      return;
+    }
+    const id = parseInt(String(req.params.id), 10);
     const { description, defaultUnitPrice } = req.body;
     if (!description) {
       res.status(400).json({ error: "description is required" });
       return;
     }
-    const [template] = await db
+    const [template] = await templateDb()
       .update(invoiceItemTemplatesTable)
       .set({
         description,
-        defaultUnitPrice: parseFloat(defaultUnitPrice ?? "0").toFixed(2),
+        defaultUnitPrice: Number(parseFloat(defaultUnitPrice ?? "0").toFixed(2)),
       })
       .where(eq(invoiceItemTemplatesTable.id, id))
       .returning();
@@ -74,9 +93,12 @@ router.put("/invoice-item-templates/:id", async (req, res) => {
 
 router.delete("/invoice-item-templates/:id", async (req, res) => {
   try {
-    if ((req as any).user?.role === "client") return res.status(403).json({ error: "Client users have read-only access" });
-    const id = parseInt(req.params.id);
-    await db.delete(invoiceItemTemplatesTable).where(eq(invoiceItemTemplatesTable.id, id));
+    if ((req as any).user?.role === "client") {
+      res.status(403).json({ error: "Client users have read-only access" });
+      return;
+    }
+    const id = parseInt(String(req.params.id), 10);
+    await templateDb().delete(invoiceItemTemplatesTable).where(eq(invoiceItemTemplatesTable.id, id));
     res.status(204).send();
   } catch (err) {
     console.error(err);
@@ -87,7 +109,8 @@ router.delete("/invoice-item-templates/:id", async (req, res) => {
 function formatTemplate(t: typeof invoiceItemTemplatesTable.$inferSelect) {
   return {
     id: t.id,
-    itemCode: t.itemCode,
+    itemCode: t.displayCode == null ? null : String(t.displayCode),
+    syncCode: t.itemCode,
     description: t.description,
     defaultUnitPrice: t.defaultUnitPrice,
     createdAt: t.createdAt ? new Date(t.createdAt).toISOString() : null,
@@ -96,18 +119,22 @@ function formatTemplate(t: typeof invoiceItemTemplatesTable.$inferSelect) {
 
 router.post("/invoice-item-templates/import", async (req: any, res: any) => {
   try {
-    if (req.user?.role === "client") return res.status(403).json({ error: "Client users have read-only access" });
+    if (req.user?.role === "client") {
+      res.status(403).json({ error: "Client users have read-only access" });
+      return;
+    }
     const rows = req.body.data;
 
     if (!Array.isArray(rows)) {
-      return res.status(400).json({ error: "Invalid data" });
+      res.status(400).json({ error: "Invalid data" });
+      return;
     }
 
     let inserted = 0;
     let updated = 0;
 
     for (const row of rows) {
-      const [existing] = await db
+      const [existing] = await templateDb()
         .select()
         .from(invoiceItemTemplatesTable)
         .where(eq(invoiceItemTemplatesTable.description, row.description))
@@ -115,18 +142,18 @@ router.post("/invoice-item-templates/import", async (req: any, res: any) => {
 
       const values = {
         description: String(row.description),
-        defaultUnitPrice: String(row.defaultUnitPrice ?? "0"),
+        defaultUnitPrice: Number(row.defaultUnitPrice ?? 0),
       };
 
       if (existing) {
-        await db
+        await templateDb()
           .update(invoiceItemTemplatesTable)
           .set(values)
           .where(eq(invoiceItemTemplatesTable.id, existing.id));
 
         updated++;
       } else {
-        await db.insert(invoiceItemTemplatesTable).values({
+        await templateDb().insert(invoiceItemTemplatesTable).values({
           ...values,
           itemCode: `X-${randomUUID()}`,
           createdAt: new Date(),

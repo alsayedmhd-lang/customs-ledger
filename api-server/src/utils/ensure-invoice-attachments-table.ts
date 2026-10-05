@@ -24,8 +24,9 @@ const attachmentColumns = [
 
 export function ensureInvoiceAttachmentsTable() {
   if (ensured || !sqlite) return;
+  const localSqlite = sqlite;
 
-  sqlite.exec(`
+  localSqlite.exec(`
     CREATE TABLE IF NOT EXISTS invoice_attachments (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       sync_id TEXT,
@@ -47,21 +48,21 @@ export function ensureInvoiceAttachmentsTable() {
     );
   `);
 
-  const columns = sqlite.prepare("PRAGMA table_info(invoice_attachments)").all() as Array<{ name: string }>;
+  const columns = localSqlite.prepare("PRAGMA table_info(invoice_attachments)").all() as Array<{ name: string }>;
   const existing = new Set(columns.map((column) => column.name));
 
   for (const [column, sql] of attachmentColumns) {
-    if (!existing.has(column)) sqlite.exec(sql);
+    if (!existing.has(column)) localSqlite.exec(sql);
   }
 
-  const backfilledCount = sqlite.transaction(() => {
-    const rows = sqlite.prepare(`
+  const backfilledCount = localSqlite.transaction(() => {
+    const rows = localSqlite.prepare(`
       SELECT id
       FROM invoice_attachments
       WHERE sync_id IS NULL OR TRIM(sync_id) = ''
     `).all() as Array<{ id: number }>;
 
-    const update = sqlite.prepare(`
+    const update = localSqlite.prepare(`
       UPDATE invoice_attachments
       SET sync_id = ?,
           updated_at = COALESCE(updated_at, NULLIF(deleted_at, 0), NULLIF(created_at, 0), ?)
@@ -77,7 +78,7 @@ export function ensureInvoiceAttachmentsTable() {
     return rows.length;
   })();
 
-  sqlite.exec(`
+  localSqlite.exec(`
     CREATE UNIQUE INDEX IF NOT EXISTS
       invoice_attachments_sync_id_unique
     ON invoice_attachments(sync_id)

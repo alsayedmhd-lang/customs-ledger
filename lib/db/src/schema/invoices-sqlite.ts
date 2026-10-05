@@ -38,6 +38,7 @@ export const invoiceItemTemplatesTableSqlite = sqliteTable("invoice_item_templat
   id: integer("id").primaryKey({ autoIncrement: true }),
   description: text("description").notNull(),
   itemCode: text("item_code"),
+  displayCode: integer("display_code"),
   defaultUnitPrice: real("default_unit_price").default(0),
   createdAt: integer("created_at", { mode: "timestamp_ms" }),
 });

@@ -1,5 +1,6 @@
+import { getLocalDb } from "../utils/local-db";
 import { Router, type IRouter } from "express";
-import { db, sqlite, receiptsTable, clientsTable, invoicesTable, customerLedgerTableSqlite, usersTable, syncQueueTable } from "@workspace/db";
+import { sqlite, receiptsTable, clientsTable, invoicesTable, customerLedgerTableSqlite, usersTable, syncQueueTable } from "@workspace/db";
 import { eq, desc, isNull, and, ne } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth";
 import { enqueueSyncChange } from "../utils/sync-queue";
@@ -8,7 +9,7 @@ const router: IRouter = Router();
 
 async function getClientScope(req: any) {
   if (req.user?.role !== "client") return null;
-  const [user] = await db
+  const [user] = await getLocalDb()
     .select({ clientId: usersTable.clientId, clientViewPermissions: usersTable.clientViewPermissions })
     .from(usersTable)
     .where(eq(usersTable.id, req.user.userId))
@@ -35,11 +36,11 @@ function removeUniqueActiveReceiptPerInvoice() {
 removeUniqueActiveReceiptPerInvoice();
 
 try {
-  sqlite.exec(`ALTER TABLE receipts ADD COLUMN created_by INTEGER;`);
+  sqlite?.exec(`ALTER TABLE receipts ADD COLUMN created_by INTEGER;`);
 } catch {}
 
 try {
-  sqlite.exec(`ALTER TABLE receipts ADD COLUMN status TEXT NOT NULL DEFAULT 'issued';`);
+  sqlite?.exec(`ALTER TABLE receipts ADD COLUMN status TEXT NOT NULL DEFAULT 'issued';`);
 } catch {}
 
 type ReceiptStatus = "draft" | "issued";
@@ -49,7 +50,7 @@ function normalizeReceiptStatus(value: unknown, fallback: ReceiptStatus = "draft
 }
 
 async function deleteReceiptLedgerEntry(receiptId: number) {
-  await db
+  await getLocalDb()
     .delete(customerLedgerTableSqlite)
     .where(eq(customerLedgerTableSqlite.receiptId, receiptId));
 }
@@ -59,7 +60,7 @@ async function syncIssuedReceiptLedgerEntry(receipt: typeof receiptsTable.$infer
 
   if (receipt.status !== "issued" || receipt.clientId === null) return;
 
-  await db.insert(customerLedgerTableSqlite).values({
+  await getLocalDb().insert(customerLedgerTableSqlite).values({
     clientId: receipt.clientId,
     invoiceId: receipt.invoiceId ?? null,
     receiptId: receipt.id,
@@ -77,7 +78,7 @@ async function syncIssuedReceiptLedgerEntry(receipt: typeof receiptsTable.$infer
 }
 
 async function findActiveReceiptByInvoiceId(invoiceId: number) {
-  const rows = await db
+  const rows = await getLocalDb()
     .select()
     .from(receiptsTable)
     .leftJoin(invoicesTable, eq(receiptsTable.invoiceId, invoicesTable.id))
@@ -111,7 +112,7 @@ function getOriginalInvoiceTotal(input: {
 async function getActiveReceiptTotal(
   invoiceId: number,
   excludeReceiptId?: number,
-  database: typeof db = db,
+  database: ReturnType<typeof getLocalDb> = getLocalDb(),
 ): Promise<number> {
   const filters = [
     eq(receiptsTable.invoiceId, invoiceId),
@@ -135,7 +136,7 @@ async function validateReceiptDoesNotExceedRemaining(
   invoiceId: number | null,
   amount: unknown,
   excludeReceiptId?: number,
-  database: typeof db = db,
+  database: ReturnType<typeof getLocalDb> = getLocalDb(),
 ) {
   if (invoiceId === null) return { ok: true as const };
 
@@ -176,7 +177,7 @@ async function validateReceiptDoesNotExceedRemaining(
 async function refreshInvoicePaidStatus(invoiceId: number | null | undefined) {
   if (!invoiceId) return;
 
-  const [invoice] = await db
+  const [invoice] = await getLocalDb()
     .select()
     .from(invoicesTable)
     .where(and(eq(invoicesTable.id, invoiceId), isNull(invoicesTable.deletedAt)))
@@ -195,7 +196,7 @@ async function refreshInvoicePaidStatus(invoiceId: number | null | undefined) {
         : invoice.status;
 
   if (invoice.status !== nextStatus) {
-    await db
+    await getLocalDb()
       .update(invoicesTable)
       .set({ status: nextStatus, updatedAt: new Date() })
       .where(eq(invoicesTable.id, invoice.id));
@@ -207,7 +208,7 @@ async function enqueueReceiptSyncChangeIfNeeded(input: {
   receipt: typeof receiptsTable.$inferSelect;
   userId?: number | string | null;
 }) {
-  const existing = await db
+  const existing = await getLocalDb()
     .select({ id: syncQueueTable.id })
     .from(syncQueueTable)
     .where(
@@ -248,7 +249,7 @@ async function enqueueReceiptSyncChangeIfNeeded(input: {
 async function generateReceiptNumber(): Promise<string> {
   const year = new Date().getFullYear();
 
-  const receipts = await db
+  const receipts = await getLocalDb()
     .select({ receiptNumber: receiptsTable.receiptNumber })
     .from(receiptsTable);
 
@@ -289,7 +290,7 @@ router.get("/receipts", requireAuth, async (req, res) => {
     let rows;
 
     if (clientId) {
-      rows = await db
+      rows = await getLocalDb()
         .select()
         .from(receiptsTable)
         .leftJoin(invoicesTable, eq(receiptsTable.invoiceId, invoicesTable.id))
@@ -298,7 +299,7 @@ router.get("/receipts", requireAuth, async (req, res) => {
         .where(buildFilters([eq(invoicesTable.clientId, clientId)]))
         .orderBy(desc(receiptsTable.id));
     } else {
-      rows = await db
+      rows = await getLocalDb()
         .select()
         .from(receiptsTable)
         .leftJoin(invoicesTable, eq(receiptsTable.invoiceId, invoicesTable.id))
@@ -311,7 +312,7 @@ router.get("/receipts", requireAuth, async (req, res) => {
     //----------------------------------------------
     const data = await Promise.all(
       rows.map(async (row) => {
-        const [client] = await db
+        const [client] = await getLocalDb()
           .select()
           .from(clientsTable)
           .where(eq(clientsTable.id, Number(row.receipts.clientId)));
@@ -320,7 +321,7 @@ router.get("/receipts", requireAuth, async (req, res) => {
         let invoiceClient: typeof client | undefined = undefined;
     
         if (!clientName && row.invoices?.clientId) {
-          [invoiceClient] = await db
+          [invoiceClient] = await getLocalDb()
             .select()
             .from(clientsTable)
             .where(eq(clientsTable.id, Number(row.invoices.clientId)));
@@ -349,6 +350,8 @@ router.get("/receipts", requireAuth, async (req, res) => {
     console.error(err);
     res.status(500).json({ error: "Internal server error" });
   }
+
+  return undefined;
 });
 
 router.get("/receipts/by-invoice/:invoiceId", requireAuth, async (req, res) => {
@@ -366,7 +369,7 @@ router.get("/receipts/by-invoice/:invoiceId", requireAuth, async (req, res) => {
     const isAdmin = req.user!.role === "admin" || req.user!.role === "supervisor" || req.user!.role === "client";
     const userId = req.user!.userId;
 
-    const invoiceRows = await db
+    const invoiceRows = await getLocalDb()
       .select()
       .from(invoicesTable)
       .where(
@@ -450,20 +453,24 @@ router.post("/receipts", requireAuth, async (req, res) => {
         ? Number(req.body.clientId)
         : invoiceId
           ? (
-              await db
+              await getLocalDb()
                 .select()
                 .from(invoicesTable)
                 .where(eq(invoicesTable.id, invoiceId))
             )[0]?.clientId ?? null
           : null;
 
-    const [receipt] = await db
+    if (clientId === null || !Number.isSafeInteger(clientId) || clientId <= 0) {
+      return res.status(400).json({ error: "A valid clientId is required" });
+    }
+
+    const [receipt] = await getLocalDb()
       .insert(receiptsTable)
       .values({
         receiptNumber,
         clientId,
         invoiceId,
-        amount: String(req.body.amount),
+        amount: Number(req.body.amount),
         paymentMethod: req.body.paymentMethod,
         status: receiptStatus,
         notes: req.body.notes || null,
@@ -482,7 +489,7 @@ router.post("/receipts", requireAuth, async (req, res) => {
     });
 
     const [client] = receipt.clientId
-      ? await db
+      ? await getLocalDb()
           .select()
           .from(clientsTable)
           .where(eq(clientsTable.id, receipt.clientId))
@@ -490,7 +497,7 @@ router.post("/receipts", requireAuth, async (req, res) => {
 
     const invoiceNumber = receipt.invoiceId
       ? (
-          await db
+          await getLocalDb()
             .select()
             .from(invoicesTable)
             .where(eq(invoicesTable.id, receipt.invoiceId))
@@ -508,19 +515,21 @@ router.post("/receipts", requireAuth, async (req, res) => {
     console.error(err);
     res.status(500).json({ error: "Internal server error" });
   }
+
+  return undefined;
 });
 
 //------Soft update receipt----------
 router.put("/receipts/:id", requireAuth, async (req, res) => {
   try {
     if (rejectClientWrite(req, res)) return;
-    const id = parseInt(req.params.id);
+    const id = parseInt(String(req.params.id), 10);
 
     if (isNaN(id)) {
       return res.status(400).json({ error: "Invalid receipt id" });
     }
 
-    const [oldReceipt] = await db
+    const [oldReceipt] = await getLocalDb()
       .select()
       .from(receiptsTable)
       .where(eq(receiptsTable.id, id))
@@ -559,7 +568,7 @@ router.put("/receipts/:id", requireAuth, async (req, res) => {
         ? Number(req.body.clientId)
         : invoiceId !== null
         ? (
-            await db
+            await getLocalDb()
               .select()
               .from(invoicesTable)
               .where(eq(invoicesTable.id, invoiceId))
@@ -621,7 +630,7 @@ router.put("/receipts/:id", requireAuth, async (req, res) => {
         patchData.amount = amount;
       }
 
-    await db
+    await getLocalDb()
       .update(receiptsTable)
       .set(patchData)
       .where(eq(receiptsTable.id, id));
@@ -629,7 +638,7 @@ router.put("/receipts/:id", requireAuth, async (req, res) => {
     await refreshInvoicePaidStatus(oldReceipt?.invoiceId);
     await refreshInvoicePaidStatus(invoiceId);
 
-    const [updatedReceipt] = await db
+    const [updatedReceipt] = await getLocalDb()
       .select()
       .from(receiptsTable)
       .where(eq(receiptsTable.id, id))
@@ -656,21 +665,23 @@ router.put("/receipts/:id", requireAuth, async (req, res) => {
     console.error(err);
     res.status(500).json({ error: "Internal server error" });
   }
+
+  return undefined;
 });
 
 // Soft delete receipt (move to trash)
 router.delete("/receipts/:id", requireAuth, async (req, res) => {
   try {
     if (rejectClientWrite(req, res)) return;
-    const id = parseInt(req.params.id);
+    const id = parseInt(String(req.params.id), 10);
 
-    const [receipt] = await db
+    const [receipt] = await getLocalDb()
       .select()
       .from(receiptsTable)
       .where(eq(receiptsTable.id, id))
       .limit(1);
 
-    await db
+    await getLocalDb()
       .update(receiptsTable)
       .set({ deletedAt: new Date() })
       .where(and(eq(receiptsTable.id, id), isNull(receiptsTable.deletedAt)));
@@ -701,7 +712,7 @@ export function formatReceipt(
     clientName,
     invoiceId: r.invoiceId ?? null,
     invoiceNumber,
-    amount: parseFloat(r.amount ?? "0"),
+    amount: Number(r.amount ?? 0),
     paymentMethod: r.paymentMethod,
     status: normalizeReceiptStatus(r.status, "draft"),
     notes: r.notes ?? null,
@@ -714,13 +725,13 @@ export function formatReceipt(
 router.post("/receipts/:id/issue", requireAuth, async (req, res) => {
   try {
     if (rejectClientWrite(req, res)) return;
-    const id = parseInt(req.params.id);
+    const id = parseInt(String(req.params.id), 10);
 
     if (isNaN(id)) {
       return res.status(400).json({ error: "Invalid receipt id" });
     }
 
-    const [receipt] = await db
+    const [receipt] = await getLocalDb()
       .select()
       .from(receiptsTable)
       .where(and(eq(receiptsTable.id, id), isNull(receiptsTable.deletedAt)))
@@ -745,7 +756,7 @@ router.post("/receipts/:id/issue", requireAuth, async (req, res) => {
       }
     }
 
-    const [issuedReceipt] = await db
+    const [issuedReceipt] = await getLocalDb()
       .update(receiptsTable)
       .set({ status: "issued" })
       .where(eq(receiptsTable.id, id))
@@ -760,7 +771,7 @@ router.post("/receipts/:id/issue", requireAuth, async (req, res) => {
     });
 
     const [client] = issuedReceipt.clientId
-      ? await db
+      ? await getLocalDb()
           .select()
           .from(clientsTable)
           .where(eq(clientsTable.id, issuedReceipt.clientId))
@@ -768,7 +779,7 @@ router.post("/receipts/:id/issue", requireAuth, async (req, res) => {
 
     const invoiceNumber = issuedReceipt.invoiceId
       ? (
-          await db
+          await getLocalDb()
             .select()
             .from(invoicesTable)
             .where(eq(invoicesTable.id, issuedReceipt.invoiceId))
@@ -784,9 +795,9 @@ router.post("/receipts/:id/issue", requireAuth, async (req, res) => {
 
 router.get("/receipts/:id", requireAuth, async (req, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(String(req.params.id), 10);
 
-    const rows = await db
+    const rows = await getLocalDb()
       .select()
       .from(receiptsTable)
       .leftJoin(invoicesTable, eq(receiptsTable.invoiceId, invoicesTable.id))
@@ -817,6 +828,8 @@ router.get("/receipts/:id", requireAuth, async (req, res) => {
     console.error(err);
     res.status(500).json({ error: "Internal server error" });
   }
+
+  return undefined;
 });
 
 router.post("/receipts/import", requireAuth, async (req, res) => {
@@ -845,7 +858,7 @@ router.post("/receipts/import", requireAuth, async (req, res) => {
         continue;
       }
       const clientId = clientIdMap ? Number(clientIdMap[String(row.clientId)]) : Number(row.clientId);
-      const [client] = await db.select({ id: clientsTable.id }).from(clientsTable)
+      const [client] = await getLocalDb().select({ id: clientsTable.id }).from(clientsTable)
         .where(eq(clientsTable.id, clientId)).limit(1);
       if (!client) {
         skipped++;
@@ -861,16 +874,16 @@ router.post("/receipts/import", requireAuth, async (req, res) => {
       if (sourceInvoiceId && invoiceIdMap) {
         // A full restore must use the ID returned by the invoice import.
         if (Number.isInteger(mappedInvoiceId) && mappedInvoiceId! > 0) {
-          [invoice] = await db.select().from(invoicesTable)
+          [invoice] = await getLocalDb().select().from(invoicesTable)
             .where(and(eq(invoicesTable.id, mappedInvoiceId!), isNull(invoicesTable.deletedAt))).limit(1);
         }
       } else if (invoiceNumber) {
-        [invoice] = await db.select().from(invoicesTable)
+        [invoice] = await getLocalDb().select().from(invoicesTable)
           .where(and(eq(invoicesTable.invoiceNumber, invoiceNumber), isNull(invoicesTable.deletedAt))).limit(1);
       } else if (sourceInvoiceId) {
         // Legacy backups without an invoice number can only use an ID when
         // the matching invoice really belongs to the same client.
-        [invoice] = await db.select().from(invoicesTable)
+        [invoice] = await getLocalDb().select().from(invoicesTable)
           .where(and(eq(invoicesTable.id, Number(sourceInvoiceId)), isNull(invoicesTable.deletedAt))).limit(1);
       }
       if (sourceInvoiceId && (!invoice || invoice.clientId !== clientId)) {
@@ -878,7 +891,7 @@ router.post("/receipts/import", requireAuth, async (req, res) => {
         errors.push({ receiptNumber, reason: "Invoice not found or client does not match" });
         continue;
       }
-      const [numberMatch] = await db
+      const [numberMatch] = await getLocalDb()
         .select()
         .from(receiptsTable)
         .where(eq(receiptsTable.receiptNumber, receiptNumber))
@@ -895,7 +908,7 @@ router.post("/receipts/import", requireAuth, async (req, res) => {
         const base = receiptNumber.replace(/\s*\(\d+\)$/, "");
         for (let counter = 1; ; counter++) {
           const candidate = `${base} (${counter})`;
-          const [used] = await db.select().from(receiptsTable)
+          const [used] = await getLocalDb().select().from(receiptsTable)
             .where(eq(receiptsTable.receiptNumber, candidate)).limit(1);
           if (!used) {
             finalReceiptNumber = candidate;
@@ -913,7 +926,7 @@ router.post("/receipts/import", requireAuth, async (req, res) => {
         receiptNumber: finalReceiptNumber,
         clientId,
         invoiceId: targetInvoiceId,
-        amount: String(row.amount ?? "0"),
+        amount: Number(row.amount ?? 0),
         paymentMethod: row.paymentMethod ?? "cash",
         status: normalizeReceiptStatus(row.status, "issued"),
         notes: row.notes ?? null,
@@ -924,7 +937,7 @@ router.post("/receipts/import", requireAuth, async (req, res) => {
       };
 
       if (targetInvoiceId !== null) {
-        const invoiceReceipts = await db.select().from(receiptsTable).where(and(
+        const invoiceReceipts = await getLocalDb().select().from(receiptsTable).where(and(
           eq(receiptsTable.invoiceId, targetInvoiceId),
           isNull(receiptsTable.deletedAt),
         ));
@@ -979,12 +992,12 @@ router.post("/receipts/import", requireAuth, async (req, res) => {
       }
 
       if (existing) {
-        await db
+        await getLocalDb()
           .update(receiptsTable)
           .set(values)
           .where(eq(receiptsTable.id, existing.id));
 
-        const [updatedReceipt] = await db
+        const [updatedReceipt] = await getLocalDb()
           .select()
           .from(receiptsTable)
           .where(eq(receiptsTable.id, existing.id))
@@ -999,7 +1012,7 @@ router.post("/receipts/import", requireAuth, async (req, res) => {
         updated++;
         if (convertedToDraft) drafted++;
       } else {
-        const [insertedReceipt] = await db.insert(receiptsTable).values(values).returning();
+        const [insertedReceipt] = await getLocalDb().insert(receiptsTable).values(values).returning();
         await syncIssuedReceiptLedgerEntry(insertedReceipt);
         await refreshInvoicePaidStatus(values.invoiceId);
         inserted++;

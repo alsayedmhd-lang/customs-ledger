@@ -23,6 +23,9 @@ export function ensureInternalSyncJournal() {
   if (!journalColumns.some(column => column.name === "invoice_id")) {
     sqlite.prepare("ALTER TABLE internal_sync_journal ADD COLUMN invoice_id INTEGER").run();
   }
+  if (!journalColumns.some(column => column.name === "item_code")) {
+    sqlite.prepare("ALTER TABLE internal_sync_journal ADD COLUMN item_code TEXT").run();
+  }
   sqlite.prepare(`
     CREATE INDEX IF NOT EXISTS internal_sync_journal_row_idx
     ON internal_sync_journal(table_name, row_id, id)
@@ -51,8 +54,8 @@ export function ensureInternalSyncJournal() {
         WHEN (SELECT capture_enabled FROM internal_sync_control WHERE id = 1) = 1
           ${operation === "update" ? `AND (${changed})` : ""}
         BEGIN
-          INSERT INTO internal_sync_journal (table_name, row_id, operation, created_at, invoice_id)
-          VALUES ('${table}', ${reference}.id, '${operation}', CAST(unixepoch('now') * 1000 AS INTEGER), ${table === "invoice_items" ? `${reference}.invoice_id` : "NULL"});
+          INSERT INTO internal_sync_journal (table_name, row_id, operation, created_at, invoice_id, item_code)
+          VALUES ('${table}', ${reference}.id, '${operation}', CAST(unixepoch('now') * 1000 AS INTEGER), ${table === "invoice_items" ? `${reference}.invoice_id` : "NULL"}, ${table === "invoice_item_templates" ? `${reference}.item_code` : "NULL"});
         END
       `).run();
     }

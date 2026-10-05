@@ -1,5 +1,6 @@
+import { getLocalDb } from "../utils/local-db";
 import { Router } from "express";
-import { db, sqlite, companySettingsTable } from "@workspace/db";
+import { sqlite, companySettingsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
 import { requireAdmin } from "../middleware/auth";
 import { hashPassword } from "../utils/password";
@@ -79,10 +80,10 @@ router.get("/company-settings", async (_req, res) => {
   try {
     ensureMasterPasswordHashColumn();
 
-    let [settings] = await db.select().from(companySettingsTable).limit(1);
+    let [settings] = await getLocalDb().select().from(companySettingsTable).limit(1);
 
     if (!settings) {
-      [settings] = await db.insert(companySettingsTable).values({ id: 1 }).returning();
+      [settings] = await getLocalDb().insert(companySettingsTable).values({ id: 1 }).returning();
     }
 
     const { masterPasswordHash, ...safeSettings } = settings as any;
@@ -229,10 +230,10 @@ router.put("/company-settings", requireAdmin, async (req, res) => {
       ...(masterPasswordHash ? { masterPasswordHash } : {}),
     };
 
-    let [existing] = await db.select().from(companySettingsTable).limit(1);
+    let [existing] = await getLocalDb().select().from(companySettingsTable).limit(1);
 
     if (!existing) {
-      [existing] = await db.insert(companySettingsTable).values({ id: 1 }).returning();
+      [existing] = await getLocalDb().insert(companySettingsTable).values({ id: 1 }).returning();
     }
 
     const lockedChanges: string[] = [];
@@ -270,7 +271,7 @@ router.put("/company-settings", requireAdmin, async (req, res) => {
       });
     }
 
-    const [result] = await db
+    const [result] = await getLocalDb()
       .update(companySettingsTable)
       .set(data as any)
       .where(eq(companySettingsTable.id, Number(existing.id)))

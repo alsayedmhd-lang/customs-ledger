@@ -31,3 +31,5 @@ export {
 export {
   syncQueueTableSqlite as syncQueueTable,
 } from "./schema/sync-queue-sqlite";
+
+export type { UserPermissions, ClientViewPermissions } from "./schema/users-sqlite";

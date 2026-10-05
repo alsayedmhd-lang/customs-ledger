@@ -1,10 +1,11 @@
+import { getLocalDb } from "../utils/local-db";
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { Router, type IRouter } from "express";
 import { and, eq, isNull } from "drizzle-orm";
 import { drizzle as drizzleSqlite } from "drizzle-orm/better-sqlite3";
-import { db, invoiceAttachmentsTable } from "@workspace/db";
+import { invoiceAttachmentsTable } from "@workspace/db";
 import { openVerifiedAttachment } from "../utils/attachment-storage";
 
 // This deliberately does NOT use the user's JWT: it is a separate device-to-device
@@ -51,7 +52,7 @@ router.get("/peer-attachments/:syncId", async (req, res) => {
     seen.set(replay, Date.now() + MAX_SKEW * 2);
     if (seen.size > 4096) seen.delete(seen.keys().next().value!);
 
-    const [attachment] = await (db as ReturnType<typeof drizzleSqlite>)
+    const [attachment] = await getLocalDb()
       .select().from(invoiceAttachmentsTable)
       .where(and(eq(invoiceAttachmentsTable.syncId, syncId), isNull(invoiceAttachmentsTable.deletedAt)))
       .limit(1);
@@ -99,5 +100,7 @@ router.get("/peer-attachments/:syncId", async (req, res) => {
     if (!res.headersSent) return res.sendStatus(403);
     return res.destroy();
   }
+
+  return undefined;
 });
 export default router;

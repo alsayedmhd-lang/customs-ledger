@@ -32,8 +32,8 @@ interface AccountingRow {
 }
 
 type SystemStatus = {
-  connections: { local: boolean; online: boolean; internal: boolean; onlineConfigured: boolean; internalConfigured: boolean };
-  sync: { status: string; lastSync: string | null; pending: number; failed: number };
+  connections: { local: boolean; online: boolean; internal: boolean; onlineConfigured: boolean; internalConfigured: boolean; onlineEnabled: boolean; internalEnabled: boolean };
+  sync: { autoSync: boolean; internalAutoSync: boolean; status: string; lastSync: string | null; pending: number; failed: number };
 };
 
 const API_BASE = (
@@ -378,8 +378,9 @@ export default function Dashboard() {
                   {(["local", "online", "internal"] as const).filter((key) => key === "local" || (systemStatus && (key === "online" ? systemStatus.connections.onlineConfigured : systemStatus.connections.internalConfigured))).map((key) => {
                     const label = key === "local" ? (isAR ? "محلي" : "Local") : key === "online" ? "Online" : (isAR ? "داخلي" : "Internal");
                     const connected = systemStatus?.connections[key];
+                    const enabled = key === "local" || (key === "online" ? systemStatus?.connections.onlineEnabled : systemStatus?.connections.internalEnabled);
                     return <span key={key} className={connected === undefined || systemStatusError ? "text-muted-foreground" : connected ? "text-emerald-700 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}>
-                      {label}: {connected === undefined || systemStatusError ? "—" : connected ? (isAR ? "متصل" : "On") : (isAR ? "منقطع" : "Off")}
+                      {label}: {connected === undefined || systemStatusError ? "—" : !enabled ? (isAR ? "مفصول" : "Disconnected") : connected ? (isAR ? "متصل" : "Connected") : (isAR ? "منقطع" : "Off")}
                     </span>;
                   })}
                 </div>
@@ -393,7 +394,7 @@ export default function Dashboard() {
               <div className="min-w-0 flex-1">
                 <p className="text-xs font-medium text-muted-foreground mb-1.5">{isAR ? "مزامنة Online" : "Online sync"}</p>
                 <p className="text-xs font-semibold text-foreground">
-                  {systemStatusError || !systemStatus ? "—" : systemStatus.sync.failed > 0 || systemStatus.sync.status === "failed" ? (isAR ? "توجد أخطاء" : "Errors") : systemStatus.sync.status === "running" ? (isAR ? "جارٍ التنفيذ" : "Running") : systemStatus.sync.pending > 0 ? (isAR ? "بانتظار المزامنة" : "Pending") : systemStatus.sync.status === "success" ? (isAR ? "مكتملة" : "Complete") : (isAR ? "لم تُشغّل بعد" : "Not run yet")}
+                  {systemStatusError || !systemStatus ? "—" : !systemStatus.connections.onlineEnabled ? (isAR ? "الاتصال مفصول" : "Disconnected") : systemStatus.sync.status === "running" ? (isAR ? "جارٍ التنفيذ" : "Running") : !systemStatus.sync.autoSync ? (isAR ? "المزامنة التلقائية متوقفة" : "Automatic sync off") : systemStatus.sync.failed > 0 || systemStatus.sync.status === "failed" ? (isAR ? "توجد أخطاء" : "Errors") : systemStatus.sync.status === "running" ? (isAR ? "جارٍ التنفيذ" : "Running") : systemStatus.sync.pending > 0 ? (isAR ? "بانتظار المزامنة" : "Pending") : systemStatus.sync.status === "success" ? (isAR ? "مكتملة" : "Complete") : (isAR ? "لم تُشغّل بعد" : "Not run yet")}
                   {systemStatus && !systemStatusError && ` · ${isAR ? "معلّق" : "Pending"} ${arabicNums(systemStatus.sync.pending, lang)} · ${isAR ? "فشل" : "Failed"} ${arabicNums(systemStatus.sync.failed, lang)}`}
                 </p>
                 {systemStatus?.sync.lastSync && !systemStatusError && <p className="text-[10px] text-muted-foreground truncate">{isAR ? "آخر مزامنة: " : "Last sync: "}{new Date(systemStatus.sync.lastSync).toLocaleString(isAR ? "ar-QA" : "en-US")}</p>}

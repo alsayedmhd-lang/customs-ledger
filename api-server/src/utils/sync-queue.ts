@@ -1,4 +1,5 @@
-import { db, syncQueueTable } from "@workspace/db";
+import { getLocalDb } from "./local-db";
+import { syncQueueTable } from "@workspace/db";
 
 type SyncEntityType = string;
 type SyncEntityId = string | number;
@@ -20,7 +21,7 @@ export async function enqueueSyncChange({
   userId,
 }: EnqueueSyncChangeInput): Promise<void> {
   try {
-    await db.insert(syncQueueTable).values({
+    await getLocalDb().insert(syncQueueTable).values({
       entityType,
       entityId: String(entityId),
       operation: action,

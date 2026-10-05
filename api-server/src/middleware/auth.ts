@@ -8,7 +8,9 @@ const JWT_SECRET = getJwtSecret();
 export interface AuthPayload {
   userId: number;
   username: string;
-  role: string;
+  role: string | null;
+  email?: string | null;
+  phone?: string | null;
 }
 
 declare global {
@@ -51,7 +53,7 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
         user: req.user,
       });
     }
-    next();
+    return next();
   } catch (err) {
     if (isCustomerLedger) {
       console.log("[customer-ledger trace] requireAuth denied", {
@@ -69,6 +71,6 @@ export function requireAdmin(req: Request, res: Response, next: NextFunction) {
     if (req.user?.role !== "admin") {
       return res.status(403).json({ message: "صلاحيات المدير مطلوبة" });
     }
-    next();
+    return next();
   });
 }

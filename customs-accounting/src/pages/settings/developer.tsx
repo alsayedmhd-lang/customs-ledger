@@ -488,7 +488,6 @@ export default function DeveloperSettingsPage() {
   const [internalDatabaseMessage, setInternalDatabaseMessage] = useState("");
   const [internalAutoStatus, setInternalAutoStatus] = useState<{ running: boolean; lastCheckAt: string | null; lastAttemptAt: string | null; lastSuccessAt: string | null; lastError: string | null } | null>(null);
   const [isSavingInternalDatabase, setIsSavingInternalDatabase] = useState(false);
-  const [isTestingInternalDatabase, setIsTestingInternalDatabase] = useState(false);
   const [isCheckingInternalReadiness, setIsCheckingInternalReadiness] = useState(false);
   const [internalJournalCount, setInternalJournalCount] = useState<number | null>(null);
   const [serverJournalCount, setServerJournalCount] = useState<number | null>(null);
@@ -502,7 +501,10 @@ export default function DeveloperSettingsPage() {
     schemaComplete: boolean;
     tables: Array<{ name: string; localCount: number | null; internalCount: number | null }>;
   } | null>(null);
-  const [internalDatabaseConnectionStatus, setInternalDatabaseConnectionStatus] = useState<"untested" | "connected" | "failed">("untested");
+  const [internalDatabaseConnectionStatus, setInternalDatabaseConnectionStatus] = useState<"untested" | "connected" | "failed" | "disconnected">("untested");
+  const [internalConnectionActive, setInternalConnectionActive] = useState(false);
+  const [isChangingInternalConnection, setIsChangingInternalConnection] = useState(false);
+  const [connectionHealth, setConnectionHealth] = useState<{ online: boolean; internal: boolean; onlineAutoSync: boolean; internalAutoSync: boolean } | null>(null);
   const [internalDatabaseConfig, setInternalDatabaseConfig] = useState({
     host: "", port: "5432", databaseName: "", username: "", password: "", connectionString: "",
     syncMode: "bidirectional", autoSync: false, timing: "startup", intervalMinutes: 30,
@@ -598,7 +600,7 @@ export default function DeveloperSettingsPage() {
       clearDeveloperUnlockSession();
     }
 
-    setOnlineDatabaseConnected(sessionStorage.getItem(ONLINE_DATABASE_CONNECTED_KEY) === "true");
+    void refreshConnectionStatus();
     void loadCurrentLicenseStatus();
   }, []);
 
@@ -737,11 +739,51 @@ export default function DeveloperSettingsPage() {
     }
   }
 
+  async function refreshConnectionStatus() {
+    try {
+      const response = await fetch(`${API_BASE}/dashboard/system-status`, { headers: authHeaders() });
+      if (!response.ok) throw new Error();
+      const data = await response.json();
+      setConnectionHealth({ online: data.connections.online, internal: data.connections.internal, onlineAutoSync: data.sync.autoSync, internalAutoSync: data.sync.internalAutoSync });
+      setOnlineDatabaseConnected(data.connections.onlineEnabled);
+      setInternalConnectionActive(data.connections.internalEnabled);
+      setInternalDatabaseConnectionStatus(!data.connections.internalEnabled ? "disconnected" : data.connections.internal ? "connected" : "failed");
+    } catch { setConnectionHealth(null); setInternalDatabaseConnectionStatus("untested"); }
+  }
+
+  async function changeInternalConnection(enabled: boolean) {
+    setIsChangingInternalConnection(true); setInternalDatabaseMessage("");
+    try {
+      const response = await fetch(`${API_BASE}/developer/internal-database/connection`, {
+        method: "POST", headers: authHeaders(), body: JSON.stringify({ enabled }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(response.status === 409
+        ? tr("انتظر انتهاء العملية الجارية ثم حاول مجددًا", "Wait for the current operation to finish and retry")
+        : tr("تعذر تغيير الاتصال؛ احفظ الإعدادات وتحقق من الخادم", "Could not change connection; save settings and check the server"));
+      setInternalConnectionActive(data.enabled);
+      if (!enabled) setInternalDatabaseConfig(current => ({ ...current, autoSync: false }));
+      await refreshConnectionStatus();
+      setInternalDatabaseMessage(enabled ? tr("تم الاتصال بالخادم الداخلي", "Internal server connected") : tr("تم فصل الخادم وإيقاف المزامنة التلقائية", "Server disconnected and automatic sync stopped"));
+    } catch (error) { setInternalDatabaseMessage(error instanceof Error ? error.message : String(error)); }
+    finally { setIsChangingInternalConnection(false); }
+  }
+
+  useEffect(() => {
+    if (!unlocked) return;
+    void refreshConnectionStatus();
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === "visible") void refreshConnectionStatus();
+    }, 30000);
+    return () => window.clearInterval(timer);
+  }, [unlocked]);
+
   async function loadInternalDatabaseSettings() {
     try {
       const response = await fetch(`${API_BASE}/developer/internal-database/settings`, { headers: authHeaders() });
       if (!response.ok) throw new Error(tr("تعذر تحميل إعدادات الخادم الداخلي", "Failed to load internal server settings"));
       const data = await response.json();
+      setInternalConnectionActive(Boolean(data.connectionEnabled));
       setInternalDatabaseConfig({
         host: data.host || "", port: data.port || "5432", databaseName: data.databaseName || "",
         username: data.username || "", password: data.password || "", connectionString: data.connectionString || "",
@@ -759,37 +801,8 @@ export default function DeveloperSettingsPage() {
       const response = await fetch(`${API_BASE}/developer/internal-database/auto-status`, { headers: authHeaders() });
       if (!response.ok) throw new Error();
       setInternalAutoStatus(await response.json());
-      const [local, server] = await Promise.allSettled([
-        fetch(`${API_BASE}/developer/internal-database/journal-status`, { headers: authHeaders() }),
-        fetch(`${API_BASE}/developer/internal-database/server-journal-status`, { headers: authHeaders() }),
-      ]);
-      if (local.status === "fulfilled" && local.value.ok) {
-        const data = await local.value.json();
-        if (data.ok) setInternalJournalCount(Number(data.pendingChanges || 0));
-        else setInternalJournalCount(null);
-      } else {
-        setInternalJournalCount(null);
-      }
-      if (server.status === "fulfilled") {
-        if (server.value.ok) {
-          const data = await server.value.json();
-          setInternalDatabaseConnectionStatus(data.ok ? "connected" : "failed");
-          setServerJournalCount(data.ok ? Number(data.pendingChanges || 0) : null);
-        } else {
-          setInternalDatabaseConnectionStatus("failed");
-          setServerJournalCount(null);
-        }
-      } else {
-        setInternalDatabaseConnectionStatus("failed");
-        setServerJournalCount(null);
-      }
-    } catch {
-      setInternalAutoStatus(null);
-      setInternalDatabaseConnectionStatus("untested");
-      setInternalJournalCount(null);
-      setServerJournalCount(null);
-      setInternalDatabaseMessage(tr("تعذر قراءة حالة المزامنة التلقائية", "Could not read automatic sync status"));
-    }
+      await refreshConnectionStatus();
+    } catch { setInternalAutoStatus(null); }
   }
 
   async function saveInternalDatabaseSettings() {
@@ -817,37 +830,12 @@ export default function DeveloperSettingsPage() {
       }
       const data = await response.json();
       setInternalDatabaseConfig(data);
-      setInternalDatabaseConnectionStatus("untested");
+      void refreshConnectionStatus();
       setInternalDatabaseMessage(tr("تم حفظ إعدادات الخادم الداخلي", "Internal server settings saved"));
     } catch (error) {
       setInternalDatabaseMessage(error instanceof Error ? error.message : tr("تعذر حفظ إعدادات الخادم الداخلي", "Failed to save internal server settings"));
     } finally {
       setIsSavingInternalDatabase(false);
-    }
-  }
-
-  async function testInternalDatabaseConnection() {
-    setInternalDatabaseMessage("");
-    setIsTestingInternalDatabase(true);
-    try {
-      const response = await fetch(`${API_BASE}/developer/internal-database/test-connection`, {
-        method: "POST", headers: authHeaders(),
-      });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok || !data.success) {
-        setInternalDatabaseConnectionStatus("failed");
-        setInternalDatabaseMessage(data.error
-          ? tr(`فشل الاتصال: ${data.error}`, `Connection failed: ${data.error}`)
-          : tr("فشل اختبار الاتصال", "Connection test failed"));
-        return;
-      }
-      setInternalDatabaseConnectionStatus("connected");
-      setInternalDatabaseMessage(tr("نجح الاتصال بالخادم الداخلي", "Internal server connection succeeded"));
-    } catch {
-      setInternalDatabaseConnectionStatus("failed");
-      setInternalDatabaseMessage(tr("تعذر الوصول إلى خدمة اختبار الاتصال", "Could not reach the connection test service"));
-    } finally {
-      setIsTestingInternalDatabase(false);
     }
   }
 
@@ -1010,7 +998,6 @@ export default function DeveloperSettingsPage() {
   }
 
   useEffect(() => {
-    setInternalDatabaseConnectionStatus("untested");
     setInternalReadiness(null);
   }, [internalDatabaseConfig]);
 
@@ -1117,13 +1104,7 @@ export default function DeveloperSettingsPage() {
 
       const count = Number(data.pendingCount ?? data.processedCount ?? 0);
       const processedCount = Number(data.processedCount || 0);
-      if (data.onlineConnected) {
-        sessionStorage.setItem(ONLINE_DATABASE_CONNECTED_KEY, "true");
-        setOnlineDatabaseConnected(true);
-      } else {
-        sessionStorage.removeItem(ONLINE_DATABASE_CONNECTED_KEY);
-        setOnlineDatabaseConnected(false);
-      }
+      void refreshConnectionStatus();
       const autoRestoredCount = Number(data.autoRestoredCount || 0);
       const autoRestoreNotice =
         autoRestoredCount > 0
@@ -1462,6 +1443,7 @@ export default function DeveloperSettingsPage() {
       applyDeveloperSettingsState(await activation.json());
       sessionStorage.setItem(ONLINE_DATABASE_CONNECTED_KEY, "true");
       setOnlineDatabaseConnected(true);
+      await refreshConnectionStatus();
       setDatabaseMessage(tr("Online: متصل بالأونلاين", "Online: Connected"));
     } catch {
       setDatabaseMessage(tr("تعذر الاتصال بقاعدة الأونلاين عبر الخادم", "Could not connect to the online database through the server"));
@@ -1483,6 +1465,7 @@ export default function DeveloperSettingsPage() {
       applyDeveloperSettingsState(await res.json());
       sessionStorage.removeItem(ONLINE_DATABASE_CONNECTED_KEY);
       setOnlineDatabaseConnected(false);
+      await refreshConnectionStatus();
       setDatabaseMessage(tr("تم فصل الأونلاين وإيقاف مزامنته على هذا الجهاز", "Online synchronization is disconnected on this device"));
     } catch (err) {
       setDatabaseMessage(err instanceof Error ? err.message : tr("تعذر فصل الاتصال", "Could not disconnect"));
@@ -2111,7 +2094,7 @@ export default function DeveloperSettingsPage() {
       {savedMessage && <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-[13px] text-emerald-700">{savedMessage}</div>}
 
       {activeTab === "devices" && (
-        <DeviceIdentitySettings isAR={isAR} pairingEnabled={onlineDatabaseConnected || internalDatabaseConnectionStatus === "connected"} />
+        <DeviceIdentitySettings isAR={isAR} pairingEnabled={Boolean(connectionHealth?.online || connectionHealth?.internal)} />
       )}
 
       {activeTab === "security" && (
@@ -2536,10 +2519,10 @@ export default function DeveloperSettingsPage() {
                   <Cloud className="h-4 w-4 text-blue-600" />
                   <span>{tr("إعدادات قاعدة البيانات عبر الإنترنت", "Online database settings")}</span>
                 </div>
-                <div className="mb-4 flex h-[34px] items-center justify-between rounded-md border border-border bg-background px-3 text-[13px]">
-                  <span className="text-muted-foreground">{tr("تفعيل مزامنة الأونلاين", "Online sync setting")}</span>
+                <div className="mb-4 flex min-h-[34px] flex-wrap gap-2 items-center justify-between rounded-md border border-border bg-background px-3 text-[13px]">
+                  <span className="text-muted-foreground">{tr("حالة الاتصال", "Connection status")}</span>
                   <span className={cn("font-semibold", onlineDatabaseConnected ? "text-emerald-600" : "text-red-600")}>
-                    {onlineDatabaseConnected ? tr("مزامنة الأونلاين مفعّلة", "Online sync enabled") : tr("متوقفة على هذا الجهاز", "Off on this device")}
+                    {connectionHealth === null ? tr("جارٍ قراءة الحالة", "Checking status") : !onlineDatabaseConnected ? tr("مفصول على هذا الجهاز", "Disconnected on this device") : connectionHealth.online ? tr("متصل", "Connected") : tr("تعذر الوصول إلى الخادم", "Server unavailable")}
                   </span>
                 </div>
                 <label className="mb-4 flex items-center gap-2 text-[13px] font-semibold text-foreground">
@@ -2583,18 +2566,22 @@ export default function DeveloperSettingsPage() {
                 )}
               </div>
             <div className="rounded-2xl border border-border bg-background/70 p-3 shadow-sm">
-              <div className="mb-4 flex flex-wrap gap-2">
-                <Button type="button" variant="outline" onClick={testPreparedConnection} size="sm" disabled={isTestingConnection}>
-                  {isTestingConnection ? tr("جارٍ الاختبار...", "Testing...") : tr("اختبار الاتصال", "Test connection")}
-                </Button>
-                <Button type="button" variant="outline" onClick={savePreparedConnection} size="sm">{tr("حفظ الإعدادات", "Save settings")}</Button>
-                {onlineDatabaseConnected ? (
-                  <Button type="button" variant="outline" onClick={disconnectOnlineDatabase} size="sm" disabled={isSaving}>{tr("فصل الاتصال", "Disconnect")}</Button>
-                ) : (
-                  <Button type="button" onClick={connectOnlineDatabase} size="sm" disabled={isConnectingOnline}>
-                    {isConnectingOnline ? tr("جارٍ الاتصال...", "Connecting...") : tr("اتصال", "Connect")}
-                  </Button>
-                )}
+              <div className="mb-4 grid min-w-0 gap-3 lg:grid-cols-2">
+                <div className="min-w-0 rounded-xl border border-border p-3 space-y-3">
+                  <h4 className="font-bold">{tr("الاتصال", "Connection")}</h4>
+                  <div className="flex flex-wrap gap-2 [&>button]:max-w-full [&>button]:h-auto [&>button]:min-h-8 [&>button]:whitespace-normal">
+                    <Button onClick={connectOnlineDatabase} size="sm" disabled={isConnectingOnline || Boolean(onlineDatabaseConnected && connectionHealth?.online)}>{tr("اتصال", "Connect")}</Button>
+                    <Button variant="outline" onClick={disconnectOnlineDatabase} size="sm" disabled={isSaving || !onlineDatabaseConnected}>{tr("فصل الاتصال", "Disconnect")}</Button>
+                    <Button variant="outline" onClick={refreshConnectionStatus} size="sm">{tr("تحديث الحالة", "Refresh status")}</Button>
+                  </div>
+                </div>
+                <div className="min-w-0 rounded-xl border border-border p-3 space-y-3">
+                  <h4 className="font-bold">{tr("التحكم والضبط", "Controls and settings")}</h4>
+                  <div className="flex flex-wrap gap-2 [&>button]:max-w-full [&>button]:h-auto [&>button]:min-h-8 [&>button]:whitespace-normal">
+                    <Button variant="outline" onClick={savePreparedConnection} size="sm" disabled={isSaving}>{tr("حفظ الإعدادات", "Save settings")}</Button>
+                    <Button variant="outline" onClick={testPreparedConnection} size="sm" disabled={isTestingConnection}>{tr("فحص الإعدادات", "Check settings")}</Button>
+                  </div>
+                </div>
               </div>
 
               <div className="grid grid-cols-1 gap-2.5 xl:grid-cols-2">
@@ -2674,9 +2661,9 @@ export default function DeveloperSettingsPage() {
                   <RefreshCw className={cn("h-3.5 w-3.5", isSyncQueueLoading && "animate-spin")} />
                   {tr("تحديث", "Refresh")}
                 </Button>
-                <Button type="button" size="sm" onClick={() => void runSyncWorkerNow()} disabled={isSyncWorkerRunning} className="gap-2">
+                <Button type="button" size="sm" onClick={() => void runSyncWorkerNow()} disabled={isSyncWorkerRunning || !onlineDatabaseConnected} className="gap-2">
                   <RefreshCw className={cn("h-3.5 w-3.5", isSyncWorkerRunning && "animate-spin")} />
-                  {isSyncWorkerRunning ? tr("جارٍ التشغيل...", "Running...") : tr("تشغيل المزامنة الآن", "Run sync now")}
+                  {isSyncWorkerRunning ? tr("جارٍ التشغيل...", "Running...") : tr("مزامنة الآن", "Sync now")}
                 </Button>
                 <Button
                   type="button"
@@ -2691,7 +2678,7 @@ export default function DeveloperSettingsPage() {
                 </Button>
               </div>
               <div className="mb-3 text-xs font-medium text-muted-foreground">
-                {syncConfig.autoSync && onlineDatabaseConnected
+                {connectionHealth?.onlineAutoSync && onlineDatabaseConnected
                   ? syncConfig.timing === "interval"
                     ? tr(`تعمل المزامنة تلقائيًا عند تشغيل البرنامج، ثم كل ${syncConfig.intervalMinutes} دقيقة أثناء تشغيله.`, `Automatic sync runs when the app starts, then every ${syncConfig.intervalMinutes} minute(s) while it is running.`)
                     : tr("تعمل المزامنة تلقائيًا بعد تسجيل الدخول.", "Automatic sync runs after sign-in.")
@@ -2756,7 +2743,7 @@ export default function DeveloperSettingsPage() {
             </div>
               </div>
             </section>
-            <section data-database-section="internal" hidden={databaseSection !== "internal"} className="rounded-xl border border-border bg-background">
+            <section data-database-section="internal" hidden={databaseSection !== "internal"} className="min-w-0 max-w-full rounded-xl border border-border bg-background">
               <div className="flex items-center gap-2.5 px-3 py-3 text-[13px] font-semibold text-foreground">
                 <span className="flex items-center gap-2"><Database className="h-5 w-5 text-primary" />{tr("قاعدة بيانات الخادم الداخلي", "Internal server database")}</span>
               </div>
@@ -2785,8 +2772,8 @@ export default function DeveloperSettingsPage() {
                   </DevField>
                 </div>
                 <div className="grid gap-2.5 md:grid-cols-2">
-                  <InfoRow isAR={isAR} label={tr("آخر فحص للخادم الداخلي", "Last internal server check")} value={internalDatabaseConnectionStatus === "connected" ? tr("نجح الاتصال", "Connection succeeded") : internalDatabaseConnectionStatus === "failed" ? tr("فشل الاتصال", "Connection failed") : tr("لم يُختبر بعد", "Not tested yet")} />
-                  <InfoRow isAR={isAR} label={tr("حالة المزامنة الداخلية", "Internal sync status")} value={!internalDatabaseConfig.autoSync ? tr("التشغيل التلقائي متوقف", "Automatic sync is off") : internalAutoStatus?.running ? tr("المزامنة جارية", "Sync in progress") : internalAutoStatus?.lastError ? tr("آخر محاولة فشلت", "Last attempt failed") : internalAutoStatus?.lastSuccessAt ? tr("آخر محاولة نجحت", "Last attempt succeeded") : tr("بانتظار أول تشغيل", "Waiting for first run")} />
+                  <InfoRow isAR={isAR} label={tr("حالة اتصال الخادم", "Server connection status")} value={internalDatabaseConnectionStatus === "disconnected" ? tr("مفصول على هذا الجهاز", "Disconnected on this device") : internalDatabaseConnectionStatus === "connected" ? tr("متصل", "Connected") : internalDatabaseConnectionStatus === "failed" ? tr("فشل الاتصال", "Connection failed") : tr("لم يُختبر بعد", "Not tested yet")} />
+                  <InfoRow isAR={isAR} label={tr("حالة المزامنة الداخلية", "Internal sync status")} value={!internalConnectionActive ? tr("الاتصال مفصول", "Disconnected") : !connectionHealth?.internalAutoSync ? tr("التشغيل التلقائي متوقف", "Automatic sync is off") : internalAutoStatus?.running ? tr("المزامنة جارية", "Sync in progress") : internalAutoStatus?.lastError ? tr("آخر محاولة فشلت", "Last attempt failed") : internalAutoStatus?.lastSuccessAt ? tr("آخر محاولة نجحت", "Last attempt succeeded") : tr("بانتظار أول تشغيل", "Waiting for first run")} />
                   <InfoRow isAR={isAR} label={tr("التغييرات المحلية المنتظرة للخادم الداخلي", "Local changes pending for internal server")} value={internalJournalCount ?? tr("لم تُفحص", "Not checked")} />
                   <InfoRow isAR={isAR} label={tr("تعديلات الخادم المباشرة في السجل", "Direct server edits in journal")} value={serverJournalCount ?? tr("تعذر الفحص", "Unavailable")} />
                 </div>
@@ -2831,40 +2818,44 @@ export default function DeveloperSettingsPage() {
                     {internalAutoStatus && <p className="text-xs text-muted-foreground">{tr("آخر فحص للجدولة", "Last schedule check")}: {internalAutoStatus.lastCheckAt ? new Date(internalAutoStatus.lastCheckAt).toLocaleString() : tr("لا يوجد", "None")} · {tr("آخر محاولة", "Last attempt")}: {internalAutoStatus.lastAttemptAt ? new Date(internalAutoStatus.lastAttemptAt).toLocaleString() : tr("لا توجد", "None")} · {tr("آخر نجاح", "Last success")}: {internalAutoStatus.lastSuccessAt ? new Date(internalAutoStatus.lastSuccessAt).toLocaleString() : tr("لا يوجد", "None")} {internalAutoStatus.running ? tr("· جارٍ التشغيل", "· Running") : ""} {internalAutoStatus.lastError ? `· ${tr("آخر خطأ", "Last error")}: ${internalAutoStatus.lastError}` : ""}</p>}
                   </div>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  <Button type="button" variant="outline" size="sm" onClick={checkInternalAutoStatus}>{tr("تحديث حالة التشغيل التلقائي", "Refresh automatic sync status")}</Button>
-                  <Button type="button" variant="outline" size="sm" onClick={saveInternalDatabaseSettings} disabled={isSavingInternalDatabase}>
-                    {isSavingInternalDatabase ? tr("جارٍ الحفظ...", "Saving...") : tr("حفظ الإعدادات", "Save settings")}
-                  </Button>
-                  <Button type="button" variant="outline" size="sm" onClick={testInternalDatabaseConnection} disabled={isTestingInternalDatabase || isSavingInternalDatabase}>
-                    {isTestingInternalDatabase ? tr("جارٍ الاختبار...", "Testing...") : tr("اختبار الاتصال", "Test connection")}
-                  </Button>
+                <div className="grid min-w-0 gap-3 lg:grid-cols-2">
+                  <div className="min-w-0 rounded-xl border border-border p-3 space-y-3">
+                    <h4 className="font-bold">{tr("الاتصال", "Connection")}</h4>
+                    <div role="status" className="rounded-lg bg-muted/50 p-3 text-sm break-words">
+                      {internalDatabaseConnectionStatus === "disconnected" ? tr("مفصول على هذا الجهاز", "Disconnected on this device") : internalDatabaseConnectionStatus === "connected" ? tr("متصل بالخادم الداخلي", "Internal server connected") : internalDatabaseConnectionStatus === "failed" ? tr("تعذر الوصول إلى الخادم", "Server unavailable") : tr("جارٍ قراءة الحالة", "Checking status")}
+                    </div>
+                    <div className="flex flex-wrap gap-2 [&>button]:max-w-full [&>button]:h-auto [&>button]:min-h-8 [&>button]:whitespace-normal">
+                      <Button size="sm" onClick={() => changeInternalConnection(true)} disabled={isChangingInternalConnection || isSavingInternalDatabase || internalDatabaseConnectionStatus === "connected"}>{tr("اتصال", "Connect")}</Button>
+                      <Button size="sm" variant="outline" onClick={() => changeInternalConnection(false)} disabled={isChangingInternalConnection || !internalConnectionActive}>{tr("فصل الاتصال", "Disconnect")}</Button>
+                      <Button size="sm" variant="outline" onClick={checkInternalAutoStatus}>{tr("تحديث الحالة", "Refresh status")}</Button>
+                    </div>
+                  </div>
+                  <div className="min-w-0 rounded-xl border border-border p-3 space-y-3">
+                    <h4 className="font-bold">{tr("التحكم والضبط", "Controls and settings")}</h4>
+                    <div className="flex flex-wrap gap-2 [&>button]:max-w-full [&>button]:h-auto [&>button]:min-h-8 [&>button]:whitespace-normal">
+                      <Button size="sm" variant="outline" onClick={saveInternalDatabaseSettings} disabled={isSavingInternalDatabase}>{isSavingInternalDatabase ? tr("جارٍ الحفظ...", "Saving...") : tr("حفظ الإعدادات", "Save settings")}</Button>
+                      <Button size="sm" onClick={() => internalDatabaseConfig.syncMode === "local-to-internal" ? runInternalPush() : internalDatabaseConfig.syncMode === "internal-to-local" ? runInternalPull() : runInternalBidirectional()} disabled={!internalConnectionActive || isRunningInternalPush || isRunningInternalPull || isRunningInternalBidirectional}>{tr("مزامنة الآن", "Sync now")}</Button>
+                    </div>
+                    <details className="min-w-0">
+                      <summary className="cursor-pointer text-sm font-semibold">{tr("الفحص والصيانة", "Diagnostics and maintenance")}</summary>
+                      <div className="flex flex-wrap gap-2 pt-3 [&>button]:max-w-full [&>button]:h-auto [&>button]:min-h-8 [&>button]:whitespace-normal">
                   <Button type="button" variant="outline" size="sm" onClick={checkInternalSyncReadiness} disabled={isCheckingInternalReadiness || isSavingInternalDatabase}>
-                    {isCheckingInternalReadiness ? tr("جارٍ فحص الجداول...", "Checking tables...") : tr("فحص جاهزية الجداول", "Check table readiness")}
+                    {isCheckingInternalReadiness ? tr("جارٍ فحص الجداول...", "Checking tables...") : tr("فحص قاعدة السيرفر", "Check table readiness")}
                   </Button>
                   <Button type="button" variant="outline" size="sm" onClick={checkInternalJournal} disabled={isCheckingInternalJournal}>
-                    {isCheckingInternalJournal ? tr("جارٍ فحص التغييرات...", "Checking changes...") : tr("فحص التغييرات الداخلية", "Check internal changes")}
+                    {isCheckingInternalJournal ? tr("جارٍ فحص التغييرات...", "Checking changes...") : tr("عرض التغييرات المحلية", "Check internal changes")}
                   </Button>
                   <Button type="button" variant="outline" size="sm" onClick={checkServerJournal} disabled={isCheckingServerJournal}>
-                    {isCheckingServerJournal ? tr("جارٍ فحص الخادم...", "Checking server...") : tr("فحص سجل تعديلات الخادم", "Check server edit journal")}
+                    {isCheckingServerJournal ? tr("جارٍ فحص الخادم...", "Checking server...") : tr("عرض تغييرات السيرفر", "Check server edit journal")}
                   </Button>
                   {internalReadiness?.tables.some((row) => row.name === "invoice_accounting" && row.localCount !== null && row.internalCount !== null && row.internalCount < row.localCount) && (
                     <Button type="button" variant="outline" size="sm" onClick={completeInternalAccountingRows} disabled={isCompletingAccounting}>
                       {isCompletingAccounting ? tr("جارٍ إكمال الحسابات...", "Completing accounting...") : tr("إكمال سجلات الحسابات", "Complete accounting records")}
                     </Button>
                   )}
-                  <Button type="button" size="sm" onClick={runInternalPush}
-                    disabled={isRunningInternalPush || internalDatabaseConfig.syncMode !== "local-to-internal"}>
-                    {isRunningInternalPush ? tr("جارٍ إرسال التغييرات...", "Sending changes...") : tr("مزامنة المحلي إلى الداخلي الآن", "Sync local to internal now")}
-                  </Button>
-                  <Button type="button" size="sm" onClick={runInternalPull}
-                    disabled={isRunningInternalPull || internalDatabaseConfig.syncMode !== "internal-to-local"}>
-                    {isRunningInternalPull ? tr("جارٍ استلام البيانات...", "Receiving data...") : tr("مزامنة الداخلي إلى المحلي الآن", "Sync internal to local now")}
-                  </Button>
-                  <Button type="button" size="sm" onClick={runInternalBidirectional}
-                    disabled={isRunningInternalBidirectional || internalDatabaseConfig.syncMode !== "bidirectional"}>
-                    {isRunningInternalBidirectional ? tr("جارٍ المزامنة الثنائية...", "Syncing both directions...") : tr("مزامنة ثنائية الآن", "Bidirectional sync now")}
-                  </Button>
+                      </div>
+                    </details>
+                  </div>
                 </div>
                 {(internalJournalCount !== null || serverJournalCount !== null) && (
                   <p className="text-xs text-muted-foreground">{tr(
@@ -2876,7 +2867,7 @@ export default function DeveloperSettingsPage() {
                   "تغييرات الأجهزة الأخرى لا تظهر في عدّاد تعديلات الخادم المباشرة؛ تلتقطها المزامنة الثنائية بفحص السجلات.",
                   "Edits from other devices are not counted as direct server edits; bidirectional sync finds them by checking the records.",
                 )}</p>
-                {internalDatabaseMessage && <p role="status" className="text-[13px] text-muted-foreground">{internalDatabaseMessage}</p>}
+                {internalDatabaseMessage && <p role="status" className="text-[13px] text-muted-foreground break-words">{internalDatabaseMessage}</p>}
                 {internalReadiness && (
                   <div className="overflow-x-auto rounded-xl border border-border">
                     <table className="w-full text-[13px]">

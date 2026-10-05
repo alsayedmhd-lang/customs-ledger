@@ -1,5 +1,6 @@
-﻿import { randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { sqlite } from "@workspace/db";
+import { ensureLocalTemplateNumbers } from "./template-numbering";
 
 const knownCodes = new Map([
   ["التخليص الجمركي customs clearance fees", "101"],
@@ -17,24 +18,25 @@ function normalize(value: string): string {
 
 export function ensureInvoiceItemTemplateCodes(): void {
   if (!sqlite) return;
+  const sqliteDb = sqlite;
 
-  const columns = sqlite.prepare(
+  const columns = sqliteDb.prepare(
     "PRAGMA table_info(invoice_item_templates)"
   ).all() as Array<{ name: string }>;
 
   if (!columns.some((column) => column.name === "item_code")) {
-    sqlite.exec("ALTER TABLE invoice_item_templates ADD COLUMN item_code TEXT");
+    sqliteDb.exec("ALTER TABLE invoice_item_templates ADD COLUMN item_code TEXT");
   }
 
-  const rows = sqlite.prepare(
+  const rows = sqliteDb.prepare(
     "SELECT id, description, item_code AS itemCode FROM invoice_item_templates"
   ).all() as Array<{ id: number; description: string; itemCode: string | null }>;
 
-  const update = sqlite.prepare(
+  const update = sqliteDb.prepare(
     "UPDATE invoice_item_templates SET item_code = ? WHERE id = ?"
   );
 
-  sqlite.transaction(() => {
+  sqliteDb.transaction(() => {
     for (const row of rows) {
       const expected = knownCodes.get(normalize(row.description));
       if (expected && row.itemCode && row.itemCode !== expected) {
@@ -44,8 +46,9 @@ export function ensureInvoiceItemTemplateCodes(): void {
         update.run(expected ?? `X-${randomUUID()}`, row.id);
       }
     }
-    sqlite.exec(
+    sqliteDb.exec(
       "CREATE UNIQUE INDEX IF NOT EXISTS invoice_item_templates_item_code_unique ON invoice_item_templates(item_code)"
     );
   })();
+  ensureLocalTemplateNumbers();
 }

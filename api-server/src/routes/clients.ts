@@ -1,12 +1,13 @@
+import { getLocalDb } from "../utils/local-db";
 import { Router, type IRouter } from "express";
-import { db, clientsTable, invoicesTable, invoiceItemsTable, usersTable, receiptsTable } from "@workspace/db";
+import { clientsTable, invoicesTable, invoiceItemsTable, usersTable, receiptsTable } from "@workspace/db";
 import { and, eq, desc, gte, lte, sql, isNull } from "drizzle-orm";
 
 const router: IRouter = Router();
 
 async function getClientScope(req: any) {
   if (req.user?.role !== "client") return null;
-  const [user] = await db
+  const [user] = await getLocalDb()
     .select({ clientId: usersTable.clientId, clientViewPermissions: usersTable.clientViewPermissions })
     .from(usersTable)
     .where(sql`${usersTable.id} = ${req.user.userId}`)
@@ -41,7 +42,7 @@ async function findClientByIdentity(input: {
   const matchedClients = new Map<number, typeof clientsTable.$inferSelect>();
 
   if (taxId) {
-    const rows = await db.select().from(clientsTable);
+    const rows = await getLocalDb().select().from(clientsTable);
     for (const client of rows) {
       if (normalizeClientIdentity(client.taxId) === taxId) {
         if (client.id !== input.excludeId) {
@@ -52,7 +53,7 @@ async function findClientByIdentity(input: {
   }
 
   if (email) {
-    const rows = await db.select().from(clientsTable);
+    const rows = await getLocalDb().select().from(clientsTable);
     for (const client of rows) {
       if (normalizeClientIdentity(client.email) === email) {
         if (client.id !== input.excludeId) {
@@ -63,7 +64,7 @@ async function findClientByIdentity(input: {
   }
 
   if (phone) {
-    const rows = await db.select().from(clientsTable);
+    const rows = await getLocalDb().select().from(clientsTable);
     for (const client of rows) {
       if (normalizeClientPhone(client.phone) === phone) {
         if (client.id !== input.excludeId) {
@@ -102,18 +103,20 @@ router.get("/clients", async (req, res) => {
   try {
     const clientScope = await getClientScope(req);
     if (clientScope && !clientScope.clientId) return res.status(403).json({ error: "Client is not linked" });
-    const query = db
+    const query = getLocalDb()
       .select()
       .from(clientsTable)
       .orderBy(sql`created_at DESC`);
     const clients = clientScope
-      ? await db.select().from(clientsTable).where(sql`${clientsTable.id} = ${clientScope.clientId}`)
+      ? await getLocalDb().select().from(clientsTable).where(sql`${clientsTable.id} = ${clientScope.clientId}`)
       : await query;
     res.json(clients.map(formatClient));
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: "Internal server error" });
   }
+
+  return undefined;
 });
 
 router.post("/clients", async (req, res) => {
@@ -151,7 +154,7 @@ router.post("/clients", async (req, res) => {
     });
   }
 
-    const [client] = await db
+    const [client] = await getLocalDb()
       .insert(clientsTable)
       .values({ name, email: email ?? null, phone: phone ?? null, address: address ?? null, taxId: taxId ?? null, notes: notes ?? null })
       .returning();
@@ -160,14 +163,16 @@ router.post("/clients", async (req, res) => {
     console.error(err);
     res.status(500).json({ error: "Internal server error" });
   }
+
+  return undefined;
 });
 
 router.get("/clients/:id", async (req, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(String(req.params.id), 10);
     const clientScope = await getClientScope(req);
     if (clientScope && clientScope.clientId !== id) return res.status(403).json({ error: "Client is not allowed" });
-    const [client] = await db.select().from(clientsTable).where(eq(clientsTable.id, id));
+    const [client] = await getLocalDb().select().from(clientsTable).where(eq(clientsTable.id, id));
     if (!client) {
       res.status(404).json({ error: "Client not found" });
       return;
@@ -177,12 +182,14 @@ router.get("/clients/:id", async (req, res) => {
     console.error(err);
     res.status(500).json({ error: "Internal server error" });
   }
+
+  return undefined;
 });
 
 router.put("/clients/:id", async (req, res) => {
   try {
     if (rejectClientWrite(req, res)) return;
-    const id = parseInt(req.params.id);
+    const id = parseInt(String(req.params.id), 10);
     const { name, email, phone, address, taxId, notes } = req.body;
     if (!name) {
       res.status(400).json({ error: "name is required" });
@@ -216,7 +223,7 @@ router.put("/clients/:id", async (req, res) => {
     });
   }
 
-    const [client] = await db
+    const [client] = await getLocalDb()
       .update(clientsTable)
       .set({ name, email: email ?? null, phone: phone ?? null, address: address ?? null, taxId: taxId ?? null, notes: notes ?? null, updatedAt: new Date() })
       .where(eq(clientsTable.id, id))
@@ -230,13 +237,15 @@ router.put("/clients/:id", async (req, res) => {
     console.error(err);
     res.status(500).json({ error: "Internal server error" });
   }
+
+  return undefined;
 });
 
 router.delete("/clients/:id", async (req, res) => {
   try {
     if (rejectClientWrite(req, res)) return;
-    const id = parseInt(req.params.id);
-    await db.delete(clientsTable).where(eq(clientsTable.id, id));
+    const id = parseInt(String(req.params.id), 10);
+    await getLocalDb().delete(clientsTable).where(eq(clientsTable.id, id));
     res.status(204).send();
   } catch (err) {
     console.error(err);
@@ -246,12 +255,12 @@ router.delete("/clients/:id", async (req, res) => {
 
 router.get("/clients/:id/statement", async (req, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(String(req.params.id), 10);
     const clientScope = await getClientScope(req);
     if (clientScope && (clientScope.clientId !== id || clientScope.permissions?.canViewStatement === false)) {
       return res.status(403).json({ error: "Statement is not allowed for this client user" });
     }
-    const [client] = await db.select().from(clientsTable).where(eq(clientsTable.id, id));
+    const [client] = await getLocalDb().select().from(clientsTable).where(eq(clientsTable.id, id));
     if (!client) {
       res.status(404).json({ error: "Client not found" });
       return;
@@ -271,7 +280,7 @@ router.get("/clients/:id/statement", async (req, res) => {
       invoiceConditions.push(sql`${invoicesTable.issueDate} <= ${toDate}`);
     }
 
-    const invoices = await db
+    const invoices = await getLocalDb()
       .select()
       .from(invoicesTable)
       .where(and(...invoiceConditions))
@@ -291,14 +300,14 @@ router.get("/clients/:id/statement", async (req, res) => {
       receiptConditions.push(sql`${receiptsTable.receiptDate} <= ${toDate}`);
     }
 
-    const issuedReceipts = await db
+    const issuedReceipts = await getLocalDb()
       .select()
       .from(receiptsTable)
       .where(and(...receiptConditions));
 
     const invoicesWithItems = await Promise.all(
       invoices.map(async (inv) => {
-        const items = await db
+        const items = await getLocalDb()
           .select()
           .from(invoiceItemsTable)
           .where(sql`${invoiceItemsTable.invoiceId} = ${inv.id}`);
@@ -332,6 +341,8 @@ router.get("/clients/:id/statement", async (req, res) => {
     console.error(err);
     res.status(500).json({ error: "Internal server error" });
   }
+
+  return undefined;
 });
 
 function formatClient(c: typeof clientsTable.$inferSelect) {
@@ -412,7 +423,7 @@ router.post("/clients/import", async (req: any, res: any) => {
       };
 
       if (existing) {
-        await db
+        await getLocalDb()
           .update(clientsTable)
           .set(values)
           .where(sql`${clientsTable.id} = ${existing.id}`);
@@ -420,7 +431,7 @@ router.post("/clients/import", async (req: any, res: any) => {
         updated++;
         if (row.id != null) clientIdMap[String(row.id)] = existing.id;
       } else {
-        const [created] = await db.insert(clientsTable).values({
+        const [created] = await getLocalDb().insert(clientsTable).values({
           ...values,
           createdAt: new Date(),
         }).returning();

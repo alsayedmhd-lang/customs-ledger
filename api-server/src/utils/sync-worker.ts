@@ -1,3 +1,4 @@
+import { ensureLocalTemplateNumbers, ensurePgTemplateNumbers, pullAllocatedTemplateNumbers } from "./template-numbering";
 import { reconcileInvoiceItems } from "./reconcile-invoice-items";
 import { sqlite } from "@workspace/db";
 import { createRequire } from "module";
@@ -596,6 +597,8 @@ async function pullUsersFromOnline(client: any, clientIdMap: Map<number, number>
 }
 
 async function pullTemplatesFromOnline(client: any) {
+  ensureLocalTemplateNumbers();
+  await ensurePgTemplateNumbers(client, true);
   if (!sqlite) throw new Error("SQLite database is not available");
   const result = await client.query(
     "SELECT item_code, description, default_unit_price, created_at FROM invoice_item_templates ORDER BY item_code ASC"
@@ -643,6 +646,7 @@ async function pullTemplatesFromOnline(client: any) {
     local.push({ id: Number(insertedRow.lastInsertRowid), itemCode: code, description });
     inserted += 1;
   }
+  await pullAllocatedTemplateNumbers(client);
   console.log("[SYNC][PULL][TEMPLATES][DONE]", { total: rows.length, inserted });
   return { total: rows.length, inserted };
 }
@@ -1958,6 +1962,8 @@ export async function runOnlineToLocalSyncOnce(): Promise<{
 // A template has no invoice dependency. Copy missing templates before clients.
 // Match templates by their shared code; local numeric IDs differ across devices.
 async function syncTemplatesBeforeQueue(client: any) {
+  ensureLocalTemplateNumbers();
+  await ensurePgTemplateNumbers(client, true);
   const online = await client.query(
     "SELECT item_code, description FROM invoice_item_templates"
   ) as { rows?: Array<{ item_code: string | null; description: string }> };
@@ -1996,6 +2002,8 @@ async function syncTemplatesBeforeQueue(client: any) {
     );
     onlineRows.push({ item_code: code, description });
   }
+  await ensurePgTemplateNumbers(client, true);
+  await pullAllocatedTemplateNumbers(client);
 }
 
 // Every invoice and receipt refers to a client, so create missing clients first.
@@ -2812,9 +2820,15 @@ export type ConfiguredSyncResult = {
 
 let configuredSyncInFlight: Promise<ConfiguredSyncResult> | null = null;
 
+export function isOnlineSyncRunning(): boolean {
+  return configuredSyncInFlight !== null;
+}
+
 // A shared run prevents a login trigger and a manual request from interleaving.
 export function runConfiguredSyncOnce(mode: string): Promise<ConfiguredSyncResult> {
   if (configuredSyncInFlight) return configuredSyncInFlight;
+  const saved = sqlite?.prepare("SELECT database_mode AS mode FROM company_settings LIMIT 1").get() as { mode: string } | undefined;
+  if (saved?.mode !== "online") return Promise.resolve({ syncMode: mode, pendingCount: 0, processedCount: 0, onlineConnected: false, lastError: "Online connection is disconnected on this device", autoRestoredCount: 0 });
   configuredSyncInFlight = performConfiguredSync(mode).finally(() => {
     configuredSyncInFlight = null;
   });

@@ -156,11 +156,16 @@ function NumInput({
   value,
   onChange,
   paid,
+  visible,
 }: {
   value: string;
   onChange: (v: string) => void;
   paid?: boolean;
+  visible: boolean;
 }) {
+  if (!visible) {
+    return <span className="inline-block w-20 px-1.5 py-1 text-right tracking-widest text-muted-foreground">••••••</span>;
+  }
   return (
     <input
       type="number"
@@ -246,6 +251,13 @@ export default function AccountingPage() {
   });
   const [filtersOpen, setFiltersOpen] = useState(true);
   const [showAmounts, setShowAmounts] = useState(false);
+  const [rowAmountVisibility, setRowAmountVisibility] = useState<Record<number, boolean>>({});
+  const toggleRowAmounts = (id: number) => {
+    setRowAmountVisibility((prev) => ({
+      ...prev,
+      [id]: !(prev[id] ?? showAmounts),
+    }));
+  };
 
   const [edits, setEdits] = useState<Record<number, RowEdit>>({});
   const [saving, setSaving] = useState<Record<number, boolean>>({});
@@ -552,7 +564,10 @@ export default function AccountingPage() {
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setShowAmounts((v) => !v)}
+            onClick={() => {
+              setShowAmounts((v) => !v);
+              setRowAmountVisibility({});
+            }}
             className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border font-medium text-sm transition-all ${
               showAmounts
                 ? "bg-card border-border text-muted-foreground hover:bg-muted/40"
@@ -860,6 +875,9 @@ export default function AccountingPage() {
                   <th className="px-2 py-2.5 text-center font-semibold text-muted-foreground whitespace-nowrap">
                     💾
                   </th>
+                  <th className="px-2 py-2.5 text-center text-muted-foreground whitespace-nowrap">
+                    {lang === "ar" ? "المبالغ" : "Amounts"}
+                  </th>
                 </tr>
                 {/* ─ column group labels ─ */}
                 <tr className="text-[10px] bg-muted/20 border-b border-border/40 sticky top-[33px] z-20">
@@ -885,12 +903,13 @@ export default function AccountingPage() {
                   >
                     {t("otherExpensesGroup")}
                   </td>
-                  <td colSpan={2} />
+                  <td colSpan={3} />
                 </tr>
               </thead>
               <tbody>
                 {filtered.map((row, idx) => {
                   const e = getEdit(row);
+                  const rowAmountsVisible = rowAmountVisibility[row.id] ?? showAmounts;
                   const income = calcIncome(row, e);
                   const dirty = isDirty(row, e);
                   const isSaving = saving[row.id];
@@ -919,13 +938,18 @@ export default function AccountingPage() {
                         </Link>
                       </td>
                       <td className="px-3 py-1.5 whitespace-nowrap font-semibold text-foreground">
-                        {showAmounts ? formatCurrency(row.total, currencySymbol, lang) : "••••••"}
+                        {rowAmountsVisible ? formatCurrency(row.total, currencySymbol, lang) : "••••••"}
                       </td>
-                      <td
-                        className="px-3 py-1.5 whitespace-nowrap max-w-[120px] truncate"
-                        title={row.clientName}
-                      >
-                        {row.clientName}
+                      <td className="px-3 py-1.5">
+                        <div
+                          className="w-[120px] overflow-x-auto whitespace-nowrap [scrollbar-width:thin]"
+                          dir="auto"
+                          tabIndex={0}
+                          title={row.clientName}
+                          aria-label={row.clientName}
+                        >
+                          {row.clientName}
+                        </div>
                       </td>
                       <td className="px-3 py-1.5 whitespace-nowrap text-muted-foreground">
                         {new Date(row.issueDate).toLocaleDateString(
@@ -936,6 +960,7 @@ export default function AccountingPage() {
                       {/* payments المدفوعات */}
                       <td className="px-1.5 py-1.5 border-r border-border/40">
                         <NumInput
+                          visible={rowAmountsVisible}
                           value={e.payments}
                           onChange={(v) => setField(row, "payments", v)}
                         />
@@ -944,6 +969,7 @@ export default function AccountingPage() {
                       {/* transportation النقليات */}
                       <td className="px-1.5 py-1.5 border-r border-border/40">
                         <NumInput
+                          visible={rowAmountsVisible}
                           value={e.transportation}
                           onChange={(v) =>
                             setField(row, "transportation", v)
@@ -983,6 +1009,7 @@ export default function AccountingPage() {
                       {/* labor العمال */}
                       <td className="px-1.5 py-1.5 border-r border-border/40">
                         <NumInput
+                          visible={rowAmountsVisible}
                           value={e.labor}
                           onChange={(v) => setField(row, "labor", v)}
                           paid={e.laborPaid}
@@ -1001,6 +1028,7 @@ export default function AccountingPage() {
                       {/* otherExpenses مصاريف أخرى */}
                       <td className="px-1.5 py-1.5 border-r border-border/40">
                         <NumInput
+                          visible={rowAmountsVisible}
                           value={e.otherExpenses}
                           onChange={(v) => setField(row, "otherExpenses", v)}
                           paid={e.otherExpensesPaid}
@@ -1023,7 +1051,7 @@ export default function AccountingPage() {
                       <td
                         className={`px-3 py-1.5 whitespace-nowrap font-bold bg-green-50/30 dark:bg-green-900/10 border-r border-border/40 ${income >= 0 ? "text-green-600" : "text-red-500"}`}
                       >
-                        {formatCurrency(income, currencySymbol, lang)}
+                        {rowAmountsVisible ? formatCurrency(income, currencySymbol, lang) : "••••••"}
                       </td>
 
                       {/* save  حفظ */}
@@ -1049,6 +1077,18 @@ export default function AccountingPage() {
                           )}
                         </button>
                       </td>
+                      <td className="px-2 py-1.5 text-center">
+                        <button
+                          type="button"
+                          onClick={() => toggleRowAmounts(row.id)}
+                          aria-pressed={rowAmountsVisible}
+                          aria-label={`${rowAmountsVisible ? t("hideAmounts") : t("showAmounts")} — ${row.invoiceNumber}`}
+                          title={rowAmountsVisible ? t("hideAmounts") : t("showAmounts")}
+                          className="inline-flex items-center justify-center w-7 h-7 rounded-lg text-muted-foreground hover:bg-muted hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                        >
+                          {rowAmountsVisible ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </td>
                     </tr>
                   );
                 })}
@@ -1063,26 +1103,26 @@ export default function AccountingPage() {
                   </td>
                   <td colSpan={2} />
                   <td className="px-2 py-2.5 text-blue-500 border-r border-border/40">
-                    {formatCurrency(totalPayments, currencySymbol, lang)}
+                    {showAmounts ? formatCurrency(totalPayments, currencySymbol, lang) : "••••••"}
                   </td>
                   <td className="px-2 py-2.5 text-orange-500 border-r border-border/40">
-                    {formatCurrency(totalTransportation, currencySymbol, lang)}
+                    {showAmounts ? formatCurrency(totalTransportation, currencySymbol, lang) : "••••••"}
                   </td>
                   <td colSpan={3} />
                   <td className="px-2 py-2.5 text-purple-500 border-r border-border/40">
-                    {formatCurrency(totalLabor, currencySymbol, lang)}
+                    {showAmounts ? formatCurrency(totalLabor, currencySymbol, lang) : "••••••"}
                   </td>
                   <td />
                   <td className="px-2 py-2.5 text-red-500 border-r border-border/40">
-                    {formatCurrency(totalOther, currencySymbol, lang)}
+                    {showAmounts ? formatCurrency(totalOther, currencySymbol, lang) : "••••••"}
                   </td>
                   <td />
                   <td
                     className={`px-3 py-2.5 bg-green-50/30 dark:bg-green-900/10 ${totalIncome >= 0 ? "text-green-600" : "text-red-500"}`}
                   >
-                    {formatCurrency(totalIncome, currencySymbol, lang)}
+                    {showAmounts ? formatCurrency(totalIncome, currencySymbol, lang) : "••••••"}
                   </td>
-                  <td />
+                  <td colSpan={2} />
                 </tr>
               </tfoot>
             </table>

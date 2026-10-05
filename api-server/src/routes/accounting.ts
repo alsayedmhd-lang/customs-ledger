@@ -1,5 +1,6 @@
+import { getLocalDb } from "../utils/local-db";
   import { Router, type IRouter } from "express";
-  import { db, invoicesTable, receiptsTable, invoiceAccountingTable, clientsTable } from "@workspace/db";
+  import { invoicesTable, receiptsTable, invoiceAccountingTable, clientsTable } from "@workspace/db";
   import { and, desc, eq, inArray, isNull } from "drizzle-orm";
   import { requireAuth } from "../middleware/auth";
 
@@ -58,7 +59,7 @@
       };
     }
 
-    const [user] = await db
+    const [user] = await getLocalDb()
       .select({ clientId: usersTable.clientId, clientViewPermissions: usersTable.clientViewPermissions })
       .from(usersTable)
       .where(eq(usersTable.id, userId))
@@ -136,7 +137,7 @@
       const to = req.query.to ? String(req.query.to) : "";
       const q = req.query.q ? String(req.query.q).trim().toLowerCase() : "";
 
-      const [client] = await db
+      const [client] = await getLocalDb()
         .select()
         .from(clientsTable)
         .where(eq(clientsTable.id, clientId))
@@ -147,11 +148,11 @@
       }
 
       const invoiceRows = clientScope
-        ? await db
+        ? await getLocalDb()
             .select()
             .from(invoicesTable)
             .where(eq(invoicesTable.clientId, clientId))
-        : await db
+        : await getLocalDb()
             .select()
             .from(invoicesTable)
             .where(
@@ -162,7 +163,7 @@
               )
             );
 
-      const receiptRows = await db
+      const receiptRows = await getLocalDb()
         .select()
         .from(receiptsTable)
         .where(
@@ -293,14 +294,16 @@
       console.error("[GET /customer-ledger/:clientId ERROR]", err);
       res.status(500).json({ error: "Internal server error" });
     }
-  });
+
+  return undefined;
+});
 
   router.patch("/accounting/:invoiceId", requireAuth, async (req, res) => {
     try {
       if (req.user?.role === "client") {
         return res.status(403).json({ error: "Client users have read-only access" });
       }
-      const invoiceId = parseInt(req.params.invoiceId);
+      const invoiceId = parseInt(String(req.params.invoiceId), 10);
       const {
         payments,
         transportation,
@@ -328,7 +331,7 @@
             isNull(invoicesTable.deletedAt)
           );
 
-      const [invoice] = await db
+      const [invoice] = await getLocalDb()
         .select({ id: invoicesTable.id })
         .from(invoicesTable)
         .where(invoiceWhere)
@@ -339,21 +342,21 @@
       }
 
       const toNum = (v: unknown) =>
-        v !== undefined && v !== null && v !== "" ? String(parseFloat(String(v))) : "0";
+        v !== undefined && v !== null && v !== "" ? parseFloat(String(v)) : 0;
 
       const toStr = (v: unknown) =>
         v !== undefined && v !== null && String(v).trim() !== "" ? String(v) : null;
 
       const toBool = (v: unknown) => v === true || v === "true";
 
-      const existing = await db
+      const existing = await getLocalDb()
         .select()
         .from(invoiceAccountingTable)
         .where(eq(invoiceAccountingTable.invoiceId, invoiceId))
         .limit(1);
 
       if (existing.length > 0) {
-        await db
+        await getLocalDb()
           .update(invoiceAccountingTable)
           .set({
             payments: toNum(payments),
@@ -369,7 +372,7 @@
           })
           .where(eq(invoiceAccountingTable.invoiceId, invoiceId));
       } else {
-        await db.insert(invoiceAccountingTable).values({
+        await getLocalDb().insert(invoiceAccountingTable).values({
           invoiceId,
           payments: toNum(payments),
           transportation: toNum(transportation),
@@ -388,7 +391,9 @@
       console.error("[PATCH /accounting/:invoiceId ERROR]", err);
       res.status(500).json({ error: "Internal server error" });
     }
-  });
+
+  return undefined;
+});
 
   router.get("/accounting", requireAuth, async (req, res) => {
     try {
@@ -403,7 +408,7 @@
         filters.push(eq(invoicesTable.createdBy, userId));
       }
 
-      const rows = await db
+      const rows = await getLocalDb()
         .select({
           id: invoicesTable.id,
           invoiceId: invoicesTable.id,
@@ -452,6 +457,8 @@
       console.error("[GET /accounting ERROR]", err);
       res.status(500).json({ error: "Failed to load accounting" });
     }
-  });
+
+  return undefined;
+});
 
   export default router;

@@ -1,15 +1,7 @@
+import { getLocalDb } from "../utils/local-db";
 import { Router, type IRouter } from "express";
 
-import {
-  db,
-  invoicesTable,
-  invoiceItemsTable,
-  clientsTable,
-  usersTable,
-  sqlite,
-  receiptsTable,
-  customerLedgerTableSqlite,
-} from "@workspace/db";
+import { invoicesTable, invoiceItemsTable, clientsTable, usersTable, sqlite, receiptsTable, customerLedgerTableSqlite } from "@workspace/db";
 import { invoiceAuditLogsTableSqlite } from "../../../lib/db/src/schema/invoices-sqlite";
 import { eq, desc, isNull, and, like, isNotNull, sql } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth";
@@ -19,7 +11,7 @@ const router: IRouter = Router();
 
 async function getClientScope(req: any) {
   if (req.user?.role !== "client") return null;
-  const [user] = await db
+  const [user] = await getLocalDb()
     .select({ clientId: usersTable.clientId, clientViewPermissions: usersTable.clientViewPermissions })
     .from(usersTable)
     .where(eq(usersTable.id, req.user.userId))
@@ -47,7 +39,7 @@ try {
 } catch {}
 
 async function getActiveReceiptTotal(invoiceId: number): Promise<number> {
-  const receipts = await db
+  const receipts = await getLocalDb()
     .select({ amount: receiptsTable.amount })
     .from(receiptsTable)
     .where(
@@ -62,7 +54,7 @@ async function getActiveReceiptTotal(invoiceId: number): Promise<number> {
 }
 
 async function getExistingAutoClosingReceipt(invoiceId: number) {
-  const receipts = await db
+  const receipts = await getLocalDb()
     .select({
       id: receiptsTable.id,
       amount: receiptsTable.amount,
@@ -119,7 +111,7 @@ async function generateInvoiceNumber(): Promise<string> {
   const prefix = `INV-${year}-`;
 
   // Use MAX of existing invoice numbers for this year to avoid race conditions
-    const [row] = await db
+    const [row] = await getLocalDb()
       .select({ maxNum: invoicesTable.invoiceNumber })
       .from(invoicesTable)
       .where(like(invoicesTable.invoiceNumber, `${prefix}%`))
@@ -138,7 +130,7 @@ async function generateInvoiceNumber(): Promise<string> {
 
 async function generateReceiptNumber(): Promise<string> {
   const year = new Date().getFullYear();
-  const count = await db.$count(receiptsTable);
+  const count = await getLocalDb().$count(receiptsTable);
   const seq = String(count + 1).padStart(4, "0");
   return `RCP-${year}-${seq}`;
 }
@@ -150,7 +142,7 @@ async function createDirectClosingReceipt(input: {
   receiptDate: string;
   createdBy: number | null;
 }) {
-  const drafts = await db
+  const drafts = await getLocalDb()
     .select()
     .from(receiptsTable)
     .where(and(
@@ -169,7 +161,7 @@ async function createDirectClosingReceipt(input: {
 
   let receipt: typeof receiptsTable.$inferSelect;
   if (drafts.length === 1) {
-    [receipt] = await db
+    [receipt] = await getLocalDb()
       .update(receiptsTable)
       .set({ status: "issued" })
       .where(and(
@@ -179,17 +171,17 @@ async function createDirectClosingReceipt(input: {
       ))
       .returning();
     if (!receipt) throw new Error("DRAFT_RECEIPT_CONFLICT: Draft receipt changed during issue");
-    await db.delete(customerLedgerTableSqlite)
+    await getLocalDb().delete(customerLedgerTableSqlite)
       .where(eq(customerLedgerTableSqlite.receiptId, receipt.id));
   } else {
     const receiptNumber = await generateReceiptNumber();
-    [receipt] = await db
+    [receipt] = await getLocalDb()
       .insert(receiptsTable)
       .values({
         receiptNumber,
         clientId: input.clientId,
         invoiceId: input.invoiceId,
-        amount: input.amount.toFixed(2),
+        amount: Number(input.amount.toFixed(2)),
         paymentMethod: "cash",
         status: "issued",
         notes: directClosingPaymentDescriptionEn,
@@ -199,7 +191,7 @@ async function createDirectClosingReceipt(input: {
       .returning();
   }
 
-  await db.insert(customerLedgerTableSqlite).values({
+  await getLocalDb().insert(customerLedgerTableSqlite).values({
     clientId: receipt.clientId,
     invoiceId: receipt.invoiceId ?? null,
     receiptId: receipt.id,
@@ -447,7 +439,7 @@ router.get("/invoices", requireAuth, async (req, res) => {
     if (clientId) {
       const filters = [eq(invoicesTable.clientId, clientId), isNull(invoicesTable.deletedAt)];
       if (ownerFilter) filters.push(ownerFilter);
-      rows = await db
+      rows = await getLocalDb()
       .select()
       .from(invoicesTable)
       .innerJoin(clientsTable, eq(invoicesTable.clientId, clientsTable.id))
@@ -457,7 +449,7 @@ router.get("/invoices", requireAuth, async (req, res) => {
     } else {
       const filters = [isNull(invoicesTable.deletedAt)];
       if (ownerFilter) filters.push(ownerFilter);
-      rows = await db
+      rows = await getLocalDb()
       .select()
       .from(invoicesTable)
       .innerJoin(clientsTable, eq(invoicesTable.clientId, clientsTable.id))
@@ -468,7 +460,7 @@ router.get("/invoices", requireAuth, async (req, res) => {
 
     const invoicesWithItems = await Promise.all(
       rows.map(async (row) => {
-        const items = await db
+        const items = await getLocalDb()
           .select()
           .from(invoiceItemsTable)
           .where(eq(invoiceItemsTable.invoiceId, row.invoices.id));
@@ -495,6 +487,8 @@ router.get("/invoices", requireAuth, async (req, res) => {
     console.error(err);
     res.status(500).json({ error: "Internal server error" });
   }
+
+  return undefined;
 });
 
 router.post("/invoices", requireAuth, async (req, res) => {
@@ -523,7 +517,7 @@ router.post("/invoices", requireAuth, async (req, res) => {
       return;
     }
     
-    const [client] = await db.select().from(clientsTable).where(eq(clientsTable.id, clientId));
+    const [client] = await getLocalDb().select().from(clientsTable).where(eq(clientsTable.id, clientId));
 
     if (!client) {
       res.status(400).json({ error: "Client not found" });
@@ -542,7 +536,7 @@ router.post("/invoices", requireAuth, async (req, res) => {
     const resolvedStatus = resolveInvoiceStatus(status, parsedAdvancePayment, total);
 
     const deletedInvoiceWithSameShipment = resolvedShipmentRef
-      ? await db
+      ? await getLocalDb()
           .select()
           .from(invoicesTable)
           .where(
@@ -559,7 +553,7 @@ router.post("/invoices", requireAuth, async (req, res) => {
     for (let attempt = 0; attempt < 5; attempt++) {
       const invoiceNumber = await generateInvoiceNumber();
       try {
-        const [inserted] = await db
+        const [inserted] = await getLocalDb()
           .insert(invoicesTable)
           .values({
             invoiceNumber,
@@ -567,16 +561,16 @@ router.post("/invoices", requireAuth, async (req, res) => {
             issueDate,
             dueDate: dueDate ?? null,
             status: resolvedStatus,
-            subtotal: subtotal.toFixed(2),
-            taxRate: parsedTaxRate.toFixed(2),
-            taxAmount: taxAmount.toFixed(2),
-            advancePayment: parsedAdvancePayment.toFixed(2),
-            total: total.toFixed(2),
+            subtotal: Number(subtotal.toFixed(2)),
+            taxRate: Number(parsedTaxRate.toFixed(2)),
+            taxAmount: Number(taxAmount.toFixed(2)),
+            advancePayment: Number(parsedAdvancePayment.toFixed(2)),
+            total: Number(total.toFixed(2)),
             notes: notes ?? null,
             shipmentRef: resolvedShipmentRef,
             billOfLading: billOfLading ?? null,
             packageCount: packageCount ? parseInt(packageCount) : null,
-            shipmentWeight: shipmentWeight ? parseFloat(shipmentWeight).toFixed(3) : null,
+            shipmentWeight: shipmentWeight ? Number(parseFloat(shipmentWeight).toFixed(3)) : null,
             portOfEntry: portOfEntry ?? null,
             importerExporterName: importerExporterName ?? null,
             createdBy: createdBy ? Number(createdBy) : req.user!.userId,
@@ -585,7 +579,7 @@ router.post("/invoices", requireAuth, async (req, res) => {
         invoice = inserted;
         const invoiceLedgerDebit = getOriginalInvoiceTotal(inserted);
 
-        await db.insert(customerLedgerTableSqlite).values({
+        await getLocalDb().insert(customerLedgerTableSqlite).values({
           clientId: inserted.clientId,
           invoiceId: inserted.id,
           receiptId: null,
@@ -608,7 +602,7 @@ router.post("/invoices", requireAuth, async (req, res) => {
         });
 
         if (Number(inserted.advancePayment ?? 0) > 0) {
-          await db.insert(customerLedgerTableSqlite).values({
+          await getLocalDb().insert(customerLedgerTableSqlite).values({
             clientId: inserted.clientId,
             invoiceId: inserted.id,
             receiptId: null,
@@ -631,7 +625,7 @@ router.post("/invoices", requireAuth, async (req, res) => {
           });
         }
                   
-      await db.insert(invoiceAuditLogsTableSqlite).values({
+      await getLocalDb().insert(invoiceAuditLogsTableSqlite).values({
         invoiceId: inserted.id,
         action:
           Array.isArray(deletedInvoiceWithSameShipment) &&
@@ -666,14 +660,14 @@ router.post("/invoices", requireAuth, async (req, res) => {
         const qty = parseFloat(String(item.quantity));
         const price = parseFloat(String(item.unitPrice));
         const itemTotal = qty * price;
-        const [inserted] = await db
+        const [inserted] = await getLocalDb()
           .insert(invoiceItemsTable)
           .values({
             invoiceId: invoice!.id,
             description: item.description,
-            quantity: qty.toFixed(3),
-            unitPrice: price.toFixed(2),
-            total: itemTotal.toFixed(2),
+            quantity: Number(qty.toFixed(3)),
+            unitPrice: Number(price.toFixed(2)),
+            total: Number(itemTotal.toFixed(2)),
           })
           .returning();
         return formatItem(inserted);
@@ -738,11 +732,11 @@ router.get("/invoices/duplicate-check", requireAuth, async (req, res) => {
       filters.push(sql`upper(trim(${invoicesTable.billOfLading})) = ${bill}`);
     }
     if (clientScope?.clientId) filters.push(eq(invoicesTable.clientId, clientScope.clientId));
-    if (!["admin", "supervisor", "client"].includes(req.user!.role)) {
+    if (!["admin", "supervisor", "client"].includes(req.user!.role ?? "")) {
       filters.push(eq(invoicesTable.createdBy, req.user!.userId));
     }
     // Fetch reference fields only; do not load items or attachments.
-    const rows = await db.select({
+    const rows = await getLocalDb().select({
       id: invoicesTable.id,
       invoiceNumber: invoicesTable.invoiceNumber,
       shipmentRef: invoicesTable.shipmentRef,
@@ -790,8 +784,8 @@ router.get("/invoices/duplicate-check", requireAuth, async (req, res) => {
 
 router.get("/invoices/:id", async (req, res) => {
   try {
-    const id = parseInt(req.params.id);
-    const rows = await db
+    const id = parseInt(String(req.params.id), 10);
+    const rows = await getLocalDb()
       .select()
       .from(invoicesTable)
       .innerJoin(clientsTable, eq(invoicesTable.clientId, clientsTable.id))
@@ -808,7 +802,7 @@ router.get("/invoices/:id", async (req, res) => {
     if (clientScope && (!clientScope.clientId || row.invoices.clientId !== clientScope.clientId || clientScope.permissions?.canViewInvoices === false)) {
       return res.status(403).json({ error: "Invoice is not allowed for this client user" });
     }
-    const items = await db
+    const items = await getLocalDb()
       .select()
       .from(invoiceItemsTable)
       .where(eq(invoiceItemsTable.invoiceId, id));
@@ -831,16 +825,18 @@ router.get("/invoices/:id", async (req, res) => {
     console.error(err);
     res.status(500).json({ error: "Internal server error" });
   }
+
+  return undefined;
 });
 
 router.get("/invoices/:id/audit-logs", requireAuth, async (req, res) => {
   try {
-    const id = parseInt(req.params.id);
+    const id = parseInt(String(req.params.id), 10);
     if (req.user?.role === "client") {
       return res.status(403).json({ error: "Audit logs are not allowed for client users" });
     }
 
-    const logs = await db
+    const logs = await getLocalDb()
       .select()
       .from(invoiceAuditLogsTableSqlite)
       .where(eq(invoiceAuditLogsTableSqlite.invoiceId, id))
@@ -851,14 +847,16 @@ router.get("/invoices/:id/audit-logs", requireAuth, async (req, res) => {
     console.error(err);
     res.status(500).json({ error: "Internal server error" });
   }
+
+  return undefined;
 });
 
 router.put("/invoices/:id", async (req, res) => {
   try {
     if (rejectClientWrite(req, res)) return;
-    const id = parseInt(req.params.id);
+    const id = parseInt(String(req.params.id), 10);
 
-    const [beforeInvoice] = await db
+    const [beforeInvoice] = await getLocalDb()
       .select()
       .from(invoicesTable)
       .where(eq(invoicesTable.id, id));
@@ -868,7 +866,7 @@ router.put("/invoices/:id", async (req, res) => {
       return;
     }
 
-    const beforeItems = await db
+    const beforeItems = await getLocalDb()
       .select()
       .from(invoiceItemsTable)
       .where(eq(invoiceItemsTable.invoiceId, id));
@@ -893,7 +891,7 @@ router.put("/invoices/:id", async (req, res) => {
 
 
 
-    const [client] = await db
+    const [client] = await getLocalDb()
       .select()
       .from(clientsTable)
       .where(eq(clientsTable.id, clientId));
@@ -972,11 +970,11 @@ router.put("/invoices/:id", async (req, res) => {
       issueDate,
       dueDate: dueDate ?? null,
       status: resolvedStatus,
-      subtotal: subtotal.toFixed(2),
-      taxRate: parsedTaxRate.toFixed(2),
-      taxAmount: taxAmount.toFixed(2),
-      advancePayment: effectiveAdvancePayment.toFixed(2),
-      total: total.toFixed(2),
+      subtotal: Number(subtotal.toFixed(2)),
+      taxRate: Number(parsedTaxRate.toFixed(2)),
+      taxAmount: Number(taxAmount.toFixed(2)),
+      advancePayment: Number(effectiveAdvancePayment.toFixed(2)),
+      total: Number(total.toFixed(2)),
       notes: notes ?? null,
       shipmentRef: resolvedShipmentRef,
       billOfLading: billOfLading ?? null,
@@ -998,7 +996,7 @@ router.put("/invoices/:id", async (req, res) => {
       updateData.createdBy = Number(createdBy);
     }
 
-    const [invoice] = await db
+    const [invoice] = await getLocalDb()
       .update(invoicesTable)
       .set(updateData)
       .where(and(eq(invoicesTable.id, id), isNull(invoicesTable.deletedAt)))
@@ -1009,7 +1007,7 @@ router.put("/invoices/:id", async (req, res) => {
       return;
     }
 
-    await db
+    await getLocalDb()
       .delete(invoiceItemsTable)
       .where(eq(invoiceItemsTable.invoiceId, id));
 
@@ -1024,14 +1022,14 @@ router.put("/invoices/:id", async (req, res) => {
           const price = parseFloat(String(item.unitPrice));
           const itemTotal = qty * price;
 
-          const [inserted] = await db
+          const [inserted] = await getLocalDb()
             .insert(invoiceItemsTable)
             .values({
               invoiceId: invoice.id,
               description: item.description,
-              quantity: qty.toFixed(3),
-              unitPrice: price.toFixed(2),
-              total: itemTotal.toFixed(2),
+              quantity: Number(qty.toFixed(3)),
+              unitPrice: Number(price.toFixed(2)),
+              total: Number(itemTotal.toFixed(2)),
             })
             .returning();
 
@@ -1048,7 +1046,7 @@ router.put("/invoices/:id", async (req, res) => {
     });
 
     if (auditChanges.changes.length > 0) {
-      await db.insert(invoiceAuditLogsTableSqlite).values({
+      await getLocalDb().insert(invoiceAuditLogsTableSqlite).values({
         invoiceId: invoice.id,
         action: "updated",
         userId: req.user?.userId ?? null,
@@ -1087,23 +1085,25 @@ router.put("/invoices/:id", async (req, res) => {
     console.error(err);
     res.status(500).json({ error: "Internal server error" });
   }
+
+  return undefined;
 });
 
 // Soft delete invoice (move to trash)
 router.delete("/invoices/:id", async (req, res) => {
   try {
     if (rejectClientWrite(req, res)) return;
-    const id = parseInt(req.params.id);
-     const [oldInvoice] = await db
+    const id = parseInt(String(req.params.id), 10);
+     const [oldInvoice] = await getLocalDb()
       .select()
       .from(invoicesTable)
       .where(eq(invoicesTable.id, id)); 
-    await db
+    await getLocalDb()
       .update(invoicesTable)
       .set({ deletedAt: new Date() })
       .where(and(eq(invoicesTable.id, id), isNull(invoicesTable.deletedAt)));
 
-    await db.insert(invoiceAuditLogsTableSqlite).values({
+    await getLocalDb().insert(invoiceAuditLogsTableSqlite).values({
         invoiceId: id,
         action: "deleted",
         userId: req.user?.userId ?? null,
@@ -1124,7 +1124,7 @@ router.delete("/invoices/:id", async (req, res) => {
   }
 });
 
-export function formatInvoice(inv: typeof invoicesTable.$inferSelect, clientName: string) {
+export function formatInvoice(inv: typeof invoicesTable.$inferSelect & { createdByName?: string | null; createdByNameEn?: string | null }, clientName: string) {
   return {
     id: inv.id,
     invoiceNumber: inv.invoiceNumber,
@@ -1212,7 +1212,7 @@ async function generateNextDeclarationNumber(
     return requested || null;
   }
 
-  const allInvoices = await db.select().from(invoicesTable);
+  const allInvoices = await getLocalDb().select().from(invoicesTable);
   const matchingInvoices = allInvoices.filter((inv: any) => {
     if (excludeInvoiceId && String(inv.id) === String(excludeInvoiceId)) return false;
     return getShipmentBase(inv.shipmentRef) === declarationBaseNumber;
@@ -1251,7 +1251,7 @@ router.post("/invoices/import", requireAuth, async (req, res) => {
       // A suffix is part of the declaration identity during backup import.
       // Do not collapse 123...-1, 123.../1 or 123...(1) into the base declaration.
       const shipmentRef = String(row.shipmentRef ?? "").trim() || null;
-      const [existing] = await db
+      const [existing] = await getLocalDb()
         .select()
         .from(invoicesTable)
         .where(
@@ -1264,7 +1264,7 @@ router.post("/invoices/import", requireAuth, async (req, res) => {
         ? Number(clientIdMap[String(row.clientId)])
         : Number(row.clientId);
 
-      const [clientExists] = await db
+      const [clientExists] = await getLocalDb()
         .select()
         .from(clientsTable)
         .where(eq(clientsTable.id, requestedClientId))
@@ -1280,7 +1280,7 @@ router.post("/invoices/import", requireAuth, async (req, res) => {
       // Keep an existing invoice's number stable; ledger and receipts may refer to it.
       let finalInvoiceNumber = existing?.invoiceNumber ?? String(row.invoiceNumber);
 
-      const [sameInvoiceNumber] = await db
+      const [sameInvoiceNumber] = await getLocalDb()
         .select()
         .from(invoicesTable)
         .where(eq(invoicesTable.invoiceNumber, finalInvoiceNumber))
@@ -1296,7 +1296,7 @@ router.post("/invoices/import", requireAuth, async (req, res) => {
         while (true) {
           const candidate = `${baseInvoice} (${counter})`;
 
-          const [existsCandidate] = await db
+          const [existsCandidate] = await getLocalDb()
             .select()
             .from(invoicesTable)
             .where(eq(invoicesTable.invoiceNumber, candidate))
@@ -1335,20 +1335,20 @@ router.post("/invoices/import", requireAuth, async (req, res) => {
 
       if (existing && shipmentRef) {
       
-        await db
+        await getLocalDb()
           .update(invoicesTable)
           .set(values)
           .where(eq(invoicesTable.id, existing.id));
 
         invoiceId = existing.id;
 
-        await db
+        await getLocalDb()
           .delete(invoiceItemsTable)
           .where(eq(invoiceItemsTable.invoiceId, invoiceId));
 
         updated++;
       } else {
-        const [created] = await db
+        const [created] = await getLocalDb()
           .insert(invoicesTable)
           .values({
             ...values,
@@ -1360,7 +1360,7 @@ router.post("/invoices/import", requireAuth, async (req, res) => {
 
           const invoiceAmount = getOriginalInvoiceTotal(values);
 
-          await db.insert(customerLedgerTableSqlite).values({
+          await getLocalDb().insert(customerLedgerTableSqlite).values({
             clientId: values.clientId,
 
             invoiceId: created.id,
@@ -1385,7 +1385,7 @@ router.post("/invoices/import", requireAuth, async (req, res) => {
           });
 
           if (Number(values.advancePayment ?? 0) > 0) {
-            await db.insert(customerLedgerTableSqlite).values({
+            await getLocalDb().insert(customerLedgerTableSqlite).values({
               clientId: values.clientId,
               invoiceId: created.id,
               receiptId: null,
@@ -1412,7 +1412,7 @@ router.post("/invoices/import", requireAuth, async (req, res) => {
       }
 
       if (Array.isArray(row.items) && row.items.length > 0) {
-        await db.insert(invoiceItemsTable).values(
+        await getLocalDb().insert(invoiceItemsTable).values(
           row.items.map((item: any) => ({
             invoiceId,
             description: String(item.description ?? ""),

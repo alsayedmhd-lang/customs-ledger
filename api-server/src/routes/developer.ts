@@ -1,7 +1,9 @@
+import { internalConnectionEnabled, setInternalConnectionEnabled } from "../utils/connection-state";
 import { Router } from "express";
 import type { Request, Response, NextFunction } from "express";
-import { db, sqlite, companySettingsTable } from "@workspace/db";
+import { sqlite, companySettingsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/better-sqlite3";
 import fs from "fs";
 import os from "os";
 import path from "path";
@@ -11,7 +13,7 @@ import packageJson from "../../../package.json";
 import { requireAdmin, requireAuth } from "../middleware/auth";
 import { ensureSyncQueueTable } from "../utils/ensure-sync-queue-table";
 import {
-  runConfiguredSyncOnce,
+  runConfiguredSyncOnce, isOnlineSyncRunning,
 } from "../utils/sync-worker";
 import { getStorageInfo } from "../utils/storage/get-storage-info";
 import { bootstrapInternalDatabase, completeInternalAccounting } from "../utils/internal-bootstrap";
@@ -80,8 +82,8 @@ router.get("/dashboard/system-status", requireAuth, async (_req, res) => {
     const onlineConfigured = Boolean(onlineConnection);
     const internalConfigured = Boolean(internalConnection);
     const [online, internal] = await Promise.all([
-      onlineConfigured ? checkPostgres(onlineConnection) : false,
-      internalConfigured ? checkPostgres(internalConnection) : false,
+      onlineConfigured && settings.databaseMode === "online" ? checkPostgres(onlineConnection) : false,
+      internalConfigured && internalConnectionEnabled() ? checkPostgres(internalConnection) : false,
     ]);
 
     let pending = 0;
@@ -99,9 +101,11 @@ router.get("/dashboard/system-status", requireAuth, async (_req, res) => {
     }
 
     return res.json({
-      connections: { local, online, internal, onlineConfigured, internalConfigured },
+      connections: { local, online, internal, onlineConfigured, internalConfigured, onlineEnabled: settings.databaseMode === "online", internalEnabled: internalConnectionEnabled() },
       sync: {
-        status: String((settings as any)?.syncStatus || "idle"),
+        autoSync: toBool(settings.syncAutoSync),
+        internalAutoSync: toBool(settings.internalSyncAutoSync),
+        status: isOnlineSyncRunning() ? "running" : String((settings as any)?.syncStatus || "idle") === "running" ? "idle" : String((settings as any)?.syncStatus || "idle"),
         lastSync: (settings as any)?.syncLastSyncTime || null,
         pending,
         failed,
@@ -1591,13 +1595,18 @@ function mapDeveloperPermissions(settings: any) {
   };
 }
 
+function developerDb() {
+  if (!sqlite) throw new Error("Local SQLite database is unavailable");
+  return drizzle(sqlite);
+}
+
 async function getSettingsRow() {
   ensureDeveloperSettingsColumns();
 
-  let [settings] = await db.select().from(companySettingsTable).limit(1);
+  let [settings] = await developerDb().select().from(companySettingsTable).limit(1);
 
   if (!settings) {
-    [settings] = await db.insert(companySettingsTable).values({ id: 1 }).returning();
+    [settings] = await developerDb().insert(companySettingsTable).values({ id: 1 }).returning();
   }
 
   return settings;
@@ -1716,6 +1725,7 @@ router.get("/developer/settings", async (_req, res) => {
 
 function mapInternalDatabaseSettings(settings: any) {
   return {
+    connectionEnabled: internalConnectionEnabled(),
     host: settings.internalDatabaseHost || "",
     port: settings.internalDatabasePort || "5432",
     databaseName: settings.internalDatabaseName || "",
@@ -1728,6 +1738,53 @@ function mapInternalDatabaseSettings(settings: any) {
     intervalMinutes: Number(settings.internalSyncIntervalMinutes || 30),
   };
 }
+
+let internalRequests = 0;
+router.use("/developer/internal-database", (req, res, next) => {
+  if (req.path === "/connection" || req.path === "/settings" || req.path === "/auto-status" || req.path === "/journal-status") {
+    next(); return;
+  }
+  if (!internalConnectionEnabled()) {
+    res.status(409).json({ ok: false, error: "Internal connection is disconnected on this device" }); return;
+  }
+  internalRequests++;
+  let released = false;
+  const release = () => { if (!released) { released = true; internalRequests--; } };
+  res.once("finish", release);
+  next();
+});
+
+router.post("/developer/internal-database/connection", async (req, res) => {
+  let client: InstanceType<typeof PgClient> | undefined;
+  try {
+    const enabled = req.body?.enabled;
+    if (typeof enabled !== "boolean") { res.status(400).json({ error: "enabled must be a boolean" }); return; }
+    if (internalRequests || getInternalAutoSyncStatus().running) {
+      res.status(409).json({ error: "An internal operation is running; wait for completion" }); return;
+    }
+    if (enabled) {
+      const saved = mapInternalDatabaseSettings(await getSettingsRow());
+      let connectionString = saved.connectionString.trim();
+      if (!connectionString) {
+        if (!saved.host.trim() || !saved.databaseName.trim() || !saved.username.trim()) throw new Error("Save internal server settings first");
+        const url = new URL("postgresql://localhost");
+        url.hostname = saved.host.trim(); url.port = saved.port;
+        url.pathname = `/${encodeURIComponent(saved.databaseName.trim())}`;
+        url.username = saved.username.trim(); url.password = saved.password;
+        connectionString = url.toString();
+      }
+      if (!isPostgresConnectionString(connectionString)) throw new Error("Invalid PostgreSQL connection string");
+      client = new PgClient({ connectionString, connectionTimeoutMillis: 5000, query_timeout: 5000 });
+      await client.connect(); await client.query("select 1");
+    }
+    setInternalConnectionEnabled(enabled);
+    res.json({ enabled, success: true });
+  } catch (error) {
+    res.status(400).json({ error: sanitizeDatabaseError(error) });
+  } finally {
+    if (client) await client.end().catch(() => undefined);
+  }
+});
 
 router.get("/developer/internal-database/settings", async (_req, res) => {
   try {
@@ -1955,10 +2012,13 @@ router.put("/developer/internal-database/settings", async (req, res) => {
       return res.status(400).json({ error: "Invalid internal sync settings" });
     }
     const settings = await getSettingsRow();
+    if (body.autoSync && !internalConnectionEnabled()) {
+      return res.status(409).json({ error: "Connect to the internal server before enabling automatic sync" });
+    }
     if (body.autoSync && settings.databaseMode === "online" && settings.syncAutoSync) {
       return res.status(409).json({ error: "Disable Online automatic sync before enabling internal automatic sync" });
     }
-    const [updated] = await db.update(companySettingsTable).set({
+    const [updated] = await developerDb().update(companySettingsTable).set({
       internalDatabaseHost: body.host.trim(),
       internalDatabasePort: port,
       internalDatabaseName: body.databaseName.trim(),
@@ -2287,12 +2347,13 @@ router.post("/developer/sync/online-connection", async (req, res) => {
   try {
     const enabled = req.body?.enabled;
     if (typeof enabled !== "boolean") return res.status(400).json({ error: "enabled must be a boolean" });
+    if (isOnlineSyncRunning()) { res.status(409).json({ error: "An Online sync operation is running; wait for completion" }); return; }
     const settings = await getSettingsRow();
     const connectionString = enabled ? String(req.body?.connectionString || "").trim() : "";
     if (enabled && !isPostgresConnectionString(connectionString)) {
       return res.status(400).json({ error: "A PostgreSQL connection string is required" });
     }
-    const [updated] = await db.update(companySettingsTable).set({
+    const [updated] = await developerDb().update(companySettingsTable).set({
       databaseMode: enabled ? "online" : "local",
       databaseProvider: "sqlite",
       ...(enabled ? { databaseConnectionString: connectionString, databaseUseConnectionString: true } : {}),
@@ -2401,7 +2462,7 @@ router.put("/developer/settings", async (req, res) => {
       return res.status(409).json({ error: "Disable internal automatic sync before enabling Online automatic sync" });
     }
 
-    const [updated] = await db
+    const [updated] = await developerDb()
       .update(companySettingsTable)
       .set({
         lockCompanyIdentity: !!body.lockCompanyIdentity,

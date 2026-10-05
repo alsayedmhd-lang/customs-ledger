@@ -1,3 +1,4 @@
+import { ensureLocalTemplateNumbers, ensurePgTemplateNumbers } from "./template-numbering";
 import { sqlite } from "@workspace/db";
 import { createRequire } from "module";
 import { convertInternalValue } from "./internal-bootstrap";
@@ -103,6 +104,7 @@ function canonicalJson(value: unknown): string {
 }
 
 async function performInternalPull(connectionString: string) {
+  ensureLocalTemplateNumbers();
   ensureInternalSyncJournal();
   if (!sqlite) throw new Error("SQLite database is unavailable");
   const pending = sqlite.prepare("SELECT COUNT(*) AS count FROM internal_sync_journal").get() as { count: number };
@@ -112,6 +114,7 @@ async function performInternalPull(connectionString: string) {
   const source: Array<{ name: string; columns: Array<{ name: string; type: string }>; rows: Array<Record<string, unknown>> }> = [];
   try {
     await client.connect();
+    await ensurePgTemplateNumbers(client, false);
     await client.query("BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY");
     inPgTransaction = true;
     await client.query("SET LOCAL statement_timeout = '30s'");
@@ -173,6 +176,33 @@ function applyInternalSource(source: Array<{
         `UPDATE ${quote(table.name)} SET ${updateNames.map((name) => `${quote(name)} = ?`).join(", ")} WHERE id = ?`,
       );
       for (const remote of table.rows) {
+        if (table.name === "invoice_item_templates") {
+          const code = String(remote.item_code ?? "").trim();
+          const description = String(remote.description ?? "").trim();
+          if (!code || !description) throw new Error("Internal template identity is incomplete");
+          const matches = sqlite!.prepare(
+            "SELECT * FROM invoice_item_templates WHERE item_code = ?"
+          ).all(code) as Array<Record<string, unknown>>;
+          if (matches.length > 1) throw new Error(`Duplicate internal template code: ${code}`);
+          const localTemplate = matches[0];
+          const duplicates = sqlite!.prepare("SELECT id, item_code FROM invoice_item_templates WHERE LOWER(TRIM(description)) = LOWER(TRIM(?))").all(description) as Array<{id:number;item_code:string|null}>;
+          if (duplicates.some(row => row.item_code && row.item_code !== code)) {
+            throw new Error(`Internal template description has another code: ${description}`);
+          }
+          const columns = table.columns.filter(column => column.name !== "id");
+          if (localTemplate?.display_code != null && remote.display_code != null && Number(localTemplate.display_code) !== Number(remote.display_code)) throw new Error(`Internal template number conflict: ${code}`);
+          const values = columns.map(({name,type}) => name === "display_code" && remote[name] == null && localTemplate?.display_code != null ? localTemplate.display_code : fromInternalValue(table.name,name,type,remote[name]));
+          if (localTemplate) {
+            if (columns.some(({name},index) => localTemplate[name] !== values[index])) {
+              sqlite!.prepare(`UPDATE invoice_item_templates SET ${columns.map(({name}) => `${quote(name)} = ?`).join(", ")} WHERE id = ?`).run(...values,localTemplate.id);
+              updated++;
+            }
+          } else {
+            sqlite!.prepare(`INSERT INTO invoice_item_templates (${columns.map(({name}) => quote(name)).join(", ")}) VALUES (${columns.map(() => "?").join(", ")})`).run(...values);
+            inserted++;
+          }
+          continue;
+        }
         const id = remote.id;
         const local = select.get(id) as Record<string, unknown> | undefined;
         if (local && table.name === "invoice_items" && Number(local.invoice_id) !== Number(remote.invoice_id)) {
@@ -232,6 +262,7 @@ function applyInternalSource(source: Array<{
 }
 
 async function performInternalJournalPull(connectionString: string) {
+  ensureLocalTemplateNumbers();
   ensureInternalSyncJournal();
   if (!sqlite) throw new Error("SQLite database is unavailable");
   const pending = sqlite.prepare("SELECT COUNT(*) AS count FROM internal_sync_journal").get() as { count: number };
@@ -242,6 +273,7 @@ async function performInternalJournalPull(connectionString: string) {
   const source: Array<{ name: string; columns: Array<{ name: string; type: string }>; rows: Array<Record<string, unknown>> }> = [];
   try {
     await client.connect();
+    await ensurePgTemplateNumbers(client, false);
     await client.query("BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY");
     transaction = true;
     await client.query("SET LOCAL statement_timeout = '30s'");
@@ -290,13 +322,14 @@ async function performInternalJournalPull(connectionString: string) {
 }
 
 async function performInternalPush(connectionString: string, bidirectional = false) {
+  ensureLocalTemplateNumbers();
   ensureInternalSyncJournal();
   if (!sqlite) throw new Error("SQLite database is unavailable");
   const sqliteDb = sqlite;
   const changes = sqliteDb.prepare(`
-    SELECT id, table_name AS tableName, row_id AS rowId, invoice_id AS invoiceId
+    SELECT id, table_name AS tableName, row_id AS rowId, invoice_id AS invoiceId, item_code AS itemCode
     FROM internal_sync_journal ORDER BY id LIMIT 500
-  `).all() as Array<{ id: number; tableName: string; rowId: number; invoiceId: number | null }>;
+  `).all() as Array<{ id: number; tableName: string; rowId: number; invoiceId: number | null; itemCode: string | null }>;
   if (!changes.length) return { processed: 0, changedRows: 0 };
   const watermark = changes[changes.length - 1].id;
   const validTables = new Set<string>(TABLES);
@@ -320,10 +353,14 @@ async function performInternalPush(connectionString: string, bidirectional = fal
   let inTransaction = false;
   try {
     await client.connect();
+    await ensurePgTemplateNumbers(client, false);
     await client.query("BEGIN");
     inTransaction = true;
     await client.query("SET LOCAL statement_timeout = '30s'");
     await client.query("SELECT pg_advisory_xact_lock(68291301)");
+    if (snapshot.some(table => table.name === "invoice_item_templates" && table.rows.length)) {
+      await client.query("LOCK TABLE public.invoice_item_templates IN SHARE ROW EXCLUSIVE MODE");
+    }
     if (bidirectional) {
       // Lock business tables before checking the remote journal so a server
       // writer cannot slip an edit between conflict detection and our upsert.
@@ -331,7 +368,7 @@ async function performInternalPush(connectionString: string, bidirectional = fal
       const remote = await client.query("SELECT table_name, row_id FROM public.internal_sync_journal");
       const localKeys = new Set(changes.map(({ tableName, rowId }) => `${tableName}:${rowId}`));
       const conflicts: Array<Record<string, unknown>> = [];
-      for (const change of remote.rows.filter(row => localKeys.has(`${row.table_name}:${row.row_id}`))) {
+      for (const change of remote.rows.filter(row => row.table_name !== "invoice_item_templates" && localKeys.has(`${row.table_name}:${row.row_id}`))) {
         const table = snapshot.find(table => table.name === change.table_name);
         if (!table) throw new Error("Unknown internal conflict table");
         const local = table.rows.find(row => row.id === Number(change.row_id))?.row;
@@ -361,7 +398,18 @@ async function performInternalPush(connectionString: string, bidirectional = fal
     for (const table of [...snapshot].reverse()) {
       for (const { id, row } of table.rows) {
         if (!row) {
-          if (table.name === "invoice_items") {
+          if (table.name === "invoice_item_templates") {
+            const event = [...changes].reverse().find(change => change.tableName === table.name && change.rowId === id);
+            const code = String(event?.itemCode ?? "").trim();
+            if (!code) throw new Error(`Legacy template deletion has no code: ${id}; manual resolution required`);
+            const remote = await client.query("SELECT id FROM public.invoice_item_templates WHERE item_code=$1 FOR UPDATE", [code]);
+            if (remote.rows.length > 1) throw new Error(`Duplicate server template code: ${code}`);
+            if (remote.rows.length) {
+              const pending = await client.query("SELECT id FROM public.internal_sync_journal WHERE table_name='invoice_item_templates' AND row_id=$1 LIMIT 1", [remote.rows[0].id]);
+              if (pending.rows.length) throw new Error(`Server template changed before deletion: ${code}`);
+              await client.query("DELETE FROM public.invoice_item_templates WHERE item_code=$1", [code]);
+            }
+          } else if (table.name === "invoice_items") {
             const existing = await client.query("SELECT invoice_id FROM public.invoice_items WHERE id=$1 FOR UPDATE", [id]);
             if (!existing.rows.length) continue;
             const event = [...changes].reverse().find(change => change.tableName === table.name && change.rowId === id);
@@ -378,6 +426,34 @@ async function performInternalPush(connectionString: string, bidirectional = fal
     for (const table of snapshot) {
       for (const { row } of table.rows) {
         if (!row) continue;
+        if (table.name === "invoice_item_templates") {
+          const code = String(row.item_code ?? "").trim();
+          const description = String(row.description ?? "").trim();
+          if (!code || !description) throw new Error("Local template identity is incomplete");
+          const existing = await client.query("SELECT * FROM public.invoice_item_templates WHERE item_code=$1 FOR UPDATE", [code]);
+          if (existing.rows.length > 1) throw new Error(`Duplicate server template code: ${code}`);
+          const duplicateDescription = await client.query("SELECT item_code FROM public.invoice_item_templates WHERE LOWER(TRIM(description))=LOWER(TRIM($1)) FOR UPDATE", [description]);
+          if (duplicateDescription.rows.some(other => other.item_code && String(other.item_code) !== code)) throw new Error(`Server template description has another code: ${description}`);
+          const remoteTemplate = existing.rows[0];
+          const columns = table.columns.filter(column => column !== "id");
+          const values = columns.map(column => convertInternalValue(table.name,column,row[column]));
+          if (remoteTemplate) {
+            const pending = await client.query("SELECT id FROM public.internal_sync_journal WHERE table_name='invoice_item_templates' AND row_id=$1 LIMIT 1", [remoteTemplate.id]);
+            const same = String(remoteTemplate.description) === String(row.description) && Number(remoteTemplate.default_unit_price ?? 0) === Number(row.default_unit_price ?? 0);
+            if (pending.rows.length && !same) throw new Error(`Internal template edit conflict: ${code}; no changes sent`);
+            if (row.display_code != null && remoteTemplate.display_code != null && Number(row.display_code) !== Number(remoteTemplate.display_code)) throw new Error(`Internal template number conflict: ${code}`);
+            if (row.display_code != null && remoteTemplate.display_code == null) {
+              await client.query("UPDATE public.invoice_item_templates SET display_code=$1 WHERE item_code=$2",[row.display_code,code]);
+            }
+            if (!same) {
+              // Preserve original creation date and shared code on edits.
+              await client.query("UPDATE public.invoice_item_templates SET description=$1, default_unit_price=$2 WHERE item_code=$3", [description,row.default_unit_price,code]);
+            }
+          } else {
+            await client.query(`INSERT INTO public.invoice_item_templates (${columns.map(quote).join(", ")}) VALUES (${columns.map((_,index) => `$${index+1}`).join(", ")})`,values);
+          }
+          continue;
+        }
         const values = table.columns.map((column) => convertInternalValue(table.name, column, row[column]));
         if (table.name === "invoice_items" || table.name === "invoices") {
           const identityColumn = table.name === "invoice_items" ? "invoice_id" : "invoice_number";
@@ -428,7 +504,7 @@ async function performInternalPush(connectionString: string, bidirectional = fal
           values,
         );
       }
-      if (table.rows.some(({ row }) => Boolean(row))) {
+      if (table.name !== "invoice_item_templates" && table.rows.some(({ row }) => Boolean(row))) {
         await client.query(
           `SELECT setval(pg_get_serial_sequence('public.${table.name}', 'id'), ` +
           `(SELECT MAX(id) FROM public.${quote(table.name)}))`,

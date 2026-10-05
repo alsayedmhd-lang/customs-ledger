@@ -1,7 +1,8 @@
+import { getLocalDb } from "../utils/local-db";
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import { db, sqlite } from "@workspace/db";
+import { sqlite } from "@workspace/db";
 import { runConfiguredSyncOnce } from "../utils/sync-worker";
 import { usersTable, otpCodesTable, DEFAULT_PERMISSIONS, companySettingsTable } from "@workspace/db/schema";
 import { and, eq, gt, isNull, sql } from "drizzle-orm";
@@ -45,19 +46,20 @@ function requireAdminOrDeveloperUsersManagement(
 // must never prevent local authentication.
 function scheduleLoginSync() {
   if (!sqlite) return;
+  const localSqlite = sqlite;
   try {
-    const settings = sqlite.prepare(
+    const settings = localSqlite.prepare(
       "SELECT sync_auto_sync AS autoSync, sync_timing AS timing, sync_mode AS mode, database_mode AS databaseMode, internal_sync_auto_sync AS internalAutoSync FROM company_settings LIMIT 1"
     ).get() as { autoSync: number; timing: string; mode: string; databaseMode: string; internalAutoSync: number } | undefined;
     if (!settings?.autoSync || settings.databaseMode !== "online" || settings.internalAutoSync || !["startup", "interval"].includes(settings.timing)) return;
     setImmediate(() => {
       void runConfiguredSyncOnce(settings.mode).then((result) => {
-        sqlite.prepare("UPDATE company_settings SET sync_status = ?, sync_last_sync_time = ?")
+        localSqlite.prepare("UPDATE company_settings SET sync_status = ?, sync_last_sync_time = ?")
           .run(result.lastError ? "failed" : "success", result.lastError ? "" : new Date().toISOString());
         if (result.lastError) console.warn("[SYNC][LOGIN]", result.lastError);
       }).catch((error) => {
         console.error("[SYNC][LOGIN][ERROR]", error);
-        try { sqlite.prepare("UPDATE company_settings SET sync_status = 'failed'").run(); } catch { /* Log above. */ }
+        try { localSqlite.prepare("UPDATE company_settings SET sync_status = 'failed'").run(); } catch { /* Log above. */ }
       });
     });
   } catch (error) {
@@ -140,6 +142,28 @@ async function sendOTPEmail(
   }
 }
 
+async function sendPasswordResetEmail(to: string, code: string, displayName: string, validityMinutes = 10): Promise<boolean> {
+  const apiKey = process.env.BREVO_API_KEY;
+  if (!apiKey) return false;
+  const safeName = displayName.replace(/[&<>"']/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[character]!));
+  try {
+    const response = await fetch("https://api.brevo.com/v3/smtp/email", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "api-key": apiKey, accept: "application/json" },
+      body: JSON.stringify({
+        sender: { name: "Ledger", email: process.env.SMTP_FROM || "atwcc1246@gmail.com" },
+        to: [{ email: to }],
+        subject: "Ledger — رمز استعادة كلمة المرور",
+        htmlContent: `<div dir="rtl" style="font-family:Arial,sans-serif;padding:20px"><h2>استعادة كلمة المرور</h2><p>مرحباً ${safeName}</p><p>رمز التحقق لتغيير كلمة المرور:</p><div style="font-size:32px;font-weight:bold">${code}</div><p>صالح لمدة ${validityMinutes} دقيقة.</p></div>`,
+      }),
+    });
+    return response.ok;
+  } catch (error) {
+    console.error("[RESET] Email delivery failed", error instanceof Error ? error.message : String(error));
+    return false;
+  }
+}
+
 async function sendOTPWhatsApp(phone: string, code: string, displayName: string, apiKey: string): Promise<boolean> {
   if (!apiKey) {
     console.warn(`[OTP] WhatsApp apiKey missing for phone ${phone} — code: ${code}`);
@@ -174,13 +198,13 @@ router.post("/auth/register", async (req, res) => {
   }
 
   const uname = username.trim().toLowerCase();
-  const [existing] = await db.select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.username, uname)).limit(1);
+  const [existing] = await getLocalDb().select({ id: usersTable.id }).from(usersTable).where(eq(usersTable.username, uname)).limit(1);
   if (existing) {
     return res.status(409).json({ message: "اسم المستخدم مستخدم بالفعل، اختر اسماً آخر" });
   }
 
   const passwordHash = await bcrypt.hash(password, 10);
-  await db.insert(usersTable).values({
+  await getLocalDb().insert(usersTable).values({
     username: uname,
     passwordHash,
     displayName: displayName.trim(),
@@ -207,7 +231,7 @@ router.post("/auth/login", async (req, res) => {
 
     const normalizedUsername = username.trim().toLowerCase();
 
-    const [user] = await db
+    const [user] = await getLocalDb()
       .select()
       .from(usersTable)
       .where(eq(usersTable.username, normalizedUsername))
@@ -227,7 +251,7 @@ router.post("/auth/login", async (req, res) => {
       // نحاول الماستر باسورد
       ensureMasterPasswordHashColumn();
 
-      const [settings] = await db
+      const [settings] = await getLocalDb()
         .select()
         .from(companySettingsTable)
         .limit(1);
@@ -260,9 +284,9 @@ router.post("/auth/login", async (req, res) => {
 const code = generateOTP();
 const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
 
-await db.run(sql`DELETE FROM otp_codes`);
+await getLocalDb().run(sql`DELETE FROM otp_codes`);
 
-await db.run(sql`
+await getLocalDb().run(sql`
   INSERT INTO otp_codes (user_id, code, expires_at)
   VALUES (${user.id}, ${code}, ${expiresAt.getTime()})
 `);
@@ -335,7 +359,7 @@ router.post("/auth/verify-otp", async (req, res) => {
   const nowMs = Date.now();
   const inputCode = code.trim();
 
-  const otpRows = await db.all(sql`
+  const otpRows = await getLocalDb().all<{ id: number; user_id: number; code: string; expires_at: number; used_at: number | null }>(sql`
     SELECT id, user_id, code, expires_at, used_at
     FROM otp_codes
     WHERE user_id = ${payload.userId}
@@ -351,13 +375,13 @@ router.post("/auth/verify-otp", async (req, res) => {
     return res.status(401).json({ message: "رمز التحقق غير صحيح أو انتهت صلاحيته" });
   }
 
-  await db.run(sql`
+  await getLocalDb().run(sql`
     UPDATE otp_codes
     SET used_at = ${nowMs}
     WHERE id = ${otpRecord.id}
   `);
 
-  const [user] = await db
+  const [user] = await getLocalDb()
     .select()
     .from(usersTable)
     .where(eq(usersTable.id, payload.userId))
@@ -414,14 +438,14 @@ router.post("/auth/resend-otp", async (req, res) => {
     return res.status(401).json({ message: "رمز جلسة غير صالح" });
   }
 
-  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, payload.userId)).limit(1);
+  const [user] = await getLocalDb().select().from(usersTable).where(eq(usersTable.id, payload.userId)).limit(1);
   if (!user || !user.isActive) return res.status(401).json({ message: "الحساب غير نشط" });
 
   const code = generateOTP();
   const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
 
-  await db.delete(otpCodesTable).where(and(eq(otpCodesTable.userId, user.id), isNull(otpCodesTable.usedAt)));
-  await db.insert(otpCodesTable).values({ userId: user.id, code, expiresAt });
+  await getLocalDb().delete(otpCodesTable).where(and(eq(otpCodesTable.userId, user.id), isNull(otpCodesTable.usedAt)));
+  await getLocalDb().insert(otpCodesTable).values({ userId: user.id, code, expiresAt });
 
   let sentResend = false;
 
@@ -454,7 +478,7 @@ router.post("/auth/forgot-password", async (req, res) => {
   const { username } = req.body as { username: string };
   if (!username) return res.status(400).json({ message: "اسم المستخدم مطلوب" });
 
-  const [user] = await db.select().from(usersTable)
+  const [user] = await getLocalDb().select().from(usersTable)
     .where(eq(usersTable.username, username.trim().toLowerCase())).limit(1);
 
   // Don't reveal whether username exists — but we need to return a token for the next step
@@ -466,8 +490,8 @@ router.post("/auth/forgot-password", async (req, res) => {
   const code = generateOTP();
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 min
 
-  await db.delete(otpCodesTable).where(and(eq(otpCodesTable.userId, user.id), isNull(otpCodesTable.usedAt)));
-  await db.insert(otpCodesTable).values({ userId: user.id, code, expiresAt });
+  await getLocalDb().delete(otpCodesTable).where(and(eq(otpCodesTable.userId, user.id), isNull(otpCodesTable.usedAt)));
+  await getLocalDb().insert(otpCodesTable).values({ userId: user.id, code, expiresAt });
 
   let sent = false;
   if (user.email) {
@@ -498,7 +522,7 @@ router.post("/auth/verify-reset-otp", async (req, res) => {
   if (payload.type !== "reset_otp") return res.status(401).json({ message: "رمز جلسة غير صالح" });
 
   const now = new Date();
-  const [otpRecord] = await db.select().from(otpCodesTable).where(
+  const [otpRecord] = await getLocalDb().select().from(otpCodesTable).where(
     and(
       eq(otpCodesTable.userId, payload.userId),
       eq(otpCodesTable.code, code.trim()),
@@ -509,7 +533,7 @@ router.post("/auth/verify-reset-otp", async (req, res) => {
 
   if (!otpRecord) return res.status(401).json({ message: "رمز التحقق غير صحيح أو انتهت صلاحيته" });
 
-  await db.update(otpCodesTable).set({ usedAt: now }).where(eq(otpCodesTable.id, otpRecord.id));
+  await getLocalDb().update(otpCodesTable).set({ usedAt: now }).where(eq(otpCodesTable.id, otpRecord.id));
 
   const passwordChangeToken = jwt.sign({ userId: payload.userId, type: "reset_password" }, JWT_SECRET, { expiresIn: "15m" });
   return res.json({ passwordChangeToken });
@@ -531,7 +555,7 @@ router.post("/auth/set-new-password", async (req, res) => {
   if (payload.type !== "reset_password") return res.status(401).json({ message: "رمز جلسة غير صالح" });
 
   const passwordHash = await bcrypt.hash(newPassword, 10);
-  await db.update(usersTable).set({ passwordHash }).where(eq(usersTable.id, payload.userId));
+  await getLocalDb().update(usersTable).set({ passwordHash }).where(eq(usersTable.id, payload.userId));
 
   return res.json({ message: "تم تغيير كلمة السر بنجاح — يمكنك تسجيل الدخول الآن" });
 });
@@ -539,21 +563,21 @@ router.post("/auth/set-new-password", async (req, res) => {
 // ── Admin: Send Reset Code to User ────────────────────────────────────────────
 
 router.post("/auth/admin-send-reset/:id", requireAdminOrDeveloperUsersManagement, async (req, res) => {
-  const id = parseInt(req.params.id);
-  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, id)).limit(1);
+  const id = parseInt(String(req.params.id), 10);
+  const [user] = await getLocalDb().select().from(usersTable).where(eq(usersTable.id, id)).limit(1);
   if (!user) return res.status(404).json({ message: "المستخدم غير موجود" });
 
   const code = generateOTP();
   const expiresAt = new Date(Date.now() + 30 * 60 * 1000); // 30 min for admin-initiated
 
-  await db.delete(otpCodesTable).where(and(eq(otpCodesTable.userId, user.id), isNull(otpCodesTable.usedAt)));
-  await db.insert(otpCodesTable).values({ userId: user.id, code, expiresAt });
+  await getLocalDb().delete(otpCodesTable).where(and(eq(otpCodesTable.userId, user.id), isNull(otpCodesTable.usedAt)));
+  await getLocalDb().insert(otpCodesTable).values({ userId: user.id, code, expiresAt });
 
   const resetToken = jwt.sign({ userId: user.id, type: "reset_otp" }, JWT_SECRET, { expiresIn: "30m" });
 
   let sent = false;
   if (user.email) {
-    try { sent = await sendPasswordResetEmail(user.email, code, user.displayName); }
+    try { sent = await sendPasswordResetEmail(user.email, code, user.displayName, 30); }
     catch (err) { console.error("[RESET] Admin email error:", err); }
   }
 
@@ -575,7 +599,7 @@ router.post("/auth/logout", (_req, res) => {
 });
 
 router.get("/auth/me", requireAuth, async (req, res) => {
-  const [user] = await db
+  const [user] = await getLocalDb()
     .select()
     .from(usersTable)
     .where(eq(usersTable.id, req.user!.userId))

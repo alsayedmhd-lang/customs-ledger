@@ -1,3 +1,4 @@
+import { ensureLocalTemplateNumbers, ensurePgTemplateNumbers } from "./template-numbering";
 import { sqlite } from "@workspace/db";
 import { createRequire } from "module";
 
@@ -46,6 +47,7 @@ export function convertInternalValue(table: string, column: string, value: unkno
 }
 
 export async function bootstrapInternalDatabase(connectionString: string) {
+  ensureLocalTemplateNumbers();
   if (!sqlite) throw new Error("SQLite database is unavailable");
   // Freeze the source in memory before the first write to PostgreSQL.
   const source = COPY_TABLES.map((table) => ({
@@ -56,6 +58,7 @@ export async function bootstrapInternalDatabase(connectionString: string) {
   let inTransaction = false;
   try {
     await client.connect();
+    await ensurePgTemplateNumbers(client, false);
     await client.query("BEGIN");
     inTransaction = true;
     await client.query("SET LOCAL statement_timeout = '30s'");
@@ -118,6 +121,7 @@ export async function completeInternalAccounting(connectionString: string) {
   let inTransaction = false;
   try {
     await client.connect();
+    await ensurePgTemplateNumbers(client, false);
     await client.query("BEGIN");
     inTransaction = true;
     await client.query("SET LOCAL statement_timeout = '30s'");

@@ -1,3 +1,4 @@
+import { internalConnectionEnabled } from "./connection-state";
 import { sqlite } from "@workspace/db";
 import {
   pushAttachmentMetadataToInternalServer,
@@ -71,6 +72,7 @@ function connectionFor(settings: Settings): string {
 async function runConfigured(settings: Settings) {
   const connectionString = connectionFor(settings);
   for (let pass = 0; pass < 20; pass++) {
+    if (!internalConnectionEnabled()) return;
     if (settings.mode === "local-to-internal") {
       const result = await runInternalLocalToServerOnce(connectionString);
       if (result.processed < 500) return;
@@ -112,7 +114,7 @@ async function tick() {
     console.warn("[INTERNAL_SYNC][AUTO] Settings unavailable", error);
     return;
   }
-  if (!settings || !settings.enabled || (settings.databaseMode === "online" && settings.onlineAutoSync)) {
+  if (!internalConnectionEnabled() || !settings || !settings.enabled || (settings.databaseMode === "online" && settings.onlineAutoSync)) {
     configuration = "";
     lastAttempt = 0;
     lastSuccess = 0;

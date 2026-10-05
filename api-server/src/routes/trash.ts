@@ -1,3 +1,4 @@
+import { getLocalDb } from "../utils/local-db";
 import {
   invoicesTable,
   invoiceItemsTable,
@@ -6,7 +7,7 @@ import {
 } from "@workspace/db/schema";
 import { invoiceAuditLogsTableSqlite } from "../../../lib/db/src/schema/invoices-sqlite";
 import { eq, desc, isNotNull, and } from "drizzle-orm";
-import { db } from "@workspace/db";
+
 import { formatInvoice, formatItem } from "./invoices";
 import { formatReceipt } from "./receipts";
 import { Router } from "express";
@@ -43,7 +44,7 @@ router.use((req, res, next) => {
 // List deleted invoices
 router.get("/trash/invoices", async (req, res) => {
   try {
-    const rows = await db
+    const rows = await getLocalDb()
       .select()
       .from(invoicesTable)
       .innerJoin(clientsTable, eq(invoicesTable.clientId, clientsTable.id))
@@ -52,7 +53,7 @@ router.get("/trash/invoices", async (req, res) => {
 
     const invoicesWithItems = await Promise.all(
       rows.map(async (row) => {
-        const items = await db
+        const items = await getLocalDb()
           .select()
           .from(invoiceItemsTable)
           .where(eq(invoiceItemsTable.invoiceId, row.invoices.id));
@@ -73,8 +74,8 @@ router.get("/trash/invoices", async (req, res) => {
 // Restore invoice from trash
 router.post("/trash/invoices/:id/restore", async (req, res) => {
   try {
-    const id = parseInt(req.params.id);
-    const [invoice] = await db
+    const id = parseInt(String(req.params.id), 10);
+    const [invoice] = await getLocalDb()
       .update(invoicesTable)
       .set({ deletedAt: null })
       .where(and(eq(invoicesTable.id, id), isNotNull(invoicesTable.deletedAt)))
@@ -85,7 +86,7 @@ router.post("/trash/invoices/:id/restore", async (req, res) => {
       return;
     }
 
-  await db.insert(invoiceAuditLogsTableSqlite).values({
+  await getLocalDb().insert(invoiceAuditLogsTableSqlite).values({
     invoiceId: invoice.id,
     action: "restored",
     userId: null,
@@ -99,8 +100,8 @@ router.post("/trash/invoices/:id/restore", async (req, res) => {
     createdAt: new Date(),
   });
 
-    const [client] = await db.select().from(clientsTable).where(eq(clientsTable.id, invoice.clientId));
-    const items = await db
+    const [client] = await getLocalDb().select().from(clientsTable).where(eq(clientsTable.id, invoice.clientId));
+    const items = await getLocalDb()
       .select()
       .from(invoiceItemsTable)
       .where(eq(invoiceItemsTable.invoiceId, invoice.id));
@@ -118,9 +119,9 @@ router.post("/trash/invoices/:id/restore", async (req, res) => {
 // Permanently delete invoice from trash
 router.delete("/trash/invoices/:id", async (req, res) => {
   try {
-    const id = parseInt(req.params.id);
-    await db.delete(invoiceItemsTable).where(eq(invoiceItemsTable.invoiceId, id));
-    await db.delete(invoicesTable).where(eq(invoicesTable.id, id));
+    const id = parseInt(String(req.params.id), 10);
+    await getLocalDb().delete(invoiceItemsTable).where(eq(invoiceItemsTable.invoiceId, id));
+    await getLocalDb().delete(invoicesTable).where(eq(invoicesTable.id, id));
     res.status(204).send();
   } catch (err) {
     console.error(err);
@@ -133,7 +134,7 @@ router.delete("/trash/invoices/:id", async (req, res) => {
 // List deleted receipts
 router.get("/trash/receipts", async (req, res) => {
   try {
-    const rows = await db
+    const rows = await getLocalDb()
       .select()
       .from(receiptsTable)
       .leftJoin(clientsTable, eq(receiptsTable.clientId, clientsTable.id))
@@ -150,8 +151,8 @@ router.get("/trash/receipts", async (req, res) => {
 // Restore receipt from trash
 router.post("/trash/receipts/:id/restore", async (req, res) => {
   try {
-    const id = parseInt(req.params.id);
-    const [receipt] = await db
+    const id = parseInt(String(req.params.id), 10);
+    const [receipt] = await getLocalDb()
       .update(receiptsTable)
       .set({ deletedAt: null })
       .where(and(eq(receiptsTable.id, id), isNotNull(receiptsTable.deletedAt)))
@@ -162,7 +163,7 @@ router.post("/trash/receipts/:id/restore", async (req, res) => {
       return;
     }
 
-    const [client] = await db.select().from(clientsTable).where(eq(clientsTable.id, receipt.clientId));
+    const [client] = await getLocalDb().select().from(clientsTable).where(eq(clientsTable.id, receipt.clientId));
     res.json(formatReceipt(receipt, client?.name ?? "", null));
   } catch (err) {
     console.error(err);
@@ -173,8 +174,8 @@ router.post("/trash/receipts/:id/restore", async (req, res) => {
 // Permanently delete receipt from trash
 router.delete("/trash/receipts/:id", async (req, res) => {
   try {
-    const id = parseInt(req.params.id);
-    await db.delete(receiptsTable).where(eq(receiptsTable.id, id));
+    const id = parseInt(String(req.params.id), 10);
+    await getLocalDb().delete(receiptsTable).where(eq(receiptsTable.id, id));
     res.status(204).send();
   } catch (err) {
     console.error(err);

@@ -1,7 +1,8 @@
+import { getLocalDb } from "../utils/local-db";
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import { randomUUID } from "node:crypto";
-import { db, sqlite } from "@workspace/db";
+import { sqlite } from "@workspace/db";
 import {
   clientsTable,
   DEFAULT_CLIENT_VIEW_PERMISSIONS,
@@ -84,7 +85,7 @@ function normalizeClientViewPermissions(input: unknown): ClientViewPermissions {
 }
 
 async function assertClientExists(clientId: number) {
-  const [client] = await db.select({ id: clientsTable.id }).from(clientsTable).where(eq(clientsTable.id, clientId)).limit(1);
+  const [client] = await getLocalDb().select({ id: clientsTable.id }).from(clientsTable).where(eq(clientsTable.id, clientId)).limit(1);
   return !!client;
 }
 
@@ -116,7 +117,7 @@ ensureUserClientColumns();
 
 router.get("/users", requireUsersManagementAccess, async (_req, res) => {
   ensureUserClientColumns();
-  const users = await db.select().from(usersTable).orderBy(usersTable.id);
+  const users = await getLocalDb().select().from(usersTable).orderBy(usersTable.id);
   return res.json(users.map(formatUser));
 });
 
@@ -157,7 +158,7 @@ router.post("/users", requireUsersManagementAccess, async (req, res) => {
   }
 
   const passwordHash = await bcrypt.hash(password, 10);
-  const [user] = await db
+  const [user] = await getLocalDb()
     .insert(usersTable)
     .values({
       userSyncId: randomUUID(),
@@ -179,7 +180,7 @@ router.post("/users", requireUsersManagementAccess, async (req, res) => {
 
 router.patch("/users/:id", requireUsersManagementAccess, async (req, res) => {
   ensureUserClientColumns();
-  const id = parseInt(req.params.id);
+  const id = parseInt(String(req.params.id), 10);
   const {
     displayName,
     displayNameAr,
@@ -216,7 +217,7 @@ router.patch("/users/:id", requireUsersManagementAccess, async (req, res) => {
     clientViewPermissions?: Partial<ClientViewPermissions>;
   };
 
-  const [currentUser] = await db.select().from(usersTable).where(eq(usersTable.id, id)).limit(1);
+  const [currentUser] = await getLocalDb().select().from(usersTable).where(eq(usersTable.id, id)).limit(1);
   if (!currentUser) return res.status(404).json({ message: "User not found" });
 
   const updates: Partial<typeof usersTable.$inferInsert> = {};
@@ -233,7 +234,7 @@ router.patch("/users/:id", requireUsersManagementAccess, async (req, res) => {
 
       updates.role = role;
     } else {
-      if (blockedManagerRoles.has(currentUser.role)) {
+      if (blockedManagerRoles.has(currentUser.role ?? "")) {
         return res.status(403).json({
           message: "Changing manager role is not allowed"
         });
@@ -243,10 +244,10 @@ router.patch("/users/:id", requireUsersManagementAccess, async (req, res) => {
     }
   }
   if (typeof isActive === "boolean") {
-    if (!isActive && blockedManagerRoles.has(currentUser.role)) {
-      const users = await db.select().from(usersTable);
+    if (!isActive && blockedManagerRoles.has(currentUser.role ?? "")) {
+      const users = await getLocalDb().select().from(usersTable);
       const hasOtherActiveManager = users.some((user) =>
-        user.id !== currentUser.id && blockedManagerRoles.has(user.role) && user.isActive
+        user.id !== currentUser.id && blockedManagerRoles.has(user.role ?? "") && user.isActive
       );
 
       if (!hasOtherActiveManager) {
@@ -290,26 +291,26 @@ router.patch("/users/:id", requireUsersManagementAccess, async (req, res) => {
   }
 
   if (Object.keys(updates).length === 0) return res.status(400).json({ message: "No data to update" });
-  const [user] = await db.update(usersTable).set(updates).where(eq(usersTable.id, id)).returning();
+  const [user] = await getLocalDb().update(usersTable).set(updates).where(eq(usersTable.id, id)).returning();
   return res.json(formatUser(user));
 });
 
 router.delete("/users/:id", requireUsersManagementAccess, async (req, res) => {
-  const id = parseInt(req.params.id);
+  const id = parseInt(String(req.params.id), 10);
   if (req.user!.userId === id) return res.status(400).json({ message: "You cannot delete your own account" });
-  const [deleted] = await db.delete(usersTable).where(eq(usersTable.id, id)).returning({ id: usersTable.id });
+  const [deleted] = await getLocalDb().delete(usersTable).where(eq(usersTable.id, id)).returning({ id: usersTable.id });
   if (!deleted) return res.status(404).json({ message: "User not found" });
   return res.json({ message: "User deleted" });
 });
 
 router.patch("/users/:id/change-password", requireUsersManagementAccess, async (req, res) => {
-  const id = parseInt(req.params.id);
+  const id = parseInt(String(req.params.id), 10);
   const canManageUsers = req.user!.role === "admin" || req.user!.role === "developer_support";
   if (req.user!.userId !== id && !canManageUsers) {
     return res.status(403).json({ message: "Forbidden" });
   }
   const { currentPassword, newPassword } = req.body as { currentPassword?: string; newPassword: string };
-  const [user] = await db.select().from(usersTable).where(eq(usersTable.id, id)).limit(1);
+  const [user] = await getLocalDb().select().from(usersTable).where(eq(usersTable.id, id)).limit(1);
   if (!user) return res.status(404).json({ message: "User not found" });
   if (!canManageUsers) {
     if (!currentPassword || !(await bcrypt.compare(currentPassword, user.passwordHash))) {
@@ -317,7 +318,7 @@ router.patch("/users/:id/change-password", requireUsersManagementAccess, async (
     }
   }
   const passwordHash = await bcrypt.hash(newPassword, 10);
-  await db.update(usersTable).set({ passwordHash }).where(eq(usersTable.id, id));
+  await getLocalDb().update(usersTable).set({ passwordHash }).where(eq(usersTable.id, id));
   return res.json({ message: "Password changed" });
 });
 
