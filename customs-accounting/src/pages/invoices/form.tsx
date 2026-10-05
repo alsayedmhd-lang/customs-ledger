@@ -41,6 +41,7 @@ import {
   Plus,
   Trash2,
   ExternalLink,
+  Loader2,
   Upload,
   Save,
   FileText,
@@ -483,6 +484,8 @@ export default function InvoiceForm() {
   const [attachments, setAttachments] = useState<InvoiceAttachment[]>([]);
   const [attachmentsLoading, setAttachmentsLoading] = useState(false);
   const [attachmentBusy, setAttachmentBusy] = useState(false);
+  const openingAttachmentIdsRef = useRef(new Set<number>());
+  const [openingAttachmentIds, setOpeningAttachmentIds] = useState<Set<number>>(new Set());
   const [selectedAttachmentIds, setSelectedAttachmentIds] = useState<Record<string, number>>({});
   const { data: clients } = useListClients();
   const { data: templates } = useListInvoiceItemTemplates();
@@ -1081,8 +1084,7 @@ export default function InvoiceForm() {
   };
 
   const handleOpenAttachment = async (attachment: InvoiceAttachment) => {
-    if (!attachment.relativePath) return;
-
+    if (!attachment.relativePath || openingAttachmentIdsRef.current.has(attachment.id)) return;
     const api = (window as any).electronAPI;
     if (!api?.openAttachmentFile) {
       toast({
@@ -1091,21 +1093,34 @@ export default function InvoiceForm() {
       });
       return;
     }
-
-    const result: AttachmentSaveResult = await api.openAttachmentFile({
-      relativePath: attachment.relativePath,
-      syncId: attachment.syncId,
-      fileHash: attachment.fileHash,
-      fileSize: attachment.fileSize,
-      storedName: attachment.storedName,
-      declarationBaseNumber: attachment.declarationBaseNumber,
+    // Lock synchronously before React renders, including rapid double clicks.
+    openingAttachmentIdsRef.current.add(attachment.id);
+    setOpeningAttachmentIds(new Set(openingAttachmentIdsRef.current));
+    const progress = toast({
+      title: isAR ? "جارٍ تجهيز المرفق وجلبه إن لم يكن محليًا…" : "Opening attachment; fetching if needed…",
+      duration: Infinity,
     });
-    if (!result.ok) {
+    try {
+      const result: AttachmentSaveResult = await api.openAttachmentFile({
+        relativePath: attachment.relativePath,
+        syncId: attachment.syncId,
+        fileHash: attachment.fileHash,
+        fileSize: attachment.fileSize,
+        storedName: attachment.storedName,
+        declarationBaseNumber: attachment.declarationBaseNumber,
+      });
+      if (!result.ok) throw new Error(result.error || (isAR ? "تعذر فتح الملف" : "Failed to open file"));
+    } catch (error) {
+      progress.dismiss();
       toast({
         title: isAR ? "تعذر فتح الملف" : "Failed to open file",
-        description: result.error,
+        description: error instanceof Error ? error.message : String(error),
         variant: "destructive",
       });
+    } finally {
+      progress.dismiss();
+      openingAttachmentIdsRef.current.delete(attachment.id);
+      setOpeningAttachmentIds(new Set(openingAttachmentIdsRef.current));
     }
   };
 
@@ -1848,6 +1863,12 @@ export default function InvoiceForm() {
           </div>
 
           <div className="p-4">
+            {openingAttachmentIds.size > 0 && (
+              <p role="status" aria-live="polite" className="mb-3 flex items-center gap-2 text-sm text-primary">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                {isAR ? "جارٍ تجهيز المرفق وجلبه إن لم يكن محليًا، يرجى الانتظار…" : "Opening attachment; fetching if needed. Please wait…"}
+              </p>
+            )}
             {!attachmentsEnabled ? (
               <p className="text-sm text-muted-foreground">
                 {isAR
@@ -1915,17 +1936,23 @@ export default function InvoiceForm() {
                                 <button
                                   type="button"
                                   onClick={() => selectedAttachment && void handleOpenAttachment(selectedAttachment)}
-                                  disabled={!selectedAttachment}
+                                  disabled={!selectedAttachment || openingAttachmentIds.has(selectedAttachment.id)}
+                                  aria-busy={selectedAttachment ? openingAttachmentIds.has(selectedAttachment.id) : false}
                                   title={isAR ? "فتح" : "Open"}
                                   aria-label={isAR ? "فتح" : "Open"}
                                   className={attachmentButtonCls}
                                 >
-                                  <ExternalLink className="w-4 h-4" />
+                                  {selectedAttachment && openingAttachmentIds.has(selectedAttachment.id) ? (
+                                    <>
+                                      <Loader2 className="w-4 h-4 animate-spin" />
+                                      <span role="status" className="text-xs">{isAR ? "جارٍ الفتح…" : "Opening…"}</span>
+                                    </>
+                                  ) : <ExternalLink className="w-4 h-4" />}
                                 </button>
                                 <button
                                   type="button"
                                   onClick={() => selectedAttachment && void handleDeleteAttachment(selectedAttachment.id)}
-                                  disabled={attachmentBusy || !selectedAttachment}
+                                  disabled={attachmentBusy || !selectedAttachment || openingAttachmentIds.has(selectedAttachment.id)}
                                   title={isAR ? "حذف" : "Delete"}
                                   aria-label={isAR ? "حذف" : "Delete"}
                                   className={attachmentDeleteButtonCls}
@@ -2004,17 +2031,23 @@ export default function InvoiceForm() {
                             <button
                               type="button"
                               onClick={() => selectedOtherAttachment && void handleOpenAttachment(selectedOtherAttachment)}
-                              disabled={!selectedOtherAttachment}
+                              disabled={!selectedOtherAttachment || openingAttachmentIds.has(selectedOtherAttachment.id)}
+                                  aria-busy={selectedOtherAttachment ? openingAttachmentIds.has(selectedOtherAttachment.id) : false}
                               title={isAR ? "فتح" : "Open"}
                               aria-label={isAR ? "فتح" : "Open"}
                               className={attachmentButtonCls}
                             >
-                              <ExternalLink className="w-4 h-4" />
+                              {selectedOtherAttachment && openingAttachmentIds.has(selectedOtherAttachment.id) ? (
+                                    <>
+                                      <Loader2 className="w-4 h-4 animate-spin" />
+                                      <span role="status" className="text-xs">{isAR ? "جارٍ الفتح…" : "Opening…"}</span>
+                                    </>
+                                  ) : <ExternalLink className="w-4 h-4" />}
                             </button>
                             <button
                               type="button"
                               onClick={() => selectedOtherAttachment && void handleDeleteAttachment(selectedOtherAttachment.id)}
-                              disabled={attachmentBusy || !selectedOtherAttachment}
+                              disabled={attachmentBusy || !selectedOtherAttachment || openingAttachmentIds.has(selectedOtherAttachment.id)}
                               title={isAR ? "حذف" : "Delete"}
                               aria-label={isAR ? "حذف" : "Delete"}
                               className={attachmentDeleteButtonCls}

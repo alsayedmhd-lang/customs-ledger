@@ -1,6 +1,6 @@
 {
   "name": "ledger",
-  "version": "2.3.21",
+  "version": "2.3.23",
   "author": "Mohamed sayed - 60020446",
   "type": "module",
   "private": true,
@@ -109,6 +109,10 @@
       "node_modules/tiny-typed-emitter/**/*"
     ],
     "extraResources": [
+      {
+        "from": "scripts/attachment-service",
+        "to": "attachment-service"
+      },
       {
         "from": "preload.js",
         "to": "preload.js"

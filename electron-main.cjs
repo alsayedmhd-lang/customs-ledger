@@ -1780,7 +1780,7 @@ async function tryTrustedPeerAttachment(payload, root) {
   const peers = (await listTrustedDevices(app)).filter(d => !d.revokedAt);
   const endpoints = readPeerEndpoints();
   const netbirdEndpoints = readPeerEndpoints("netbird");
-  const routes = peers.flatMap(peer => [
+  const baseRoutes = peers.flatMap(peer => [
     { peer, channel: "lan", address: endpoints[peer.deviceId] },
     { peer, channel: "netbird", address: netbirdEndpoints[peer.deviceId] },
   ]).filter(route => route.address);
@@ -1794,11 +1794,40 @@ async function tryTrustedPeerAttachment(payload, root) {
       !/^[a-z0-9]+$/i.test(payload.declarationBaseNumber) ||
       safeStoredAttachmentName(payload.storedName) !== payload.storedName) return null;
 
+  // Dedicated read-only attachment service remains available when Ledger is closed.
+  // Prefer the service and VPN to avoid waiting for a closed Ledger API.
+  const routes = [...baseRoutes].sort((a, b) => Number(b.channel === "netbird") - Number(a.channel === "netbird")).flatMap(route => {
+    if (!route.address) return [];
+    try {
+      const endpoint = normalizePeerEndpoint(route.address, route.channel);
+      const host = endpoint.split(":")[0];
+      return endpoint.endsWith(":3001") ? [route] :
+        [{ ...route, address: `${host}:3001` }, route];
+    } catch { return []; }
+  });
+
   for (const { peer, address, channel } of routes) {
     if (!address) continue;
     let temp = null;
     try {
       const endpoint = normalizePeerEndpoint(address, channel);
+      // Skip unreachable addresses quickly; the transfer keeps its existing timeout.
+      const reachable = await new Promise(resolve => {
+        const [host, port] = endpoint.split(":");
+        const socket = require("node:net").createConnection({ host, port: Number(port) });
+        let settled = false;
+        const finish = ok => {
+          if (settled) return;
+          settled = true;
+          socket.destroy();
+          resolve(ok);
+        };
+        socket.setTimeout(1500);
+        socket.once("connect", () => finish(true));
+        socket.once("timeout", () => finish(false));
+        socket.once("error", () => finish(false));
+      });
+      if (!reachable) continue;
       const time = String(Date.now());
       const nonce = crypto.randomBytes(16).toString("hex");
       const canonical = ["LEDGER_PEER_ATTACHMENT_V1", identity.deviceId,
