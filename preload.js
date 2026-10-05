@@ -67,8 +67,9 @@ contextBridge.exposeInMainWorld("electronAPI", {
 
   listTrustedLedgerDevices: () =>
     ipcRenderer.invoke("device:trusted-list"),
-  listPeerEndpoints: () => ipcRenderer.invoke("device:peer-endpoints"),
-  setPeerEndpoint: (deviceId, address) => ipcRenderer.invoke("device:peer-set-endpoint", deviceId, address),
+  listPeerEndpoints: (channel = "lan") => ipcRenderer.invoke("device:peer-endpoints", channel),
+  setPeerEndpoint: (deviceId, address, channel = "lan") => ipcRenderer.invoke("device:peer-set-endpoint", deviceId, address, channel),
+  testPeerEndpoint: (deviceId, address, channel = "lan") => ipcRenderer.invoke("device:peer-test-endpoint", deviceId, address, channel),
   developerUnlock: (password) =>
     ipcRenderer.invoke("developer:unlock", password),
 

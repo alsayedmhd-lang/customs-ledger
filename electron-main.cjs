@@ -1688,49 +1688,87 @@ ipcMain.handle("device:trusted-list", async (event) => {
 });
 
 // Pairing remains manual. A private LAN endpoint is saved separately from trust.
-function normalizePeerEndpoint(input) {
+function validatePeerChannel(channel = "lan") {
+  if (channel !== "lan" && channel !== "netbird") throw new Error("Invalid connection type");
+  return channel;
+}
+function normalizePeerEndpoint(input, channel = "lan") {
+  validatePeerChannel(channel);
   if (typeof input !== "string" || input.length > 64) throw new Error("Invalid peer address");
-  const raw = input.trim();
-  const match = /^((?:10|127|192\.168|172\.(?:1[6-9]|2\d|3[01]))(?:\.\d{1,3}){1,3}):(\d{1,5})$/.exec(raw);
+  const raw = input.trim().replace(/^http:\/\//i, "").replace(/\/$/, "");
+  const match = /^((?:\d{1,3}\.){3}\d{1,3}):(\d{1,5})$/.exec(raw);
   if (!match) throw new Error("Use a private IPv4 address and port, e.g. 192.168.1.20:3000");
   const [host, portText] = raw.split(":");
   const parts = host.split(".").map(Number);
   if (parts.length !== 4 || parts.some(x => !Number.isInteger(x) || x < 0 || x > 255)) throw new Error("Invalid IP address");
+  const netbirdIP = parts[0] === 100 && parts[1] >= 64 && parts[1] <= 127;
   const privateIP = parts[0] === 10 || parts[0] === 127 ||
     (parts[0] === 192 && parts[1] === 168) ||
     (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31);
   const port = Number(portText);
-  if (!privateIP || port < 1 || port > 65535) throw new Error("Private LAN address required");
-  return `${host}:${port}`;
+  if (!(channel === "netbird" ? netbirdIP : privateIP) || port < 1 || port > 65535) {
+    throw new Error(channel === "netbird" ? "Use a NetBird IPv4 address (100.64.0.0/10) and port" : "Private LAN address required");
+  }
+  return `${parts.join(".")}:${port}`;
 }
-function peerEndpointFile() { return path.join(app.getPath("userData"), "peer-endpoints.json"); }
-function readPeerEndpoints() {
-  try { return JSON.parse(fs.readFileSync(peerEndpointFile(), "utf8")); }
+function peerEndpointFile(channel = "lan") {
+  validatePeerChannel(channel);
+  return path.join(app.getPath("userData"), channel === "netbird" ? "peer-netbird-endpoints.json" : "peer-endpoints.json");
+}
+function readPeerEndpoints(channel = "lan") {
+  try { return JSON.parse(fs.readFileSync(peerEndpointFile(channel), "utf8")); }
   catch (error) { if (error.code === "ENOENT") return {}; throw error; }
 }
-ipcMain.handle("device:peer-endpoints", async event => {
+ipcMain.handle("device:peer-endpoints", async (event, channel = "lan") => {
+  validatePeerChannel(channel);
   assertLedgerDeviceIPC(event);
   const { listTrustedDevices } = getLedgerDeviceModule();
   const peers = await listTrustedDevices(app);
-  const saved = readPeerEndpoints();
+  const saved = readPeerEndpoints(channel);
   return peers.filter(d => !d.revokedAt).map(d => ({
     deviceId: d.deviceId, name: d.name, address: saved[d.deviceId] || "",
   }));
 });
-ipcMain.handle("device:peer-set-endpoint", async (event, deviceId, address) => {
+ipcMain.handle("device:peer-set-endpoint", async (event, deviceId, address, channel = "lan") => {
+  validatePeerChannel(channel);
   assertLedgerDeviceIPC(event);
   const { getTrustedDevice } = getLedgerDeviceModule();
   const trusted = await getTrustedDevice(app, deviceId);
   if (!trusted || trusted.revokedAt) throw new Error("Device is not trusted");
-  const normalized = address?.trim() ? normalizePeerEndpoint(address) : "";
-  const saved = readPeerEndpoints();
+  const normalized = address?.trim() ? normalizePeerEndpoint(address, channel) : "";
+  const saved = readPeerEndpoints(channel);
   if (normalized) saved[trusted.deviceId] = normalized;
   else delete saved[trusted.deviceId];
-  const file = peerEndpointFile();
+  const file = peerEndpointFile(channel);
   const tmp = `${file}.${crypto.randomBytes(6).toString("hex")}.tmp`;
   fs.writeFileSync(tmp, JSON.stringify(saved, null, 2), { mode: 0o600 });
   fs.renameSync(tmp, file);
   return { ok: true };
+});
+
+// A TCP check confirms reachability only. Attachment identity is verified separately.
+ipcMain.handle("device:peer-test-endpoint", async (event, deviceId, address, channel = "lan") => {
+  assertLedgerDeviceIPC(event);
+  validatePeerChannel(channel);
+  const { getTrustedDevice } = getLedgerDeviceModule();
+  const trusted = await getTrustedDevice(app, deviceId);
+  if (!trusted || trusted.revokedAt) throw new Error("Device is not trusted");
+  const endpoint = normalizePeerEndpoint(address, channel);
+  const [host, port] = endpoint.split(":");
+  return await new Promise(resolve => {
+    const socket = require("node:net").createConnection({ host, port: Number(port) });
+    let settled = false;
+    const finish = (ok, error) => {
+      if (settled) return;
+      settled = true;
+      socket.destroy();
+      resolve({ ok, error });
+    };
+    socket.setTimeout(5000);
+    socket.once("connect", () => finish(true, null));
+    socket.once("timeout", () => finish(false, "TIMEOUT"));
+    socket.once("error", error => finish(false, error.code || "CONNECTION_FAILED"));
+  });
 });
 
 async function tryTrustedPeerAttachment(payload, root) {
@@ -1741,6 +1779,11 @@ async function tryTrustedPeerAttachment(payload, root) {
   const identity = await getDeviceIdentity(app);
   const peers = (await listTrustedDevices(app)).filter(d => !d.revokedAt);
   const endpoints = readPeerEndpoints();
+  const netbirdEndpoints = readPeerEndpoints("netbird");
+  const routes = peers.flatMap(peer => [
+    { peer, channel: "lan", address: endpoints[peer.deviceId] },
+    { peer, channel: "netbird", address: netbirdEndpoints[peer.deviceId] },
+  ]).filter(route => route.address);
   const { Readable } = require("node:stream");
   const { pipeline } = require("node:stream/promises");
   const fsp = fs.promises;
@@ -1751,12 +1794,11 @@ async function tryTrustedPeerAttachment(payload, root) {
       !/^[a-z0-9]+$/i.test(payload.declarationBaseNumber) ||
       safeStoredAttachmentName(payload.storedName) !== payload.storedName) return null;
 
-  for (const peer of peers) {
-    const address = endpoints[peer.deviceId];
+  for (const { peer, address, channel } of routes) {
     if (!address) continue;
     let temp = null;
     try {
-      const endpoint = normalizePeerEndpoint(address);
+      const endpoint = normalizePeerEndpoint(address, channel);
       const time = String(Date.now());
       const nonce = crypto.randomBytes(16).toString("hex");
       const canonical = ["LEDGER_PEER_ATTACHMENT_V1", identity.deviceId,
@@ -1770,6 +1812,7 @@ async function tryTrustedPeerAttachment(payload, root) {
           "X-Ledger-Nonce": nonce,
           "X-Ledger-Signature": signature,
         },
+        redirect: "error",
         signal: AbortSignal.timeout(15000),
       });
       if (!reply.ok || !reply.body ||

@@ -3,6 +3,7 @@ import { reconcileInvoiceItems } from "./reconcile-invoice-items";
 import { sqlite } from "@workspace/db";
 import { createRequire } from "module";
 import { ensureSyncQueueTable } from "./ensure-sync-queue-table";
+import { pushOnlineAttachmentMetadata, pullOnlineAttachmentMetadata } from "./online-attachment-metadata-sync";
 
 const require = createRequire(process.cwd() + "/package.json");
 const { Client: PgClient } = require("pg") as {
@@ -540,7 +541,7 @@ async function syncUsersBeforeQueue(client: any) {
 async function pullUsersFromOnline(client: any, clientIdMap: Map<number, number>) {
   if (!sqlite) throw new Error("SQLite database is not available");
   const result = await client.query(`
-    SELECT id, username, password_hash, display_name, display_name_ar,
+    SELECT id, user_sync_id, username, password_hash, display_name, display_name_ar,
       display_name_en, role, is_active, pending_approval, permissions,
       client_id, client_view_permissions, email, phone, whatsapp_api_key,
       receiver_signature_base64, two_factor_email, two_factor_whatsapp, created_at
@@ -576,8 +577,8 @@ async function pullUsersFromOnline(client: any, clientIdMap: Map<number, number>
         username, password_hash, display_name, display_name_ar, display_name_en,
         role, is_active, pending_approval, permissions, client_id,
         client_view_permissions, email, phone, whatsapp_api_key,
-        receiver_signature_base64, two_factor_email, two_factor_whatsapp, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        receiver_signature_base64, two_factor_email, two_factor_whatsapp, created_at, user_sync_id
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       username, user.password_hash, user.display_name,
       user.display_name_ar, user.display_name_en, user.role || "user",
@@ -588,7 +589,8 @@ async function pullUsersFromOnline(client: any, clientIdMap: Map<number, number>
       user.email, user.phone, user.whatsapp_api_key,
       user.receiver_signature_base64, user.two_factor_email === true ? 1 : 0,
       user.two_factor_whatsapp === true ? 1 : 0,
-      toSqliteTimestamp(user.created_at) ?? Date.now()
+      toSqliteTimestamp(user.created_at) ?? Date.now(),
+      user.user_sync_id ?? null
     );
     inserted += 1;
   }
@@ -1801,6 +1803,7 @@ async function pullReceiptsFromOnline(
 export async function runOnlineToLocalSyncOnce(): Promise<{
   onlineConnected: boolean;
   lastError: string | null;
+  attachments: { total: number; inserted: number; updated: number; skipped: number };
   templates: { total: number; inserted: number };
   clients: {
     total: number;
@@ -1830,6 +1833,7 @@ export async function runOnlineToLocalSyncOnce(): Promise<{
   const emptyResult = {
     onlineConnected: false,
     lastError: null as string | null,
+    attachments: { total: 0, inserted: 0, updated: 0, skipped: 0 },
     templates: { total: 0, inserted: 0 },
     clients: {
       total: 0,
@@ -1906,7 +1910,10 @@ export async function runOnlineToLocalSyncOnce(): Promise<{
         invoicesResult.invoiceIdMap
       );
 
+    const attachmentsResult = await pullOnlineAttachmentMetadata(client);
+
     console.log("[SYNC][PULL][DONE]", {
+      attachments: attachmentsResult,
       templates: templatesResult,
       clients: clientsResult,
       users: usersResult,
@@ -1923,6 +1930,7 @@ export async function runOnlineToLocalSyncOnce(): Promise<{
     return {
       onlineConnected: true,
       lastError: null,
+      attachments: attachmentsResult,
       templates: templatesResult,
       clients: {
         total: clientsResult.total,
@@ -2727,10 +2735,12 @@ export async function runSyncWorkerOnce(): Promise<{
         await syncTemplatesBeforeQueue(client);
         await syncClientsBeforeQueue(client);
         await syncUsersBeforeQueue(client);
+        const attachments = await pushOnlineAttachmentMetadata(client);
+        processedCount += attachments.processed;
       } catch (err) {
         lastError = errorMessage(err);
         console.error("[SYNC][PREREQUISITES][ERROR]", err);
-        return { pendingCount: pending.length, processedCount: 0, onlineConnected: true,
+        return { pendingCount: pending.length, processedCount, onlineConnected: true,
           lastError, autoRestoredCount: stats.autoRestoredCount };
       }
       for (const row of pending) {
@@ -2876,7 +2886,8 @@ async function performConfiguredSync(mode: string): Promise<ConfiguredSyncResult
   const pullResult = await runOnlineToLocalSyncOnce();
   onlineConnected = pullResult.onlineConnected;
   lastError = pullResult.lastError;
-  processedCount += pullResult.templates.inserted + pullResult.users.inserted +
+  processedCount += pullResult.attachments.inserted + pullResult.attachments.updated +
+    pullResult.templates.inserted + pullResult.users.inserted +
     pullResult.clients.inserted + pullResult.clients.updated +
     pullResult.invoices.inserted + pullResult.invoices.updated +
     pullResult.invoiceItems.inserted +

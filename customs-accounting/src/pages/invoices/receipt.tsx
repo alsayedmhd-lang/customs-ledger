@@ -257,7 +257,7 @@ const impExpValue =
   return (
     <A4PrintShell
       dir="rtl"
-      pageClassName="max-w-4xl shadow-xl"
+      pageClassName="invoice-print-page max-w-4xl shadow-xl"
       controls={
         <>
       <style>{`
@@ -323,6 +323,57 @@ const impExpValue =
           html body .print-page {
             width: 198mm !important;
             min-height: 0 !important;
+          }
+        }
+      `}</style>
+      {/* ledger-invoice-pagination-fix */}
+      <style>{`
+        @media print {
+          .print-page.invoice-print-page {
+            display: block !important;
+            height: auto !important;
+            min-height: 0 !important;
+            max-height: none !important;
+            overflow: visible !important;
+            width: 185mm !important;
+            padding: 4mm !important;
+          }
+
+          .invoice-print-page .print-content {
+            display: block !important;
+            flex: none !important;
+            height: auto !important;
+            max-height: none !important;
+            overflow: visible !important;
+          }
+
+          .invoice-print-page .invoice-signature-stamp-area {
+            margin-top: 4mm !important;
+            break-inside: avoid !important;
+            page-break-inside: avoid !important;
+          }
+
+          .invoice-print-page .print-document-footer {
+            position: static !important;
+            inset: auto !important;
+            width: auto !important;
+            margin-top: 4mm !important;
+            break-inside: avoid !important;
+            page-break-inside: avoid !important;
+          }
+
+          .invoice-print-page table {
+            break-inside: auto !important;
+            page-break-inside: auto !important;
+          }
+
+          .invoice-print-page thead {
+            display: table-header-group !important;
+          }
+
+          .invoice-print-page tr {
+            break-inside: avoid !important;
+            page-break-inside: avoid !important;
           }
         }
       `}</style>
