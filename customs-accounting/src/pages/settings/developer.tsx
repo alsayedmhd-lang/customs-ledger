@@ -1,3 +1,4 @@
+import { settingsAccessGroups, parseSettingsAccess, defaultSettingsAccess } from "@/lib/settings-access-policy";
 import CompactSettingsStyle from "@/components/layout/CompactSettingsStyle";
 import { PasswordInput } from "@/components/ui/password-input";
 import DeviceIdentitySettings from "@/components/DeviceIdentitySettings";
@@ -26,16 +27,12 @@ const DEFAULT_LOGIN_FOOTER_TEXT = "Internal Accounting System For Companes - als
 type LoginMessageType = "welcome" | "notice" | "warning" | "quote";
 
 type DeveloperSettings = {
-  lockCompanyIdentity: boolean;
-  lockCompanyName: boolean;
-  lockLogo: boolean;
-  lockStamp: boolean;
-  lockLegalInfo: boolean;
-  lockFooterBranding: boolean;
+  managerSettingsAccess: string;
+
   loginFooterText: string;
   loginMessageText: string;
   loginMessageType: LoginMessageType;
-  preventRebrandToAnotherCompany: boolean;
+
   licenseStatus: string;
   licensedCompanyName: string;
   licenseId: string;
@@ -83,16 +80,12 @@ type DeveloperSettings = {
 };
 
 const defaultSettings: DeveloperSettings = {
-  lockCompanyIdentity: false,
-  lockCompanyName: false,
-  lockLogo: false,
-  lockStamp: false,
-  lockLegalInfo: false,
-  lockFooterBranding: false,
+  managerSettingsAccess: "",
+
   loginFooterText: "",
   loginMessageText: "",
   loginMessageType: "welcome",
-  preventRebrandToAnotherCompany: false,
+
   licenseStatus: "not_configured",
   licensedCompanyName: "",
   licenseId: "",
@@ -127,9 +120,9 @@ const defaultSettings: DeveloperSettings = {
 };
 
 const tabs = [
-  { id: "security", labelAr: "الحماية والترخيص", labelEn: "Security & License", icon: Shield },
+  { id: "security", labelAr: "بيانات الترخيص ورسالة الدخول", labelEn: "License Details & Login", icon: Shield },
   { id: "devices", labelAr: "توثيق الأجهزة", labelEn: "Device Pairing", icon: Shield },
-  { id: "manager", labelAr: "صلاحيات المدير", labelEn: "Manager Access", icon: Users },
+  { id: "manager", labelAr: "حماية الترخيص وصلاحيات المدير", labelEn: "License Protection & Manager Access", icon: Users },
   { id: "database", labelAr: "قاعدة البيانات", labelEn: "Database", icon: Database },
   { id: "diagnostics", labelAr: "النظام والتشخيص", labelEn: "Diagnostics", icon: Activity },
 ] as const;
@@ -269,24 +262,6 @@ type BoolKey = {
 type TextKey = {
   [K in keyof DeveloperSettings]-?: NonNullable<DeveloperSettings[K]> extends string ? K : never;
 }[keyof DeveloperSettings];
-
-const securityToggles: Array<[BoolKey, string, string, string, string]> = [
-  ["lockCompanyIdentity", "قفل هوية الشركة", "Lock company identity", "يمنع تعديل الاسم والترجمة والوصف", "Prevents editing the name, translations, and description"],
-  ["lockCompanyName", "قفل اسم الشركة", "Lock company name", "يمنع تغيير الاسم العربي أو الإنجليزي", "Prevents changing the Arabic or English company name"],
-  ["lockLogo", "قفل الشعار", "Lock logo", "يمنع استبدال شعار الشركة", "Prevents replacing the company logo"],
-  ["lockStamp", "قفل الختم", "Lock stamp", "يمنع استبدال ختم الشركة", "Prevents replacing the company stamp"],
-  ["lockLegalInfo", "قفل البيانات القانونية", "Lock legal info", "يحمي السجل والضريبة وبيانات التواصل", "Protects registration, tax, and contact details"],
-  ["lockFooterBranding", "قفل تذييل العلامة", "Lock footer branding", "يمنع تغيير نصوص العلامة في التذييل", "Prevents changing branding text in the footer"],
-  ["preventRebrandToAnotherCompany", "منع إعادة العلامة لشركة أخرى", "Prevent rebranding to another company", "يربط الهوية باسم الشركة المرخص", "Keeps the identity tied to the licensed company name"],
-];
-
-const managerToggles: Array<[BoolKey, string, string, string, string]> = [
-  ["allowManagerEditLegalInfo", "إظهار تبويب بيانات الشركة", "Show company info tab", "يعرض بيانات الشركة ومعلومات التواصل والبيانات القانونية", "Shows company, contact, and legal information"],
-  ["allowManagerEditBranding", "إظهار تبويب الشعارات", "Show branding tab", "يعرض تبويب الشعار والختم والعلامة المائية والتوقيعات", "Shows logo, stamp, watermark, and signature settings"],
-  ["allowManagerEditPrintSettings", "إظهار تبويب أدوات الطباعة", "Show print tools tab", "يعرض تبويب عناوين الفواتير وخيارات الطباعة", "Shows invoice titles and print options"],
-  ["allowManagerEditInvoicesBackupImport", "إظهار تبويب النسخ الاحتياطي", "Show backup tab", "يعرض تبويب التصدير والاستيراد فقط", "Shows export and import only"],
-  ["allowManagerViewUpdate", "إظهار تبويب تحديث البرنامج", "Show update tab", "يعرض تبويب فحص التحديثات والتوزيع", "Shows update checking and distribution"],
-];
 
 const licenseFields: Array<[TextKey, string, string]> = [
   ["licenseStatus", "حالة الترخيص", "License status"],
@@ -484,8 +459,24 @@ export default function DeveloperSettingsPage() {
   const [isBackupVerifying, setIsBackupVerifying] = useState(false);
   const [onlineDatabaseConnected, setOnlineDatabaseConnected] = useState(false);
   const [savedMessage, setSavedMessage] = useState("");
-  const [databaseMessage, setDatabaseMessage] = useState("");
-  const [internalDatabaseMessage, setInternalDatabaseMessage] = useState("");
+  const databaseNoticeClass = (tone: "success" | "error" | "warning") =>
+    `rounded-md border px-3 py-2 text-[13px] font-medium break-words ${tone === "error"
+      ? "border-red-300 bg-red-50 text-red-800 dark:border-red-800 dark:bg-red-950 dark:text-red-200"
+      : tone === "warning"
+        ? "border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200"
+        : "border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-200"}`;
+  const [databaseMessage, storeDatabaseMessage] = useState("");
+  const [databaseMessageTone, setDatabaseMessageTone] = useState<"success" | "error" | "warning">("success");
+  function setDatabaseMessage(message: string, tone: "success" | "error" | "warning" = "success") {
+    storeDatabaseMessage(message);
+    setDatabaseMessageTone(tone);
+  }
+  const [internalDatabaseMessage, storeInternalDatabaseMessage] = useState("");
+  const [internalDatabaseMessageTone, setInternalDatabaseMessageTone] = useState<"success" | "error" | "warning">("success");
+  function setInternalDatabaseMessage(message: string, tone: "success" | "error" | "warning" = "success") {
+    storeInternalDatabaseMessage(message);
+    setInternalDatabaseMessageTone(tone);
+  }
   const [internalAutoStatus, setInternalAutoStatus] = useState<{ running: boolean; lastCheckAt: string | null; lastAttemptAt: string | null; lastSuccessAt: string | null; lastError: string | null } | null>(null);
   const [isSavingInternalDatabase, setIsSavingInternalDatabase] = useState(false);
   const [isCheckingInternalReadiness, setIsCheckingInternalReadiness] = useState(false);
@@ -505,11 +496,32 @@ export default function DeveloperSettingsPage() {
   const [internalConnectionActive, setInternalConnectionActive] = useState(false);
   const [isChangingInternalConnection, setIsChangingInternalConnection] = useState(false);
   const [connectionHealth, setConnectionHealth] = useState<{ online: boolean; internal: boolean; onlineAutoSync: boolean; internalAutoSync: boolean } | null>(null);
+  const [syncGuards, setSyncGuards] = useState<{ online: { blocked: boolean }; internal: { blocked: boolean } } | null>(null);
+  useEffect(() => {
+    if (!unlocked) return;
+    let disposed = false;
+    const refresh = async () => {
+      try {
+        const response = await fetch(`${API_BASE}/developer/sync/schedule-status`, { headers: authHeaders() });
+        if (!response.ok) throw new Error("Sync status unavailable");
+        const data = await response.json();
+        if (!disposed) setSyncGuards(data);
+      } catch { if (!disposed) setSyncGuards(null); }
+    };
+    void refresh();
+    const timer = window.setInterval(() => { void refresh(); }, 5000);
+    return () => { disposed = true; window.clearInterval(timer); };
+  }, [unlocked]);
   const [internalDatabaseConfig, setInternalDatabaseConfig] = useState({
     host: "", port: "5432", databaseName: "", username: "", password: "", connectionString: "",
     syncMode: "bidirectional", autoSync: false, timing: "startup", intervalMinutes: 30,
   });
-  const [syncWorkerMessage, setSyncWorkerMessage] = useState("");
+  const [syncWorkerMessage, storeSyncWorkerMessage] = useState("");
+  const [syncWorkerMessageTone, setSyncWorkerMessageTone] = useState<"success" | "error" | "warning">("success");
+  function setSyncWorkerMessage(message: string, tone: "success" | "error" | "warning" = "success") {
+    storeSyncWorkerMessage(message);
+    setSyncWorkerMessageTone(tone);
+  }
   const [systemDiagnostics, setSystemDiagnostics] = useState<SystemDiagnosticsResult | null>(null);
   const [systemDiagnosticsError, setSystemDiagnosticsError] = useState("");
   const [dataStorageAnalysis, setDataStorageAnalysis] = useState<DataStorageAnalysisResult | null>(null);
@@ -676,7 +688,7 @@ export default function DeveloperSettingsPage() {
       mode: nextSettings.syncMode || "local-to-online",
       autoSync: Boolean(nextSettings.syncAutoSync),
       timing: nextSettings.syncTiming || "startup",
-      intervalMinutes: Number(nextSettings.syncIntervalMinutes || 30),
+      intervalMinutes: Math.max(10, Number(nextSettings.syncIntervalMinutes || 30)),
       lastSyncTime: nextSettings.syncLastSyncTime || current.lastSyncTime,
       status: nextSettings.syncStatus || "idle",
     }));
@@ -765,7 +777,7 @@ export default function DeveloperSettingsPage() {
       if (!enabled) setInternalDatabaseConfig(current => ({ ...current, autoSync: false }));
       await refreshConnectionStatus();
       setInternalDatabaseMessage(enabled ? tr("تم الاتصال بالخادم الداخلي", "Internal server connected") : tr("تم فصل الخادم وإيقاف المزامنة التلقائية", "Server disconnected and automatic sync stopped"));
-    } catch (error) { setInternalDatabaseMessage(error instanceof Error ? error.message : String(error)); }
+    } catch (error) { setInternalDatabaseMessage(error instanceof Error ? error.message : String(error), "error"); }
     finally { setIsChangingInternalConnection(false); }
   }
 
@@ -788,11 +800,11 @@ export default function DeveloperSettingsPage() {
         host: data.host || "", port: data.port || "5432", databaseName: data.databaseName || "",
         username: data.username || "", password: data.password || "", connectionString: data.connectionString || "",
         syncMode: data.syncMode || "bidirectional", autoSync: Boolean(data.autoSync),
-        timing: data.timing || "startup", intervalMinutes: Number(data.intervalMinutes || 30),
+        timing: data.timing || "startup", intervalMinutes: Math.max(10, Number(data.intervalMinutes || 30)),
       });
       void checkInternalAutoStatus();
     } catch (error) {
-      setInternalDatabaseMessage(error instanceof Error ? error.message : tr("تعذر تحميل إعدادات الخادم الداخلي", "Failed to load internal server settings"));
+      setInternalDatabaseMessage(error instanceof Error ? error.message : tr("تعذر تحميل إعدادات الخادم الداخلي", "Failed to load internal server settings"), "error");
     }
   }
 
@@ -806,6 +818,10 @@ export default function DeveloperSettingsPage() {
   }
 
   async function saveInternalDatabaseSettings() {
+    if (!Number.isInteger(internalDatabaseConfig.intervalMinutes) || internalDatabaseConfig.intervalMinutes < 10 || internalDatabaseConfig.intervalMinutes > 1440) {
+      setInternalDatabaseMessage(tr("الفاصل التلقائي يجب أن يكون من 10 إلى 1440 دقيقة", "Automatic interval must be 10 to 1440 minutes"), "warning");
+      return;
+    }
     setInternalDatabaseMessage("");
     setIsSavingInternalDatabase(true);
     try {
@@ -818,7 +834,7 @@ export default function DeveloperSettingsPage() {
           throw new Error(tr("أوقف مزامنة Online التلقائية أولاً", "Turn off Online automatic sync first"));
         }
         if (problem.error === "Invalid internal sync settings") {
-          throw new Error(tr("تحقق من خيارات المزامنة والفاصل الزمني (1 إلى 1440 دقيقة)", "Check sync options and the interval (1 to 1440 minutes)"));
+          throw new Error(tr("تحقق من خيارات المزامنة والفاصل الزمني (10 إلى 1440 دقيقة)", "Check sync options and the interval (10 to 1440 minutes)"));
         }
         if (problem.error === "Invalid internal database port") {
           throw new Error(tr("المنفذ يجب أن يكون رقمًا بين 1 و65535", "Port must be between 1 and 65535"));
@@ -833,7 +849,7 @@ export default function DeveloperSettingsPage() {
       void refreshConnectionStatus();
       setInternalDatabaseMessage(tr("تم حفظ إعدادات الخادم الداخلي", "Internal server settings saved"));
     } catch (error) {
-      setInternalDatabaseMessage(error instanceof Error ? error.message : tr("تعذر حفظ إعدادات الخادم الداخلي", "Failed to save internal server settings"));
+      setInternalDatabaseMessage(error instanceof Error ? error.message : tr("تعذر حفظ إعدادات الخادم الداخلي", "Failed to save internal server settings"), "error");
     } finally {
       setIsSavingInternalDatabase(false);
     }
@@ -852,9 +868,9 @@ export default function DeveloperSettingsPage() {
       setInternalReadiness(data);
       setInternalDatabaseMessage(data.schemaComplete
         ? tr("الجداول موجودة. راجع أعداد السجلات قبل تشغيل المزامنة.", "Tables exist. Review record counts before starting sync.")
-        : tr("بعض الجداول مفقودة. أكمل إنشاءها قبل تشغيل المزامنة.", "Some tables are missing. Create them before starting sync."));
+        : tr("بعض الجداول مفقودة. أكمل إنشاءها قبل تشغيل المزامنة.", "Some tables are missing. Create them before starting sync."), data.schemaComplete ? "success" : "warning");
     } catch (error) {
-      setInternalDatabaseMessage(error instanceof Error ? error.message : tr("تعذر فحص الجداول", "Could not check tables"));
+      setInternalDatabaseMessage(error instanceof Error ? error.message : tr("تعذر فحص الجداول", "Could not check tables"), "error");
     } finally {
       setIsCheckingInternalReadiness(false);
     }
@@ -876,7 +892,7 @@ export default function DeveloperSettingsPage() {
         `Local changes pending for internal server: ${count}`,
       ));
     } catch (error) {
-      setInternalDatabaseMessage(error instanceof Error ? error.message : tr("تعذر فحص التغييرات", "Could not check changes"));
+      setInternalDatabaseMessage(error instanceof Error ? error.message : tr("تعذر فحص التغييرات", "Could not check changes"), "error");
     } finally {
       setIsCheckingInternalJournal(false);
     }
@@ -898,7 +914,7 @@ export default function DeveloperSettingsPage() {
         `Direct PostgreSQL edits in journal: ${count}`,
       ));
     } catch (error) {
-      setInternalDatabaseMessage(error instanceof Error ? error.message : tr("تعذر فحص تغييرات الخادم", "Could not check server changes"));
+      setInternalDatabaseMessage(error instanceof Error ? error.message : tr("تعذر فحص تغييرات الخادم", "Could not check server changes"), "error");
     } finally {
       setIsCheckingServerJournal(false);
     }
@@ -924,7 +940,7 @@ export default function DeveloperSettingsPage() {
       setInternalJournalCount(null);
       setServerJournalCount(null);
     } catch (error) {
-      setInternalDatabaseMessage(error instanceof Error ? error.message : tr("فشلت المزامنة الثنائية", "Bidirectional sync failed"));
+      setInternalDatabaseMessage(error instanceof Error ? error.message : tr("فشلت المزامنة الثنائية", "Bidirectional sync failed"), "error");
     } finally {
       setIsRunningInternalBidirectional(false);
     }
@@ -945,7 +961,7 @@ export default function DeveloperSettingsPage() {
       ));
       setInternalJournalCount(null);
     } catch (error) {
-      setInternalDatabaseMessage(error instanceof Error ? error.message : tr("فشلت المزامنة الداخلية", "Internal sync failed"));
+      setInternalDatabaseMessage(error instanceof Error ? error.message : tr("فشلت المزامنة الداخلية", "Internal sync failed"), "error");
     } finally {
       setIsRunningInternalPush(false);
     }
@@ -970,7 +986,7 @@ export default function DeveloperSettingsPage() {
       ));
       setInternalJournalCount(null);
     } catch (error) {
-      setInternalDatabaseMessage(error instanceof Error ? error.message : tr("فشل استلام بيانات الخادم الداخلي", "Could not receive internal server data"));
+      setInternalDatabaseMessage(error instanceof Error ? error.message : tr("فشل استلام بيانات الخادم الداخلي", "Could not receive internal server data"), "error");
     } finally {
       setIsRunningInternalPull(false);
     }
@@ -991,7 +1007,7 @@ export default function DeveloperSettingsPage() {
       ));
       setInternalReadiness(null);
     } catch (error) {
-      setInternalDatabaseMessage(error instanceof Error ? error.message : tr("تعذر إكمال سجلات الحسابات", "Could not complete accounting records"));
+      setInternalDatabaseMessage(error instanceof Error ? error.message : tr("تعذر إكمال سجلات الحسابات", "Could not complete accounting records"), "error");
     } finally {
       setIsCompletingAccounting(false);
     }
@@ -1024,7 +1040,39 @@ export default function DeveloperSettingsPage() {
     }
   }
 
+  function setAccessPermission(section: "tabs" | "edit", key: string, value: boolean) {
+    setSavedMessage(""); setError("");
+    setSettings(current => {
+      const policy = parseSettingsAccess(current.managerSettingsAccess) || defaultSettingsAccess();
+      return { ...current, managerSettingsAccess: JSON.stringify({ ...policy, [section]: { ...policy[section], [key]: value } }) };
+    });
+  }
+  async function saveProtectionSettings() {
+    setError(""); setSavedMessage(""); setIsSaving(true);
+    try {
+      const policy = parseSettingsAccess(settings.managerSettingsAccess) || defaultSettingsAccess();
+      const response = await fetch(`${API_BASE}/developer/settings-protection`, {
+        method: "PUT", headers: authHeaders(), body: JSON.stringify({
+          ...Object.fromEntries(["allowManagerEditLegalInfo", "allowManagerEditBranding", "allowManagerEditPrintSettings", "allowManagerEditInvoicesBackupImport", "allowManagerViewUpdate", "allowManagerEditAccountantSignature", "allowManagerEditAppearance", "allowManagerViewPreview", "allowManagerEditRegistrationSettings", "allowManagerEditSensitiveUsers"].map(key => [key, settings[key as keyof DeveloperSettings]])),
+          managerSettingsAccess: JSON.stringify(policy),
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || tr("تعذر حفظ الصلاحيات", "Could not save permissions"));
+      // Keep unsaved database form edits untouched when saving protection.
+      setSettings(current => ({ ...current, ...Object.fromEntries(["allowManagerEditLegalInfo", "allowManagerEditBranding", "allowManagerEditPrintSettings", "allowManagerEditInvoicesBackupImport", "allowManagerViewUpdate", "allowManagerEditAccountantSignature", "allowManagerEditAppearance", "allowManagerViewPreview", "allowManagerEditRegistrationSettings", "allowManagerEditSensitiveUsers"].map(key => [key, data[key]])), managerSettingsAccess: data.managerSettingsAccess }));
+      sessionStorage.setItem("developer_settings", JSON.stringify(data));
+      window.dispatchEvent(new CustomEvent("developer-settings-updated", { detail: data }));
+      setSavedMessage(tr("تم حفظ الحماية والصلاحيات بنجاح", "Protection and permissions saved"));
+    } catch (error) { setError(error instanceof Error ? error.message : tr("تعذر حفظ الصلاحيات", "Could not save permissions")); }
+    finally { setIsSaving(false); }
+  }
+
   async function saveSettings() {
+    if (!Number.isInteger(syncConfig.intervalMinutes) || syncConfig.intervalMinutes < 10 || syncConfig.intervalMinutes > 1440) {
+      setError(tr("الفاصل التلقائي يجب أن يكون من 10 إلى 1440 دقيقة", "Automatic interval must be 10 to 1440 minutes"));
+      return;
+    }
     setError("");
     setSavedMessage("");
     setIsSaving(true);
@@ -1058,7 +1106,7 @@ export default function DeveloperSettingsPage() {
         connectionStatus: data.databaseStatus === "connected" ? "connected" : "not_connected",
       }));
     }
-    setDatabaseMessage(data.databaseStatus === "connected" ? tr("الاتصال سليم", "Connection OK") : tr("قاعدة البيانات غير متاحة", "Database unavailable"));
+    setDatabaseMessage(data.databaseStatus === "connected" ? tr("الاتصال سليم", "Connection OK") : tr("قاعدة البيانات غير متاحة", "Database unavailable"), data.databaseStatus === "connected" ? "success" : "error");
   }
 
   async function loadSyncQueueStatus() {
@@ -1119,7 +1167,7 @@ export default function DeveloperSettingsPage() {
           : tr("تعذر الاتصال بقاعدة البيانات السحابية", "Unable to connect to online database");
 
         if (!silent) {
-          setSyncWorkerMessage(lastError ? `${message}: ${lastError}` : message);
+          setSyncWorkerMessage(lastError ? `${message}: ${lastError}` : message, "error");
         }
         await loadSyncQueueStatus();
         return;
@@ -1150,7 +1198,7 @@ export default function DeveloperSettingsPage() {
       await loadSyncQueueStatus();
     } catch (err) {
       if (!silent) {
-        setSyncWorkerMessage(err instanceof Error ? err.message : tr("تعذر تشغيل المزامنة", "Failed to run sync"));
+        setSyncWorkerMessage(err instanceof Error ? err.message : tr("تعذر تشغيل المزامنة", "Failed to run sync"), "error");
       }
     } finally {
       syncWorkerRunningRef.current = false;
@@ -1181,7 +1229,7 @@ export default function DeveloperSettingsPage() {
       );
       await loadSyncQueueStatus();
     } catch (err) {
-      setSyncWorkerMessage(err instanceof Error ? err.message : tr("تعذر إعادة محاولة العناصر الفاشلة", "Failed to retry failed items"));
+      setSyncWorkerMessage(err instanceof Error ? err.message : tr("تعذر إعادة محاولة العناصر الفاشلة", "Failed to retry failed items"), "error");
     } finally {
       setIsRetryingFailedSync(false);
     }
@@ -1225,7 +1273,7 @@ export default function DeveloperSettingsPage() {
   }, []);
   async function copyDatabasePath() {
     await navigator.clipboard?.writeText(settings.sqlitePath || "");
-    setDatabaseMessage(settings.sqlitePath ? tr("تم نسخ المسار", "Path copied") : tr("المسار غير متاح", "Path unavailable"));
+    setDatabaseMessage(settings.sqlitePath ? tr("تم نسخ المسار", "Path copied") : tr("المسار غير متاح", "Path unavailable"), settings.sqlitePath ? "success" : "warning");
   }
   async function copyLicenseDeviceId() {
     await navigator.clipboard?.writeText(licenseDeviceId || "");
@@ -1364,18 +1412,18 @@ export default function DeveloperSettingsPage() {
     setDatabaseMessage("");
 
     if (!databaseConfig.useConnectionString) {
-      setDatabaseMessage(tr("فعّل خيار Connection String الكامل ثم أدخل الرابط", "Enable full connection string and enter the URL"));
+      setDatabaseMessage(tr("فعّل خيار Connection String الكامل ثم أدخل الرابط", "Enable full connection string and enter the URL"), "warning");
       return;
     }
 
     const connectionString = databaseConfig.connectionString.trim();
     if (!connectionString) {
-      setDatabaseMessage(tr("Connection String مطلوب لاختبار الاتصال", "Connection string is required to test the connection"));
+      setDatabaseMessage(tr("Connection String مطلوب لاختبار الاتصال", "Connection string is required to test the connection"), "warning");
       return;
     }
 
     if (!/^postgres(?:ql)?:\/\//i.test(connectionString)) {
-      setDatabaseMessage(tr("يدعم الاختبار PostgreSQL connection string فقط حالياً", "Only PostgreSQL connection strings are supported for now"));
+      setDatabaseMessage(tr("يدعم الاختبار PostgreSQL connection string فقط حالياً", "Only PostgreSQL connection strings are supported for now"), "warning");
       return;
     }
 
@@ -1389,13 +1437,13 @@ export default function DeveloperSettingsPage() {
       const data = await res.json().catch(() => ({}));
 
       if (!res.ok || !data?.success) {
-        setDatabaseMessage(data?.error ? tr(`فشل الاتصال: ${data.error}`, `Connection failed: ${data.error}`) : tr("فشل الاتصال", "Connection failed"));
+        setDatabaseMessage(data?.error ? tr(`فشل الاتصال: ${data.error}`, `Connection failed: ${data.error}`) : tr("فشل الاتصال", "Connection failed"), "error");
         return;
       }
 
       setDatabaseMessage(tr("تم الاتصال بنجاح", "Connected successfully"));
     } catch {
-      setDatabaseMessage(tr("تعذر اختبار الاتصال بالخادم", "Could not test the connection through the server"));
+      setDatabaseMessage(tr("تعذر اختبار الاتصال بالخادم", "Could not test the connection through the server"), "error");
     } finally {
       setIsTestingConnection(false);
     }
@@ -1405,18 +1453,18 @@ export default function DeveloperSettingsPage() {
     setDatabaseMessage("");
 
     if (!databaseConfig.useConnectionString) {
-      setDatabaseMessage(tr("فعّل خيار Connection String الكامل ثم أدخل الرابط", "Enable full connection string and enter the URL"));
+      setDatabaseMessage(tr("فعّل خيار Connection String الكامل ثم أدخل الرابط", "Enable full connection string and enter the URL"), "warning");
       return;
     }
 
     const connectionString = databaseConfig.connectionString.trim();
     if (!connectionString) {
-      setDatabaseMessage(tr("Connection String مطلوب للاتصال", "Connection string is required to connect"));
+      setDatabaseMessage(tr("Connection String مطلوب للاتصال", "Connection string is required to connect"), "warning");
       return;
     }
 
     if (!/^postgres(?:ql)?:\/\//i.test(connectionString)) {
-      setDatabaseMessage(tr("يدعم الاتصال PostgreSQL connection string فقط حالياً", "Only PostgreSQL connection strings are supported for now"));
+      setDatabaseMessage(tr("يدعم الاتصال PostgreSQL connection string فقط حالياً", "Only PostgreSQL connection strings are supported for now"), "warning");
       return;
     }
 
@@ -1430,7 +1478,7 @@ export default function DeveloperSettingsPage() {
       const data = await res.json().catch(() => ({}));
 
       if (!res.ok || !data?.success) {
-        setDatabaseMessage(data?.error ? tr(`فشل الاتصال: ${data.error}`, `Connection failed: ${data.error}`) : tr("فشل الاتصال", "Connection failed"));
+        setDatabaseMessage(data?.error ? tr(`فشل الاتصال: ${data.error}`, `Connection failed: ${data.error}`) : tr("فشل الاتصال", "Connection failed"), "error");
         return;
       }
 
@@ -1446,7 +1494,7 @@ export default function DeveloperSettingsPage() {
       await refreshConnectionStatus();
       setDatabaseMessage(tr("Online: متصل بالأونلاين", "Online: Connected"));
     } catch {
-      setDatabaseMessage(tr("تعذر الاتصال بقاعدة الأونلاين عبر الخادم", "Could not connect to the online database through the server"));
+      setDatabaseMessage(tr("تعذر الاتصال بقاعدة الأونلاين عبر الخادم", "Could not connect to the online database through the server"), "error");
     } finally {
       setIsConnectingOnline(false);
     }
@@ -1468,7 +1516,7 @@ export default function DeveloperSettingsPage() {
       await refreshConnectionStatus();
       setDatabaseMessage(tr("تم فصل الأونلاين وإيقاف مزامنته على هذا الجهاز", "Online synchronization is disconnected on this device"));
     } catch (err) {
-      setDatabaseMessage(err instanceof Error ? err.message : tr("تعذر فصل الاتصال", "Could not disconnect"));
+      setDatabaseMessage(err instanceof Error ? err.message : tr("تعذر فصل الاتصال", "Could not disconnect"), "error");
     } finally {
       setIsSaving(false);
     }
@@ -1490,7 +1538,7 @@ export default function DeveloperSettingsPage() {
       window.dispatchEvent(new CustomEvent("developer-settings-updated", { detail: data }));
       setDatabaseMessage(tr("تم حفظ إعدادات قاعدة البيانات", "Database settings saved"));
     } catch (err) {
-      setDatabaseMessage(err instanceof Error ? err.message : tr("تعذر حفظ إعدادات قاعدة البيانات", "Failed to save database settings"));
+      setDatabaseMessage(err instanceof Error ? err.message : tr("تعذر حفظ إعدادات قاعدة البيانات", "Failed to save database settings"), "error");
     } finally {
       setIsSaving(false);
     }
@@ -2083,7 +2131,7 @@ export default function DeveloperSettingsPage() {
       activeTab={activeTab}
       onTabChange={setActiveTab}
       actions={
-        <Button type="button" onClick={saveSettings} disabled={isSaving} className="gap-2">
+        <Button type="button" onClick={activeTab === "manager" ? saveProtectionSettings : saveSettings} disabled={isSaving} className="gap-2">
           <Save className="h-4 w-4" />
           {isSaving ? (isAR ? "جارٍ الحفظ..." : "Saving...") : (isAR ? "حفظ" : "Save")}
         </Button>
@@ -2099,14 +2147,7 @@ export default function DeveloperSettingsPage() {
 
       {activeTab === "security" && (
         <div data-settings-security className="flex min-w-0 flex-col gap-3">
-<details data-settings-fold className="rounded-xl border-border/70 shadow-sm">
-            <summary className="flex cursor-pointer items-center gap-2 px-3 py-2 text-[13px] font-semibold">{tr("إعدادات الحماية", "Security Settings")}<span aria-hidden="true" className="ms-auto text-muted-foreground">⌄</span></summary>
-            <CardContent className="grid gap-2.5 px-3 pb-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 300px), 1fr))", alignItems: "start" }}>
-              {securityToggles.map(([key, labelAr, labelEn, hintAr, hintEn]) => (
-                <ToggleRow key={key} label={tr(labelAr, labelEn)} hint={tr(hintAr, hintEn)} checked={!!settings[key]} onChange={(checked) => setBool(key, checked)} />
-              ))}
-            </CardContent>
-          </details>
+
 <details data-settings-fold className="rounded-xl border-border/70 shadow-sm">
             <summary className="flex cursor-pointer items-center gap-2 px-3 py-2 text-[13px] font-semibold">{tr("رسالة صفحة تسجيل الدخول", "Login Page Message")}<span aria-hidden="true" className="ms-auto text-muted-foreground">⌄</span></summary>
             <CardContent className="grid gap-2.5 px-3 pb-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 300px), 1fr))", alignItems: "start" }}>
@@ -2261,15 +2302,26 @@ export default function DeveloperSettingsPage() {
        )}
 
        {activeTab === "manager" && (
-        <div className="grid gap-2.5">
-        <details data-settings-fold className="rounded-xl border-border/70 shadow-sm">
-          <summary className="flex cursor-pointer items-center gap-2 px-3 py-2 text-[13px] font-semibold">{tr("صلاحيات المدير", "Manager Access")}<span aria-hidden="true" className="ms-auto text-muted-foreground">⌄</span></summary>
-          <CardContent className="px-3 pb-3 grid gap-2.5 md:grid-cols-2">
-            {managerToggles.map(([key, labelAr, labelEn, hintAr, hintEn]) => (
-              <ToggleRow key={key} label={tr(labelAr, labelEn)} hint={tr(hintAr, hintEn)} checked={!!settings[key]} onChange={(checked) => setBool(key, checked)} />
-            ))}
-          </CardContent>
-        </details>
+        <div className="grid gap-3">
+
+
+          {settingsAccessGroups.map(group => {
+            const policy = parseSettingsAccess(settings.managerSettingsAccess) || defaultSettingsAccess();
+            return <details key={group.id} open data-settings-fold className="rounded-xl border border-border p-3">
+              <summary className="font-semibold">{tr(group.ar, group.en)}</summary>
+              <ToggleRow label={tr("إظهار التبويب كاملًا", "Show this tab")} hint={tr("أوقفه لإخفاء التبويب وكل محتوياته", "Turn off to hide the tab and all its contents")}
+                checked={policy.tabs[group.id]} onChange={checked => setAccessPermission("tabs", group.id, checked)} />
+              {policy.tabs[group.id] && group.parts.map(([id, ar, en]) =>
+                <ToggleRow key={id} label={tr(ar, en)} hint={tr("السماح بتعديل هذا الجزء", "Allow editing this part")}
+                  checked={policy.edit[id]} onChange={checked => setAccessPermission("edit", id, checked)} />)}
+            </details>;
+          })}
+          <div role={error ? "alert" : "status"} aria-live="polite" className={cn("rounded-md border px-3 py-2 text-[13px] font-medium",
+            error ? "border-red-300 bg-red-50 text-red-800 dark:bg-red-950 dark:text-red-200"
+              : savedMessage ? "border-emerald-300 bg-emerald-50 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200"
+              : "border-amber-300 bg-amber-50 text-amber-900 dark:bg-amber-950 dark:text-amber-200")}>
+            {error || savedMessage || tr("إغلاق التبويب يخفيه بالكامل. عند إظهاره، فعّل فقط الأجزاء المسموح بتعديلها، ثم اضغط زر الحفظ أعلى الصفحة.", "Turn off a tab to hide it completely. When visible, enable only the parts that may be edited, then use Save at the top of the page.")}
+          </div>
         </div>
       )}
 
@@ -2637,10 +2689,14 @@ export default function DeveloperSettingsPage() {
                     <DevField label={tr("الفاصل بالدقائق", "Interval in minutes")}>
                       <Input
                         type="number"
-                        min={1}
+                        min={10}
+                        max={1440}
+                        step={1}
+                        onBlur={() => setSyncConfig(current => ({ ...current, intervalMinutes: Math.max(10, Math.min(1440, Math.trunc(current.intervalMinutes) || 10)) }))}
                         value={syncConfig.intervalMinutes}
                         onChange={(event) => setSyncConfig((current) => ({ ...current, intervalMinutes: Number(event.target.value) }))}
                       />
+                      <p className="rounded-md border border-amber-300 bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">{tr("الحد الأدنى 10 دقائق للمزامنة التلقائية", "Automatic sync minimum: 10 minutes")}</p>
                     </DevField>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
@@ -2661,7 +2717,7 @@ export default function DeveloperSettingsPage() {
                   <RefreshCw className={cn("h-3.5 w-3.5", isSyncQueueLoading && "animate-spin")} />
                   {tr("تحديث", "Refresh")}
                 </Button>
-                <Button type="button" size="sm" onClick={() => void runSyncWorkerNow()} disabled={isSyncWorkerRunning || !onlineDatabaseConnected} className="gap-2">
+                <Button type="button" size="sm" onClick={() => void runSyncWorkerNow()} disabled={isSyncWorkerRunning || !onlineDatabaseConnected || !syncGuards || syncGuards.online.blocked} className="gap-2">
                   <RefreshCw className={cn("h-3.5 w-3.5", isSyncWorkerRunning && "animate-spin")} />
                   {isSyncWorkerRunning ? tr("جارٍ التشغيل...", "Running...") : tr("مزامنة الآن", "Sync now")}
                 </Button>
@@ -2685,7 +2741,7 @@ export default function DeveloperSettingsPage() {
                   : tr("المزامنة التلقائية متوقفة على هذا الجهاز.", "Automatic sync is off on this device.")}
               </div>
               {syncWorkerMessage && (
-                <div className="mb-3 rounded-md border border-border bg-background px-3 py-2 text-[13px] text-muted-foreground">
+                <div role={syncWorkerMessageTone === "error" ? "alert" : "status"} className={`mb-3 ${databaseNoticeClass(syncWorkerMessageTone)}`}>
                   {syncWorkerMessage}
                 </div>
               )}
@@ -2810,8 +2866,11 @@ export default function DeveloperSettingsPage() {
                         </select>
                       </DevField>
                       <DevField label={tr("الفاصل بالدقائق", "Interval in minutes")}>
-                        <Input type="number" min={1} max={1440} value={internalDatabaseConfig.intervalMinutes}
+                        <Input type="number" min={10} max={1440} step={1}
+                          onBlur={() => setInternalDatabaseConfig(current => ({ ...current, intervalMinutes: Math.max(10, Math.min(1440, Math.trunc(current.intervalMinutes) || 10)) }))}
+                          value={internalDatabaseConfig.intervalMinutes}
                           onChange={(event) => setInternalDatabaseConfig((current) => ({ ...current, intervalMinutes: Number(event.target.value) }))} />
+                        <p className="rounded-md border border-amber-300 bg-amber-50 px-2 py-1 text-xs font-semibold text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-200">{tr("الحد الأدنى 10 دقائق للمزامنة التلقائية", "Automatic sync minimum: 10 minutes")}</p>
                       </DevField>
                     </div>
                     <p className="text-xs text-muted-foreground">{tr("بعد حفظ التفعيل، تعمل المزامنة تلقائيًا عند بدء البرنامج أو كل فترة حسب اختيارك. التعارض والحذف من الخادم يوقفان المزامنة الثنائية للمراجعة.", "After saving, sync runs automatically on startup or at the selected interval. Conflicts and server deletions stop bidirectional sync for review.")}</p>
@@ -2834,7 +2893,7 @@ export default function DeveloperSettingsPage() {
                     <h4 className="font-bold">{tr("التحكم والضبط", "Controls and settings")}</h4>
                     <div className="flex flex-wrap gap-2 [&>button]:max-w-full [&>button]:h-auto [&>button]:min-h-8 [&>button]:whitespace-normal">
                       <Button size="sm" variant="outline" onClick={saveInternalDatabaseSettings} disabled={isSavingInternalDatabase}>{isSavingInternalDatabase ? tr("جارٍ الحفظ...", "Saving...") : tr("حفظ الإعدادات", "Save settings")}</Button>
-                      <Button size="sm" onClick={() => internalDatabaseConfig.syncMode === "local-to-internal" ? runInternalPush() : internalDatabaseConfig.syncMode === "internal-to-local" ? runInternalPull() : runInternalBidirectional()} disabled={!internalConnectionActive || isRunningInternalPush || isRunningInternalPull || isRunningInternalBidirectional}>{tr("مزامنة الآن", "Sync now")}</Button>
+                      <Button size="sm" onClick={() => internalDatabaseConfig.syncMode === "local-to-internal" ? runInternalPush() : internalDatabaseConfig.syncMode === "internal-to-local" ? runInternalPull() : runInternalBidirectional()} disabled={!internalConnectionActive || isRunningInternalPush || isRunningInternalPull || isRunningInternalBidirectional || !syncGuards || syncGuards.internal.blocked}>{tr("مزامنة الآن", "Sync now")}</Button>
                     </div>
                     <details className="min-w-0">
                       <summary className="cursor-pointer text-sm font-semibold">{tr("الفحص والصيانة", "Diagnostics and maintenance")}</summary>
@@ -2867,7 +2926,7 @@ export default function DeveloperSettingsPage() {
                   "تغييرات الأجهزة الأخرى لا تظهر في عدّاد تعديلات الخادم المباشرة؛ تلتقطها المزامنة الثنائية بفحص السجلات.",
                   "Edits from other devices are not counted as direct server edits; bidirectional sync finds them by checking the records.",
                 )}</p>
-                {internalDatabaseMessage && <p role="status" className="text-[13px] text-muted-foreground break-words">{internalDatabaseMessage}</p>}
+                {internalDatabaseMessage && <p role={internalDatabaseMessageTone === "error" ? "alert" : "status"} className={databaseNoticeClass(internalDatabaseMessageTone)}>{internalDatabaseMessage}</p>}
                 {internalReadiness && (
                   <div className="overflow-x-auto rounded-xl border border-border">
                     <table className="w-full text-[13px]">
@@ -2889,7 +2948,7 @@ export default function DeveloperSettingsPage() {
               </div>
             </section>
             </div>
-            {databaseMessage && <div role="status" className="text-[13px] text-muted-foreground">{databaseMessage}</div>}
+            {databaseMessage && <div role={databaseMessageTone === "error" ? "alert" : "status"} className={databaseNoticeClass(databaseMessageTone)}>{databaseMessage}</div>}
           </CardContent>
         </Card>
       )}

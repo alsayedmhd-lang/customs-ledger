@@ -1,6 +1,7 @@
 import { sqliteTable, integer, text } from "drizzle-orm/sqlite-core";
 
 export const companySettingsTableSqlite = sqliteTable("company_settings", {
+  managerSettingsAccess: text("manager_settings_access").default(""),
   id: integer("id").primaryKey({ autoIncrement: true }),
   nameAr: text("name_ar").notNull().default("اسم الشركة"),
   nameEn: text("name_en").notNull().default("Company Name"),

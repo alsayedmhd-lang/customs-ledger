@@ -11,6 +11,8 @@ export interface UserPermissions {
   canViewStatements: boolean;
   canViewAccounting: boolean;
   canCustomizePrintContact: boolean;
+  canRunOnlineSync?: boolean;
+  canRunInternalSync?: boolean;
 }
 
 export interface ClientViewPermissions {
@@ -31,6 +33,8 @@ export const DEFAULT_PERMISSIONS: UserPermissions = {
   canViewStatements: true,
   canViewAccounting: true,
   canCustomizePrintContact: false,
+  canRunOnlineSync: false,
+  canRunInternalSync: false,
 };
 
 export const DEFAULT_CLIENT_VIEW_PERMISSIONS: ClientViewPermissions = {

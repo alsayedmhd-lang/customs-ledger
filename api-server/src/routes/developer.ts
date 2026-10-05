@@ -1,3 +1,6 @@
+import { ensureSettingsAccessColumn } from "../utils/ensure-settings-access-column";
+import { parseSettingsAccess } from "../utils/settings-access-policy";
+import { withSyncLock, manualSyncAvailableAt, isSyncOperationRunning } from "../utils/sync-operation-lock";
 import { internalConnectionEnabled, setInternalConnectionEnabled } from "../utils/connection-state";
 import { Router } from "express";
 import type { Request, Response, NextFunction } from "express";
@@ -19,8 +22,8 @@ import { getStorageInfo } from "../utils/storage/get-storage-info";
 import { bootstrapInternalDatabase, completeInternalAccounting } from "../utils/internal-bootstrap";
 import { ensureInternalSyncJournal, getInternalSyncJournalStatus } from "../utils/internal-sync-journal";
 import { runInternalLocalToServerOnce, runInternalServerToLocalOnce, runInternalBidirectionalOnce } from "../utils/internal-sync-worker";
-import { checkInternalSyncScheduleNow, getInternalAutoSyncStatus, startInternalSyncScheduler } from "../utils/internal-sync-scheduler";
-import { startOnlineSyncScheduler } from "../utils/online-sync-scheduler";
+import { checkInternalSyncScheduleNow, getInternalAutoSyncStatus, startInternalSyncScheduler, runInternalManualSyncOnce } from "../utils/internal-sync-scheduler";
+import { startOnlineSyncScheduler, getOnlineSyncScheduleStatus } from "../utils/online-sync-scheduler";
 import {
   pushAttachmentMetadataToInternalServer,
   pullAttachmentMetadataFromInternalServer,
@@ -38,6 +41,8 @@ function getRuntimeAppVersion(): string {
   }
   return `v${packageJson.version}`;
 }
+
+import { getDashboardSyncPermissions, requireDashboardSyncPermission } from "../utils/sync-permissions";
 
 const router = Router();
 // A read-only summary for signed-in dashboard users. Never return database credentials.
@@ -102,18 +107,53 @@ router.get("/dashboard/system-status", requireAuth, async (_req, res) => {
 
     return res.json({
       connections: { local, online, internal, onlineConfigured, internalConfigured, onlineEnabled: settings.databaseMode === "online", internalEnabled: internalConnectionEnabled() },
-      sync: {
-        autoSync: toBool(settings.syncAutoSync),
-        internalAutoSync: toBool(settings.internalSyncAutoSync),
-        status: isOnlineSyncRunning() ? "running" : String((settings as any)?.syncStatus || "idle") === "running" ? "idle" : String((settings as any)?.syncStatus || "idle"),
-        lastSync: (settings as any)?.syncLastSyncTime || null,
-        pending,
-        failed,
-      },
+      sync: { ...dashboardSyncStatus(settings), pending, failed },
     });
   } catch {
     return res.status(503).json({ error: "System status is unavailable" });
   }
+});
+
+
+function dashboardSyncStatus(settings: any) {
+  const counts = sqlite?.prepare(
+    "SELECT status, COUNT(*) AS count FROM sync_queue WHERE status IN ('pending', 'failed') GROUP BY status"
+  ).all() as Array<{ status: string; count: number }> | undefined;
+  return {
+    autoSync: toBool(settings.syncAutoSync),
+    internalAutoSync: toBool(settings.internalSyncAutoSync),
+    status: isOnlineSyncRunning() ? "running" : settings.syncStatus === "running" ? "idle" : String(settings.syncStatus || "idle"),
+    lastSync: settings.syncLastSyncTime || null,
+    pending: counts?.find(row => row.status === "pending")?.count || 0,
+    failed: counts?.find(row => row.status === "failed")?.count || 0,
+    ...getOnlineSyncScheduleStatus(),
+    manualAvailableAt: manualSyncAvailableAt("online") || null,
+  };
+}
+// Lightweight polling: no remote connection probes or database credentials.
+router.get("/dashboard/sync-status", requireAuth, async (req, res) => {
+  try {
+    const settings = await getSettingsRow();
+    const internal = getInternalAutoSyncStatus();
+    const journal = sqlite?.prepare("SELECT COUNT(*) AS count FROM internal_sync_journal").get() as { count: number } | undefined;
+    return res.json({
+      online: dashboardSyncStatus(settings),
+      internal: { ...internal, manualAvailableAt: manualSyncAvailableAt("internal") || null, status: internal.running || internalRequests > 0 ? "running" : internal.lastError ? "failed" : internal.lastSuccessAt ? "success" : "idle", pending: journal?.count || 0, lastSync: internal.lastSuccessAt },
+      connections: { onlineEnabled: settings.databaseMode === "online", internalEnabled: internalConnectionEnabled() },
+      permissions: getDashboardSyncPermissions(req.user),
+    });
+  }
+  catch { return res.status(503).json({ error: "Sync status is unavailable" }); }
+});
+router.post("/dashboard/sync/run-once", requireAuth, requireDashboardSyncPermission("online"), runOnlineSyncRequest);
+router.post("/dashboard/internal-sync/run-once", requireAuth, requireDashboardSyncPermission("internal"), async (_req, res) => {
+  if (!internalConnectionEnabled()) return res.status(409).json({ ok: false, message: "Internal connection is disconnected on this device" });
+  if (isOnlineSyncRunning() || internalRequests || getInternalAutoSyncStatus().running) return res.status(409).json({ ok: false, message: "An internal operation is already running" });
+  if (Date.now() < manualSyncAvailableAt("internal")) return res.status(409).json({ ok: false, message: "Wait for the sync countdown to finish" });
+  internalRequests++;
+  try { await runInternalManualSyncOnce(); return res.json({ ok: true }); }
+  catch (error) { return res.status(500).json({ ok: false, message: sanitizeDatabaseError(error) }); }
+  finally { internalRequests--; }
 });
 
 try {
@@ -181,16 +221,9 @@ const developerPermissionColumns = [
   ["allow_manager_edit_branding", "ALTER TABLE company_settings ADD COLUMN allow_manager_edit_branding INTEGER DEFAULT 0"],
   ["allow_manager_edit_registration_settings", "ALTER TABLE company_settings ADD COLUMN allow_manager_edit_registration_settings INTEGER DEFAULT 0"],
   ["allow_manager_edit_sensitive_users", "ALTER TABLE company_settings ADD COLUMN allow_manager_edit_sensitive_users INTEGER DEFAULT 0"],
-  ["lock_company_identity", "ALTER TABLE company_settings ADD COLUMN lock_company_identity INTEGER DEFAULT 0"],
-  ["lock_company_name", "ALTER TABLE company_settings ADD COLUMN lock_company_name INTEGER DEFAULT 0"],
-  ["lock_logo", "ALTER TABLE company_settings ADD COLUMN lock_logo INTEGER DEFAULT 0"],
-  ["lock_stamp", "ALTER TABLE company_settings ADD COLUMN lock_stamp INTEGER DEFAULT 0"],
-  ["lock_legal_info", "ALTER TABLE company_settings ADD COLUMN lock_legal_info INTEGER DEFAULT 0"],
-  ["lock_footer_branding", "ALTER TABLE company_settings ADD COLUMN lock_footer_branding INTEGER DEFAULT 0"],
   ["login_footer_text", "ALTER TABLE company_settings ADD COLUMN login_footer_text TEXT DEFAULT ''"],
   ["login_message_text", "ALTER TABLE company_settings ADD COLUMN login_message_text TEXT DEFAULT ''"],
   ["login_message_type", "ALTER TABLE company_settings ADD COLUMN login_message_type TEXT DEFAULT 'welcome'"],
-  ["prevent_rebrand_to_another_company", "ALTER TABLE company_settings ADD COLUMN prevent_rebrand_to_another_company INTEGER DEFAULT 0"],
   ["license_status", "ALTER TABLE company_settings ADD COLUMN license_status TEXT DEFAULT 'not_configured'"],
   ["licensed_company_name", "ALTER TABLE company_settings ADD COLUMN licensed_company_name TEXT DEFAULT ''"],
   ["license_id", "ALTER TABLE company_settings ADD COLUMN license_id TEXT DEFAULT ''"],
@@ -1538,16 +1571,12 @@ function mapDeveloperPermissions(settings: any) {
     settings?.hardwareId ||
     crypto.createHash("sha256").update(`${os.hostname()}-${os.userInfo().username}`).digest("hex").slice(0, 16);
   return {
-    lockCompanyIdentity: toBool(settings?.lockCompanyIdentity),
-    lockCompanyName: toBool(settings?.lockCompanyName),
-    lockLogo: toBool(settings?.lockLogo),
-    lockStamp: toBool(settings?.lockStamp),
-    lockLegalInfo: toBool(settings?.lockLegalInfo),
-    lockFooterBranding: toBool(settings?.lockFooterBranding),
+    managerSettingsAccess: settings?.managerSettingsAccess || "",
+
     loginFooterText: settings?.loginFooterText || "",
     loginMessageText: settings?.loginMessageText || "",
     loginMessageType: settings?.loginMessageType || "welcome",
-    preventRebrandToAnotherCompany: toBool(settings?.preventRebrandToAnotherCompany),
+
     licenseStatus: settings?.licenseStatus || "not_configured",
     licensedCompanyName: settings?.licensedCompanyName || "",
     licenseId: settings?.licenseId || "",
@@ -1576,7 +1605,7 @@ function mapDeveloperPermissions(settings: any) {
     syncMode: settings?.syncMode || "local-to-online",
     syncAutoSync: toBool(settings?.syncAutoSync),
     syncTiming: settings?.syncTiming || "startup",
-    syncIntervalMinutes: Number(settings?.syncIntervalMinutes || 30),
+    syncIntervalMinutes: Math.max(10, Number(settings?.syncIntervalMinutes || 30)),
     syncLastSyncTime: settings?.syncLastSyncTime || "",
     syncStatus: settings?.syncStatus || "idle",
     sqlitePath: sqlitePath || null,
@@ -1602,6 +1631,7 @@ function developerDb() {
 
 async function getSettingsRow() {
   ensureDeveloperSettingsColumns();
+  ensureSettingsAccessColumn();
 
   let [settings] = await developerDb().select().from(companySettingsTable).limit(1);
 
@@ -1612,6 +1642,7 @@ async function getSettingsRow() {
   return settings;
 }
 
+ensureSettingsAccessColumn();
 ensureDeveloperSettingsColumns();
 ensureSyncQueueTable();
 startInternalSyncScheduler();
@@ -1713,6 +1744,46 @@ router.get("/developer/system-diagnostics/export", async (_req, res) => {
   }
 });
 
+router.get("/developer/sync/schedule-status", (_req, res) => {
+  try {
+    const busy = isSyncOperationRunning() || isOnlineSyncRunning() || getInternalAutoSyncStatus().running;
+    return res.json({
+      online: { blocked: busy || Date.now() < manualSyncAvailableAt("online") },
+      internal: { blocked: busy || Date.now() < manualSyncAvailableAt("internal") },
+    });
+  } catch { return res.status(503).json({ error: "Sync status is unavailable" }); }
+});
+
+const settingsProtectionKeys = ["allowManagerEditLegalInfo", "allowManagerEditBranding", "allowManagerEditPrintSettings", "allowManagerEditInvoicesBackupImport", "allowManagerViewUpdate", "allowManagerEditAccountantSignature", "allowManagerEditAppearance", "allowManagerViewPreview", "allowManagerEditRegistrationSettings", "allowManagerEditSensitiveUsers"] as const;
+router.get("/settings-access", (req, res, next) => {
+  return isExternalDeveloperModeRequest(req) ? requireDeveloperAccess(req, res, next) : requireAuth(req, res, next);
+}, async (_req, res) => {
+  try {
+    const settings = await getSettingsRow();
+    const mapped = mapDeveloperPermissions(settings);
+    return res.json({ managerSettingsAccess: mapped.managerSettingsAccess,
+      ...Object.fromEntries(settingsProtectionKeys.map(key => [key, mapped[key]])) });
+  } catch { return res.status(503).json({ error: "Settings permissions unavailable" }); }
+});
+router.put("/developer/settings-protection", async (req, res) => {
+  try {
+    const body = req.body ?? {};
+    if (settingsProtectionKeys.some(key => typeof body[key] !== "boolean")) {
+      return res.status(400).json({ error: "Invalid settings protection flags" });
+    }
+    let policy;
+    try { policy = parseSettingsAccess(body.managerSettingsAccess); }
+    catch { return res.status(400).json({ error: "Invalid settings access policy" }); }
+    if (!policy) return res.status(400).json({ error: "Settings access policy required" });
+    const settings = await getSettingsRow();
+    const [updated] = await developerDb().update(companySettingsTable).set({
+      ...Object.fromEntries(settingsProtectionKeys.map(key => [key, body[key]])),
+      managerSettingsAccess: JSON.stringify(policy), updatedAt: new Date(),
+    }).where(eq(companySettingsTable.id, Number(settings.id))).returning();
+    return res.json(mapDeveloperPermissions(updated));
+  } catch { return res.status(500).json({ error: "Failed to save settings protection" }); }
+});
+
 router.get("/developer/settings", async (_req, res) => {
   try {
     const settings = await getSettingsRow();
@@ -1735,7 +1806,7 @@ function mapInternalDatabaseSettings(settings: any) {
     syncMode: settings.internalSyncMode || "bidirectional",
     autoSync: toBool(settings.internalSyncAutoSync),
     timing: settings.internalSyncTiming || "startup",
-    intervalMinutes: Number(settings.internalSyncIntervalMinutes || 30),
+    intervalMinutes: Math.max(10, Number(settings.internalSyncIntervalMinutes || 30)),
   };
 }
 
@@ -1921,10 +1992,12 @@ router.post("/developer/internal-database/sync-bidirectional", async (_req, res)
     if (!isPostgresConnectionString(connectionString)) {
       return res.status(400).json({ ok: false, error: "Only PostgreSQL connection strings are supported" });
     }
+    return await withSyncLock("internal", connectionString, async () => {
     const result = await runInternalBidirectionalOnce(connectionString);
     const attachmentsPulled = await pullAttachmentMetadataFromInternalServer(connectionString);
     const attachmentsPushed = await pushAttachmentMetadataToInternalServer(connectionString);
     return res.json({ ok: true, ...result, attachments: {pulled: attachmentsPulled, pushed: attachmentsPushed} });
+    });
   } catch (error) {
     return res.status(400).json({ ok: false, error: sanitizeDatabaseError(error) });
   }
@@ -1952,9 +2025,11 @@ router.post("/developer/internal-database/sync-local-to-server", async (_req, re
     if (!isPostgresConnectionString(connectionString)) {
       return res.status(400).json({ ok: false, error: "Only PostgreSQL connection strings are supported" });
     }
+    return await withSyncLock("internal", connectionString, async () => {
     const result = await runInternalLocalToServerOnce(connectionString);
     const attachments = await pushAttachmentMetadataToInternalServer(connectionString);
     return res.json({ ok: true, ...result, attachments });
+    });
   } catch (error) {
     return res.status(400).json({ ok: false, error: sanitizeDatabaseError(error) });
   }
@@ -1982,9 +2057,11 @@ router.post("/developer/internal-database/sync-server-to-local", async (_req, re
     if (!isPostgresConnectionString(connectionString)) {
       return res.status(400).json({ ok: false, error: "Only PostgreSQL connection strings are supported" });
     }
+    return await withSyncLock("internal", connectionString, async () => {
     const result = await runInternalServerToLocalOnce(connectionString);
     const attachments = await pullAttachmentMetadataFromInternalServer(connectionString);
     return res.json({ ok: true, ...result, attachments });
+    });
   } catch (error) {
     return res.status(400).json({ ok: false, error: sanitizeDatabaseError(error) });
   }
@@ -2007,7 +2084,7 @@ router.put("/developer/internal-database/settings", async (req, res) => {
     }
     if (!["local-to-internal", "internal-to-local", "bidirectional"].includes(body.syncMode) ||
         !["startup", "interval"].includes(body.timing) ||
-        !Number.isInteger(body.intervalMinutes) || body.intervalMinutes < 1 || body.intervalMinutes > 1440 ||
+        !Number.isInteger(body.intervalMinutes) || body.intervalMinutes < 10 || body.intervalMinutes > 1440 ||
         typeof body.autoSync !== "boolean") {
       return res.status(400).json({ error: "Invalid internal sync settings" });
     }
@@ -2324,11 +2401,14 @@ router.post("/developer/sync-queue/retry-failed", (_req, res) => {
   }
 });
 
-router.post("/developer/sync/run-once", async (_req, res) => {
+async function runOnlineSyncRequest(_req: Request, res: Response) {
+  try {
   const settings = await getSettingsRow();
   if (settings?.databaseMode !== "online") {
     return res.status(409).json({ ok: false, onlineConnected: false, message: "Online synchronization is disconnected on this device" });
   }
+  if (isOnlineSyncRunning() || internalRequests || getInternalAutoSyncStatus().running) return res.status(409).json({ ok: false, message: "A sync operation is already running" });
+  if (Date.now() < manualSyncAvailableAt("online")) return res.status(409).json({ ok: false, message: "Wait for the sync countdown to finish" });
   const result = await runConfiguredSyncOnce(String(settings?.syncMode || "local-to-online"));
   if (sqlite) {
     sqlite.prepare("UPDATE company_settings SET sync_status = ?, sync_last_sync_time = ?")
@@ -2341,7 +2421,11 @@ router.post("/developer/sync/run-once", async (_req, res) => {
       ? `Sync failed: ${result.lastError}`
       : `Online: Connected. ${result.syncMode} sync completed.`,
   });
-});
+  } catch (error) {
+    return res.status(500).json({ ok: false, message: sanitizeDatabaseError(error) });
+  }
+}
+router.post("/developer/sync/run-once", runOnlineSyncRequest);
 
 router.post("/developer/sync/online-connection", async (req, res) => {
   try {
@@ -2455,7 +2539,7 @@ router.put("/developer/settings", async (req, res) => {
     const settings = await getSettingsRow();
     const body = req.body ?? {};
     if (!["startup", "interval"].includes(body.syncTiming) ||
-        !Number.isInteger(body.syncIntervalMinutes) || body.syncIntervalMinutes < 1 || body.syncIntervalMinutes > 1440) {
+        !Number.isInteger(body.syncIntervalMinutes) || body.syncIntervalMinutes < 10 || body.syncIntervalMinutes > 1440) {
       return res.status(400).json({ error: "Invalid Online sync schedule" });
     }
     if (body.syncAutoSync && body.databaseMode === "online" && settings.internalSyncAutoSync) {
@@ -2465,16 +2549,11 @@ router.put("/developer/settings", async (req, res) => {
     const [updated] = await developerDb()
       .update(companySettingsTable)
       .set({
-        lockCompanyIdentity: !!body.lockCompanyIdentity,
-        lockCompanyName: !!body.lockCompanyName,
-        lockLogo: !!body.lockLogo,
-        lockStamp: !!body.lockStamp,
-        lockLegalInfo: !!body.lockLegalInfo,
-        lockFooterBranding: !!body.lockFooterBranding,
+
         loginFooterText: String(body.loginFooterText || ""),
         loginMessageText: String(body.loginMessageText || ""),
         loginMessageType: String(body.loginMessageType || "welcome"),
-        preventRebrandToAnotherCompany: !!body.preventRebrandToAnotherCompany,
+
         licenseStatus: String(body.licenseStatus || ""),
         licensedCompanyName: String(body.licensedCompanyName || ""),
         licenseId: String(body.licenseId || ""),

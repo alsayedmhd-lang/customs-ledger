@@ -1,10 +1,13 @@
+import { withSyncLock, syncCooldownDeadline, isSyncOperationRunning } from "./sync-operation-lock";
 import { internalConnectionEnabled } from "./connection-state";
 import { sqlite } from "@workspace/db";
+import { isOnlineSyncRunning } from "./sync-worker";
 import {
   pushAttachmentMetadataToInternalServer,
   pullAttachmentMetadataFromInternalServer,
 } from "./internal-attachment-metadata-sync";
 import {
+  isInternalSyncRunning,
   runInternalBidirectionalOnce,
   runInternalLocalToServerOnce,
   runInternalServerToLocalOnce,
@@ -32,6 +35,17 @@ let lastAttempt = 0;
 let lastSuccess = 0;
 let lastError = "";
 let lastCheck = 0;
+let initialRunAt = 0;
+let wakeTimer: ReturnType<typeof setTimeout> | null = null;
+
+function scheduleWake(settings: Settings) {
+  if (wakeTimer) clearTimeout(wakeTimer);
+  wakeTimer = null;
+  if (started && settings.enabled && settings.timing === "interval" && internalConnectionEnabled() && !(settings.databaseMode === "online" && settings.onlineAutoSync)) {
+    const interval = Math.max(10, Math.min(1440, Number(settings.minutes) || 30)) * 60_000;
+    wakeTimer = setTimeout(() => { wakeTimer = null; void tick(); }, Math.max(0, (syncCooldownDeadline("internal") || lastAttempt + interval) - Date.now()));
+  }
+}
 
 function readSettings(): Settings | undefined {
   if (!sqlite) return;
@@ -89,7 +103,7 @@ async function runConfigured(settings: Settings) {
   throw new Error("Internal sync batch limit reached; run again to finish remaining changes");
 }
 
-async function runConfiguredWithAttachments(settings: Settings) {
+async function unlockedConfiguredWithAttachments(settings: Settings) {
   // Complete regular data synchronization first.
   await runConfigured(settings);
 
@@ -104,9 +118,12 @@ async function runConfiguredWithAttachments(settings: Settings) {
     await pushAttachmentMetadataToInternalServer(connectionString);
   }
 }
+function runConfiguredWithAttachments(settings: Settings) {
+  return withSyncLock("internal", connectionFor(settings), () => unlockedConfiguredWithAttachments(settings));
+}
 async function tick() {
   lastCheck = Date.now();
-  if (running) return;
+  if (running || isInternalSyncRunning() || isOnlineSyncRunning()) return;
   let settings: Settings | undefined;
   try {
     settings = readSettings();
@@ -116,9 +133,8 @@ async function tick() {
   }
   if (!internalConnectionEnabled() || !settings || !settings.enabled || (settings.databaseMode === "online" && settings.onlineAutoSync)) {
     configuration = "";
-    lastAttempt = 0;
-    lastSuccess = 0;
-    lastError = "";
+    if (wakeTimer) clearTimeout(wakeTimer);
+    wakeTimer = null;
     return;
   }
   const key = JSON.stringify(settings);
@@ -128,8 +144,8 @@ async function tick() {
     lastSuccess = 0;
     lastError = "";
   }
-  const interval = Math.max(1, Math.min(1440, Number(settings.minutes) || 30)) * 60_000;
-  if (lastAttempt && (settings.timing === "startup" || Date.now() - lastAttempt < interval)) return;
+  if (lastAttempt && settings.timing === "startup") return;
+  if (Date.now() < syncCooldownDeadline("internal")) return;
   running = true;
   lastAttempt = Date.now();
   try {
@@ -143,12 +159,14 @@ async function tick() {
     console.warn("[INTERNAL_SYNC][AUTO] Failed", lastError);
   } finally {
     running = false;
+    scheduleWake(settings);
   }
 }
 
 export function startInternalSyncScheduler() {
   if (started || !sqlite) return;
   started = true;
+  initialRunAt = Date.now() + 5000;
   setTimeout(() => { void tick(); }, 5000);
   setInterval(() => { void tick(); }, 10_000);
 }
@@ -158,11 +176,38 @@ export function checkInternalSyncScheduleNow() {
 }
 
 export function getInternalAutoSyncStatus() {
+  const settings = readSettings();
+  const intervalMinutes = Math.max(10, Math.min(1440, Number(settings?.minutes) || 30));
+  const enabled = Boolean(settings?.enabled && internalConnectionEnabled() && !(settings.databaseMode === "online" && settings.onlineAutoSync));
+  const scheduleEnabled = enabled && settings?.timing === "interval";
+  const nextRunAt = !scheduleEnabled || isSyncOperationRunning() ? null : syncCooldownDeadline("internal") || (configuration !== JSON.stringify(settings)
+    ? Math.max(Date.now(), initialRunAt) : (lastAttempt ? lastAttempt + intervalMinutes * 60_000 : Math.max(Date.now(), initialRunAt)));
   return {
-    running,
+    running: running || isInternalSyncRunning(),
     lastCheckAt: lastCheck ? new Date(lastCheck).toISOString() : null,
     lastAttemptAt: lastAttempt ? new Date(lastAttempt).toISOString() : null,
     lastSuccessAt: lastSuccess ? new Date(lastSuccess).toISOString() : null,
     lastError: lastError || null,
+    serverTime: Date.now(), nextRunAt, intervalMinutes, scheduleEnabled,
+    timing: settings?.timing || "startup", autoSync: Boolean(settings?.enabled),
   };
+}
+
+export async function runInternalManualSyncOnce() {
+  if (running || isInternalSyncRunning() || isOnlineSyncRunning()) throw new Error("An internal sync is already in progress");
+  const settings = readSettings();
+  if (!settings || !internalConnectionEnabled()) throw new Error("Internal connection is disconnected on this device");
+  running = true;
+  configuration = JSON.stringify(settings);
+  lastAttempt = Date.now();
+  try {
+    await runConfiguredWithAttachments(settings);
+    lastSuccess = Date.now();
+    lastError = "";
+    return { ok: true };
+  } catch (error) {
+    lastError = (error instanceof Error ? error.message : String(error))
+      .replace(/postgres(?:ql)?:\/\/[^\s]+/gi, "[masked-connection-string]").slice(0, 250);
+    throw error;
+  } finally { running = false; scheduleWake(settings); }
 }

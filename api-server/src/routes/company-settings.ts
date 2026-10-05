@@ -1,8 +1,10 @@
+import { ensureSettingsAccessColumn } from "../utils/ensure-settings-access-column";
+import { parseSettingsAccess, canChangeSettingsField } from "../utils/settings-access-policy";
 import { getLocalDb } from "../utils/local-db";
 import { Router } from "express";
 import { sqlite, companySettingsTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
-import { requireAdmin } from "../middleware/auth";
+import { requireAuth } from "../middleware/auth";
 import { hashPassword } from "../utils/password";
 import { ensureMasterPasswordHashColumn } from "../utils/ensure-company-settings-columns";
 
@@ -73,6 +75,7 @@ function ensureCompanySettingsPrintTitleColumns() {
   }
 }
 
+ensureSettingsAccessColumn();
 ensureCompanySettingsPrintTitleColumns();
 ensureMasterPasswordHashColumn();
 
@@ -144,11 +147,17 @@ router.get("/company-settings", async (_req, res) => {
   }
 });
 
-router.put("/company-settings", requireAdmin, async (req, res) => {
+router.put("/company-settings", requireAuth, async (req, res) => {
   try {
     ensureMasterPasswordHashColumn();
 
+    if (!["admin", "manager", "supervisor"].includes(req.user?.role || "")) {
+      return res.status(403).json({ error: "Settings access denied" });
+    }
     const body = req.body as any;
+    if (body.masterPassword && req.user?.role !== "admin") {
+      return res.status(403).json({ error: "Admin permission required for emergency password" });
+    }
 
     let masterPasswordHash: string | undefined;
 
@@ -236,41 +245,20 @@ router.put("/company-settings", requireAdmin, async (req, res) => {
       [existing] = await getLocalDb().insert(companySettingsTable).values({ id: 1 }).returning();
     }
 
-    const lockedChanges: string[] = [];
-    const isChanged = (key: string) => String((existing as any)[key] ?? "") !== String((data as any)[key] ?? "");
-
-    if ((existing as any).lockCompanyIdentity) {
-      for (const key of ["nameAr", "nameEn", "subtitleAr", "subtitleEn", "taglineAr", "taglineEn"]) {
-        if (isChanged(key)) lockedChanges.push(key);
-      }
+    let access;
+    try { access = parseSettingsAccess((existing as any).managerSettingsAccess); }
+    catch { return res.status(403).json({ error: "Invalid settings permissions; contact developer" }); }
+    if (req.user?.role !== "admin" && !access) {
+      return res.status(403).json({ error: "Settings permissions must be configured by developer" });
     }
-    if ((existing as any).lockCompanyName) {
-      for (const key of ["nameAr", "nameEn"]) {
-        if (isChanged(key)) lockedChanges.push(key);
-      }
+    const forbidden: string[] = [];
+    for (const key of Object.keys(data)) {
+      if (canChangeSettingsField(access, key)) continue;
+      if (body[key] !== undefined && String(body[key] ?? "") !== String((existing as any)[key] ?? "")) forbidden.push(key);
+      // Retain exact persisted values; normalization must not alter denied fields.
+      (data as any)[key] = (existing as any)[key];
     }
-    if ((existing as any).lockLogo && isChanged("logoBase64")) lockedChanges.push("logoBase64");
-    if ((existing as any).lockStamp && isChanged("stampBase64")) lockedChanges.push("stampBase64");
-    if ((existing as any).lockLegalInfo) {
-      for (const key of ["crNumber", "taxNumber", "email", "phone", "address", "poBox", "website"]) {
-        if (isChanged(key)) lockedChanges.push(key);
-      }
-    }
-    if ((existing as any).lockFooterBranding && isChanged("footerText")) lockedChanges.push("footerText");
-    if ((existing as any).preventRebrandToAnotherCompany) {
-      const licensedName = String((existing as any).licensedCompanyName || "").trim();
-      if (licensedName && String(data.nameEn || data.nameAr || "").trim() !== licensedName) {
-        lockedChanges.push("licensedCompanyName");
-      }
-    }
-
-    if (lockedChanges.length > 0) {
-      return res.status(403).json({
-        error: "Developer lock prevents changing protected company settings",
-        lockedFields: Array.from(new Set(lockedChanges)),
-      });
-    }
-
+    if (forbidden.length) return res.status(403).json({ error: "Settings field permission denied", lockedFields: forbidden });
     const [result] = await getLocalDb()
       .update(companySettingsTable)
       .set(data as any)

@@ -93,6 +93,13 @@ const PERM_GROUPS: { label_ar: string; label_en: string; icon: React.ElementType
     ],
   },
   {
+    label_ar: "المزامنة", label_en: "Synchronization", icon: ShieldCheck,
+    items: [
+      { key: "canRunOnlineSync", label_ar: "تشغيل مزامنة Online", label_en: "Run Online sync" },
+      { key: "canRunInternalSync", label_ar: "تشغيل مزامنة السيرفر الداخلي", label_en: "Run internal server sync" },
+    ],
+  },
+  {
     label_ar: "أخرى", label_en: "Other", icon: PackageSearch,
     items: [
       { key: "canManageTemplates", label_ar: "إدارة النماذج", label_en: "Manage Templates" },
@@ -109,6 +116,7 @@ const DEFAULT_PERMS: UserPermissions = {
   canEditClients: true, canDeleteClients: true,
   canManageTemplates: true, canViewStatements: true,
   canViewAccounting: true, canCustomizePrintContact: false,
+  canRunOnlineSync: false, canRunInternalSync: false,
 };
 
 const DEFAULT_CLIENT_VIEW_PERMS: ClientViewPermissions = {
@@ -373,7 +381,7 @@ export default function UsersPage() {
           <tbody className="divide-y divide-border/30">
             {users.map(u => {
               const perms = u.permissions ?? DEFAULT_PERMS;
-              const permCount = u.role === "admin" ? 8 : Object.values(perms).filter(Boolean).length;
+              const permCount = u.role === "admin" ? PERM_GROUPS.reduce((n, group) => n + group.items.length, 0) : Object.values(perms).filter(Boolean).length;
               return (
                 <tr key={u.id} className="hover:bg-muted/20 transition-colors">
                   <td className="px-5 py-4 font-semibold">{(isAR ? u.displayNameAr : u.displayNameEn) || u.displayName}</td>
@@ -437,11 +445,11 @@ export default function UsersPage() {
                       </span>
                     ) : (
                       <button
-                        onClick={() => { setPermId(u.id); setPermForm(u.permissions ?? DEFAULT_PERMS); }}
+                        onClick={() => { setPermId(u.id); setPermForm({ ...DEFAULT_PERMS, ...u.permissions }); }}
                         className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition-colors font-medium"
                       >
                         <Shield className="w-3.5 h-3.5" />
-                        {permCount}/8 {isAR ? "صلاحية" : "perms"}
+                        {permCount}/{PERM_GROUPS.reduce((n, group) => n + group.items.length, 0)} {isAR ? "صلاحية" : "perms"}
                       </button>
                     )}
                   </td>
@@ -786,7 +794,7 @@ export default function UsersPage() {
                       <label className="flex items-center gap-2 cursor-pointer select-none">
                         <input
                           type="checkbox"
-                          checked={permForm[item.key]}
+                          checked={Boolean(permForm[item.key])}
                           onChange={e => setPermForm(p => ({ ...p, [item.key]: e.target.checked }))}
                           className="w-4 h-4 accent-primary cursor-pointer"
                           aria-label={isAR ? item.label_ar : item.label_en}

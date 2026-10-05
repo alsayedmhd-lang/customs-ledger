@@ -56,6 +56,8 @@ const NO_EDIT_PERMISSIONS: UserPermissions = {
   canViewStatements: false,
   canViewAccounting: false,
   canCustomizePrintContact: false,
+  canRunOnlineSync: false,
+  canRunInternalSync: false,
 };
 
 function ensureUserClientColumns() {
@@ -90,7 +92,11 @@ async function assertClientExists(clientId: number) {
 }
 
 function formatUser(u: typeof usersTable.$inferSelect) {
-  const permissions = u.role === "admin" ? DEFAULT_PERMISSIONS : u.role === "client" ? NO_EDIT_PERMISSIONS : (u.permissions ?? DEFAULT_PERMISSIONS);
+  const permissions = {
+    ...(u.role === "admin" ? DEFAULT_PERMISSIONS : u.role === "client" ? NO_EDIT_PERMISSIONS : (u.permissions ?? DEFAULT_PERMISSIONS)),
+    canRunOnlineSync: u.role === "admin" || u.permissions?.canRunOnlineSync === true,
+    canRunInternalSync: u.role === "admin" || u.permissions?.canRunInternalSync === true,
+  };
   return {
     id: u.id,
     username: u.username,
@@ -217,6 +223,14 @@ router.patch("/users/:id", requireUsersManagementAccess, async (req, res) => {
     clientViewPermissions?: Partial<ClientViewPermissions>;
   };
 
+  if (permissions) {
+    for (const key of ["canRunOnlineSync", "canRunInternalSync"] as const) {
+      if (permissions[key] !== undefined && typeof permissions[key] !== "boolean") {
+        return res.status(400).json({ message: "Sync permissions must be boolean values" });
+      }
+    }
+  }
+
   const [currentUser] = await getLocalDb().select().from(usersTable).where(eq(usersTable.id, id)).limit(1);
   if (!currentUser) return res.status(404).json({ message: "User not found" });
 
@@ -279,7 +293,11 @@ router.patch("/users/:id", requireUsersManagementAccess, async (req, res) => {
     }
     updates.clientId = normalizedClientId;
     updates.clientViewPermissions = normalizeClientViewPermissions(clientViewPermissions ?? currentUser.clientViewPermissions);
-    updates.permissions = NO_EDIT_PERMISSIONS;
+    updates.permissions = {
+      ...NO_EDIT_PERMISSIONS,
+      canRunOnlineSync: permissions?.canRunOnlineSync ?? currentUser.permissions?.canRunOnlineSync ?? false,
+      canRunInternalSync: permissions?.canRunInternalSync ?? currentUser.permissions?.canRunInternalSync ?? false,
+    };
   } else if (role && updates.role !== "client") {
     updates.clientId = null;
     updates.clientViewPermissions = DEFAULT_CLIENT_VIEW_PERMISSIONS;

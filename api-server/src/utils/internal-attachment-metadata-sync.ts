@@ -1,3 +1,4 @@
+import { withSyncLock, guardSyncClient } from "./sync-operation-lock";
 import { sqlite } from "@workspace/db";
 
 export type AttachmentSyncMetadata = {
@@ -120,7 +121,7 @@ function toSafeAttachmentInteger(
   return number;
 }
 
-export async function pushAttachmentMetadataToInternalServer(
+async function unlockedPushAttachmentMetadataToInternalServer(
   connectionString: string,
 ): Promise<{ processed: number }> {
   const { createRequire } = await import("module");
@@ -147,6 +148,7 @@ export async function pushAttachmentMetadataToInternalServer(
   });
 
   await client.connect();
+  guardSyncClient(client);
 
   let transaction = false;
 
@@ -329,6 +331,7 @@ export async function readInternalAttachmentMetadata(
   });
 
   await client.connect();
+  guardSyncClient(client);
 
   try {
     const result = await client.query(`
@@ -654,7 +657,7 @@ export function applyInternalAttachmentMetadata(
   }).immediate();
 }
 
-export async function pullAttachmentMetadataFromInternalServer(
+async function unlockedPullAttachmentMetadataFromInternalServer(
   connectionString: string,
 ): Promise<{ inserted: number; updated: number; skipped: number }> {
   // Fetch and validate the complete server metadata before local writes.
@@ -662,4 +665,11 @@ export async function pullAttachmentMetadataFromInternalServer(
 
   // Apply all rows inside one synchronous SQLite transaction.
   return applyInternalAttachmentMetadata(rows);
+}
+
+export function pushAttachmentMetadataToInternalServer(connectionString: string) {
+  return withSyncLock("internal", connectionString, () => unlockedPushAttachmentMetadataToInternalServer(connectionString));
+}
+export function pullAttachmentMetadataFromInternalServer(connectionString: string) {
+  return withSyncLock("internal", connectionString, () => unlockedPullAttachmentMetadataFromInternalServer(connectionString));
 }

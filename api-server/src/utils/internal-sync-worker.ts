@@ -1,3 +1,4 @@
+import { withSyncLock, guardSyncClient } from "./sync-operation-lock";
 import { ensureLocalTemplateNumbers, ensurePgTemplateNumbers } from "./template-numbering";
 import { sqlite } from "@workspace/db";
 import { createRequire } from "module";
@@ -24,7 +25,9 @@ const quote = (value: string) => `"${value}"`;
 let inFlight: Promise<{ processed: number; changedRows: number }> | null = null;
 let pullInFlight = false;
 
-export async function runInternalBidirectionalOnce(connectionString: string) {
+export function isInternalSyncRunning() { return inFlight !== null || pullInFlight; }
+
+async function unlockedInternalBidirectionalOnce(connectionString: string) {
   if (inFlight || pullInFlight) throw new Error("An internal sync is already in progress");
   pullInFlight = true;
   try {
@@ -49,7 +52,7 @@ export async function runInternalBidirectionalOnce(connectionString: string) {
   }
 }
 
-export function runInternalLocalToServerOnce(connectionString: string) {
+function unlockedInternalLocalToServerOnce(connectionString: string) {
   if (pullInFlight) throw new Error("An internal server pull is in progress");
   if (inFlight) return inFlight;
   inFlight = performInternalPush(connectionString).finally(() => { inFlight = null; });
@@ -60,7 +63,7 @@ export function runInternalLocalToServerOnce(connectionString: string) {
 // journal gate prevents overwriting local changes that have not been sent.
 // Complete invoice line lists include removals; absence in other business
 // tables is not treated as a deletion.
-export async function runInternalServerToLocalOnce(connectionString: string) {
+async function unlockedInternalServerToLocalOnce(connectionString: string) {
   if (inFlight || pullInFlight) throw new Error("An internal sync is already in progress");
   pullInFlight = true;
   try {
@@ -114,6 +117,7 @@ async function performInternalPull(connectionString: string) {
   const source: Array<{ name: string; columns: Array<{ name: string; type: string }>; rows: Array<Record<string, unknown>> }> = [];
   try {
     await client.connect();
+    guardSyncClient(client);
     await ensurePgTemplateNumbers(client, false);
     await client.query("BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY");
     inPgTransaction = true;
@@ -273,6 +277,7 @@ async function performInternalJournalPull(connectionString: string) {
   const source: Array<{ name: string; columns: Array<{ name: string; type: string }>; rows: Array<Record<string, unknown>> }> = [];
   try {
     await client.connect();
+    guardSyncClient(client);
     await ensurePgTemplateNumbers(client, false);
     await client.query("BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY");
     transaction = true;
@@ -353,6 +358,7 @@ async function performInternalPush(connectionString: string, bidirectional = fal
   let inTransaction = false;
   try {
     await client.connect();
+    guardSyncClient(client);
     await ensurePgTemplateNumbers(client, false);
     await client.query("BEGIN");
     inTransaction = true;
@@ -521,4 +527,14 @@ async function performInternalPush(connectionString: string, bidirectional = fal
   } finally {
     await client.end().catch(() => undefined);
   }
+}
+
+export function runInternalBidirectionalOnce(connectionString: string) {
+  return withSyncLock("internal", connectionString, () => unlockedInternalBidirectionalOnce(connectionString));
+}
+export function runInternalLocalToServerOnce(connectionString: string) {
+  return withSyncLock("internal", connectionString, () => unlockedInternalLocalToServerOnce(connectionString));
+}
+export function runInternalServerToLocalOnce(connectionString: string) {
+  return withSyncLock("internal", connectionString, () => unlockedInternalServerToLocalOnce(connectionString));
 }

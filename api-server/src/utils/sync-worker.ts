@@ -1,3 +1,4 @@
+import { withSyncLock, guardSyncClient } from "./sync-operation-lock";
 import { ensureLocalTemplateNumbers, ensurePgTemplateNumbers, pullAllocatedTemplateNumbers } from "./template-numbering";
 import { reconcileInvoiceItems } from "./reconcile-invoice-items";
 import { sqlite } from "@workspace/db";
@@ -814,6 +815,7 @@ async function createOnlineClient(connectionString: string) {
   });
 
   await client.connect();
+  guardSyncClient(client);
   await client.query("select 1");
   console.log("Sync worker PostgreSQL select 1 succeeded");
 
@@ -1800,7 +1802,7 @@ async function pullReceiptsFromOnline(
   };
 }
 
-export async function runOnlineToLocalSyncOnce(): Promise<{
+async function unlockedOnlineToLocalSyncOnce(): Promise<{
   onlineConnected: boolean;
   lastError: string | null;
   attachments: { total: number; inserted: number; updated: number; skipped: number };
@@ -2666,7 +2668,7 @@ async function pushAccountingEntry(client: any, entry: LocalAccountingRow, opera
   );
 }
 
-export async function runSyncWorkerOnce(): Promise<{
+async function unlockedSyncWorkerOnce(): Promise<{
   pendingCount: number;
   processedCount: number;
   onlineConnected: boolean;
@@ -2839,7 +2841,10 @@ export function runConfiguredSyncOnce(mode: string): Promise<ConfiguredSyncResul
   if (configuredSyncInFlight) return configuredSyncInFlight;
   const saved = sqlite?.prepare("SELECT database_mode AS mode FROM company_settings LIMIT 1").get() as { mode: string } | undefined;
   if (saved?.mode !== "online") return Promise.resolve({ syncMode: mode, pendingCount: 0, processedCount: 0, onlineConnected: false, lastError: "Online connection is disconnected on this device", autoRestoredCount: 0 });
-  configuredSyncInFlight = performConfiguredSync(mode).finally(() => {
+  configuredSyncInFlight = withSyncLock("online", getOnlineConnectionString(), () => performConfiguredSync(mode)).catch((error) => ({
+    syncMode: mode, pendingCount: 0, processedCount: 0, onlineConnected: false,
+    lastError: error instanceof Error ? error.message : "Synchronization could not start", autoRestoredCount: 0,
+  })).finally(() => {
     configuredSyncInFlight = null;
   });
   return configuredSyncInFlight;
@@ -2893,4 +2898,11 @@ async function performConfiguredSync(mode: string): Promise<ConfiguredSyncResult
     pullResult.invoiceItems.inserted +
     pullResult.receipts.inserted + pullResult.receipts.updated;
   return { syncMode, pendingCount, processedCount, onlineConnected, lastError, autoRestoredCount, pullResult };
+}
+
+export function runSyncWorkerOnce() {
+  return withSyncLock("online", getOnlineConnectionString(), () => unlockedSyncWorkerOnce());
+}
+export function runOnlineToLocalSyncOnce() {
+  return withSyncLock("online", getOnlineConnectionString(), () => unlockedOnlineToLocalSyncOnce());
 }

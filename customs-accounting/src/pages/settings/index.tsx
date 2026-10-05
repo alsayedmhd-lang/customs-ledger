@@ -1,3 +1,4 @@
+import { parseSettingsAccess, canChangeSettingsField, type SettingsAccess } from "@/lib/settings-access-policy";
 import ResizableScrollArea from "@/components/layout/ResizableScrollArea";
 import InvoicePrintHeader from "@/components/invoice-print-header";
 import {
@@ -614,29 +615,30 @@ export default function SettingsPage() {
   const [allowManagerViewUpdate, setAllowManagerViewUpdate] = useState(false);
   const [allowManagerEditRegistrationSettings, setAllowManagerEditRegistrationSettings] = useState(false);
   const [allowManagerEditSensitiveUsers, setAllowManagerEditSensitiveUsers] = useState(false);
-  const [lockCompanyIdentity, setLockCompanyIdentity] = useState(false);
-  const [lockCompanyName, setLockCompanyName] = useState(false);
-  const [lockLogo, setLockLogo] = useState(false);
-  const [lockStamp, setLockStamp] = useState(false);
-  const [lockLegalInfo, setLockLegalInfo] = useState(false);
-  const [lockFooterBranding, setLockFooterBranding] = useState(false);
+  const [settingsAccess, setSettingsAccess] = useState<SettingsAccess | null>(null);
+  const [accessLoaded, setAccessLoaded] = useState(false);
   const roleCanEdit = user?.role === "admin" || isDeveloperSupportMode;
-  const canViewAllSettingsTabs =
-    user?.role === "admin" || user?.role === "manager" || isDeveloperSupportMode;
-  const canEditAccountantSignature = roleCanEdit || allowManagerEditAccountantSignature;
-  const canEditAppearance = true;
-  const canEditBranding =
-    (roleCanEdit || allowManagerEditBranding || allowManagerEditAppearance) &&
-    (!lockCompanyIdentity || isDeveloperSupportMode);
-  const canEditCompanyName = canEditBranding && (!lockCompanyName || isDeveloperSupportMode);
-  const canEditLogo = canEditBranding && (!lockLogo || isDeveloperSupportMode);
-  const canEditStamp = canEditBranding && (!lockStamp || isDeveloperSupportMode);
-  const canEditLegalInfo =
-    (roleCanEdit || allowManagerEditLegalInfo) && (!lockLegalInfo || isDeveloperSupportMode);
-  const canEditPrintSettings =
-    (roleCanEdit || allowManagerEditPrintSettings) && (!lockFooterBranding || isDeveloperSupportMode);
-  const canEditBrandIdentity = canEditBranding;
-  const canUseInvoicesBackupImport = roleCanEdit || allowManagerEditInvoicesBackupImport;
+  const canViewAllSettingsTabs = user?.role === "admin" || user?.role === "manager" || isDeveloperSupportMode;
+  const accessPart = (tab: string, part: string, legacy: boolean) => isDeveloperSupportMode ||
+    (accessLoaded && (settingsAccess ? settingsAccess.tabs[tab] && settingsAccess.edit[part] : legacy));
+  const canEditAccountantSignature = accessPart("branding", "accountant", roleCanEdit || allowManagerEditAccountantSignature);
+  const canEditAppearance = isDeveloperSupportMode || (accessLoaded && (!settingsAccess || settingsAccess.tabs.display));
+  const canEditBranding = accessPart("company", "identity", roleCanEdit || allowManagerEditBranding);
+  const canEditCompanyName = accessPart("company", "name", roleCanEdit || allowManagerEditBranding);
+  const canEditLogo = accessPart("branding", "logo", roleCanEdit || allowManagerEditBranding);
+  const canEditStamp = accessPart("branding", "stamp", roleCanEdit || allowManagerEditBranding);
+  const canEditWatermark = accessPart("branding", "watermark", roleCanEdit || allowManagerEditBranding);
+  const canEditReceiver = accessPart("branding", "receiver", roleCanEdit || allowManagerEditBranding);
+  const canEditContact = accessPart("company", "contact", roleCanEdit || allowManagerEditLegalInfo);
+  const canEditLegalInfo = accessPart("company", "legal", roleCanEdit || allowManagerEditLegalInfo);
+  const canEditPrintSettings = isDeveloperSupportMode || (accessLoaded && (settingsAccess ? settingsAccess.tabs.print : roleCanEdit || allowManagerEditPrintSettings));
+  const canEditBrandIdentity = canEditBranding || canEditCompanyName || canEditLogo || canEditStamp || canEditWatermark;
+  const canUseInvoicesBackupImport = isDeveloperSupportMode || (accessLoaded && (settingsAccess ? settingsAccess.tabs.backup : roleCanEdit || allowManagerEditInvoicesBackupImport));
+  const canEditSettingsField = (key: string) => {
+    if (isDeveloperSupportMode) return true;
+    if (!accessLoaded || !canChangeSettingsField(settingsAccess, key)) return false;
+    return true;
+  };
   const [activeTab, setActiveTab] = useState<TabId>("preview");
   const [appearanceTab, setAppearanceTab] = useState<"theme" | "colors" | "layout">("theme");
   const [printTab, setPrintTab] = useState<"invoice" | "receipt" | "statement" | "ledger" | "common">("invoice");
@@ -832,6 +834,8 @@ const decryptBackupData = async (backupFile: any, password: string) => {
     const token = sessionStorage.getItem("auth_token");
 
     const applyDeveloperSettings = (data: any) => {
+        try { setSettingsAccess(parseSettingsAccess(data.managerSettingsAccess)); setAccessLoaded(true); }
+        catch { setAccessLoaded(false); }
         setAllowManagerEditAccountantSignature(!!data.allowManagerEditAccountantSignature);
         setAllowManagerEditAppearance(!!data.allowManagerEditAppearance);
         setAllowManagerEditInvoicesBackupImport(!!data.allowManagerEditInvoicesBackupImport);
@@ -842,27 +846,28 @@ const decryptBackupData = async (backupFile: any, password: string) => {
         setAllowManagerViewUpdate(!!data.allowManagerViewUpdate);
         setAllowManagerEditRegistrationSettings(!!data.allowManagerEditRegistrationSettings);
         setAllowManagerEditSensitiveUsers(!!data.allowManagerEditSensitiveUsers);
-        setLockCompanyIdentity(!!data.lockCompanyIdentity);
-        setLockCompanyName(!!data.lockCompanyName);
-        setLockLogo(!!data.lockLogo);
-        setLockStamp(!!data.lockStamp);
-        setLockLegalInfo(!!data.lockLegalInfo);
-        setLockFooterBranding(!!data.lockFooterBranding);
+
+
+
+
+
+
     };
 
     const cached = sessionStorage.getItem("developer_settings");
     if (cached) {
       try {
-        applyDeveloperSettings(JSON.parse(cached));
+        // Cached permissions are not authoritative; wait for the server.
       } catch {
         sessionStorage.removeItem("developer_settings");
       }
     }
 
-    fetch(`${API_BASE}/developer/settings?t=${Date.now()}`, {
+    fetch(`${API_BASE}/settings-access?t=${Date.now()}`, {
       cache: "no-store",
       headers: {
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(isDeveloperSupportMode ? { "x-developer-mode": "true", "x-developer-unlocked": "true" } : {}),
         "Cache-Control": "no-cache",
       },
     })
@@ -872,6 +877,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
         applyDeveloperSettings(data);
       })
       .catch(() => {
+        setAccessLoaded(false);
         setAllowManagerEditAccountantSignature(false);
         setAllowManagerEditAppearance(false);
         setAllowManagerEditInvoicesBackupImport(false);
@@ -882,12 +888,12 @@ const decryptBackupData = async (backupFile: any, password: string) => {
         setAllowManagerViewUpdate(false);
         setAllowManagerEditRegistrationSettings(false);
         setAllowManagerEditSensitiveUsers(false);
-        setLockCompanyIdentity(false);
-        setLockCompanyName(false);
-        setLockLogo(false);
-        setLockStamp(false);
-        setLockLegalInfo(false);
-        setLockFooterBranding(false);
+
+
+
+
+
+
       });
 
     const handler = (event: Event) => {
@@ -1344,7 +1350,11 @@ const decryptBackupData = async (backupFile: any, password: string) => {
           });
         }
 
-        console.log("payload accountant:", payload.accountantSignatureBase64?.slice?.(0, 50));
+        if (!isDeveloperSupportMode) {
+          for (const key of Object.keys(payload)) {
+            if (!canEditSettingsField(key)) payload[key] = (settings as any)[key];
+          }
+        }
         const res = await fetch(`${API_BASE}/company-settings`, {
           method: "PUT",
           headers: {
@@ -1383,7 +1393,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
   const Toggle = ({ field, disabled = false }: { field: keyof CompanySettings; disabled?: boolean }) => (
     <button
       type="button"
-      disabled={disabled}
+      disabled={disabled || (!isDeveloperSupportMode && !canEditSettingsField(field))}
       onClick={() => setForm(p => ({ ...p, [field]: !p[field] }))}
       className={cn(tog(!!form[field]), disabled && "cursor-not-allowed opacity-50")}
     >
@@ -1410,6 +1420,9 @@ const decryptBackupData = async (backupFile: any, password: string) => {
 ];
 
   const canViewSettingsTab = (tabId: TabId) => {
+    if (isDeveloperSupportMode) return true;
+    if (!accessLoaded) return false;
+    if (settingsAccess) return settingsAccess.tabs[tabId] === true;
     if (canViewAllSettingsTabs) return true;
     if (tabId === "preview") return true;
     if (tabId === "display") return true;
@@ -2709,67 +2722,67 @@ const decryptBackupData = async (backupFile: any, password: string) => {
         })()}
 
         {/* ── Identity Tab ── */}
-        {activeTab === "company" && canEditBranding && (
+        {activeTab === "company" && (canEditBranding || canEditCompanyName) && (
           <Section icon={Building2} title={isAR ? "هوية الشركة" : "Company Identity"} color="bg-blue-500/5">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-            <Field label={isAR ? "اسم الشركة (عربي)" : "Company Name (Arabic)"}>
-              <input value={form.nameAr} onChange={e => setForm(p => ({ ...p, nameAr: e.target.value }))} className={inp} placeholder="اسم الشركة بالعربي" />
-            </Field>
+            <fieldset disabled={!isDeveloperSupportMode && !canEditSettingsField("nameAr")} className="min-w-0"><Field label={isAR ? "اسم الشركة (عربي)" : "Company Name (Arabic)"}>
+              <input disabled={!canEditCompanyName} value={form.nameAr} onChange={e => setForm(p => ({ ...p, nameAr: e.target.value }))} className={inp} placeholder="اسم الشركة بالعربي" />
+            </Field></fieldset>
 
-            <Field label={isAR ? "اسم الشركة (إنجليزي)" : "Company Name (English)"}>
-              <input value={form.nameEn} onChange={e => setForm(p => ({ ...p, nameEn: e.target.value }))} className={inp} placeholder="Enter company name in English" />
-            </Field>
+            <fieldset disabled={!isDeveloperSupportMode && !canEditSettingsField("nameEn")} className="min-w-0"><Field label={isAR ? "اسم الشركة (إنجليزي)" : "Company Name (English)"}>
+              <input disabled={!canEditCompanyName} value={form.nameEn} onChange={e => setForm(p => ({ ...p, nameEn: e.target.value }))} className={inp} placeholder="Enter company name in English" />
+            </Field></fieldset>
 
-            <Field label={isAR ? "الترجمة الثانوية (عربي)" : "Subtitle (Arabic)"}>
-              <input value={form.subtitleAr} onChange={e => setForm(p => ({ ...p, subtitleAr: e.target.value }))} className={inp} placeholder="الترجمة الثانوية بالعربي" />
-            </Field>
+            <fieldset disabled={!isDeveloperSupportMode && !canEditSettingsField("subtitleAr")} className="min-w-0"><Field label={isAR ? "الترجمة الثانوية (عربي)" : "Subtitle (Arabic)"}>
+              <input disabled={!canEditBranding} value={form.subtitleAr} onChange={e => setForm(p => ({ ...p, subtitleAr: e.target.value }))} className={inp} placeholder="الترجمة الثانوية بالعربي" />
+            </Field></fieldset>
 
-            <Field label={isAR ? "الترجمة الثانوية (إنجليزي)" : "Subtitle (English)"}>
-              <input value={form.subtitleEn} onChange={e => setForm(p => ({ ...p, subtitleEn: e.target.value }))} className={inp} placeholder="Enter subtitle in English" />
-            </Field>
+            <fieldset disabled={!isDeveloperSupportMode && !canEditSettingsField("subtitleEn")} className="min-w-0"><Field label={isAR ? "الترجمة الثانوية (إنجليزي)" : "Subtitle (English)"}>
+              <input disabled={!canEditBranding} value={form.subtitleEn} onChange={e => setForm(p => ({ ...p, subtitleEn: e.target.value }))} className={inp} placeholder="Enter subtitle in English" />
+            </Field></fieldset>
 
-            <Field label={isAR ? "الوصف (عربي)" : "Tagline (Arabic)"}>
-              <input value={form.taglineAr} onChange={e => setForm(p => ({ ...p, taglineAr: e.target.value }))} className={inp} placeholder="وصف النشاط بالعربي" />
-            </Field>
+            <fieldset disabled={!isDeveloperSupportMode && !canEditSettingsField("taglineAr")} className="min-w-0"><Field label={isAR ? "الوصف (عربي)" : "Tagline (Arabic)"}>
+              <input disabled={!canEditBranding} value={form.taglineAr} onChange={e => setForm(p => ({ ...p, taglineAr: e.target.value }))} className={inp} placeholder="وصف النشاط بالعربي" />
+            </Field></fieldset>
 
-            <Field label={isAR ? "الوصف (إنجليزي)" : "Tagline (English)"}>
-              <input value={form.taglineEn} onChange={e => setForm(p => ({ ...p, taglineEn: e.target.value }))} className={inp} placeholder="Enter business description in English" />
-            </Field>
+            <fieldset disabled={!isDeveloperSupportMode && !canEditSettingsField("taglineEn")} className="min-w-0"><Field label={isAR ? "الوصف (إنجليزي)" : "Tagline (English)"}>
+              <input disabled={!canEditBranding} value={form.taglineEn} onChange={e => setForm(p => ({ ...p, taglineEn: e.target.value }))} className={inp} placeholder="Enter business description in English" />
+            </Field></fieldset>
             </div>
           </Section>
         )}
 
         {/* ── Contact Tab ── */}
-        {activeTab === "company" && canEditLegalInfo &&(
+        {activeTab === "company" && canEditContact &&(
           <Section icon={Phone} title={isAR ? "معلومات التواصل" : "Contact Information"} color="bg-green-500/5">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-              <Field label={isAR ? "البريد الإلكتروني" : "Email"}>
+              <fieldset disabled={!isDeveloperSupportMode && !canEditSettingsField("email")} className="min-w-0"><Field label={isAR ? "البريد الإلكتروني" : "Email"}>
                 <div className="relative">
                   <Mail className="absolute top-2.5 start-3 w-3.5 h-3.5 text-muted-foreground" />
                   <input value={form.email} onChange={e => setForm(p => ({ ...p, email: e.target.value }))} className={`${inp} ps-9`} placeholder={isAR ? "أدخل البريد الإلكتروني" : "Enter email address"} type="email" />
                 </div>
-              </Field>
-              <Field label={isAR ? "رقم الهاتف" : "Phone"}>
+              </Field></fieldset>
+              <fieldset disabled={!isDeveloperSupportMode && !canEditSettingsField("phone")} className="min-w-0"><Field label={isAR ? "رقم الهاتف" : "Phone"}>
                 <div className="relative">
                   <Phone className="absolute top-2.5 start-3 w-3.5 h-3.5 text-muted-foreground" />
                   <input value={form.phone} onChange={e => setForm(p => ({ ...p, phone: e.target.value }))} className={`${inp} ps-9`} placeholder={isAR ? "أدخل رقم الهاتف" : "Enter phone number"} />
                 </div>
-              </Field>
-              <Field label={isAR ? "العنوان" : "Address"}>
+              </Field></fieldset>
+              <fieldset disabled={!isDeveloperSupportMode && !canEditSettingsField("address")} className="min-w-0"><Field label={isAR ? "العنوان" : "Address"}>
                 <div className="relative">
                   <MapPin className="absolute top-2.5 start-3 w-3.5 h-3.5 text-muted-foreground" />
                   <input value={form.address} onChange={e => setForm(p => ({ ...p, address: e.target.value }))} className={`${inp} ps-9`} placeholder={isAR ? "أدخل عنوان الشركة" : "Enter company address"} />
                 </div>
-              </Field>
-              <Field label={isAR ? "صندوق البريد" : "P.O Box"}>
+              </Field></fieldset>
+              <fieldset disabled={!isDeveloperSupportMode && !canEditSettingsField("poBox")} className="min-w-0"><Field label={isAR ? "صندوق البريد" : "P.O Box"}>
                 <input value={form.poBox} onChange={e => setForm(p => ({ ...p, poBox: e.target.value }))} className={inp} placeholder={isAR ? "أدخل صندوق البريد" : "Enter P.O Box"} />
-              </Field>
-              <Field label={isAR ? "الموقع الإلكتروني" : "Website"}>
+              </Field></fieldset>
+              <fieldset disabled={!isDeveloperSupportMode && !canEditSettingsField("website")} className="min-w-0"><Field label={isAR ? "الموقع الإلكتروني" : "Website"}>
                 <div className="relative">
                   <Globe className="absolute top-2.5 start-3 w-3.5 h-3.5 text-muted-foreground" />
                   <input value={form.website} onChange={e => setForm(p => ({ ...p, website: e.target.value }))} className={`${inp} ps-9`} placeholder={isAR ? "أدخل الموقع الإلكتروني" : "Enter website"} />
                 </div>
-              </Field>
+              </Field></fieldset>
             </div>
           </Section>
         )}
@@ -2778,25 +2791,25 @@ const decryptBackupData = async (backupFile: any, password: string) => {
         {activeTab === "company" && canEditLegalInfo && (
           <Section icon={Hash} title={isAR ? "القانونية والنسخ" : "Legal & Backup"} color="bg-amber-500/5">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-              <Field label={isAR ? "رقم السجل التجاري" : "Commercial Registration No."}>
+              <fieldset disabled={!isDeveloperSupportMode && !canEditSettingsField("crNumber")} className="min-w-0"><Field label={isAR ? "رقم السجل التجاري" : "Commercial Registration No."}>
                 <div className="relative">
                   <Hash className="absolute top-2.5 start-3 w-3.5 h-3.5 text-muted-foreground" />
                   <input value={form.crNumber} onChange={e => setForm(p => ({ ...p, crNumber: e.target.value }))} className={`${inp} ps-9`} placeholder="12345678" />
                 </div>
-              </Field>
-              <Field label={isAR ? "الرقم الضريبي" : "Tax / VAT Number"}>
+              </Field></fieldset>
+              <fieldset disabled={!isDeveloperSupportMode && !canEditSettingsField("taxNumber")} className="min-w-0"><Field label={isAR ? "الرقم الضريبي" : "Tax / VAT Number"}>
                 <div className="relative">
                   <Hash className="absolute top-2.5 start-3 w-3.5 h-3.5 text-muted-foreground" />
                   <input value={form.taxNumber} onChange={e => setForm(p => ({ ...p, taxNumber: e.target.value }))} className={`${inp} ps-9`} placeholder="VAT-123456" />
                 </div>
-              </Field>
+              </Field></fieldset>
             </div>
 
           </Section>
         )}
 
         {/* ── Branding Tab ── */}
-        {activeTab === "branding" && (canEditLogo || canEditStamp || canEditAccountantSignature || canEditBranding) && (
+        {activeTab === "branding" && (canEditLogo || canEditStamp || canEditAccountantSignature || canEditWatermark || canEditReceiver) && (
           <Section icon={Image} title={isAR ? "الشعار والختم والعلامة المائية" : "Logo, Stamp & Watermark"} color="bg-purple-500/5">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               {/* Logo */}
@@ -2933,7 +2946,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
               </div>}
 
               {/* Watermark */}
-              {canEditBranding && <div className="space-y-3">
+              {canEditWatermark && <div className="space-y-3">
                 <p className="text-xs font-semibold text-muted-foreground ">{isAR ? "العلامة المائية" : "Watermark"}</p>
                 <div className="flex flex-col items-center justify-center gap-2.5 p-3 border-2 border-dashed border-purple-400/40 rounded-xl bg-purple-500/5 hover:bg-purple-500/10 transition-colors min-h-[112px]">
                   <img src={currentWatermarkSrc} alt="watermark" className="h-16 w-auto object-contain opacity-40" onError={(e) => { e.currentTarget.style.display = "none"; }} />
@@ -3000,24 +3013,24 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                 ))}
 
                 <div id="print-panel-invoice" role="tabpanel" aria-labelledby="print-tab-invoice" hidden={printTab !== "invoice"} className="space-y-5">
-                  <DocumentTitleEditor prefix="invoice" titlePrefix="invoiceCredit" label={isAR ? "عنوان الفاتورة" : "Invoice title"} isAR={isAR} form={form} setForm={setForm} />
+                  <fieldset disabled={!isDeveloperSupportMode && !canEditSettingsField("invoiceTitleAr")} className="min-w-0"><DocumentTitleEditor prefix="invoice" titlePrefix="invoiceCredit" label={isAR ? "عنوان الفاتورة" : "Invoice title"} isAR={isAR} form={form} setForm={setForm} /></fieldset>
                   <details className="rounded-xl border border-border bg-background">
                     <summary className="cursor-pointer px-3 py-3 text-[13px] font-medium">{isAR ? "معاينة رأس الفاتورة" : "Invoice header preview"}</summary>
                     <div data-settings-preview className="overflow-auto rounded-b-xl bg-white p-4 text-gray-900"><InvoicePrintHeader company={form} logoSrc={currentLogoSrc} isAR={isAR} invoiceNumber="INV-PREVIEW" statusText={isAR ? "مسودة" : "Draft"} /></div>
                   </details>
                 </div>
                 <div id="print-panel-receipt" role="tabpanel" aria-labelledby="print-tab-receipt" hidden={printTab !== "receipt"} className="space-y-5">
-                  <DocumentTitleEditor prefix="receipt" titlePrefix="receipt" label={isAR ? "عنوان سند القبض" : "Receipt title"} isAR={isAR} form={form} setForm={setForm} />
+                  <fieldset disabled={!isDeveloperSupportMode && !canEditSettingsField("receiptTitleAr")} className="min-w-0"><DocumentTitleEditor prefix="receipt" titlePrefix="receipt" label={isAR ? "عنوان سند القبض" : "Receipt title"} isAR={isAR} form={form} setForm={setForm} /></fieldset>
                   <details className="rounded-xl border border-border bg-background">
                     <summary className="cursor-pointer px-3 py-3 text-[13px] font-medium">{isAR ? "معاينة رأس سند القبض" : "Receipt header preview"}</summary>
                     <div data-settings-preview className="overflow-auto rounded-b-xl bg-white text-gray-900"><ReceiptPrintHeader receiptNumber="RCP-PREVIEW" override={{ settings: form, logoSrc: currentLogoSrc }} /></div>
                   </details>
                 </div>
                 <div id="print-panel-statement" role="tabpanel" aria-labelledby="print-tab-statement" hidden={printTab !== "statement"} className="space-y-5">
-                  <DocumentTitleEditor prefix="statement" titlePrefix="statement" label={isAR ? "عنوان كشف الحساب" : "Statement title"} isAR={isAR} form={form} setForm={setForm} />
+                  <fieldset disabled={!isDeveloperSupportMode && !canEditSettingsField("statementTitleAr")} className="min-w-0"><DocumentTitleEditor prefix="statement" titlePrefix="statement" label={isAR ? "عنوان كشف الحساب" : "Statement title"} isAR={isAR} form={form} setForm={setForm} /></fieldset>
                 </div>
                 <div id="print-panel-ledger" role="tabpanel" aria-labelledby="print-tab-ledger" hidden={printTab !== "ledger"} className="space-y-5">
-                  <DocumentTitleEditor prefix="customerLedger" titlePrefix="customerLedger" label={isAR ? "عنوان ملخص العميل المالي" : "Customer summary title"} isAR={isAR} form={form} setForm={setForm} />
+                  <fieldset disabled={!isDeveloperSupportMode && !canEditSettingsField("customerLedgerTitleAr")} className="min-w-0"><DocumentTitleEditor prefix="customerLedger" titlePrefix="customerLedger" label={isAR ? "عنوان ملخص العميل المالي" : "Customer summary title"} isAR={isAR} form={form} setForm={setForm} /></fieldset>
                 </div>
                 <div id="print-panel-common" role="tabpanel" aria-labelledby="print-tab-common" hidden={printTab !== "common"} className="space-y-5">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
@@ -3036,7 +3049,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                   <div className="rounded-xl border border-border bg-muted/20 p-3 space-y-4">
                     <h3 className="text-[16px] font-semibold">{isAR ? "تذييل المستندات" : "Document footer"}</h3>
 
-                <Field
+                <fieldset disabled={!isDeveloperSupportMode && !canEditSettingsField("footerText")} className="min-w-0"><Field
                   label={isAR ? "نص التذييل في صفحات الطباعة" : "Footer text on print pages"}
                   hint={isAR ? "نص مشترك يظهر في تذييل المستندات التي تستخدم إعدادات الطباعة" : "Shared text displayed in document print footers"}
                 >
@@ -3047,7 +3060,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                     className={`${inp} resize-none`}
                     placeholder={isAR ? "مثال: شكراً لتعاملكم معنا · جميع الأسعار شاملة الضريبة" : "e.g. Thank you for your business"}
                   />
-                </Field>
+                </Field></fieldset>
                     {form.footerText && <div data-settings-preview className="rounded-lg border border-gray-200 bg-white p-4 text-center text-xs text-gray-500 whitespace-pre-line">{form.footerText}</div>}
                   </div>
                 </div>

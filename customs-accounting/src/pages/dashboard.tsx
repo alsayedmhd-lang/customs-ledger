@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { Link } from "wouter";
 import {
@@ -33,7 +33,14 @@ interface AccountingRow {
 
 type SystemStatus = {
   connections: { local: boolean; online: boolean; internal: boolean; onlineConfigured: boolean; internalConfigured: boolean; onlineEnabled: boolean; internalEnabled: boolean };
-  sync: { autoSync: boolean; internalAutoSync: boolean; status: string; lastSync: string | null; pending: number; failed: number };
+  sync: { autoSync: boolean; internalAutoSync: boolean; status: string; lastSync: string | null; pending: number; failed: number; serverTime: number; nextRunAt: number | null; manualAvailableAt: number | null; timing: string; intervalMinutes: number; scheduleEnabled: boolean };
+};
+
+type LiveSyncStatus = {
+  online: SystemStatus["sync"];
+  internal: Omit<SystemStatus["sync"], "failed" | "internalAutoSync"> & { lastError: string | null };
+  connections: { onlineEnabled: boolean; internalEnabled: boolean };
+  permissions: { online: boolean; internal: boolean };
 };
 
 const API_BASE = (
@@ -62,6 +69,21 @@ async function fetchSystemStatus(): Promise<SystemStatus> {
   return res.json();
 }
 
+async function fetchSyncStatus(): Promise<LiveSyncStatus> {
+  const res = await fetch(`${API_BASE}/api/dashboard/sync-status`, {
+    headers: { Authorization: `Bearer ${getToken()}` },
+  });
+  if (!res.ok) throw new Error("Failed to load sync status");
+  return res.json();
+}
+async function requestOnlineSync(target: "online" | "internal"): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/dashboard/${target === "online" ? "sync" : "internal-sync"}/run-once`, {
+    method: "POST", headers: { Authorization: `Bearer ${getToken()}` },
+  });
+  const result = await res.json();
+  if (!res.ok || !result.ok) throw new Error(result.message || result.error || "Sync failed");
+}
+
 export default function Dashboard() {
   const { t, lang, currencySymbol } = useLanguage();
   const isAR = lang === "ar";
@@ -84,6 +106,44 @@ export default function Dashboard() {
     enabled: !!user,
     refetchInterval: 60_000,
   });
+  const queryClient = useQueryClient();
+  const { data: liveSync, dataUpdatedAt: syncReceivedAt, isError: syncStatusError } = useQuery({
+    queryKey: ["dashboard-sync-status"], queryFn: fetchSyncStatus,
+    enabled: !!user, refetchInterval: 5000,
+  });
+  const [clock, setClock] = useState(Date.now());
+  const [syncMessage, setSyncMessage] = useState("");
+  const manualSync = useMutation({
+    mutationFn: requestOnlineSync,
+    onMutate: () => setSyncMessage(""),
+    onSuccess: () => setSyncMessage(isAR ? "تمت المزامنة بنجاح" : "Sync completed"),
+    onError: (error: Error) => setSyncMessage(error.message),
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ["dashboard-sync-status"] });
+      void queryClient.invalidateQueries({ queryKey: ["dashboard-system-status"] });
+      void queryClient.invalidateQueries({ queryKey: ["accounting"] });
+      void queryClient.invalidateQueries({ predicate: query => {
+        const key = JSON.stringify(query.queryKey).toLowerCase();
+        return key.includes("invoice") || key.includes("receipt") || key.includes("client");
+      } });
+    },
+  });
+  const syncRunning = manualSync.isPending || liveSync?.online.status === "running" || liveSync?.internal.status === "running";
+  useEffect(() => {
+    if (!liveSync?.online.manualAvailableAt && !liveSync?.internal.manualAvailableAt) return;
+    setClock(Date.now());
+    const timer = window.setInterval(() => setClock(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [liveSync?.online.manualAvailableAt, liveSync?.internal.manualAvailableAt]);
+  const formatCountdown = (status: LiveSyncStatus["online"] | LiveSyncStatus["internal"]) => {
+    if (status.manualAvailableAt === null) return "—";
+    const seconds = Math.max(0, Math.ceil((status.manualAvailableAt - status.serverTime - Math.max(0, clock - syncReceivedAt)) / 1000));
+    return `${Math.floor(seconds / 60).toString().padStart(2, "0")}:${(seconds % 60).toString().padStart(2, "0")}`;
+  };
+  const enabledConnections = liveSync?.connections ?? systemStatus?.connections;
+  const syncTargets = (["online", "internal"] as const).filter(target =>
+    target === "online" ? enabledConnections?.onlineEnabled : enabledConnections?.internalEnabled
+  );
   const [showAmounts, setShowAmounts] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(() =>
     document.documentElement.classList.contains("dark")
@@ -375,10 +435,10 @@ export default function Dashboard() {
               <div className="min-w-0 flex-1">
                 <p className="text-xs font-medium text-muted-foreground mb-1.5">{isAR ? "حالة الاتصال" : "Connections"}</p>
                 <div className="flex flex-wrap gap-x-2 gap-y-1 text-[11px] font-semibold">
-                  {(["local", "online", "internal"] as const).filter((key) => key === "local" || (systemStatus && (key === "online" ? systemStatus.connections.onlineConfigured : systemStatus.connections.internalConfigured))).map((key) => {
+                  {(["local", "online", "internal"] as const).filter((key) => key === "local" || (key === "online" ? enabledConnections?.onlineEnabled : enabledConnections?.internalEnabled)).map((key) => {
                     const label = key === "local" ? (isAR ? "محلي" : "Local") : key === "online" ? "Online" : (isAR ? "داخلي" : "Internal");
                     const connected = systemStatus?.connections[key];
-                    const enabled = key === "local" || (key === "online" ? systemStatus?.connections.onlineEnabled : systemStatus?.connections.internalEnabled);
+                    const enabled = key === "local" || (key === "online" ? enabledConnections?.onlineEnabled : enabledConnections?.internalEnabled);
                     return <span key={key} className={connected === undefined || systemStatusError ? "text-muted-foreground" : connected ? "text-emerald-700 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}>
                       {label}: {connected === undefined || systemStatusError ? "—" : !enabled ? (isAR ? "مفصول" : "Disconnected") : connected ? (isAR ? "متصل" : "Connected") : (isAR ? "منقطع" : "Off")}
                     </span>;
@@ -390,17 +450,41 @@ export default function Dashboard() {
             <div className="mt-2 h-1 rounded-full bg-emerald-500/70" />
           </motion.div>
           <motion.div variants={item} className="stat-card bg-card border border-border rounded-2xl p-2 shadow-sm">
-            <div className="flex items-start justify-between bg-sky-50 dark:bg-sky-950/30 rounded-xl p-1.5 min-h-[58px]">
-              <div className="min-w-0 flex-1">
-                <p className="text-xs font-medium text-muted-foreground mb-1.5">{isAR ? "مزامنة Online" : "Online sync"}</p>
-                <p className="text-xs font-semibold text-foreground">
-                  {systemStatusError || !systemStatus ? "—" : !systemStatus.connections.onlineEnabled ? (isAR ? "الاتصال مفصول" : "Disconnected") : systemStatus.sync.status === "running" ? (isAR ? "جارٍ التنفيذ" : "Running") : !systemStatus.sync.autoSync ? (isAR ? "المزامنة التلقائية متوقفة" : "Automatic sync off") : systemStatus.sync.failed > 0 || systemStatus.sync.status === "failed" ? (isAR ? "توجد أخطاء" : "Errors") : systemStatus.sync.status === "running" ? (isAR ? "جارٍ التنفيذ" : "Running") : systemStatus.sync.pending > 0 ? (isAR ? "بانتظار المزامنة" : "Pending") : systemStatus.sync.status === "success" ? (isAR ? "مكتملة" : "Complete") : (isAR ? "لم تُشغّل بعد" : "Not run yet")}
-                  {systemStatus && !systemStatusError && ` · ${isAR ? "معلّق" : "Pending"} ${arabicNums(systemStatus.sync.pending, lang)} · ${isAR ? "فشل" : "Failed"} ${arabicNums(systemStatus.sync.failed, lang)}`}
-                </p>
-                {systemStatus?.sync.lastSync && !systemStatusError && <p className="text-[10px] text-muted-foreground truncate">{isAR ? "آخر مزامنة: " : "Last sync: "}{new Date(systemStatus.sync.lastSync).toLocaleString(isAR ? "ar-QA" : "en-US")}</p>}
+            <div className="bg-sky-50 dark:bg-sky-950/30 rounded-xl p-1.5 min-h-[58px]">
+              <div className="flex gap-2">
+                {syncTargets.map(target => {
+                  const status = liveSync?.[target];
+                  const running = status?.status === "running" || (manualSync.isPending && manualSync.variables === target);
+                  const waiting = Boolean(status?.manualAvailableAt != null && status.manualAvailableAt - status.serverTime - Math.max(0, clock - syncReceivedAt) > 0);
+                  const permitted = liveSync?.permissions[target] === true;
+                  const label = target === "online" ? "Online" : (isAR ? "السيرفر الداخلي" : "Internal server");
+                  const nextLabel = syncStatusError || !status ? "—" : running ? (isAR ? "جارٍ التنفيذ" : "Running")
+                    : waiting ? (isAR ? "الزر متاح خلال" : "Button available in")
+                    : (isAR ? "مزامنة يدوية" : "Manual sync");
+                  return <div key={target} className="min-w-0 flex-1 text-center">
+                    <p className="text-[11px] font-medium text-muted-foreground">{label}</p>
+                    <button type="button" onClick={() => manualSync.mutate(target)} disabled={!permitted || syncRunning || waiting || syncStatusError}
+                      aria-label={`${isAR ? "مزامنة الآن: " : "Sync now: "}${label}`}
+                      title={!permitted ? (isAR ? "تحتاج صلاحية المزامنة من المدير" : "Sync permission from an administrator is required") : waiting ? (isAR ? "انتظر انتهاء العدّ التنازلي" : "Wait for the countdown to finish") : (isAR ? "مزامنة الآن" : "Sync now")}
+                      className="rounded-lg p-2 text-sky-600 hover:bg-sky-100 dark:hover:bg-sky-900 disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-600">
+                      <RefreshCw className={`w-5 h-5 ${running ? "animate-spin" : ""}`} />
+                    </button>
+                    <p className="text-[9px] text-muted-foreground">{nextLabel}</p>
+                    {!syncStatusError && waiting && status && !running && <p dir="ltr" className="text-[11px] font-semibold tabular-nums text-sky-700 dark:text-sky-400">{formatCountdown(status)}</p>}
+                    {!syncStatusError && status && <p className="text-[9px] text-muted-foreground">
+                      {isAR ? "معلّق" : "Pending"} {arabicNums(status.pending, lang)}
+                      {target === "online" && ` · ${isAR ? "فشل" : "Failed"} ${arabicNums(liveSync!.online.failed, lang)}`}
+                    </p>}
+                    {!syncStatusError && status?.status === "failed" && <p className="text-[9px] text-rose-600">{isAR ? "توجد أخطاء" : "Errors"}</p>}
+                    {!syncStatusError && status?.lastSync && <p className="text-[9px] text-muted-foreground" title={new Date(status.lastSync).toLocaleString(isAR ? "ar-QA" : "en-US")}>
+                      {isAR ? "آخر مزامنة " : "Last sync "}{new Date(status.lastSync).toLocaleTimeString(isAR ? "ar-QA" : "en-US", { hour: "2-digit", minute: "2-digit" })}
+                    </p>}
+                  </div>;
+                })}
               </div>
-              <RefreshCw className="w-5 h-5 text-sky-600 flex-shrink-0 m-2" />
+              {syncTargets.length === 0 && <p className="text-xs text-muted-foreground text-center py-3">{isAR ? "المزامنة غير مفعّلة" : "Sync is disabled"}</p>}
             </div>
+            {syncMessage && <p role="status" className={`mt-1 text-[10px] break-words ${manualSync.isError ? "text-rose-600" : "text-emerald-700 dark:text-emerald-400"}`}>{syncMessage}</p>}
             <div className="mt-2 h-1 rounded-full bg-sky-500/70" />
           </motion.div>
         </div>
