@@ -1,4 +1,5 @@
 import ResizableScrollArea from "@/components/layout/ResizableScrollArea";
+import { useUnsavedChanges } from "@/hooks/use-unsaved-changes";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useParams, Link } from "wouter";
 import { useSearch } from "wouter";
@@ -557,6 +558,8 @@ export default function InvoiceForm() {
             ? "تم إنشاء الفاتورة بنجاح"
             : "Invoice created",
         });
+        markChangesSaved();
+        reset(getValues());
         setLocation("/invoices");
       },
       onError: (err: any) => {
@@ -576,6 +579,7 @@ export default function InvoiceForm() {
   const updateMut = useUpdateInvoice({
     mutation: {
       onSuccess: async (data) => {
+        if (JSON.stringify(getValues()) === submittedValuesRef.current) { markChangesSaved(); reset(getValues()); }
         rememberSuggestion(
           IMPORTER_EXPORTER_SUGGESTIONS_KEY,
           pendingSuggestionsRef.current.importerExporterName
@@ -627,7 +631,7 @@ export default function InvoiceForm() {
     setFocus,
     reset,
     getValues,
-    formState: { errors },
+    formState: { errors, isDirty },
   } = useForm<InvoiceFormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -648,6 +652,9 @@ export default function InvoiceForm() {
       items: [{ description: "", quantity: 1, unitPrice: 0 }],
     },
   });
+
+  const submittedValuesRef = useRef("");
+  const { markChangesSaved } = useUnsavedChanges(isDirty, isAR);
 
   const { fields, append, remove, move } = useFieldArray({
     control,
@@ -906,6 +913,7 @@ export default function InvoiceForm() {
   }
 
   const onSubmit = async (data: InvoiceFormValues) => {
+    submittedValuesRef.current = JSON.stringify(getValues());
     pendingShipmentRefRef.current = String(data.shipmentRef ?? "").trim();
     pendingSuggestionsRef.current = {
       importerExporterName: data.importerExporterName ?? "",
@@ -2200,7 +2208,9 @@ export default function InvoiceForm() {
               className="px-5 py-2 bg-primary text-primary-foreground text-sm font-semibold rounded-xl shadow-lg shadow-primary/20 hover:-translate-y-0.5 transition-all flex items-center gap-1.5 disabled:opacity-60"
             >
               <Save className="w-4 h-4" />
-              {isEdit
+              {createMut.isPending || updateMut.isPending
+                ? (isAR ? "جارٍ الحفظ..." : "Saving...")
+                : isEdit
                 ? isAR
                   ? "حفظ التغييرات"
                   : "Save Changes"

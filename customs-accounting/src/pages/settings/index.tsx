@@ -1,4 +1,5 @@
 import { parseSettingsAccess, canChangeSettingsField, type SettingsAccess } from "@/lib/settings-access-policy";
+import { useUnsavedChanges } from "@/hooks/use-unsaved-changes";
 import ResizableScrollArea from "@/components/layout/ResizableScrollArea";
 import InvoicePrintHeader from "@/components/invoice-print-header";
 import {
@@ -594,6 +595,11 @@ export default function SettingsPage() {
   const { toast } = useToast();
   const [form, setForm] = useState<any>({ masterPassword: "", ...DEFAULT_SETTINGS });
   const [saving, setSaving] = useState(false);
+  const [savedFormSnapshot, setSavedFormSnapshot] = useState("");
+  const formSnapshot = JSON.stringify(form);
+  const { markChangesSaved } = useUnsavedChanges(
+    !!savedFormSnapshot && formSnapshot !== savedFormSnapshot, isAR
+  );
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [stampPreview, setStampPreview] = useState<string | null>(null);
   const [watermarkPreview, setWatermarkPreview] = useState<string | null>(null);
@@ -823,6 +829,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
 
   useEffect(() => {
     setForm({ ...DEFAULT_SETTINGS, ...settings });
+    setSavedFormSnapshot(JSON.stringify({ ...DEFAULT_SETTINGS, ...settings }));
     setLogoPreview(settings.logoBase64 || null);
     setStampPreview(settings.stampBase64 || null);
     setWatermarkPreview(settings.watermarkBase64 || null);
@@ -1369,6 +1376,8 @@ const decryptBackupData = async (backupFile: any, password: string) => {
         const saved = await res.json();
         const mergedSaved = { ...DEFAULT_SETTINGS, ...saved };
 
+        markChangesSaved();
+        setSavedFormSnapshot(JSON.stringify(mergedSaved));
         setForm(mergedSaved);
         setSettings(mergedSaved);
         sessionStorage.setItem("company_settings", JSON.stringify(mergedSaved));

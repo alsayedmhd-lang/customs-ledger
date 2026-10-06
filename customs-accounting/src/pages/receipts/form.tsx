@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { useUnsavedChanges } from "@/hooks/use-unsaved-changes";
 import { useLocation, useParams, Link } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -85,7 +86,7 @@ export default function ReceiptForm() {
     watch,
     setValue,
     reset,
-    formState: { errors, isSubmitting },
+    formState: { errors, isSubmitting, isDirty },
   } = useForm<ReceiptFormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -100,6 +101,8 @@ export default function ReceiptForm() {
       receiptDate: new Date().toISOString().split("T")[0],
     },
   });
+
+  const { markChangesSaved } = useUnsavedChanges(isDirty, isAR);
 
   async function issueReceipt(receiptId: number) {
     const token = sessionStorage.getItem("auth_token");
@@ -226,6 +229,7 @@ export default function ReceiptForm() {
       }
 
       console.log("Receipt saved response", saved);
+      if (JSON.stringify(watch()) === JSON.stringify(data)) { markChangesSaved(); reset(data); }
 
       queryClient.invalidateQueries({ queryKey: getListReceiptsQueryKey() });
       queryClient.invalidateQueries({ queryKey: getListInvoicesQueryKey() });

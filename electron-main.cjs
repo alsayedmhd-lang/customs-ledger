@@ -987,6 +987,20 @@ function createWindow() {
     setAppZoomFactor(readUserPreferences().zoomFactor, { save: false });
   });
 
+  mainWindow.webContents.on("will-prevent-unload", (event) => {
+    const choice = dialog.showMessageBoxSync(mainWindow, {
+      type: "question",
+      buttons: ["البقاء / Stay", "المغادرة دون حفظ / Leave without saving"],
+      defaultId: 0,
+      cancelId: 0,
+      title: "Ledger",
+      message: "توجد تغييرات غير محفوظة. هل تريد إغلاق البرنامج؟",
+      detail: "Unsaved changes will be lost if you close Ledger.",
+      noLink: true,
+    });
+    if (choice === 1) event.preventDefault();
+  });
+
   mainWindow.on("close", (event) => {
     if (!app.isQuittingForPrint && Array.from(printPreviewWindows).some((win) =>
       !win.isDestroyed() && (printPreviewJobs.get(win)?.pending ?? 0) > 0)) {

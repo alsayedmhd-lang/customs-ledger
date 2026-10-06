@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import ResizableScrollArea from "@/components/layout/ResizableScrollArea";
 import { useAuth } from "@/lib/auth-context";
 import { useLanguage } from "@/lib/language-context";
 import { formatCurrency } from "@/lib/utils";
@@ -400,8 +401,9 @@ return (
 
       {/* Table */}
       <div className="order-4 bg-card border border-border rounded-2xl shadow-sm overflow-hidden">
+        <ResizableScrollArea storageKey="customer-ledger-table" maxHeight={580}>
         <table className="w-full text-sm">
-          <thead>
+          <thead className="sticky top-0 z-10 bg-card">
             <tr className="bg-muted/30 border-b border-border text-muted-foreground">
               <th className="p-3 text-right">{tr("التاريخ", "Date")}</th>
               <th className="p-3 text-right">{tr("النوع", "Type")}</th>
@@ -471,6 +473,7 @@ return (
             })()}
           </tbody>
         </table>
+        </ResizableScrollArea>
       </div>
     </div>
   );

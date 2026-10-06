@@ -1,4 +1,4 @@
-import { useRef, useState, type PointerEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type PointerEvent, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -8,6 +8,8 @@ type Props = {
   storageKey: string;
   minHeight?: number;
   maxDragHeight?: number;
+  restoreScrollKey?: string;
+  scrollReady?: boolean;
 };
 
 export default function ResizableScrollArea({
@@ -17,6 +19,8 @@ export default function ResizableScrollArea({
   storageKey,
   minHeight = 160,
   maxDragHeight = 1600,
+  restoreScrollKey,
+  scrollReady = true,
 }: Props) {
   const areaRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{ y: number; height: number } | null>(null);
@@ -28,6 +32,28 @@ export default function ResizableScrollArea({
       return null;
     }
   });
+
+  const scrollRestored = useRef(false);
+  useEffect(() => {
+    scrollRestored.current = false;
+  }, [restoreScrollKey]);
+  useEffect(() => {
+    if (!restoreScrollKey || !scrollReady || scrollRestored.current || !areaRef.current) return;
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(restoreScrollKey) || "{}");
+      if (typeof saved.top === "number" && Number.isFinite(saved.top)) areaRef.current.scrollTop = Math.max(0, saved.top);
+      if (typeof saved.left === "number" && Number.isFinite(saved.left)) areaRef.current.scrollLeft = saved.left;
+    } catch {}
+    scrollRestored.current = true;
+  }, [restoreScrollKey, scrollReady]);
+  const rememberScroll = () => {
+    if (!restoreScrollKey || !scrollRestored.current || !areaRef.current) return;
+    try {
+      sessionStorage.setItem(restoreScrollKey, JSON.stringify({
+        top: areaRef.current.scrollTop, left: areaRef.current.scrollLeft,
+      }));
+    } catch {}
+  };
 
   const startDrag = (event: PointerEvent<HTMLButtonElement>) => {
     if (!areaRef.current) return;
@@ -55,6 +81,7 @@ export default function ResizableScrollArea({
     <div className="min-w-0">
       <div
         ref={areaRef}
+        onScroll={rememberScroll}
         className={cn("overflow-x-auto overflow-y-auto", className)}
         style={height === null ? { maxHeight } : { height }}
       >

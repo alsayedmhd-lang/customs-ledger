@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import { useListInvoices, useDeleteInvoice, getListInvoicesQueryKey, getGetInvoiceQueryKey, useGetInvoice } from "@workspace/api-client-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { StatusBadge } from "../dashboard";
-import { Plus, Search, Edit2, Trash2, Printer, FileText, Send, CheckCircle2, XCircle, Eye, EyeOff } from "lucide-react";
+import { Plus, Search, Edit2, Trash2, Printer, FileText, Send, CheckCircle2, XCircle, Eye, EyeOff, Filter, ChevronDown, ChevronUp, X } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
@@ -40,12 +40,42 @@ export default function InvoicesList() {
   const firstDayOfMonth = formatLocalDate(new Date(now.getFullYear(), now.getMonth(), 1));
   const today = formatLocalDate(now);
 
-  const [search, setSearch] = useState("");
-  const [fromDate, setFromDate] = useState(firstDayOfMonth);
-  const [toDate, setToDate] = useState(today);
-  const [statusFilter, setStatusFilter] = useState("");
-  const [salesmanFilter, setSalesmanFilter] = useState("");
-  const [portFilter, setPortFilter] = useState("");
+  const filtersStorageKey = `ledger:invoice-filters:${user?.id ?? "guest"}`;
+  const [savedFilters] = useState<Record<string, unknown>>(() => {
+    try {
+      const value = JSON.parse(sessionStorage.getItem(filtersStorageKey) || "{}");
+      return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+    } catch { return {}; }
+  });
+  const savedText = (key: string, fallback = "") =>
+    typeof savedFilters[key] === "string" ? savedFilters[key] as string : fallback;
+  const [search, setSearch] = useState(() => savedText("search"));
+  const [fromDate, setFromDate] = useState(() => savedText("fromDate", firstDayOfMonth));
+  const [toDate, setToDate] = useState(() => savedText("toDate", today));
+  const [statusFilter, setStatusFilter] = useState(() => savedText("statusFilter"));
+  const [salesmanFilter, setSalesmanFilter] = useState(() => savedText("salesmanFilter"));
+  const [portFilter, setPortFilter] = useState(() => savedText("portFilter"));
+  const [filtersOpen, setFiltersOpen] = useState(() => savedFilters.filtersOpen !== false);
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(filtersStorageKey, JSON.stringify({
+        search, fromDate, toDate, statusFilter, salesmanFilter, portFilter, filtersOpen,
+      }));
+    } catch {}
+  }, [filtersStorageKey, search, fromDate, toDate, statusFilter, salesmanFilter, portFilter, filtersOpen]);
+  const activeFilterCount = [
+    search, fromDate, toDate, statusFilter, salesmanFilter, portFilter,
+  ].filter(Boolean).length;
+
+  const clearFilters = () => {
+    setSearch("");
+    setFromDate("");
+    setToDate("");
+    setStatusFilter("");
+    setSalesmanFilter("");
+    setPortFilter("");
+  };
+
   const [showAmounts, setShowAmounts] = useState(false);
   const hiddenAmount = <span className="inline-block min-w-[96px] tracking-widest opacity-35 font-mono text-end">••••••</span>;
 
@@ -264,7 +294,42 @@ export default function InvoicesList() {
       </div>
 
       <div className="bg-card border border-border/50 shadow-sm rounded-2xl overflow-hidden">
-        <div className="px-5 py-4 border-b border-border/50 space-y-4">
+        <div className="flex items-center gap-3 px-5 py-3 border-b border-border/50">
+          <button
+            type="button"
+            onClick={() => setFiltersOpen(value => !value)}
+            aria-expanded={filtersOpen}
+            aria-controls="invoice-search-filters"
+            className="flex flex-1 items-center justify-between gap-3 text-sm font-semibold text-foreground hover:text-primary transition-colors"
+          >
+            <span className="flex items-center gap-2">
+              <Filter className="h-4 w-4 text-primary" />
+              {tr("البحث والفلاتر", "Search and filters")}
+              {activeFilterCount > 0 && (
+                <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">
+                  {activeFilterCount}
+                </span>
+              )}
+            </span>
+            {filtersOpen
+              ? <ChevronUp className="h-4 w-4 text-muted-foreground" />
+              : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+          </button>
+          <button
+            type="button"
+            onClick={clearFilters}
+            disabled={activeFilterCount === 0}
+            className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <X className="h-3.5 w-3.5" />
+            {tr("مسح الفلاتر", "Clear filters")}
+          </button>
+        </div>
+        <div
+          id="invoice-search-filters"
+          hidden={!filtersOpen}
+          className="px-5 py-4 border-b border-border/50 space-y-4"
+        >
           {/* Search row */}
           <div className="flex flex-col gap-2">
             <span className="text-sm font-medium text-muted-foreground">
@@ -351,7 +416,7 @@ export default function InvoicesList() {
           </div>
         </div>
 
-        <ResizableScrollArea storageKey="invoices-index" maxHeight={580}>
+        <ResizableScrollArea storageKey="invoices-index" maxHeight={580} restoreScrollKey={`${filtersStorageKey}:scroll`} scrollReady={!isLoading}>
           <table className="w-full text-sm">
             <thead className="bg-muted/40 text-muted-foreground font-medium border-b border-border/60 sticky top-0 z-10">
               <tr>
