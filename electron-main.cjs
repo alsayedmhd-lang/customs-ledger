@@ -1,4 +1,32 @@
 const { app, BrowserWindow, ipcMain, dialog, Menu, shell } = require("electron");
+// Acquire the lock before update handling, IPC registration or backend startup.
+const ledgerHasInstanceLock = app.requestSingleInstanceLock();
+if (!ledgerHasInstanceLock) {
+  app.exit(0);
+  return;
+}
+let ledgerDuplicateNoticeOpen = false;
+function notifyLedgerAlreadyRunning() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
+  if (ledgerDuplicateNoticeOpen) return;
+  ledgerDuplicateNoticeOpen = true;
+  dialog.showMessageBox(mainWindow, {
+    type: "info",
+    title: "Ledger",
+    message: "برنامج Ledger مفتوح بالفعل",
+    detail: "تم إظهار النافذة الحالية. / Ledger is already running.",
+    buttons: ["موافق / OK"],
+    noLink: true,
+  }).catch(() => {}).finally(() => { ledgerDuplicateNoticeOpen = false; });
+}
+app.on("second-instance", () => {
+  if (app.isReady()) notifyLedgerAlreadyRunning();
+  else app.whenReady().then(() => setImmediate(notifyLedgerAlreadyRunning));
+});
+
 const os = require("node:os");
 const crypto = require("node:crypto");
 const { autoUpdater } = require("electron-updater");
