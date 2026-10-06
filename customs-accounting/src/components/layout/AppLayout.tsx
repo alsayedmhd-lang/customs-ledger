@@ -122,7 +122,8 @@ export default function AppLayout({ children }: AppLayoutProps) {
     };
   }, []);
 
-  const sidebarStyle: React.CSSProperties = isDarkMode
+  const customSidebar = Boolean(display.sidebarCustomHex) || (display.sidebarTone || "original") !== "original";
+  const sidebarStyle: React.CSSProperties = isDarkMode && !customSidebar
     ? {
         background: "linear-gradient(180deg, hsl(var(--card)) 0%, hsl(var(--background)) 100%)",
         borderColor: "hsl(var(--border))",
@@ -281,7 +282,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                     : undefined,
                   color: isActive
                     ? collapsed
-                      ? isDarkMode ? "hsl(var(--foreground))" : "#ffffff"
+                      ? customSidebar ? "var(--sb-foreground)" : isDarkMode ? "hsl(var(--foreground))" : "#ffffff"
                       : "var(--sb-active-fg)"
                     : "var(--sb-muted-foreground)",
                 }}
@@ -305,7 +306,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                   )}
                     style={{ background: isActive ? undefined : "var(--sb-hover-bg)" }}
                   >
-                    <item.icon className={cn(
+                    <item.icon style={customSidebar ? { color: isActive && !collapsed ? "var(--sb-active-fg)" : "var(--sb-foreground)" } : undefined} className={cn(
                       "w-4 h-4",
                       isActive
                         ? isDarkMode ? "text-foreground" : collapsed ? "text-white" : "text-primary"

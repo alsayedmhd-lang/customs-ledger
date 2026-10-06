@@ -2,6 +2,8 @@ import { parseSettingsAccess, canChangeSettingsField, type SettingsAccess } from
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes";
 import ResizableScrollArea from "@/components/layout/ResizableScrollArea";
 import InvoicePrintHeader from "@/components/invoice-print-header";
+import ColorStudio from "@/components/ColorStudio";
+import { toneColor } from "@/lib/color-tools";
 import {
   PrintDocumentFooter,
   PrintTitleBlock,
@@ -606,6 +608,7 @@ export default function SettingsPage() {
   const [accountantSignaturePreview, setAccountantSignaturePreview] = useState<string | null>(null);
   const [receiverSignaturePreview, setReceiverSignaturePreview] = useState<string | null>(null);
   const logoRef = useRef<HTMLInputElement>(null);
+  const backgroundImageRef = useRef<HTMLInputElement>(null);
   const accountantSignatureRef = useRef<HTMLInputElement>(null);
   const receiverSignatureRef = useRef<HTMLInputElement>(null);
   const stampRef = useRef<HTMLInputElement>(null);
@@ -2402,6 +2405,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
           return (
             <>
             <div data-settings-appearance className="space-y-3">
+              <p className="text-xs text-muted-foreground">{isAR ? "تُطبّق خيارات المظهر مباشرة وتُحفظ على هذا الجهاز تلقائيًا." : "Appearance changes apply immediately and are saved automatically on this device."}</p>
               <div role="tablist" aria-label={isAR ? "أقسام المظهر" : "Appearance sections"} className="flex flex-wrap gap-2 border-b border-border pb-3">
                 {[
                   { id: "theme" as const, ar: "مظهر الواجهة والخلفية", en: "Theme & Background", icon: Sun },
@@ -2413,20 +2417,21 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                   </button>
                 ))}
               </div>
-              <div id="appearance-panel-theme" role="tabpanel" aria-labelledby="appearance-tab-theme" hidden={appearanceTab !== "theme"} className="space-y-6">
-              <SectionCard icon={Sun} title={isAR ? "مظهر الواجهة" : "Interface Theme"} color="bg-yellow-500/5">
+              <div id="appearance-panel-theme" role="tabpanel" aria-labelledby="appearance-tab-theme" hidden={appearanceTab !== "theme"} className="space-y-3">
+              <SectionCard icon={Sun} title={isAR ? "مظهر الواجهة" : "Interface Theme"} color="bg-muted/40">
                 <div className="grid grid-cols-3 gap-2">
                   {([["light", Sun, isAR ? "فاتح" : "Light"], ["dark", Moon, isAR ? "داكن" : "Dark"], ["system", Monitor, isAR ? "تلقائي" : "System"]] as const).map(([mode, Icon, label]) => (
-                    <button key={mode} onClick={() => { toggleTheme(mode); }}
-                      className={cn("flex flex-col items-center gap-2 py-3 px-2 rounded-xl text-xs font-semibold border-2 transition-all",
-                        currentTheme === mode ? "border-primary bg-primary/10 text-primary" : "border-border bg-background text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                    <button type="button" key={mode} aria-pressed={currentTheme === mode} onClick={() => { toggleTheme(mode); }}
+                      className={cn("flex flex-col items-center gap-2 py-3 px-2 rounded-xl text-xs font-semibold border transition-colors",
+                        currentTheme === mode ? "border-primary bg-primary/5 text-primary" : "border-border bg-background text-muted-foreground hover:border-primary/40 hover:text-foreground"
                       )}>
+                      {currentTheme === mode && <span aria-hidden="true" className="text-[10px] font-bold text-primary">✓</span>}
                       <Icon className="w-3.5 h-3.5" />{label}
                     </button>
                   ))}
                 </div>
               </SectionCard>
-              <SectionCard icon={Wallpaper} title={isAR ? "خلفية التطبيق" : "App Background"}color="bg-primary/5">
+              <SectionCard icon={Wallpaper} title={isAR ? "خلفية التطبيق" : "App Background"}color="bg-muted/40">
                 {/* Type selector */}
                 <div className="grid grid-cols-3 gap-2 mb-5">
                   {([
@@ -2434,64 +2439,48 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                     { v: "color" as BgType, Icon: Blend,   labelAr: "لون",     labelEn: "Color" },
                     { v: "image" as BgType, Icon: Wallpaper, labelAr: "صورة",  labelEn: "Image" },
                   ]).map(({ v, Icon: Ic, labelAr, labelEn }) => (
-                    <button key={v} onClick={() => updateDisplay({ bgType: v })}
+                    <button type="button" key={v} aria-pressed={display.bgType === v} onClick={() => updateDisplay({ bgType: v })}
                       className={cn(
-                        "flex flex-col items-center gap-2 py-3 rounded-xl border-2 text-xs font-semibold transition-all",
+                        "flex flex-col items-center gap-2 py-3 rounded-xl border text-xs font-medium transition-colors",
                         display.bgType === v
-                          ? "border-primary bg-primary/10 text-primary"
+                          ? "border-primary bg-primary/5 text-primary"
                           : "border-border bg-background text-muted-foreground hover:border-primary/40 hover:text-foreground"
                       )}>
+                      {display.bgType === v && <span aria-hidden="true" className="text-[10px] font-bold text-primary">✓</span>}
                       <Ic className="w-3.5 h-3.5" />
                       {isAR ? labelAr : labelEn}
                     </button>
                   ))}
                 </div>
 
-                {/* Color picker */}
                 {display.bgType === "color" && (
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-2.5">
-                      <label className="text-xs font-semibold text-muted-foreground  shrink-0">
-                        {isAR ? "اختر اللون" : "Pick color"}
-                      </label>
-                      <div className="flex items-center gap-2.5 flex-1">
-                        <input
-                          type="color"
-                          value={display.bgColor}
-                          onChange={e => updateDisplay({ bgColor: e.target.value })}
-                          className="w-8 h-8 rounded-xl border border-border cursor-pointer p-0.5 bg-background"
-                        />
-                        <div className="flex flex-wrap gap-1.5">
-                          {["#e8f0fe","#fce4ec","#e8f5e9","#fff3e0","#f3e5f5","#e0f7fa","#fafafa","#1e1e2e"].map(c => (
-                            <button key={c} onClick={() => updateDisplay({ bgColor: c })}
-                              title={c}
-                              className={cn("w-6 h-6 rounded-lg border-2 transition-all hover:scale-110",
-                                display.bgColor === c ? "border-primary scale-110 shadow-md" : "border-border/50"
-                              )}
-                              style={{ background: c }}
-                            />
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                    {/* Mini preview */}
-                    <div className="h-16 rounded-xl border border-border/40 overflow-hidden relative">
-                      <div className="absolute inset-0" style={{ backgroundColor: display.bgColor, opacity: display.bgOpacity / 100 }} />
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <span className="text-xs font-medium text-muted-foreground">{isAR ? "معاينة الخلفية" : "Background preview"}</span>
-                      </div>
-                    </div>
-                  </div>
+                  <ColorStudio isAR={isAR} label={isAR ? "لون الخلفية" : "Background color"}
+                    palette={[
+                      { id: "#e8f0fe", hex: "#e8f0fe", ar: "أزرق", en: "Blue" },
+                      { id: "#fce4ec", hex: "#fce4ec", ar: "وردي", en: "Rose" },
+                      { id: "#e8f5e9", hex: "#e8f5e9", ar: "أخضر", en: "Green" },
+                      { id: "#fff3e0", hex: "#fff3e0", ar: "بيج", en: "Beige" },
+                      { id: "#f3e5f5", hex: "#f3e5f5", ar: "بنفسجي", en: "Purple" },
+                      { id: "#e0f7fa", hex: "#e0f7fa", ar: "سماوي", en: "Cyan" },
+                      { id: "#fafafa", hex: "#fafafa", ar: "أبيض", en: "White" },
+                      { id: "#1e1e2e", hex: "#1e1e2e", ar: "فحمي", en: "Charcoal" },
+                    ]}
+                    selectedId={display.bgBaseColor || display.bgColor}
+                    customHex={["#e8f0fe", "#fce4ec", "#e8f5e9", "#fff3e0", "#f3e5f5", "#e0f7fa", "#fafafa", "#1e1e2e"].includes(display.bgBaseColor || display.bgColor) ? "" : display.bgBaseColor || display.bgColor}
+                    baseHex={display.bgBaseColor || display.bgColor} tone={display.bgTone || "original"}
+                    onPreset={hex => updateDisplay({ bgBaseColor: hex, bgColor: toneColor(hex, display.bgTone || "original") })}
+                    onCustom={hex => updateDisplay({ bgBaseColor: hex, bgColor: toneColor(hex, display.bgTone || "original") })}
+                    onTone={tone => updateDisplay({ bgTone: tone, bgBaseColor: display.bgBaseColor || display.bgColor, bgColor: toneColor(display.bgBaseColor || display.bgColor, tone) })}
+                    onReset={() => updateDisplay({ bgTone: "original", bgBaseColor: "#e8f0fe", bgColor: "#e8f0fe" })} />
                 )}
 
                 {/* Image upload */}
                 {display.bgType === "image" && (() => {
-                  const bgImgRef = { current: null as HTMLInputElement | null };
                   return (
                     <div className="space-y-4">
                       <div className="flex items-center gap-2.5">
                         <button
-                          onClick={() => bgImgRef.current?.click()}
+                          onClick={() => backgroundImageRef.current?.click()}
                           className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-primary text-primary-foreground text-[13px] font-semibold shadow hover:bg-primary/90 transition-colors"
                         >
                           <Upload className="w-3.5 h-3.5" />
@@ -2508,18 +2497,26 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                         )}
                         <input
                           type="file"
-                          accept="image/*"
+                          accept="image/jpeg,image/png,image/webp"
                           className="hidden"
-                          ref={el => { bgImgRef.current = el; }}
+                          ref={backgroundImageRef}
                           onChange={e => {
                             const file = e.target.files?.[0];
                             if (!file) return;
+                            e.target.value = "";
+                            if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+                              toast({ title: isAR ? "اختر صورة JPG أو PNG أو WebP" : "Choose a JPG, PNG or WebP image", variant: "destructive" });
+                              return;
+                            }
                             if (file.size > 600 * 1024) {
                               toast({ title: isAR ? "الصورة كبيرة جداً (600KB حد أقصى)" : "Image too large (max 600KB)", variant: "destructive" });
                               return;
                             }
                             const reader = new FileReader();
-                            reader.onload = ev => updateDisplay({ bgImage: ev.target?.result as string });
+                            reader.onload = () => {
+                              if (typeof reader.result === "string") updateDisplay({ bgImage: reader.result });
+                            };
+                            reader.onerror = () => toast({ title: isAR ? "تعذر قراءة الصورة" : "Could not read image", variant: "destructive" });
                             reader.readAsDataURL(file);
                           }}
                         />
@@ -2528,7 +2525,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                       <div className="h-28 rounded-xl border border-border/40 overflow-hidden relative bg-muted/20">
                         {display.bgImage ? (
                           <>
-                            <img src={display.bgImage} alt="bg preview"
+                            <img src={display.bgImage} alt={isAR ? "معاينة خلفية التطبيق" : "App background preview"}
                               className="absolute inset-0 w-full h-full object-cover"
                               style={{ opacity: display.bgOpacity / 100 }}
                             />
@@ -2555,7 +2552,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                       <div className="flex items-center gap-2">
                         <SlidersHorizontal className="w-3.5 h-3.5 text-muted-foreground" />
                         <span className="text-xs font-semibold text-muted-foreground ">
-                          {isAR ? "درجة الشفافية" : "Opacity"}
+                          {isAR ? "درجة ظهور الخلفية" : "Background opacity"}
                         </span>
                       </div>
                       <span className="text-[13px] font-bold text-primary tabular-nums">{display.bgOpacity}%</span>
@@ -2563,6 +2560,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                     <div className="relative">
                       <input
                         type="range"
+                        aria-label={isAR ? "درجة ظهور الخلفية" : "Background opacity"}
                         min={5} max={80} step={1}
                         value={display.bgOpacity}
                         onChange={e => updateDisplay({ bgOpacity: Number(e.target.value) })}
@@ -2577,109 +2575,71 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                 )}
               </SectionCard>
               </div>
-              <div id="appearance-panel-colors" role="tabpanel" aria-labelledby="appearance-tab-colors" hidden={appearanceTab !== "colors"} className="space-y-6">
-              <SectionCard icon={Palette} title={isAR ? "اللون الأساسي" : "Primary Color"} color="bg-fuchsia-500/5">
-                <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-7 gap-2">
-                  {(Object.entries(COLOR_PRESETS) as [PrimaryColor, typeof COLOR_PRESETS[PrimaryColor]][]).map(([key, preset]) => (
-                    <button key={key} onClick={() => updateDisplay({ primaryColor: key })}
-                      title={isAR ? preset.labelAr : preset.labelEn}
-                      className={cn("flex flex-col items-center gap-2 py-3 rounded-xl border-2 transition-all text-xs font-semibold",
-                        display.primaryColor === key ? "border-current shadow-lg scale-105" : "border-transparent hover:border-border hover:scale-105"
-                      )}
-                      style={{ color: preset.hex }}
-                    >
-                      <span className="w-8 h-8 rounded-full shadow-md border-2 border-white/20 block"
-                        style={{ background: preset.hex }} />
-                      <span className="text-foreground">{isAR ? preset.labelAr : preset.labelEn}</span>
-                    </button>
-                  ))}
-                </div>
-                <div className="mt-3 pt-3 border-t border-border/40 flex items-center gap-2.5">
-                  <span className="text-xs text-muted-foreground">{isAR ? "معاينة:" : "Preview:"}</span>
-                  <div className="flex items-center gap-2">
-                    <span className="h-6 px-3 rounded-full text-xs font-bold flex items-center"
-                      style={{
-                        background: COLOR_PRESETS[display.primaryColor].hex,
-                        color: `hsl(${COLOR_PRESETS[display.primaryColor].foreground ?? "210 40% 98%"})`,
-                        border: `1px solid hsl(${COLOR_PRESETS[display.primaryColor].border ?? COLOR_PRESETS[display.primaryColor].light})`,
-                      }}>
-                      {isAR ? "زر أساسي" : "Primary Button"}
-                    </span>
-                    <span className="h-6 px-3 rounded-full text-xs font-bold flex items-center border-2"
-                      style={{
-                        borderColor: `hsl(${COLOR_PRESETS[display.primaryColor].border ?? COLOR_PRESETS[display.primaryColor].light})`,
-                        color: `hsl(${COLOR_PRESETS[display.primaryColor].foreground ? "222 47% 11%" : COLOR_PRESETS[display.primaryColor].light})`,
-                      }}>
-                      {isAR ? "حد ملوّن" : "Outline"}
-                    </span>
-                  </div>
-                </div>
-              </SectionCard>
-              <SectionCard icon={Layers} title={isAR ? "لون الشريط الجانبي" : "Sidebar Color"} color="bg-slate-500/5">
-                <div className="grid grid-cols-4 gap-2">
-                  {(Object.entries(SIDEBAR_COLOR_PRESETS) as [SidebarColor, typeof SIDEBAR_COLOR_PRESETS[SidebarColor]][]).map(([key, preset]) => (
-                    <button key={key} onClick={() => updateDisplay({ sidebarColor: key })}
-                      title={isAR ? preset.labelAr : preset.labelEn}
-                      className={cn(
-                        "flex flex-col items-center gap-2 p-3 rounded-xl border-2 transition-all text-xs font-medium",
-                        display.sidebarColor === key
-                          ? "border-primary shadow-md scale-105"
-                          : "border-transparent hover:border-border hover:scale-105"
-                      )}
-                    >
-                      {/* Mini gradient preview */}
-                      <div className="w-full h-[34px] rounded-lg shadow-inner border border-white/10 overflow-hidden">
-                        <div className="w-full h-full" style={{ background: `linear-gradient(180deg, ${preset.from} 0%, ${preset.to} 100%)` }} />
-                      </div>
-                      <span className="text-foreground text-center leading-tight">{isAR ? preset.labelAr : preset.labelEn}</span>
-                    </button>
-                  ))}
-                </div>
-                {/* Live preview mini sidebar */}
-                <div className="mt-4 pt-4 border-t border-border/40">
-                  <p className="text-xs text-muted-foreground mb-2">{isAR ? "معاينة مصغّرة:" : "Preview:"}</p>
-                  <div className="h-16 rounded-xl overflow-hidden shadow-md flex items-stretch"
-                    style={{ background: `linear-gradient(180deg, ${SIDEBAR_COLOR_PRESETS[display.sidebarColor].from} 0%, ${SIDEBAR_COLOR_PRESETS[display.sidebarColor].to} 100%)` }}>
-                    <div className="flex items-center gap-2 px-3">
-                      <div data-settings-preview className="w-6 h-6 rounded-lg bg-white/10" />
-                      <div className="space-y-1">
-                        <div data-settings-preview className="w-16 h-2 rounded bg-white/30" />
-                        <div data-settings-preview className="w-10 h-1.5 rounded bg-white/15" />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </SectionCard>
+              <div id="appearance-panel-colors" role="tabpanel" aria-labelledby="appearance-tab-colors" hidden={appearanceTab !== "colors"} className="space-y-3">
+                <SectionCard icon={Palette} title={isAR ? "اللون الأساسي" : "Primary color"} color="bg-muted/40">
+                  <ColorStudio isAR={isAR} label={isAR ? "اللون الأساسي" : "Primary color"}
+                    palette={([
+                      ["blue", "أزرق", "Blue"], ["emerald", "أخضر", "Green"], ["violet", "بنفسجي", "Purple"],
+                      ["rose", "وردي", "Rose"], ["amber", "عنبري", "Amber"], ["cyan", "سماوي", "Cyan"],
+                      ["teal", "فيروزي", "Teal"], ["lightCyan", "بترولي", "Petrol"], ["olive", "زيتي", "Olive"],
+                      ["white", "كحلي رمادي", "Slate"], ["lightGray", "رمادي", "Gray"],
+                    ] as const).map(([id, ar, en]) => ({ id, ar, en, hex: COLOR_PRESETS[id].hex }))}
+                    selectedId={display.primaryColor} customHex={display.primaryCustomHex}
+                    baseHex={display.primaryCustomHex || (COLOR_PRESETS[display.primaryColor] ?? COLOR_PRESETS.blue).hex}
+                    tone={display.primaryTone || "original"}
+                    onPreset={id => updateDisplay({ primaryColor: id as PrimaryColor, primaryCustomHex: "" })}
+                    onCustom={hex => updateDisplay({ primaryCustomHex: hex })}
+                    onTone={tone => updateDisplay({ primaryTone: tone })}
+                    onReset={() => updateDisplay({ primaryCustomHex: "", primaryTone: "original" })} />
+                </SectionCard>
+                <SectionCard icon={Layers} title={isAR ? "لون الشريط الجانبي" : "Sidebar color"} color="bg-muted/40">
+                  <ColorStudio isAR={isAR} label={isAR ? "لون الشريط الجانبي" : "Sidebar color"}
+                    palette={([
+                      ["navy", "كحلي", "Navy"], ["blue", "أزرق", "Blue"], ["green", "أخضر", "Green"],
+                      ["purple", "بنفسجي", "Purple"], ["rose", "وردي", "Rose"], ["teal", "فيروزي", "Teal"],
+                      ["lightCyan", "بترولي", "Petrol"], ["olive", "زيتي", "Olive"],
+                      ["brown", "بني", "Brown"], ["charcoal", "فحمي", "Charcoal"], ["offWhite", "رمادي دافئ", "Warm gray"],
+                    ] as const).map(([id, ar, en]) => ({ id, ar, en, hex: SIDEBAR_COLOR_PRESETS[id].from }))}
+                    selectedId={display.sidebarColor} customHex={display.sidebarCustomHex}
+                    baseHex={display.sidebarCustomHex || (SIDEBAR_COLOR_PRESETS[display.sidebarColor] ?? SIDEBAR_COLOR_PRESETS.navy).from}
+                    tone={display.sidebarTone || "original"}
+                    onPreset={id => updateDisplay({ sidebarColor: id as SidebarColor, sidebarCustomHex: "" })}
+                    onCustom={hex => updateDisplay({ sidebarCustomHex: hex })}
+                    onTone={tone => updateDisplay({ sidebarTone: tone })}
+                    onReset={() => updateDisplay({ sidebarCustomHex: "", sidebarTone: "original" })} />
+                </SectionCard>
               </div>
-              <div id="appearance-panel-layout" role="tabpanel" aria-labelledby="appearance-tab-layout" hidden={appearanceTab !== "layout"} className="space-y-6">
-              <SectionCard icon={Square} title={isAR ? "حجم الزوايا" : "Border Radius"} color="bg-blue-500/5">
+              <div id="appearance-panel-layout" role="tabpanel" aria-labelledby="appearance-tab-layout" hidden={appearanceTab !== "layout"} className="space-y-3">
+              <SectionCard icon={Square} title={isAR ? "حجم الزوايا" : "Border Radius"} color="bg-muted/40">
                 <div className="grid grid-cols-3 gap-2.5">
                   {([
                     { v: "sharp"   as BorderRadius, labelAr: "حادة",    labelEn: "Sharp",   radius: "rounded-sm",  Icon: Minus },
                     { v: "normal"  as BorderRadius, labelAr: "متوسطة",  labelEn: "Normal",  radius: "rounded-xl",  Icon: RectangleHorizontal },
                     { v: "rounded" as BorderRadius, labelAr: "ناعمة",   labelEn: "Rounded", radius: "rounded-full", Icon: Square },
                   ]).map(({ v, labelAr, labelEn, radius, Icon }) => (
-                    <button key={v} onClick={() => updateDisplay({ borderRadius: v })}
-                      className={cn("flex flex-col items-center gap-2 py-3 rounded-xl border-2 text-xs font-semibold transition-all",
-                        display.borderRadius === v ? "border-primary bg-primary/10 text-primary" : "border-border bg-background text-muted-foreground hover:border-primary/40"
+                    <button type="button" key={v} aria-pressed={display.borderRadius === v} onClick={() => updateDisplay({ borderRadius: v })}
+                      className={cn("flex min-h-[76px] flex-col items-center justify-center gap-2 py-3 rounded-xl border text-xs font-medium transition-colors",
+                        display.borderRadius === v ? "border-primary bg-primary/5 text-primary" : "border-border bg-background text-muted-foreground hover:border-primary/40"
                       )}>
+                      {display.borderRadius === v && <span aria-hidden="true" className="text-[10px] font-bold text-primary">✓</span>}
                       <div className={`w-10 h-6 border-2 ${display.borderRadius === v ? "border-primary" : "border-current"} ${radius}`} />
                       {isAR ? labelAr : labelEn}
                     </button>
                   ))}
                 </div>
               </SectionCard>
-              <SectionCard icon={AlignVerticalSpaceAround} title={isAR ? "كثافة العرض (حجم النص)" : "Display Density (Font Size)"} color="bg-teal-500/5">
+              <SectionCard icon={AlignVerticalSpaceAround} title={isAR ? "كثافة العرض (حجم النص)" : "Display Density (Font Size)"} color="bg-muted/40">
                 <div className="grid grid-cols-3 gap-2.5">
                   {([
                     { v: "compact"     as Density, labelAr: "مضغوط",   labelEn: "Compact",     Icon: AlignVerticalJustifyStart,  hint: "12.5px" },
                     { v: "normal"      as Density, labelAr: "عادي",    labelEn: "Normal",      Icon: AlignVerticalJustifyCenter, hint: "14px"   },
                     { v: "comfortable" as Density, labelAr: "مريح",    labelEn: "Comfortable", Icon: AlignVerticalSpaceAround,   hint: "15.5px" },
                   ]).map(({ v, labelAr, labelEn, Icon, hint }) => (
-                    <button key={v} onClick={() => updateDisplay({ density: v })}
-                      className={cn("flex flex-col items-center gap-1.5 py-3 rounded-xl border-2 text-xs font-semibold transition-all",
-                        display.density === v ? "border-primary bg-primary/10 text-primary" : "border-border bg-background text-muted-foreground hover:border-primary/40"
+                    <button type="button" key={v} aria-pressed={display.density === v} onClick={() => updateDisplay({ density: v })}
+                      className={cn("flex min-h-[76px] flex-col items-center justify-center gap-1.5 py-3 rounded-xl border text-xs font-medium transition-colors",
+                        display.density === v ? "border-primary bg-primary/5 text-primary" : "border-border bg-background text-muted-foreground hover:border-primary/40"
                       )}>
+                      {display.density === v && <span aria-hidden="true" className="text-[10px] font-bold text-primary">✓</span>}
                       <Icon className="w-3.5 h-3.5" />
                       <span>{isAR ? labelAr : labelEn}</span>
                       <span className="font-mono text-[13px] opacity-60">{hint}</span>
@@ -2687,7 +2647,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                   ))}
                 </div>
               </SectionCard>
-              <SectionCard icon={Layers} title={isAR ? "خيارات إضافية" : "Extra Options"} color="bg-slate-500/5">
+              <SectionCard icon={Layers} title={isAR ? "خيارات إضافية" : "Extra Options"} color="bg-muted/40">
                 <div className="space-y-1">
                   {[
                     {
@@ -2717,7 +2677,7 @@ const decryptBackupData = async (backupFile: any, password: string) => {
                           <p className="text-xs text-muted-foreground">{isAR ? hintAr : hintEn}</p>
                         </div>
                       </div>
-                      <button type="button" onClick={() => updateDisplay({ [field]: !display[field] })} className={tog(!!display[field])}>
+                      <button type="button" role="switch" aria-checked={!!display[field]} aria-label={isAR ? labelAr : labelEn} onClick={() => updateDisplay({ [field]: !display[field] })} className={tog(!!display[field])}>
                         <span className={`absolute top-0.5 left-0.5 w-3.5 h-3.5 rounded-full bg-white shadow transition-transform ${display[field] ? "translate-x-5" : ""}`} />
                       </button>
                     </div>

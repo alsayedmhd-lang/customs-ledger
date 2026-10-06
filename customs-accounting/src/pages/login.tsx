@@ -1,6 +1,6 @@
 import { PasswordInput } from "@/components/ui/password-input";
 import { useCompanySettings } from "@/lib/company-settings-context";
-import { COLOR_PRESETS, useDisplaySettings } from "@/lib/display-settings-context";
+import { resolvedPrimaryPreset, useDisplaySettings } from "@/lib/display-settings-context";
 import { useState, FormEvent, useRef, KeyboardEvent, useEffect, ChangeEvent } from "react";
 import { useAuth, type OtpPending } from "@/lib/auth-context";
 import { useLocation } from "wouter";
@@ -76,7 +76,7 @@ export default function LoginPage() {
   const isDark = true; // حاليا ثابت
   const { settings, logoSrc } = useCompanySettings();
   const { display } = useDisplaySettings();
-  const displayPrimary = COLOR_PRESETS[display.primaryColor] ?? COLOR_PRESETS.blue;
+  const displayPrimary = resolvedPrimaryPreset(display);
   const primaryColor = "hsl(var(--primary))";
   const primaryShadow = "0 6px 20px hsl(var(--primary) / 0.35)";
   const logoShadow = `drop-shadow(0 0 24px ${displayPrimary.hex}66)`;

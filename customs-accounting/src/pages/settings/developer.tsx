@@ -1,5 +1,6 @@
 import { settingsAccessGroups, parseSettingsAccess, defaultSettingsAccess } from "@/lib/settings-access-policy";
 import CompactSettingsStyle from "@/components/layout/CompactSettingsStyle";
+import { useUnsavedChanges } from "@/hooks/use-unsaved-changes";
 import { PasswordInput } from "@/components/ui/password-input";
 import DeviceIdentitySettings from "@/components/DeviceIdentitySettings";
 import ResizableScrollArea from "@/components/layout/ResizableScrollArea";
@@ -118,6 +119,41 @@ const defaultSettings: DeveloperSettings = {
   syncLastSyncTime: "",
   syncStatus: "idle",
 };
+
+const editableDeveloperKeys = [
+  "managerSettingsAccess", "loginFooterText", "loginMessageText", "loginMessageType",
+  "allowManagerEditAccountantSignature", "allowManagerEditLegalInfo",
+  "allowManagerEditInvoicesBackupImport", "allowManagerEditAppearance",
+  "allowManagerEditPrintSettings", "allowManagerViewPreview", "allowManagerViewUpdate",
+  "allowManagerEditBranding", "allowManagerEditRegistrationSettings", "allowManagerEditSensitiveUsers",
+  "databaseMode", "databaseUseConnectionString", "databaseConnectionString",
+  "databaseHost", "databasePort", "databaseName", "databaseUsername", "databasePassword",
+  "syncMode", "syncAutoSync", "syncTiming", "syncIntervalMinutes",
+] as const;
+
+function developerEditableValues(data: DeveloperSettings): Record<string, unknown> {
+  const merged = { ...defaultSettings, ...data };
+  const values: Record<string, unknown> = Object.fromEntries(
+    editableDeveloperKeys.map(key => [key, merged[key] ?? defaultSettings[key]])
+  );
+  values.databaseMode = merged.databaseMode === "online" ? "online" : "local";
+  values.databaseUseConnectionString = Boolean(merged.databaseUseConnectionString);
+  values.databaseConnectionString = values.databaseUseConnectionString ? merged.databaseConnectionString || "" : "";
+  values.databasePort = merged.databasePort || "5432";
+  values.syncMode = merged.syncMode || "local-to-online";
+  values.syncAutoSync = Boolean(merged.syncAutoSync);
+  values.syncTiming = merged.syncTiming || "startup";
+  values.syncIntervalMinutes = Math.max(10, Number(merged.syncIntervalMinutes || 30));
+  return values;
+}
+
+function internalEditableSnapshot(data: Record<string, unknown>): string {
+  const defaults: Record<string, unknown> = {
+    host: "", port: "5432", databaseName: "", username: "", password: "", connectionString: "",
+    syncMode: "bidirectional", autoSync: false, timing: "startup", intervalMinutes: 30,
+  };
+  return JSON.stringify(Object.fromEntries(Object.keys(defaults).map(key => [key, data[key] ?? defaults[key]])));
+}
 
 const tabs = [
   { id: "security", labelAr: "بيانات الترخيص ورسالة الدخول", labelEn: "License Details & Login", icon: Shield },
@@ -582,6 +618,16 @@ export default function DeveloperSettingsPage() {
     lastSyncTime: tr("غير متاح", "Unavailable"),
     status: "idle",
   });
+  const [savedDeveloperValues, setSavedDeveloperValues] = useState<Record<string, unknown> | null>(null);
+  const [savedInternalSnapshot, setSavedInternalSnapshot] = useState<string | null>(null);
+  const currentDeveloperValues = developerEditableValues(buildDeveloperSettingsPayload());
+  const developerFormDirty = savedDeveloperValues !== null && editableDeveloperKeys.some(
+    key => JSON.stringify(currentDeveloperValues[key]) !== JSON.stringify(savedDeveloperValues[key])
+  );
+  const internalFormDirty = savedInternalSnapshot !== null &&
+    internalEditableSnapshot(internalDatabaseConfig) !== savedInternalSnapshot;
+  useUnsavedChanges(developerFormDirty || internalFormDirty, isAR);
+
   const syncWorkerRunningRef = useRef(false);
   const databaseViewportRef = useRef<HTMLDivElement>(null);
   const [databaseViewportHeight, setDatabaseViewportHeight] = useState<number | null>(null);
@@ -674,6 +720,7 @@ export default function DeveloperSettingsPage() {
   function applyDeveloperSettingsState(data: DeveloperSettings) {
     const nextSettings = { ...defaultSettings, ...data };
     setSettings(nextSettings);
+    setSavedDeveloperValues(developerEditableValues(nextSettings));
     const onlineEnabled = nextSettings.databaseMode === "online";
     setDatabaseMode(onlineEnabled ? "online" : "local");
     setOnlineDatabaseConnected(onlineEnabled);
@@ -781,7 +828,10 @@ export default function DeveloperSettingsPage() {
         ? tr("انتظر انتهاء العملية الجارية ثم حاول مجددًا", "Wait for the current operation to finish and retry")
         : tr("تعذر تغيير الاتصال؛ احفظ الإعدادات وتحقق من الخادم", "Could not change connection; save settings and check the server"));
       setInternalConnectionActive(data.enabled);
-      if (!enabled) setInternalDatabaseConfig(current => ({ ...current, autoSync: false }));
+      if (!enabled) {
+        setInternalDatabaseConfig(current => ({ ...current, autoSync: false }));
+        setSavedInternalSnapshot(current => current === null ? null : internalEditableSnapshot({ ...JSON.parse(current), autoSync: false }));
+      }
       await refreshConnectionStatus();
       setInternalDatabaseMessage(enabled ? tr("تم الاتصال بالخادم الداخلي", "Internal server connected") : tr("تم فصل الخادم وإيقاف المزامنة التلقائية", "Server disconnected and automatic sync stopped"));
     } catch (error) { setInternalDatabaseMessage(error instanceof Error ? error.message : String(error), "error"); }
@@ -803,12 +853,14 @@ export default function DeveloperSettingsPage() {
       if (!response.ok) throw new Error(tr("تعذر تحميل إعدادات الخادم الداخلي", "Failed to load internal server settings"));
       const data = await response.json();
       setInternalConnectionActive(Boolean(data.connectionEnabled));
-      setInternalDatabaseConfig({
+      const loadedInternalConfig = {
         host: data.host || "", port: data.port || "5432", databaseName: data.databaseName || "",
         username: data.username || "", password: data.password || "", connectionString: data.connectionString || "",
         syncMode: data.syncMode || "bidirectional", autoSync: Boolean(data.autoSync),
         timing: data.timing || "startup", intervalMinutes: Math.max(10, Number(data.intervalMinutes || 30)),
-      });
+      };
+      setInternalDatabaseConfig(loadedInternalConfig);
+      setSavedInternalSnapshot(internalEditableSnapshot(loadedInternalConfig));
       void checkInternalAutoStatus();
     } catch (error) {
       setInternalDatabaseMessage(error instanceof Error ? error.message : tr("تعذر تحميل إعدادات الخادم الداخلي", "Failed to load internal server settings"), "error");
@@ -853,6 +905,7 @@ export default function DeveloperSettingsPage() {
       }
       const data = await response.json();
       setInternalDatabaseConfig(data);
+      setSavedInternalSnapshot(internalEditableSnapshot(data));
       void refreshConnectionStatus();
       setInternalDatabaseMessage(tr("تم حفظ إعدادات الخادم الداخلي", "Internal server settings saved"));
     } catch (error) {
@@ -1066,6 +1119,12 @@ export default function DeveloperSettingsPage() {
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || tr("تعذر حفظ الصلاحيات", "Could not save permissions"));
+      setSavedDeveloperValues(current => {
+        if (!current) return current;
+        const saved = developerEditableValues(data);
+        const protectionKeys = editableDeveloperKeys.filter(key => key.startsWith("allowManager") || key === "managerSettingsAccess");
+        return { ...current, ...Object.fromEntries(protectionKeys.map(key => [key, saved[key]])) };
+      });
       // Keep unsaved database form edits untouched when saving protection.
       setSettings(current => ({ ...current, ...Object.fromEntries(["allowManagerEditLegalInfo", "allowManagerEditBranding", "allowManagerEditPrintSettings", "allowManagerEditInvoicesBackupImport", "allowManagerViewUpdate", "allowManagerEditAccountantSignature", "allowManagerEditAppearance", "allowManagerViewPreview", "allowManagerEditRegistrationSettings", "allowManagerEditSensitiveUsers"].map(key => [key, data[key]])), managerSettingsAccess: data.managerSettingsAccess }));
       sessionStorage.setItem("developer_settings", JSON.stringify(data));
@@ -2119,10 +2178,17 @@ export default function DeveloperSettingsPage() {
       activeTab={activeTab}
       onTabChange={setActiveTab}
       actions={
+        <>
+        {(developerFormDirty || internalFormDirty) && (
+          <span role="status" className="text-xs font-medium text-amber-700 dark:text-amber-400">
+            {tr("تغييرات غير محفوظة", "Unsaved changes")}
+          </span>
+        )}
         <Button type="button" onClick={activeTab === "manager" ? saveProtectionSettings : saveSettings} disabled={isSaving} className="gap-2">
           <Save className="h-4 w-4" />
           {isSaving ? (isAR ? "جارٍ الحفظ..." : "Saving...") : (isAR ? "حفظ" : "Save")}
         </Button>
+        </>
       }
     >
 
