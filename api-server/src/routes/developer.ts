@@ -1175,6 +1175,16 @@ async function buildSystemDiagnostics() {
             deletedAt: number | null;
           }>;
 
+        // Deleted metadata remains a valid reference to retained historical files.
+        const deletedRows = sqlite.prepare(`
+          SELECT relative_path AS relativePath FROM invoice_attachments
+          WHERE deleted_at IS NOT NULL
+        `).all() as Array<{ relativePath: string | null }>;
+        const deletedAttachmentPaths = new Set<string>();
+        for (const row of deletedRows) {
+          const retainedPath = getSafeAttachmentPath(context.dataRoot, attachmentsRoot, String(row.relativePath || ""));
+          if (retainedPath) deletedAttachmentPaths.add(path.normalize(retainedPath).toLowerCase());
+        }
         const activeAttachmentPaths = new Set<string>();
         const missingFiles: Array<{ id: number; fileName: string | null }> = [];
         const unsafePaths: Array<{ id: number; fileName: string | null }> = [];
@@ -1197,9 +1207,14 @@ async function buildSystemDiagnostics() {
         }
 
         const declarationFiles = await listFilesRecursive(declarationsRoot);
-        const orphanFiles = declarationFiles.filter(
-          (filePath) => !activeAttachmentPaths.has(path.normalize(filePath).toLowerCase()),
-        );
+        const retainedDeletedFiles = declarationFiles.filter((filePath) => {
+          const key = path.normalize(filePath).toLowerCase();
+          return !activeAttachmentPaths.has(key) && deletedAttachmentPaths.has(key);
+        });
+        const orphanFiles = declarationFiles.filter((filePath) => {
+          const key = path.normalize(filePath).toLowerCase();
+          return !activeAttachmentPaths.has(key) && !deletedAttachmentPaths.has(key);
+        });
         const orphanFileDetails = await Promise.all(
           orphanFiles.map(async (filePath) => {
             const stats = await safeStat(filePath);
@@ -1255,13 +1270,13 @@ async function buildSystemDiagnostics() {
           location: attachmentsRoot,
           messageAr:
             status === "pass"
-              ? "المرفقات سليمة."
+              ? `المرفقات النشطة سليمة. ملفات محفوظة لسجلات محذوفة: ${retainedDeletedFiles.length}.`
               : onlyOrphans
                 ? "توجد ملفات مرفقات غير مرتبطة بسجلات."
                 : "توجد مشاكل في بعض المرفقات.",
           messageEn:
             status === "pass"
-              ? "Attachments integrity check passed."
+              ? `Active attachments integrity check passed. Retained files for deleted records: ${retainedDeletedFiles.length}.`
               : onlyOrphans
                 ? "Orphan attachment files were found."
                 : "Some attachment issues were found.",
@@ -1283,6 +1298,10 @@ async function buildSystemDiagnostics() {
               : "Review attachments from invoices, re-upload missing files, and avoid manually deleting files from the data folder.",
           details: {
             totalActiveAttachments: rows.length,
+            totalDeletedAttachmentRecords: deletedRows.length,
+            retainedDeletedFilesCount: retainedDeletedFiles.length,
+            retainedDeletedFilesSample: retainedDeletedFiles.slice(0, 10)
+              .map((filePath) => path.relative(attachmentsRoot, filePath).replace(/\\/g, "/")),
             missingFilesCount,
             unsafePathsCount,
             orphanFilesCount,

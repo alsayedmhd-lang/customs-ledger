@@ -149,6 +149,8 @@ type AttachmentSaveResult = {
   relativePath?: string;
   fileHash?: string;
   fullPath?: string;
+  storedName?: string;
+  duplicate?: boolean;
   error?: string;
 };
 
@@ -1043,6 +1045,11 @@ export default function InvoiceForm() {
         throw new Error(saveResult.error || "Failed to save attachment file");
       }
 
+      if (saveResult.duplicate) {
+        await fetchAttachments(declarationBaseNumber);
+        toast({ title: isAR ? "المرفق موجود بالفعل لهذا البيان" : "Attachment already exists for this declaration" });
+        return;
+      }
       const token = sessionStorage.getItem("auth_token");
       const response = await fetch(getAttachmentApiBase(), {
         method: "POST",
@@ -1055,7 +1062,7 @@ export default function InvoiceForm() {
           declarationNumber: shipmentRefWatch || declarationBaseNumber,
           declarationBaseNumber,
           fileName: selected.fileName,
-          storedName,
+          storedName: saveResult.storedName || storedName,
           relativePath: saveResult.relativePath,
           fileHash: saveResult.fileHash,
           mimeType: extension || null,

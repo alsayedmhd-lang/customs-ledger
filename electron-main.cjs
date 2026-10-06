@@ -1052,6 +1052,28 @@ function createWindow() {
 
   mainWindow.webContents.on("did-create-window", (childWindow, details) => {
     if (details.frameName === "ledger-diagnostics-report") {
+      printPreviewWindows.add(childWindow);
+      printPreviewWebContentsIds.add(childWindow.webContents.id);
+      keepPrintPreviewOpenUntilFinished(childWindow);
+      const state = getPrintPreviewJob(childWindow);
+      state.pending++;
+      childWindow.diagnosticsPreparing = true;
+      childWindow.diagnosticsPrepareTimer = setTimeout(() => {
+        if (!childWindow.isDestroyed() && childWindow.diagnosticsPreparing) {
+          childWindow.diagnosticsPreparing = false;
+          finishPrintPreviewJob(childWindow);
+        }
+      }, 10000);
+      const childId = childWindow.webContents.id;
+      childWindow.on("closed", () => {
+        clearTimeout(childWindow.diagnosticsPrepareTimer);
+        printPreviewWindows.delete(childWindow);
+        printPreviewWebContentsIds.delete(childId);
+        if (mainCloseAfterPrinting && printPreviewWindows.size === 0 && mainWindow && !mainWindow.isDestroyed()) {
+          mainCloseAfterPrinting = false;
+          mainWindow.close();
+        }
+      });
       setupDiagnosticsReportWindowMenu(childWindow);
     }
   });
@@ -1122,66 +1144,15 @@ function setupApplicationMenu() {
 
 function setupDiagnosticsReportWindowMenu(reportWindow) {
   if (!reportWindow || reportWindow.isDestroyed()) return;
-
-  const diagnosticsFileMenu = {
-    label: "File",
-    submenu: [
-      {
-        label: "Print",
-        accelerator: "CommandOrControl+P",
-        click: () => {
-          if (!reportWindow.isDestroyed()) {
-            reportWindow.webContents.print();
-          }
-        },
-      },
-      {
-        label: "Save As",
-        accelerator: "CommandOrControl+S",
-        click: async () => {
-          if (reportWindow.isDestroyed()) return;
-
-          const { canceled, filePath } = await dialog.showSaveDialog(reportWindow, {
-            title: "Save Diagnostics Report",
-            defaultPath: "diagnostics-report.pdf",
-            filters: [{ name: "PDF", extensions: ["pdf"] }],
-          });
-
-          if (canceled || !filePath || reportWindow.isDestroyed()) return;
-
-          try {
-            const pdf = await reportWindow.webContents.printToPDF({
-              printBackground: true,
-              pageSize: "A4",
-            });
-            fs.writeFileSync(filePath, pdf);
-          } catch (error) {
-            console.error("Failed to save diagnostics report:", error);
-            if (!reportWindow.isDestroyed()) {
-              dialog.showErrorBox("Save Failed", "Failed to save the diagnostics report.");
-            }
-          }
-        },
-      },
-      { type: "separator" },
-      {
-        label: "Close",
-        accelerator: "CommandOrControl+W",
-        click: () => {
-          if (!reportWindow.isDestroyed()) {
-            reportWindow.close();
-          }
-        },
-      },
-    ],
-  };
-  const diagnosticsMenuTemplate = buildApplicationMenuTemplate().map((item) =>
-    item.label === "File" ? diagnosticsFileMenu : item
-  );
-  const menu = Menu.buildFromTemplate(diagnosticsMenuTemplate);
-
+  const diagnosticsFileMenu = { label: "File", submenu: [
+    { label: "Print", accelerator: "CommandOrControl+P", click: () => printPrintPreviewWindow(reportWindow) },
+    { label: "Save As", accelerator: "CommandOrControl+S", click: () => savePrintPreviewWindowAsPdf(reportWindow) },
+    { type: "separator" },
+    { label: "Close", accelerator: "CommandOrControl+W", click: () => closePrintPreviewWindow(reportWindow) },
+  ] };
+  const template = buildApplicationMenuTemplate().map(item => item.label === "File" ? diagnosticsFileMenu : item);
   reportWindow.setAutoHideMenuBar(false);
-  reportWindow.setMenu(menu);
+  reportWindow.setMenu(Menu.buildFromTemplate(template));
 }
 
 async function getPrintPreviewDefaultPdfName(printWindow) {
@@ -2283,17 +2254,53 @@ ipcMain.handle("attachment:save-file", async (_event, payload = {}) => {
       return { ok: false, error: "Invalid attachment path" };
     }
 
+    // Keep lookup and copy synchronous: concurrent IPC calls cannot both save a duplicate.
+    if (sourceStats.size <= 0 || sourceStats.size > 5 * 1024 * 1024) {
+      return { ok: false, error: "Attachment must be nonempty and no larger than 5MB" };
+    }
+    const content = fs.readFileSync(sourcePath);
+    if (!content.length || content.length > 5 * 1024 * 1024) {
+      return { ok: false, error: "Attachment must be nonempty and no larger than 5MB" };
+    }
+    const fileHash = crypto.createHash("sha256").update(content).digest("hex");
+    const Database = app.isPackaged
+      ? require(path.join(process.resourcesPath, "api-server", "node_modules", "better-sqlite3"))
+      : require("better-sqlite3");
+    const attachmentDb = new Database(getResolvedDatabasePath(), { readonly: true, fileMustExist: true });
+    try {
+      const candidates = attachmentDb.prepare(`
+        SELECT stored_name AS storedName FROM invoice_attachments
+        WHERE declaration_base_number = ? AND deleted_at IS NULL
+      `).all(declarationBaseNumber);
+      for (const candidate of candidates) {
+        const candidateName = safeStoredAttachmentName(candidate.storedName);
+        if (!candidateName) continue;
+        const existingPath = path.resolve(targetDir, candidateName);
+        if (!isPathInside(attachmentsRoot, existingPath) || !fs.existsSync(existingPath)) continue;
+        const stats = fs.lstatSync(existingPath);
+        if (!stats.isFile() || stats.size !== content.length) continue;
+        const existingHash = crypto.createHash("sha256").update(fs.readFileSync(existingPath)).digest("hex");
+        if (existingHash === fileHash) {
+          return { ok: true, duplicate: true, storedName: candidateName, fileHash,
+            fullPath: existingPath,
+            relativePath: getAttachmentRelativePath("declarations", declarationBaseNumber, candidateName) };
+        }
+      }
+    } finally {
+      attachmentDb.close();
+    }
     fs.mkdirSync(targetDir, { recursive: true });
-    fs.copyFileSync(sourcePath, targetPath);
-
-    const fileHash = await new Promise((resolve, reject) => {
-      const hash = crypto.createHash("sha256");
-      const stream = fs.createReadStream(targetPath);
-
-      stream.on("data", (chunk) => hash.update(chunk));
-      stream.on("error", reject);
-      stream.on("end", () => resolve(hash.digest("hex")));
-    });
+    // Also reuse an identical file left by an interrupted metadata request.
+    for (const entry of fs.readdirSync(targetDir, { withFileTypes: true })) {
+      if (!entry.isFile() || !safeStoredAttachmentName(entry.name)) continue;
+      const existingPath = path.join(targetDir, entry.name);
+      if (fs.statSync(existingPath).size !== content.length) continue;
+      if (crypto.createHash("sha256").update(fs.readFileSync(existingPath)).digest("hex") === fileHash) {
+        return { ok: true, storedName: entry.name, fileHash, fullPath: existingPath,
+          relativePath: getAttachmentRelativePath("declarations", declarationBaseNumber, entry.name) };
+      }
+    }
+    fs.writeFileSync(targetPath, content, { flag: "wx" });
 
     return {
       ok: true,
@@ -2585,6 +2592,34 @@ ipcMain.on("print-preview:zoom-wheel", (event, direction) => {
   if (!printPreviewWebContentsIds.has(event.sender.id)) return;
 
   adjustPrintPreviewZoom(event.sender, direction);
+});
+
+ipcMain.handle("diagnostics-report:print", async (event) => {
+  if (!mainWindow || mainWindow.isDestroyed() || event.sender !== mainWindow.webContents) return false;
+  const reportWindow = Array.from(printPreviewWindows).find(win => !win.isDestroyed() && win.diagnosticsPreparing);
+  if (!reportWindow) return false;
+  clearTimeout(reportWindow.diagnosticsPrepareTimer);
+  try {
+    await reportWindow.webContents.executeJavaScript(`(async () => {
+      if (document.fonts) await document.fonts.ready;
+      await Promise.all(Array.from(document.images).map(img => img.complete ? Promise.resolve() : new Promise(resolve => {
+        img.addEventListener('load', resolve, { once: true });
+        img.addEventListener('error', resolve, { once: true });
+      })));
+    })()`, true);
+    if (reportWindow.isDestroyed()) return false;
+    reportWindow.diagnosticsPreparing = false;
+    const state = getPrintPreviewJob(reportWindow);
+    // Keep the window protected until print() has taken over the pending job.
+    state.pending = Math.max(0, state.pending - 1);
+    printPrintPreviewWindow(reportWindow);
+    return true;
+  } catch (error) {
+    reportWindow.diagnosticsPreparing = false;
+    finishPrintPreviewJob(reportWindow);
+    console.error("Diagnostics report print failed:", error);
+    return false;
+  }
 });
 
 ipcMain.handle("print-preview:print", (event) => {

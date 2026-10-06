@@ -1952,9 +1952,13 @@ export default function DeveloperSettingsPage() {
       printWindow.document.write(buildSystemDiagnosticsPrintHtml(data));
       printWindow.document.close();
       printWindow.focus();
-      window.setTimeout(() => {
-        printWindow.print();
-      }, 250);
+      const electron = (window as Window & { electronAPI?: { printDiagnosticsReport?: () => Promise<boolean> } }).electronAPI;
+      if (electron?.printDiagnosticsReport) {
+        const started = await electron.printDiagnosticsReport();
+        if (!started) throw new Error(tr("تعذر بدء طباعة التقرير", "Could not start report printing"));
+      } else {
+        window.setTimeout(() => { if (!printWindow.closed) printWindow.print(); }, 250);
+      }
     } catch (error) {
       setSystemDiagnosticsError(error instanceof Error ? error.message : tr("تعذر توليد ملف PDF", "Failed to generate PDF"));
     } finally {
@@ -2134,17 +2138,17 @@ export default function DeveloperSettingsPage() {
 
 <details data-settings-fold className="rounded-xl border-border/70 shadow-sm">
             <summary className="flex cursor-pointer items-center gap-2 px-3 py-2 text-[13px] font-semibold">{tr("رسالة صفحة تسجيل الدخول", "Login Page Message")}<span aria-hidden="true" className="ms-auto text-muted-foreground">⌄</span></summary>
-            <CardContent className="grid gap-2.5 px-3 pb-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 300px), 1fr))", alignItems: "start" }}>
-              <div className="space-y-2">
+            <CardContent className="grid grid-cols-1 items-start gap-3 px-4 pb-4 lg:grid-cols-3">
+              <div className="space-y-2 rounded-xl border border-border/60 bg-muted/20 p-3">
                 <Label>{tr("نص الرسالة", "Message text")}</Label>
                 <Textarea
                   value={settings.loginMessageText}
                   onChange={(event) => setText("loginMessageText", event.target.value)}
-                  className="min-h-[68px]"
+                  className="min-h-[96px] resize-y bg-background"
                   placeholder={tr("اتركها فارغة لإخفاء الرسالة", "Leave empty to hide the message")}
                 />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-2 rounded-xl border border-border/60 bg-muted/20 p-3">
                 <Label>{tr("نوع الرسالة", "Message type")}</Label>
                 <RadioGroup
                   value={settings.loginMessageType || "welcome"}
@@ -2159,32 +2163,27 @@ export default function DeveloperSettingsPage() {
                   ))}
                 </RadioGroup>
               </div>
-              <div className="flex justify-end">
-                <Button type="button" onClick={saveSettings} disabled={isSaving} className="gap-2">
-                  <Save className="h-4 w-4" />
-                  {isSaving ? tr("جاري الحفظ...", "Saving...") : tr("حفظ", "Save")}
-                </Button>
-              </div>
-            </CardContent>
-          </details>
-<details data-settings-fold className="rounded-xl border-border/70 shadow-sm">
-            <summary className="flex cursor-pointer items-center gap-2 px-3 py-2 text-[13px] font-semibold">{tr("بيانات الترخيص", "License Details")}<span aria-hidden="true" className="ms-auto text-muted-foreground">⌄</span></summary>
-            <CardContent className="grid gap-2.5 px-3 pb-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 300px), 1fr))", alignItems: "start" }}>
-              <div className="space-y-1">
+              <div className="space-y-2 rounded-xl border border-border/60 bg-muted/20 p-3">
                 <Label>{tr("نص أسفل صفحة الدخول", "Login footer text")}</Label>
                 <Textarea
                   value={settings.loginFooterText || DEFAULT_LOGIN_FOOTER_TEXT}
                   onChange={(event) => setText("loginFooterText", event.target.value)}
-                  className="min-h-[68px]"
+                  className="min-h-[96px] resize-y bg-background"
                 />
               </div>
+
+            </CardContent>
+          </details>
+<details data-settings-fold className="overflow-hidden rounded-2xl border border-border/70 bg-card shadow-sm">
+            <summary className="flex cursor-pointer items-center gap-2 px-3 py-2 text-[13px] font-semibold">{tr("بيانات الترخيص", "License Details")}<span aria-hidden="true" className="ms-auto text-muted-foreground">⌄</span></summary>
+            <CardContent className="grid grid-cols-1 gap-4 px-4 pb-4 md:grid-cols-2 xl:grid-cols-3">
               {licenseFields.map(([key, labelAr, labelEn]) => (
-                <div key={key} className="space-y-1">
+                <div key={key} className="space-y-2 rounded-xl border border-border/60 bg-muted/20 p-3">
                   <Label>{tr(labelAr, labelEn)}</Label>
                   <Input value={settings[key] || ""} onChange={(event) => setText(key, event.target.value)} />
                 </div>
               ))}
-              <div className="rounded-xl border border-border bg-muted/30 p-3 space-y-2">
+              <div className="rounded-xl border border-border/60 bg-muted/20 p-3 space-y-2">
                 <div className="flex items-center justify-between gap-2">
                   <Label>{tr("رقم الجهاز", "Device ID")}</Label>
 
@@ -2216,10 +2215,14 @@ export default function DeveloperSettingsPage() {
                   )}
                 </p>
               </div>
-              <div className="rounded-xl border border-border bg-muted/30 p-3 space-y-3">
-                <div className="font-semibold text-[13px]">
+              <div className="min-w-0 rounded-2xl border border-primary/20 bg-muted/20 p-4 md:col-span-2 xl:col-span-3">
+                <div className="mb-4 flex items-center gap-2 border-b border-border/60 pb-3 text-[14px] font-semibold">
+                  <Shield className="h-4 w-4 text-primary" />
                   {tr("مولد ترخيص العميل", "Client License Generator")}
                 </div>
+                <div className="grid grid-cols-1 items-end gap-3 md:grid-cols-2 xl:grid-cols-3">
+                  <div className="space-y-2">
+                    <Label>{tr("اسم العميل", "Customer name")}</Label>
 
                 <Input
                   value={licenseCustomerName}
@@ -2227,6 +2230,9 @@ export default function DeveloperSettingsPage() {
                   placeholder={tr("اسم العميل", "Customer name")}
                 />
 
+                  </div>
+                  <div className="space-y-2">
+                    <Label>{tr("رقم جهاز العميل", "Customer Device ID")}</Label>
                 <Input
                   value={licenseTargetDeviceId}
                   onChange={(event) => setLicenseTargetDeviceId(event.target.value)}
@@ -2235,6 +2241,9 @@ export default function DeveloperSettingsPage() {
                   className="font-mono text-xs"
                 />
 
+                  </div>
+                  <div className="space-y-2">
+                    <Label>{tr("تاريخ انتهاء الترخيص", "License expiry date")}</Label>
                 <Input
                   value={licenseExpiryDate}
                   onChange={(event) => setLicenseExpiryDate(event.target.value)}
@@ -2242,10 +2251,12 @@ export default function DeveloperSettingsPage() {
                   dir="ltr"
                 />
 
+                  </div>
+                </div>
+                <div className="mt-4 flex flex-wrap gap-2">
                 <Button
                   type="button"
-                  variant="outline"
-                  className="w-full"
+                  className="min-w-[160px] rounded-lg"
                   onClick={generateClientLicenseText}
                 >
                   {tr("توليد الترخيص", "Generate License")}
@@ -2254,15 +2265,16 @@ export default function DeveloperSettingsPage() {
                 <Button
                   type="button"
                   variant="outline"
-                  className="w-full"
+                  className="min-w-[160px] rounded-lg"
                   onClick={activateCurrentLicense}
                   disabled={isActivatingLicense}
                 >
                   {isActivatingLicense ? tr("جاري التفعيل...", "Activating...") : tr("تفعيل هذه النسخة", "Activate This Build")}
                 </Button>
 
+                </div>
                 {generatedLicenseText && (
-                  <>
+                  <div className="mt-4 space-y-3 rounded-xl border border-border/70 bg-background p-3">
                     <Textarea
                       value={generatedLicenseText}
                       readOnly
@@ -2277,7 +2289,7 @@ export default function DeveloperSettingsPage() {
                     >
                       {tr("حفظ ملف الترخيص", "Save License File")}
                     </Button>
-                  </>
+                  </div>
                 )}
               </div>
             </CardContent>
@@ -3064,13 +3076,40 @@ export default function DeveloperSettingsPage() {
           <details data-settings-fold className="rounded-xl border-border/70 shadow-sm">
             <summary className="flex cursor-pointer items-center gap-2 px-3 py-2 text-[13px] font-semibold">{tr("مسارات تخزين البيانات", "Data Storage Paths")}<span aria-hidden="true" className="ms-auto text-muted-foreground">⌄</span></summary>
 
-            <CardContent className="px-3 pb-3 grid gap-2.5 md:grid-cols-2">
-              <InfoRow isAR={isAR} label={tr("مسار البيانات", "Data Root")} value={storageInfo?.dataRoot} />
-              <InfoRow isAR={isAR} label={tr("مصدر المسار", "Source")} value={storageInfo?.source} />
-              <InfoRow isAR={isAR} label={tr("قاعدة البيانات", "Database Dir")} value={storageInfo?.databaseDir} />
-              <InfoRow isAR={isAR} label={tr("النسخ الاحتياطية", "Backups Dir")} value={storageInfo?.backupsDir} />
-              <InfoRow isAR={isAR} label={tr("المرفقات", "Attachments Dir")} value={storageInfo?.attachmentsDir} />
-              <InfoRow isAR={isAR} label={tr("السجلات", "Logs Dir")} value={storageInfo?.logsDir} />
+            <CardContent className="px-3 pb-3 grid gap-3 md:grid-cols-2">
+              {[
+                { folder: storageInfo?.dataRoot, ar: "مجلد البيانات", en: "Data folder" },
+                { folder: storageInfo?.databaseDir, ar: "قاعدة البيانات", en: "Database folder" },
+                { folder: storageInfo?.attachmentsDir, ar: "المرفقات", en: "Attachments" },
+                { folder: storageInfo?.backupsDir, ar: "النسخ الاحتياطية", en: "Backups" },
+                { folder: storageInfo?.logsDir, ar: "السجلات", en: "Logs" },
+              ].map(({ folder, ar, en }) => (
+                <div key={en} className="rounded-xl border border-border/70 bg-muted/20 p-3 transition-colors hover:border-primary/40 hover:bg-muted/40">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-[13px] font-semibold text-foreground">{tr(ar, en)}</span>
+                    <Button type="button" variant="outline" size="sm"
+                      className="h-8 shrink-0 rounded-lg border-primary/20 bg-background px-3 text-xs text-primary shadow-sm hover:bg-primary/10"
+                      aria-label={tr(`فتح ${ar}`, `Open ${en}`)}
+                      disabled={!folder || !window.electronAPI?.openExternalFile}
+                      onClick={async () => {
+                        if (!folder) return;
+                        try {
+                          const result = await window.electronAPI?.openExternalFile?.(folder) as { success?: boolean; error?: string } | undefined;
+                          if (!result?.success) throw new Error(result?.error || "Could not open folder");
+                        } catch (error) {
+                          toast({ title: tr("تعذر فتح المجلد", "Could not open folder"),
+                            description: error instanceof Error ? error.message : String(error),
+                            variant: "destructive" });
+                        }
+                      }}>{tr("فتح المجلد", "Open folder")}</Button>
+                  </div>
+                  <div dir="ltr" className="mt-3 select-text break-all rounded-lg bg-background/70 px-2.5 py-2 text-left font-mono text-[11px] leading-relaxed text-muted-foreground">{folder || tr("غير متوفر", "Unavailable")}</div>
+                </div>
+              ))}
+              <div className="rounded-xl border border-border/70 bg-muted/20 p-3">
+                <div className="text-[13px] font-semibold text-foreground">{tr("مصدر المسار", "Path source")}</div>
+                <div className="mt-3 rounded-lg bg-background/70 px-2.5 py-2 text-xs text-muted-foreground">{storageInfo?.source || tr("غير متوفر", "Unavailable")}</div>
+              </div>
             </CardContent>
           </details>
             <div className="rounded-2xl border border-border bg-background/70 p-3 shadow-sm">

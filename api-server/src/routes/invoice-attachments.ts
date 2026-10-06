@@ -371,6 +371,16 @@ router.post("/invoice-attachments", async (req, res) => {
       return res.status(400).json({ error: "fileSize must be a number or null" });
     }
 
+    // Return the existing active record; do not create another sync identity or audit event.
+    if (suppliedHash) {
+      const existing = (db as LedgerSqliteDb).select().from(invoiceAttachmentsTable)
+        .where(and(
+          eq(invoiceAttachmentsTable.declarationBaseNumber, String(req.body.declarationBaseNumber).trim()),
+          eq(invoiceAttachmentsTable.fileHash, suppliedHash.toLowerCase()),
+          isNull(invoiceAttachmentsTable.deletedAt)
+        )).get();
+      if (existing) return res.status(200).json(formatAttachment(existing));
+    }
     const [attachment] = await (db as LedgerSqliteDb)
       .insert(invoiceAttachmentsTable)
       .values({
