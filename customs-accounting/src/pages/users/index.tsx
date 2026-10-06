@@ -449,7 +449,7 @@ export default function UsersPage() {
                         className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition-colors font-medium"
                       >
                         <Shield className="w-3.5 h-3.5" />
-                        {permCount}/{PERM_GROUPS.reduce((n, group) => n + group.items.length, 0)} {isAR ? "صلاحية" : "perms"}
+                        {isAR ? "إدارة الصلاحيات" : "Manage permissions"} ({permCount}/{PERM_GROUPS.reduce((n, group) => n + group.items.length, 0)})
                       </button>
                     )}
                   </td>
@@ -812,14 +812,14 @@ export default function UsersPage() {
             <div className="flex items-center gap-2 text-xs">
               <button
                 type="button"
-                onClick={() => setPermForm({ canEditInvoices: true, canDeleteInvoices: true, canEditReceipts: true, canDeleteReceipts: true, canEditClients: true, canDeleteClients: true, canManageTemplates: true, canViewStatements: true, canViewAccounting: true, canCustomizePrintContact: true })}
+                onClick={() => setPermForm({ canEditInvoices: true, canDeleteInvoices: true, canEditReceipts: true, canDeleteReceipts: true, canEditClients: true, canDeleteClients: true, canManageTemplates: true, canViewStatements: true, canViewAccounting: true, canCustomizePrintContact: true, canRunOnlineSync: true, canRunInternalSync: true })}
                 className="px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition-colors font-medium"
               >
                 {isAR ? "تفعيل الكل" : "Enable All"}
               </button>
               <button
                 type="button"
-                onClick={() => setPermForm({ canEditInvoices: false, canDeleteInvoices: false, canEditReceipts: false, canDeleteReceipts: false, canEditClients: false, canDeleteClients: false, canManageTemplates: false, canViewStatements: false, canViewAccounting: false, canCustomizePrintContact: false })}
+                onClick={() => setPermForm({ canEditInvoices: false, canDeleteInvoices: false, canEditReceipts: false, canDeleteReceipts: false, canEditClients: false, canDeleteClients: false, canManageTemplates: false, canViewStatements: false, canViewAccounting: false, canCustomizePrintContact: false, canRunOnlineSync: false, canRunInternalSync: false })}
                 className="px-3 py-1.5 rounded-lg bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 transition-colors font-medium"
               >
                 {isAR ? "تعطيل الكل" : "Disable All"}

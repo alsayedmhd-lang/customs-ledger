@@ -321,6 +321,14 @@ function formatDisplayValue(value: string | number | boolean | null | undefined,
   if (typeof value === "boolean") return value ? (isAR ? "نعم" : "Yes") : (isAR ? "لا" : "No");
   const normalized = String(value);
   const labels: Record<string, [string, string]> = {
+    "database-only": ["قاعدة البيانات فقط", "Database only"],
+    none: ["بدون ضغط", "Uncompressed"],
+    online: ["يعمل", "Running"],
+    present: ["موجود", "Present"],
+    not_found: ["غير موجود في مسار التشغيل", "Not found in runtime path"],
+    not_available: ["غير متاح — راجع ملفات التثبيت", "Unavailable — check installation files"],
+    runtime_environment: ["لا يوجد ملف env؛ الإعدادات تُمرر عبر بيئة التشغيل", "No env file; settings are passed through the runtime environment"],
+    development_runtime: ["تشغيل من المصدر", "Running from source"],
     connected: ["متصل", "Connected"],
     online_connected: ["متصل بالأونلاين", "Connected"],
     online_disconnected: ["غير متصل بالأونلاين", "Disconnected"],
@@ -454,7 +462,6 @@ export default function DeveloperSettingsPage() {
   const [isSystemDiagnosticsPdfExporting, setIsSystemDiagnosticsPdfExporting] = useState(false);
   const [isSavingCurrentDataRoot, setIsSavingCurrentDataRoot] = useState(false);
   const [isBackupReadinessAnalyzing, setIsBackupReadinessAnalyzing] = useState(false);
-  const [isBackupManifestGenerating, setIsBackupManifestGenerating] = useState(false);
   const [isBackupDirectoryCreating, setIsBackupDirectoryCreating] = useState(false);
   const [isBackupVerifying, setIsBackupVerifying] = useState(false);
   const [onlineDatabaseConnected, setOnlineDatabaseConnected] = useState(false);
@@ -1596,33 +1603,9 @@ export default function DeveloperSettingsPage() {
     }
   }
 
-  async function generateBackupManifest() {
-    setIsBackupManifestGenerating(true);
-    try {
-      const api = (window as Window & {
-        electronAPI?: {
-          createBackupManifest?: () => Promise<BackupManifestResult>;
-        };
-      }).electronAPI;
-
-      if (!api?.createBackupManifest) {
-        setBackupManifestResult({ ok: false, error: isAR ? "واجهة ملف وصف النسخة الاحتياطية غير متاحة" : "Backup manifest API is unavailable" });
-        return;
-      }
-
-      const result = await api.createBackupManifest();
-      setBackupManifestResult(result);
-    } catch (err) {
-      setBackupManifestResult({
-        ok: false,
-        error: err instanceof Error ? err.message : String(err),
-      });
-    } finally {
-      setIsBackupManifestGenerating(false);
-    }
-  }
-
   async function createBackupDirectory() {
+    setBackupVerificationResult(null);
+    setBackupDirectoryResult(null);
     setIsBackupDirectoryCreating(true);
     try {
       const api = (window as Window & {
@@ -1638,6 +1621,7 @@ export default function DeveloperSettingsPage() {
 
       const result = await api.createBackupDirectory();
       setBackupDirectoryResult(result);
+      if (result.ok) setBackupManifestResult({ ok: true, manifest: result.manifest });
     } catch (err) {
       setBackupDirectoryResult({
         ok: false,
@@ -3216,17 +3200,14 @@ export default function DeveloperSettingsPage() {
                   <span>{isAR ? "ملف وصف النسخة الاحتياطية" : "Backup Manifest"}</span>
                 </div>
                 <div className="flex flex-wrap justify-end gap-2">
-                  <Button type="button" variant="outline" size="sm" onClick={generateBackupManifest} disabled={isBackupManifestGenerating} className="gap-2">
-                    <RefreshCw className={cn("h-3.5 w-3.5", isBackupManifestGenerating && "animate-spin")} />
-                    {isBackupManifestGenerating ? (isAR ? "جار الإنشاء..." : "Generating...") : (isAR ? "إنشاء ملف وصف النسخة الاحتياطية" : "Generate Backup Manifest")}
-                  </Button>
                   <Button type="button" variant="outline" size="sm" onClick={createBackupDirectory} disabled={isBackupDirectoryCreating} className="gap-2">
                     <FileText className="h-3.5 w-3.5" />
-                    {isBackupDirectoryCreating ? (isAR ? "جار الإنشاء..." : "Creating...") : (isAR ? "إنشاء مجلد النسخة الاحتياطية" : "Create Backup Folder")}
+                    {isBackupDirectoryCreating ? (isAR ? "جار الإنشاء..." : "Creating...") : (isAR ? "إنشاء نسخة قاعدة البيانات" : "Create Database Backup")}
                   </Button>
                 </div>
               </div>
 
+              <p className="mb-3 text-sm text-muted-foreground">{isAR ? "إنشاء النسخة يحفظ قاعدة البيانات وملف وصفها دون ملفات المرفقات. التحقق متاح للنسخة المنشأة في هذه الجلسة." : "Creating a backup saves the database and its manifest without attachment files. Verification applies to the backup created in this session."}</p>
               {(backupManifestResult || backupDirectoryResult) && (
                 <div className="space-y-3">
                   {backupManifestResult && (
@@ -3255,7 +3236,7 @@ export default function DeveloperSettingsPage() {
 
                       {backupDirectoryResult.ok ? (
                         <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-[13px] text-emerald-700">
-                          {isAR ? "تم إنشاء مجلد النسخة الاحتياطية بنجاح." : "Backup folder created successfully."}
+                          {isAR ? "تم إنشاء نسخة قاعدة البيانات بنجاح." : "Database backup created and checked; attachment files are not included."}
                         </div>
                       ) : (
                         <div className="rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-[13px] text-destructive">
@@ -3285,11 +3266,11 @@ export default function DeveloperSettingsPage() {
                   variant="outline"
                   size="sm"
                   onClick={verifyLatestBackupDirectory}
-                  disabled={isBackupVerifying || !backupDirectoryResult?.ok}
+                  disabled={isBackupVerifying || isBackupDirectoryCreating || !backupDirectoryResult?.ok}
                   className="gap-2"
                 >
                   <RefreshCw className={cn("h-3.5 w-3.5", isBackupVerifying && "animate-spin")} />
-                  {isBackupVerifying ? (isAR ? "جار التحقق..." : "Verifying...") : (isAR ? "التحقق من آخر نسخة احتياطية" : "Verify Latest Backup")}
+                  {isBackupVerifying ? (isAR ? "جار التحقق..." : "Verifying...") : (isAR ? "التحقق من النسخة المنشأة في هذه الجلسة" : "Verify Backup Created This Session")}
                 </Button>
               </div>
 

@@ -961,7 +961,7 @@ async function buildSystemDiagnostics() {
         messageEn: "No logs were found to inspect.",
         causeAr: "مجلد logs غير موجود ضمن Data Root.",
         causeEn: "The logs folder does not exist under Data Root.",
-        suggestedFixAr: "راجع إعدادات التشغيل وتأكد من تفعيل السجلات عند الحاجة.",
+        suggestedFixAr: "هذا الفحص لم يجد سجلات في مجلد البيانات. في Electron راجع backend.log داخل مجلد ledger في APPDATA، وسجل خدمة المرفقات داخل attachment-service.",
         suggestedFixEn: "Review runtime settings and ensure logging is enabled when needed.",
         details: {
           logsPath,
@@ -998,7 +998,7 @@ async function buildSystemDiagnostics() {
           messageEn: "No logs were found to inspect.",
           causeAr: "مجلد logs موجود لكنه لا يحتوي ملفات قابلة للفحص.",
           causeEn: "The logs folder exists but contains no files to inspect.",
-          suggestedFixAr: "راجع إعدادات التشغيل وتأكد من تفعيل السجلات عند الحاجة.",
+          suggestedFixAr: "هذا الفحص لم يجد سجلات في مجلد البيانات. في Electron راجع backend.log داخل مجلد ledger في APPDATA، وسجل خدمة المرفقات داخل attachment-service.",
           suggestedFixEn: "Review runtime settings and ensure logging is enabled when needed.",
           details: {
             logsPath,
@@ -1381,9 +1381,9 @@ async function buildSystemDiagnostics() {
           status: "warning",
           area: "backups",
           location: latestBackup.backupPath,
-          messageAr: "توجد نسخة احتياطية لكن ملف manifest غير صالح.",
-          messageEn: "A backup was found but its manifest is missing or invalid.",
-          causeAr: "لم يتم العثور على manifest.json داخل أحدث نسخة احتياطية.",
+          messageAr: "توجد نسخة احتياطية بلا ملف وصف؛ لم يتم التحقق من سلامتها.",
+          messageEn: "A backup has no manifest; its integrity has not been verified.",
+          causeAr: "أحدث مجلد نسخة احتياطية لا يحتوي manifest.json؛ قد يكون نسخة حماية قبل المزامنة، وهذا لا يثبت تلفها.",
           causeEn: "manifest.json was not found in the latest backup.",
           suggestedFixAr: "أنشئ نسخة احتياطية جديدة.",
           suggestedFixEn: "Create a new backup.",
@@ -1428,8 +1428,8 @@ async function buildSystemDiagnostics() {
             status: "warning",
             area: "backups",
             location: latestBackup.backupPath,
-            messageAr: "توجد نسخة احتياطية لكن ملف manifest غير صالح.",
-            messageEn: "A backup was found but its manifest is missing or invalid.",
+            messageAr: "توجد نسخة احتياطية بلا ملف وصف؛ لم يتم التحقق من سلامتها.",
+            messageEn: "A backup has no manifest; its integrity has not been verified.",
             causeAr: "تعذرت قراءة manifest.json أو تحليله.",
             causeEn: "manifest.json could not be read or parsed.",
             suggestedFixAr: "أنشئ نسخة احتياطية جديدة.",
@@ -1565,6 +1565,14 @@ async function buildSystemDiagnostics() {
 }
 
 function mapDeveloperPermissions(settings: any) {
+  const runtimeScriptDir = path.dirname(process.argv[1] || process.cwd());
+  const runtimeEnvPath = path.resolve(runtimeScriptDir, "../.env");
+  const packagedRuntime = process.env.ELECTRON_RUN_AS_NODE === "1" && Boolean(process.env.LEDGER_ELECTRON_USER_DATA);
+  const resourcesRoot = path.resolve(runtimeScriptDir, "../..");
+  const resourcesPresent = fs.existsSync(path.join(runtimeScriptDir, "index.cjs")) && (
+    fs.existsSync(path.join(resourcesRoot, "app.asar")) ||
+    fs.existsSync(path.join(resourcesRoot, "customs-accounting", "dist", "public", "index.html"))
+  );
   const sqlitePath = process.env.SQLITE_DB_PATH || "";
   const databaseSize = sqlitePath && fs.existsSync(sqlitePath) ? fs.statSync(sqlitePath).size : null;
   const hardwareId =
@@ -1616,8 +1624,8 @@ function mapDeveloperPermissions(settings: any) {
     frontendPath: path.resolve(process.cwd(), "customs-accounting"),
     backendPath: process.cwd(),
     apiStatus: "online",
-    envFileStatus: fs.existsSync(path.resolve(process.cwd(), "api-server/.env")) ? "present" : "not_found",
-    resourcesStatus: fs.existsSync(path.resolve(process.cwd(), "release")) ? "present" : "not_available",
+    envFileStatus: fs.existsSync(runtimeEnvPath) ? "present" : packagedRuntime ? "runtime_environment" : "not_found",
+    resourcesStatus: packagedRuntime ? (resourcesPresent ? "present" : "not_available") : "development_runtime",
     buildMode: process.env.NODE_ENV || "development",
     isPackaged: process.env.NODE_ENV === "production",
     installPath: process.cwd(),

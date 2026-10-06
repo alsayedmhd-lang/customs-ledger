@@ -55,7 +55,7 @@ export const usersTableSqlite = sqliteTable("users", {
   role: text("role").default("user"),
   isActive: integer("is_active", { mode: "boolean" }).default(true),
   pendingApproval: integer("pending_approval", { mode: "boolean" }).default(false),
-  permissions: text("permissions", { mode: "json" }).default(JSON.stringify(DEFAULT_PERMISSIONS)),
+  permissions: text("permissions", { mode: "json" }).$type<UserPermissions>().default(DEFAULT_PERMISSIONS),
   clientId: integer("client_id"),
   clientViewPermissions: text("client_view_permissions", { mode: "json" }).default(JSON.stringify(DEFAULT_CLIENT_VIEW_PERMISSIONS)),
   email: text("email"),

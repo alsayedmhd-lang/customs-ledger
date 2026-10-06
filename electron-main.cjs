@@ -650,7 +650,7 @@ function analyzeDataRootMigration() {
 function analyzeBackupReadiness() {
   const warnings = [];
   const dataRoot = resolveDataRoot();
-  const databasePath = path.join(dataRoot, "local.db");
+  const databasePath = getResolvedDatabasePath();
   const backupsRoot = path.join(dataRoot, "backups");
   const databaseExists = fs.existsSync(databasePath);
   let databaseReadable = false;
@@ -724,7 +724,7 @@ function createBackupManifest() {
   const dataRoot = resolveDataRoot();
   const timestamp = new Date().toISOString();
   const backupId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  const databasePath = path.join(dataRoot, "local.db");
+  const databasePath = getResolvedDatabasePath();
   const attachmentsPath = path.join(dataRoot, "attachments");
   const backupsRoot = path.join(dataRoot, "backups");
   let databaseExists = false;
@@ -768,116 +768,95 @@ function createBackupManifest() {
     },
     backup: {
       formatVersion: 1,
-      type: "full",
+      type: "database-only",
       compression: "none",
     },
   };
 }
 
-function createBackupDirectory() {
+async function createBackupDirectory() {
   const manifest = createBackupManifest();
-  const dataRoot = manifest.dataRoot;
-  const backupsRoot = path.join(dataRoot, "backups");
-
-  if (!fs.existsSync(backupsRoot)) {
-    fs.mkdirSync(backupsRoot, { recursive: true });
-  }
-
-  const folderName = `backup-${manifest.createdAt.replace(/[:.]/g, "-")}-${manifest.backupId}`;
-  const backupDir = path.join(backupsRoot, folderName);
-  fs.mkdirSync(backupDir, { recursive: true });
-
+  if (!manifest.database.exists) throw new Error("Database file does not exist / ملف قاعدة البيانات غير موجود");
+  const backupsRoot = path.join(manifest.dataRoot, "backups");
+  fs.mkdirSync(backupsRoot, { recursive: true });
+  const backupDir = path.join(backupsRoot, `backup-${manifest.createdAt.replace(/[:.]/g, "-")}-${manifest.backupId}`);
+  fs.mkdirSync(backupDir);
   const manifestPath = path.join(backupDir, "manifest.json");
-  fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
-
-  const sourceDbPath = manifest.database.path;
-  const targetDbPath = path.join(backupDir, "local.db");
-  let databasePath = null;
-  let databaseCopied = false;
-  let databaseSizeBytes = 0;
-
-  if (manifest.database.exists) {
-    fs.copyFileSync(sourceDbPath, targetDbPath);
-
-    const sourceSizeBytes = fs.statSync(sourceDbPath).size;
-    const targetSizeBytes = fs.statSync(targetDbPath).size;
-
-    if (sourceSizeBytes !== targetSizeBytes) {
-      throw new Error("Database backup verification failed: size mismatch");
+  const databasePath = path.join(backupDir, "local.db");
+  let sourceDatabase;
+  let backupDatabase;
+  try {
+    const Database = app.isPackaged
+      ? require(path.join(process.resourcesPath, "api-server", "node_modules", "better-sqlite3"))
+      : require("better-sqlite3");
+    sourceDatabase = new Database(manifest.database.path, { readonly: true, fileMustExist: true });
+    await sourceDatabase.backup(databasePath);
+    sourceDatabase.close();
+    sourceDatabase = null;
+    backupDatabase = new Database(databasePath, { readonly: true, fileMustExist: true });
+    const results = backupDatabase.pragma("integrity_check");
+    if (results.length !== 1 || results[0].integrity_check !== "ok") {
+      throw new Error("Backup integrity check failed / فشل فحص سلامة النسخة");
     }
-
-    databasePath = targetDbPath;
-    databaseCopied = true;
-    databaseSizeBytes = targetSizeBytes;
+    backupDatabase.close();
+    backupDatabase = null;
+    const databaseSizeBytes = fs.statSync(databasePath).size;
+    if (databaseSizeBytes <= 0) throw new Error("Backup database is empty");
+    manifest.database.backupFile = "local.db";
+    manifest.database.backupSizeBytes = databaseSizeBytes;
+    manifest.backup.type = "database-only";
+    manifest.attachments.included = false;
+    fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
+    return { ok: true, backupDir, manifestPath, databasePath, databaseCopied: true, databaseSizeBytes, manifest };
+  } catch (error) {
+    if (backupDatabase?.open) backupDatabase.close();
+    if (sourceDatabase?.open) sourceDatabase.close();
+    // Remove only the new, incomplete backup created by this operation.
+    fs.rmSync(backupDir, { recursive: true, force: true });
+    throw error;
   }
-
-  return {
-    ok: true,
-    backupDir,
-    manifestPath,
-    databasePath,
-    databaseCopied,
-    databaseSizeBytes,
-    manifest,
-  };
 }
 
 function verifyBackupDirectory(backupDir) {
+  let database;
   try {
-    if (!backupDir) {
-      throw new Error("Backup directory is required");
+    if (!backupDir) throw new Error("Backup directory is required");
+    const backupRoot = path.resolve(resolveDataRoot(), "backups");
+    const resolvedDir = path.resolve(backupDir);
+    const relativeDir = path.relative(backupRoot, resolvedDir);
+    if (!relativeDir || relativeDir === ".." || relativeDir.startsWith(`..${path.sep}`) || path.isAbsolute(relativeDir)) {
+      throw new Error("Backup directory must be inside the current backups folder");
     }
-
-    if (!fs.existsSync(backupDir)) {
-      throw new Error("Backup directory not found");
-    }
-
-    const manifestPath = path.join(backupDir, "manifest.json");
-    const databasePath = path.join(backupDir, "local.db");
-
-    if (!fs.existsSync(manifestPath)) {
-      throw new Error("Backup manifest not found");
-    }
-
-    if (!fs.existsSync(databasePath)) {
-      throw new Error("Backup database not found");
-    }
-
+    const manifestPath = path.join(resolvedDir, "manifest.json");
+    const databasePath = path.join(resolvedDir, "local.db");
+    if (!fs.existsSync(manifestPath)) throw new Error("Backup manifest not found / ملف وصف النسخة غير موجود");
+    if (!fs.existsSync(databasePath)) throw new Error("Backup database not found / قاعدة بيانات النسخة غير موجودة");
     const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
-
-    if (!manifest.backup) {
-      throw new Error("Backup manifest is missing backup metadata");
+    if (manifest?.backup?.formatVersion !== 1) throw new Error("Unsupported backup manifest formatVersion");
+    if (typeof manifest.createdAt !== "string" || !Number.isFinite(Date.parse(manifest.createdAt))) {
+      throw new Error("Invalid backup creation date");
     }
-
-    if (!manifest.createdAt) {
-      throw new Error("Backup manifest is missing createdAt");
-    }
-
-    if (manifest.backup.formatVersion !== 1) {
-      throw new Error("Unsupported backup manifest formatVersion");
-    }
-
     const databaseSizeBytes = fs.statSync(databasePath).size;
-
-    if (databaseSizeBytes <= 0) {
-      throw new Error("Backup database is empty");
+    if (databaseSizeBytes <= 0) throw new Error("Backup database is empty");
+    if (typeof manifest.database?.backupSizeBytes === "number" && manifest.database.backupSizeBytes !== databaseSizeBytes) {
+      throw new Error("Backup database size differs from its manifest");
     }
-
-    return {
-      ok: true,
-      verified: true,
-      backupDir,
-      databaseSizeBytes,
-      manifest,
-      warnings: [],
-    };
+    const Database = app.isPackaged
+      ? require(path.join(process.resourcesPath, "api-server", "node_modules", "better-sqlite3"))
+      : require("better-sqlite3");
+    database = new Database(databasePath, { readonly: true, fileMustExist: true });
+    const results = database.pragma("integrity_check");
+    if (results.length !== 1 || results[0].integrity_check !== "ok") {
+      throw new Error("Backup integrity check failed / فشل فحص سلامة النسخة");
+    }
+    database.close();
+    database = null;
+    return { ok: true, verified: true, backupDir: resolvedDir, databaseSizeBytes, manifest,
+      warnings: ["تم التحقق من قاعدة البيانات فقط؛ ملفات المرفقات غير مشمولة / Database verified only; attachment files are not included."] };
   } catch (error) {
-    return {
-      ok: false,
-      verified: false,
-      backupDir,
-      error: error?.message || String(error),
-    };
+    return { ok: false, verified: false, backupDir, error: error?.message || String(error) };
+  } finally {
+    if (database?.open) database.close();
   }
 }
 
@@ -1984,7 +1963,7 @@ ipcMain.handle("backup:create-manifest", async () => {
 
 ipcMain.handle("backup:create-directory", async () => {
   try {
-    return createBackupDirectory();
+    return await createBackupDirectory();
   } catch (error) {
     return {
       ok: false,

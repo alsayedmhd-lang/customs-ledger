@@ -35,7 +35,7 @@ export function parseSettingsAccess(value: unknown): SettingsAccess | null {
 }
 export function defaultSettingsAccess(): SettingsAccess {
   return { version: 1, tabs: Object.fromEntries(settingsAccessGroups.map(g => [g.id, true])),
-    edit: Object.fromEntries(settingsAccessGroups.flatMap(g => g.parts.map(([id]) => [id, true]))) };
+    edit: Object.fromEntries(settingsAccessGroups.flatMap(g => g.parts.map(part => [part[0], true]))) };
 }
 export function settingsFieldAccess(key: string): [string, string] | null {
   if (["nameAr", "nameEn"].includes(key)) return ["company", "name"];
