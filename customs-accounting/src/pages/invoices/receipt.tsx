@@ -480,7 +480,7 @@ const impExpValue =
 
         {/* ══ LETTERHEAD / راس الفاتورة والشعار ════════════════════════════ */}
         <InvoicePrintHeader
-          company={company}
+          company={{ ...company, phone: printPhone, email: printEmail }}
           logoSrc={logoSrc}
           isAR={isAR}
           invoiceNumber={invNum}

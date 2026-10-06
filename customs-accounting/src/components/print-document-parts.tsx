@@ -1,6 +1,7 @@
 import Barcode from "react-barcode";
 import { useCompanySettings, type CompanySettings } from "@/lib/company-settings-context";
 import { useLanguage } from "@/lib/language-context";
+import { useAuth } from "@/lib/auth-context";
 
 type DocumentKind = "invoice" | "receipt" | "statement";
 
@@ -63,9 +64,18 @@ export function PrintTitleBlock({
 
 function usePrintSettings(override?: SettingsOverride) {
   const ctx = useCompanySettings();
+  const { user } = useAuth();
+  const baseSettings = override?.settings ?? ctx.settings;
+  // Explicit overrides belong to the company-settings preview.
+  const canCustomize = !override?.settings && user?.permissions?.canCustomizePrintContact === true;
+  const settings = canCustomize ? {
+    ...baseSettings,
+    phone: user?.phone?.trim() || baseSettings.phone,
+    email: user?.email?.trim() || baseSettings.email,
+  } : baseSettings;
 
   return {
-    settings: override?.settings ?? ctx.settings,
+    settings,
     logoSrc: override?.logoSrc ?? ctx.logoSrc,
     stampSrc: override?.stampSrc ?? ctx.stampSrc,
     watermarkSrc: override?.watermarkSrc ?? ctx.watermarkSrc,

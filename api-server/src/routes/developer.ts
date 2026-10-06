@@ -950,8 +950,17 @@ async function buildSystemDiagnostics() {
   try {
     const logsPath = path.join(context.dataRoot, "logs");
     const logsStats = await safeStat(logsPath);
+    const electronUserData = process.env.LEDGER_ELECTRON_USER_DATA?.trim();
+    const runtimeLogPaths = electronUserData && path.isAbsolute(electronUserData)
+      ? [path.join(electronUserData, "backend.log"),
+         path.join(electronUserData, "attachment-service", "service.log")]
+      : [];
+    const availableRuntimeLogs = (await Promise.all(runtimeLogPaths.map(async (filePath) => {
+      const stats = await safeStat(filePath);
+      return stats?.isFile() ? { fileName: path.basename(filePath), filePath, mtimeMs: stats.mtimeMs, size: stats.size } : null;
+    }))).filter((item): item is { fileName: string; filePath: string; mtimeMs: number; size: number } => Boolean(item));
 
-    if (!logsStats?.isDirectory()) {
+    if (!logsStats?.isDirectory() && availableRuntimeLogs.length === 0) {
       addCheck({
         id: "recent-log-errors-check",
         status: "warning",
@@ -972,7 +981,8 @@ async function buildSystemDiagnostics() {
         },
       });
     } else {
-      const entries = await fs.promises.readdir(logsPath, { withFileTypes: true });
+      const entries = logsStats?.isDirectory()
+        ? await fs.promises.readdir(logsPath, { withFileTypes: true }) : [];
       const logFiles = (
         await Promise.all(
           entries
@@ -985,6 +995,8 @@ async function buildSystemDiagnostics() {
         )
       )
         .filter((item): item is { fileName: string; filePath: string; mtimeMs: number; size: number } => Boolean(item))
+        .concat(availableRuntimeLogs)
+        .filter((item, index, items) => items.findIndex(candidate => path.resolve(candidate.filePath).toLowerCase() === path.resolve(item.filePath).toLowerCase()) === index)
         .sort((a, b) => b.mtimeMs - a.mtimeMs)
         .slice(0, RECENT_LOG_FILES_LIMIT);
 
@@ -1077,6 +1089,7 @@ async function buildSystemDiagnostics() {
           details: {
             logsPath,
             logFilesChecked: logFiles.length,
+            searchedLogPaths: [logsPath, ...runtimeLogPaths],
             logFilesSample: logFiles.map((file) => ({ fileName: file.fileName, sizeBytes: file.size })),
             recentErrorCount,
             crashUnhandledCount,
