@@ -1,3 +1,4 @@
+import { describeDatePeriod } from "@/lib/date-period-description";
 import ResizableScrollArea from "@/components/layout/ResizableScrollArea";
 import { useState, useRef, useMemo, useEffect, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -223,6 +224,8 @@ export default function AccountingPage() {
   );
 
   const [search, setSearch] = useState(initialInvoice);
+  const [linkedInvoice, setLinkedInvoice] = useState(initialInvoice);
+  const consumingInvoiceLink = useRef(false);
   const [clientFilter, setClientFilter] = useState("");
   const [driverFilter, setDriverFilter] = useState("");
   const [locationFilter, setLocationFilter] = useState("");
@@ -249,7 +252,7 @@ export default function AccountingPage() {
 
     return `${year}-${month}-${day}`;
   });
-  const [filtersOpen, setFiltersOpen] = useState(true);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [showAmounts, setShowAmounts] = useState(false);
   const [rowAmountVisibility, setRowAmountVisibility] = useState<Record<number, boolean>>({});
   const toggleRowAmounts = (id: number) => {
@@ -278,17 +281,23 @@ export default function AccountingPage() {
   }, [rows]);
 
   useEffect(() => {
-    if (initialInvoice) {
-      setSearch(initialInvoice);
-      setTimeout(
-        () =>
-          highlightRef.current?.scrollIntoView({
-            behavior: "smooth",
-            block: "center",
-          }),
-        400,
-      );
+    if (!initialInvoice && consumingInvoiceLink.current) {
+      consumingInvoiceLink.current = false;
+      return;
     }
+    setSearch(initialInvoice);
+    setLinkedInvoice(initialInvoice);
+    if (!initialInvoice) return;
+
+    // Use the invoice link once; future visits start with an empty search.
+    const url = new URL(window.location.href);
+    url.searchParams.delete("invoice");
+    consumingInvoiceLink.current = true;
+    window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}${url.hash}`);
+    const timer = setTimeout(() => {
+      highlightRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 400);
+    return () => clearTimeout(timer);
   }, [initialInvoice]);
 
   const getEdit = useCallback(
@@ -469,8 +478,10 @@ export default function AccountingPage() {
     setClientFilter("");
     setDriverFilter("");
     setLocationFilter("");
-    setDateFrom("");
-    setDateTo("");
+    const now = new Date();
+    const localDate = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+    setDateFrom(localDate(new Date(now.getFullYear(), now.getMonth(), 1)));
+    setDateTo(localDate(now));
   };
 
   const summaryCards = [
@@ -553,7 +564,7 @@ export default function AccountingPage() {
             {t("accounting")}
           </h1>
           <p className="text-muted-foreground text-sm mt-1 mr-10">
-            {t("accountingDetailedTable")} • {rows.length} {t("invoices")}
+            {t("accountingDetailedTable")} {describeDatePeriod(dateFrom, dateTo, lang)} • {filtered.length} {t("invoices")}
             {hasFilters && (
               <span className="text-primary font-medium">
                 {" "}
@@ -629,50 +640,38 @@ export default function AccountingPage() {
 
       {/* ── Filters ── */}
       <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
-        {/* filter header */}
-        <button
-          onClick={() => setFiltersOpen((v) => !v)}
-          className="w-full flex items-center justify-between px-5 py-3 hover:bg-muted/30 transition-colors"
-        >
-          <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
-            <Filter className="w-4 h-4 text-primary" />
-            <span>{t("searchAndFilters")}</span>
-            {hasFilters && (
-              <span className="bg-primary text-primary-foreground text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">
-                {
-                  [
-                    search,
-                    clientFilter,
-                    driverFilter,
-                    locationFilter,
-                    dateFrom,
-                    dateTo,
-                  ].filter(Boolean).length
-                }
-              </span>
-            )}
-          </div>
+        <div dir={lang === "ar" ? "rtl" : "ltr"} className="flex items-center justify-between gap-3 px-5 py-3 border-b border-border/50">
+          <button
+            type="button"
+            onClick={() => setFiltersOpen(value => !value)}
+            aria-expanded={filtersOpen}
+            aria-controls="accounting-search-filters"
+            className="flex items-center gap-2 text-sm font-semibold text-foreground hover:text-primary transition-colors"
+          >
+            <Filter className="h-4 w-4 text-primary" />
+            <span>{lang === "ar" ? "البحث والفلاتر" : "Search and filters"}</span>
+            {hasFilters && <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">{[search, clientFilter, driverFilter, locationFilter, dateFrom, dateTo].filter(Boolean).length}</span>}
+          </button>
           <div className="flex items-center gap-2">
-            {hasFilters && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  clearFilters();
-                }}
-                className="flex items-center gap-1 text-xs text-destructive hover:underline"
-              >
-                <X className="w-3 h-3" /> {t("clearAll")}
-              </button>
-            )}
-            {filtersOpen ? (
-              <ChevronUp className="w-4 h-4 text-muted-foreground" />
-            ) : (
-              <ChevronDown className="w-4 h-4 text-muted-foreground" />
-            )}
+            <button type="button" onClick={clearFilters} className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/10 transition-colors">
+              <X className="h-3.5 w-3.5" />
+              {lang === "ar" ? "مسح الفلاتر" : "Clear filters"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setFiltersOpen(value => !value)}
+              aria-expanded={filtersOpen}
+              aria-controls="accounting-search-filters"
+              aria-label={lang === "ar" ? (filtersOpen ? "طي الفلاتر" : "فتح الفلاتر") : (filtersOpen ? "Collapse filters" : "Expand filters")}
+              className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted/30 transition-colors"
+            >
+              {filtersOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </button>
           </div>
-        </button>
+        </div>
 
         {/* filter body */}
+        <div id="accounting-search-filters">
         <AnimatePresence initial={false}>
           {filtersOpen && (
             <motion.div
@@ -691,6 +690,8 @@ export default function AccountingPage() {
                   <div className="relative">
                     <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
                     <input
+                      autoComplete="off"
+                      name="ledger-accounting-search"
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
                       placeholder={t("searchInvoiceOrClient")}
@@ -797,6 +798,7 @@ export default function AccountingPage() {
             </motion.div>
           )}
         </AnimatePresence>
+        </div>
       </div>
 
       {/* ── Table ── */}
@@ -915,7 +917,7 @@ export default function AccountingPage() {
                   const isSaving = saving[row.id];
                   const isSaved = saved[row.id];
                   const isHighlighted =
-                    initialInvoice && row.invoiceNumber === initialInvoice;
+                    linkedInvoice && row.invoiceNumber === linkedInvoice;
 
                   return (
                     <tr

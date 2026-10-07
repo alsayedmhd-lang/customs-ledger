@@ -14,7 +14,6 @@ export default function InvoicePrintHeader({
   logoSrc,
   isAR = true,
   invoiceNumber = "INV-PREVIEW",
-  statusText = "صادرة",
 }: Props) {
   return (
     <>
@@ -86,9 +85,6 @@ export default function InvoicePrintHeader({
             subtitleEn={company.invoiceSubtitleEn || ""}
             subtitleFontSize={company.invoiceSubtitleFontSize || 12}
           />
-          <div className="mt-1 flex items-center gap-2.5 text-sm text-gray-500 font-semibold">
-            <span dir="rtl">{statusText}</span>
-          </div>
         </div>
       </div>
     </>

@@ -1,3 +1,4 @@
+import { describeDatePeriod } from "@/lib/date-period-description";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import ResizableScrollArea from "@/components/layout/ResizableScrollArea";
 import { useAuth } from "@/lib/auth-context";
@@ -42,8 +43,11 @@ function formatDateInput(date: Date) {
 
 function getDefaultDateRange() {
   const today = new Date();
+  const from = new Date(today.getFullYear(), today.getMonth() - 6, 1);
+  const lastDay = new Date(from.getFullYear(), from.getMonth() + 1, 0).getDate();
+  from.setDate(Math.min(today.getDate(), lastDay));
   return {
-    from: formatDateInput(new Date(today.getFullYear(), today.getMonth(), 1)),
+    from: formatDateInput(from),
     to: formatDateInput(today),
   };
 }
@@ -194,7 +198,7 @@ return (
         {tr("ملخص العميل المالي", "Customer Financial Summary")}
       </h1>
       <p className="text-sm text-muted-foreground mt-1">
-        {tr("كشف مختصر لحركات العميل والرصيد", "A brief statement of customer transactions and balance")}
+        {tr("حركات العميل والرصيد", "Customer transactions and balance")} {describeDatePeriod(fromDate, toDate, lang)}
       </p>
     </div>
 

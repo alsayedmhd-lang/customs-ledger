@@ -1,3 +1,4 @@
+import { describeDatePeriod } from "@/lib/date-period-description";
 import ResizableScrollArea from "@/components/layout/ResizableScrollArea";
 import { useState } from "react";
 import { motion } from "framer-motion";
@@ -25,14 +26,16 @@ export default function StatementsIndex() {
   const [showAmounts, setShowAmounts] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [fromDate, setFromDate] = useState(() => {
-  const today = new Date();
-  return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-01`;
-    });
-
-    const [toDate, setToDate] = useState(() => {
-      const today = new Date();
-      return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
-    });
+    const today = new Date();
+    const from = new Date(today.getFullYear(), today.getMonth() - 6, 1);
+    const lastDay = new Date(from.getFullYear(), from.getMonth() + 1, 0).getDate();
+    from.setDate(Math.min(today.getDate(), lastDay));
+    return `${from.getFullYear()}-${String(from.getMonth() + 1).padStart(2, "0")}-${String(from.getDate()).padStart(2, "0")}`;
+  });
+  const [toDate, setToDate] = useState(() => {
+    const today = new Date();
+    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  });
   const hidden = <span className="tracking-widest opacity-35 font-mono">••••••</span>;
   const { data: clients, isLoading: loadingClients } = useListClients();
   const { data: allInvoices, isLoading: loadingInvoices } = useListInvoices();
@@ -110,7 +113,7 @@ export default function StatementsIndex() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-foreground">{t("statements")}</h1>
-          <p className="text-muted-foreground text-sm mt-0.5">{t("statementsDesc")}</p>
+          <p className="text-muted-foreground text-sm mt-0.5">{lang === "ar" ? "ملخص أرصدة جميع العملاء" : "Summary of all client balances"} {describeDatePeriod(fromDate, toDate, lang)}</p>
         </div>
         <button
           onClick={() => setShowAmounts(v => !v)}

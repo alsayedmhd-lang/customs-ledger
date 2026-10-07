@@ -1,3 +1,4 @@
+import { describeDatePeriod } from "@/lib/date-period-description";
 import ResizableScrollArea from "@/components/layout/ResizableScrollArea";
 import { useEffect, useState } from "react";
 import { Link, useLocation } from "wouter";
@@ -41,36 +42,21 @@ export default function InvoicesList() {
   const today = formatLocalDate(now);
 
   const filtersStorageKey = `ledger:invoice-filters:${user?.id ?? "guest"}`;
-  const [savedFilters] = useState<Record<string, unknown>>(() => {
-    try {
-      const value = JSON.parse(sessionStorage.getItem(filtersStorageKey) || "{}");
-      return value && typeof value === "object" && !Array.isArray(value) ? value : {};
-    } catch { return {}; }
-  });
-  const savedText = (key: string, fallback = "") =>
-    typeof savedFilters[key] === "string" ? savedFilters[key] as string : fallback;
-  const [search, setSearch] = useState(() => savedText("search"));
-  const [fromDate, setFromDate] = useState(() => savedText("fromDate", firstDayOfMonth));
-  const [toDate, setToDate] = useState(() => savedText("toDate", today));
-  const [statusFilter, setStatusFilter] = useState(() => savedText("statusFilter"));
-  const [salesmanFilter, setSalesmanFilter] = useState(() => savedText("salesmanFilter"));
-  const [portFilter, setPortFilter] = useState(() => savedText("portFilter"));
-  const [filtersOpen, setFiltersOpen] = useState(() => savedFilters.filtersOpen !== false);
-  useEffect(() => {
-    try {
-      sessionStorage.setItem(filtersStorageKey, JSON.stringify({
-        search, fromDate, toDate, statusFilter, salesmanFilter, portFilter, filtersOpen,
-      }));
-    } catch {}
-  }, [filtersStorageKey, search, fromDate, toDate, statusFilter, salesmanFilter, portFilter, filtersOpen]);
+  const [search, setSearch] = useState("");
+  const [fromDate, setFromDate] = useState(firstDayOfMonth);
+  const [toDate, setToDate] = useState(today);
+  const [statusFilter, setStatusFilter] = useState("");
+  const [salesmanFilter, setSalesmanFilter] = useState("");
+  const [portFilter, setPortFilter] = useState("");
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const activeFilterCount = [
     search, fromDate, toDate, statusFilter, salesmanFilter, portFilter,
   ].filter(Boolean).length;
 
   const clearFilters = () => {
     setSearch("");
-    setFromDate("");
-    setToDate("");
+    setFromDate(firstDayOfMonth);
+    setToDate(today);
     setStatusFilter("");
     setSalesmanFilter("");
     setPortFilter("");
@@ -235,7 +221,7 @@ export default function InvoicesList() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-foreground">{t("invoices")}</h1>
-          <p className="text-muted-foreground text-sm mt-0.5">{t("invoicesDesc")}</p>
+          <p className="text-muted-foreground text-sm mt-0.5">{lang === "ar" ? "عرض الفواتير ومتابعة حالتها" : "Invoices and their status"} {describeDatePeriod(fromDate, toDate, lang)}</p>
         </div>
 
         <div className="flex items-center gap-2">
@@ -293,42 +279,40 @@ export default function InvoicesList() {
         })}
       </div>
 
-      <div className="bg-card border border-border/50 shadow-sm rounded-2xl overflow-hidden">
-        <div className="flex items-center gap-3 px-5 py-3 border-b border-border/50">
+      <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
+        <div dir={lang === "ar" ? "rtl" : "ltr"} className="flex items-center justify-between gap-3 px-5 py-3 border-b border-border/50">
           <button
             type="button"
             onClick={() => setFiltersOpen(value => !value)}
             aria-expanded={filtersOpen}
             aria-controls="invoice-search-filters"
-            className="flex flex-1 items-center justify-between gap-3 text-sm font-semibold text-foreground hover:text-primary transition-colors"
+            className="flex items-center gap-2 text-sm font-semibold text-foreground hover:text-primary transition-colors"
           >
-            <span className="flex items-center gap-2">
-              <Filter className="h-4 w-4 text-primary" />
-              {tr("البحث والفلاتر", "Search and filters")}
-              {activeFilterCount > 0 && (
-                <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">
-                  {activeFilterCount}
-                </span>
-              )}
-            </span>
-            {filtersOpen
-              ? <ChevronUp className="h-4 w-4 text-muted-foreground" />
-              : <ChevronDown className="h-4 w-4 text-muted-foreground" />}
+            <Filter className="h-4 w-4 text-primary" />
+            <span>{tr("البحث والفلاتر", "Search and filters")}</span>
+            {activeFilterCount > 0 && <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">{activeFilterCount}</span>}
           </button>
-          <button
-            type="button"
-            onClick={clearFilters}
-            disabled={activeFilterCount === 0}
-            className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/10 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            <X className="h-3.5 w-3.5" />
-            {tr("مسح الفلاتر", "Clear filters")}
-          </button>
+          <div className="flex items-center gap-2">
+            <button type="button" onClick={clearFilters} className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/10 transition-colors">
+              <X className="h-3.5 w-3.5" />
+              {lang === "ar" ? "مسح الفلاتر" : "Clear filters"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setFiltersOpen(value => !value)}
+              aria-expanded={filtersOpen}
+              aria-controls="invoice-search-filters"
+              aria-label={lang === "ar" ? (filtersOpen ? "طي الفلاتر" : "فتح الفلاتر") : (filtersOpen ? "Collapse filters" : "Expand filters")}
+              className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted/30 transition-colors"
+            >
+              {filtersOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </button>
+          </div>
         </div>
         <div
           id="invoice-search-filters"
           hidden={!filtersOpen}
-          className="px-5 py-4 border-b border-border/50 space-y-4"
+          className="px-5 py-4 space-y-4"
         >
           {/* Search row */}
           <div className="flex flex-col gap-2">
@@ -340,6 +324,8 @@ export default function InvoicesList() {
               <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
 
               <input
+                autoComplete="off"
+                name="ledger-invoice-search"
                 placeholder={t("searchInvoicePlaceholder")}
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -416,6 +402,9 @@ export default function InvoicesList() {
           </div>
         </div>
 
+      </div>
+
+      <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
         <ResizableScrollArea storageKey="invoices-index" maxHeight={580} restoreScrollKey={`${filtersStorageKey}:scroll`} scrollReady={!isLoading}>
           <table className="w-full text-sm">
             <thead className="bg-muted/40 text-muted-foreground font-medium border-b border-border/60 sticky top-0 z-10">

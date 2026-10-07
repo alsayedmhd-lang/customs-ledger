@@ -151,13 +151,6 @@ function numberToArabicWords(amount: number): string {
   return "ريال قطري " + parts.join(" و") + " فقط لا غير";
 }
 
-const STATUS_AR: Record<string, string> = {
-  draft: "مسودة",
-  issued: "صادرة",
-  paid: "مدفوعة",
-  cancelled: "ملغاة",
-};
-
 export default function InvoiceReceipt() {
   const { id } = useParams<{ id: string }>();
   const { data: invoice, isLoading } = useGetInvoice(parseInt(id || "0"));
@@ -484,7 +477,6 @@ const impExpValue =
           logoSrc={logoSrc}
           isAR={isAR}
           invoiceNumber={invNum}
-          statusText={STATUS_AR[invoice.status] ?? invoice.status}
         />
         <div className="hidden">
           <div className="relative flex items-start justify-between gap-4">
@@ -545,9 +537,7 @@ const impExpValue =
               {company.invoiceCreditTitleEn || "Cash / Credit Invoice"}
               </span>
           
-              <span className="w-1 h-1 rounded-full bg-gray-400 inline-block" />
           
-              <span dir="rtl">{STATUS_AR[invoice.status] ?? invoice.status}</span>
             </div>
           </div>
           </div>

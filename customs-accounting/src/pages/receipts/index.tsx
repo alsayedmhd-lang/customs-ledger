@@ -1,3 +1,4 @@
+import { describeDatePeriod } from "@/lib/date-period-description";
 import ResizableScrollArea from "@/components/layout/ResizableScrollArea";
 import { useState } from "react";
 import { Link } from "wouter";
@@ -146,7 +147,7 @@ const getClientName = (receipt: { clientName?: string | null; clientId?: number 
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">{t("receipts")}</h1>
-          <p className="text-muted-foreground text-sm mt-1">{t("receiptsDesc")}</p>
+          <p className="text-muted-foreground text-sm mt-1">{lang === "ar" ? "عرض سندات القبض والتحصيلات" : "Receipt vouchers and collections"} {describeDatePeriod(fromDate, toDate, lang)}</p>
         </div>
 
         <div className="flex items-center gap-2">

@@ -1,3 +1,4 @@
+import { describeDatePeriod } from "@/lib/date-period-description";
 import { useParams, Link } from "wouter";
 import { motion } from "framer-motion";
 import { useGetClient, useListInvoices, useListReceipts, useUpdateClient, getGetClientQueryKey } from "@workspace/api-client-react";
@@ -33,8 +34,11 @@ function formatDateInput(date: Date) {
 
 function getDefaultDateRange() {
   const today = new Date();
+  const from = new Date(today.getFullYear(), today.getMonth() - 6, 1);
+  const lastDay = new Date(from.getFullYear(), from.getMonth() + 1, 0).getDate();
+  from.setDate(Math.min(today.getDate(), lastDay));
   return {
-    from: formatDateInput(new Date(today.getFullYear(), today.getMonth(), 1)),
+    from: formatDateInput(from),
     to: formatDateInput(today),
   };
 }
@@ -108,6 +112,7 @@ export default function ClientDetail() {
           </div>
           <div>
             <h1 className="text-2xl font-bold text-foreground">{client.name}</h1>
+            <p className="text-muted-foreground text-sm mt-1">{lang === "ar" ? "فواتير ومدفوعات العميل" : "Customer invoices and payments"} {describeDatePeriod(fromDate, toDate, lang)}</p>
             <p className="text-muted-foreground flex items-center gap-2 text-sm mt-1">
               <span className="flex items-center gap-1"><Mail className="w-3.5 h-3.5"/> {client.email || t("noEmail")}</span>
               <span className="text-border">•</span>
