@@ -1,0 +1,60 @@
+import {createServer} from 'node:net';
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {spawn} from 'node:child_process';
+import {once} from 'node:events';
+import {fileURLToPath} from 'node:url';
+import {after} from 'node:test';
+const probe=createServer();await new Promise(resolve=>probe.listen(0,'127.0.0.1',resolve));const testPort=probe.address().port;await new Promise(resolve=>probe.close(resolve));
+const child=spawn(process.execPath,[fileURLToPath(new URL('../server.mjs',import.meta.url))],{env:{...process.env,DATABASE_URL:'',PORT:String(testPort),HOST:'127.0.0.1',APP_ORIGIN:''},stdio:['ignore','pipe','pipe']});
+after(()=>child.kill());
+await once(child.stdout,'data');
+const base='http://localhost:'+testPort;
+test('demo authentication, origin, read-only API and logout',async()=>{
+const page=await (await fetch(base+'/')).text();
+const assets=[...page.matchAll(/(?:src|href)="(\/[^" ]+\.(?:js|css))"/g)].map(match=>match[1]);
+assert.ok(assets.length>5);
+for(const asset of assets){const response=await fetch(base+asset);assert.equal(response.status,200,'Referenced asset is served: '+asset);assert.match(response.headers.get('content-type'),asset.endsWith('.js')?/javascript/:/css/);}
+assert.ok(!page.includes('/sidebar-company.js'));
+assert.equal((await fetch(base+'/api/clients')).status,401);
+assert.equal((await fetch(base+'/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:'demo',password:'demo'})})).status,403);
+const login=async password=>fetch(base+'/api/login',{method:'POST',headers:{Origin:base,'Content-Type':'application/json'},body:JSON.stringify({username:'demo',password})});
+assert.equal((await login('incorrect')).status,401);
+const challenge=await login('demo');assert.equal(challenge.status,200);const otp=await challenge.json();assert.equal(otp.requiresOtp,true);assert.match(otp.visibleCode,/^\d{6}$/);assert.equal((await fetch(base+'/api/me')).status,401);const r=await fetch(base+'/api/otp-verify',{method:'POST',headers:{Origin:base,'Content-Type':'application/json'},body:JSON.stringify({otpToken:otp.otpToken,code:otp.visibleCode})});assert.equal(r.status,200);const cookie=r.headers.get('set-cookie').split(';')[0];assert.match(r.headers.get('set-cookie'),/HttpOnly/);
+const headers={Cookie:cookie};
+assert.match(r.headers.get('set-cookie'),/Max-Age=300(?:;|$)/);
+const before=(await (await fetch(base+'/api/me',{headers})).json()).expiresAt;
+assert.ok(Number.isFinite(before) && Math.abs((before-Date.now())-300000)<1000, "Invalid session deadline: "+before);
+await fetch(base+'/api/clients',{headers});
+assert.equal((await (await fetch(base+'/api/me',{headers})).json()).expiresAt,before);
+assert.equal((await fetch(base+'/api/session-activity',{method:'POST',headers})).status,403);
+const activity=await fetch(base+'/api/session-activity',{method:'POST',headers:{...headers,Origin:base}});
+assert.equal(activity.status,200);assert.match(activity.headers.get('set-cookie'),/Max-Age=300/);
+assert.ok((await activity.json()).expiresAt>=before);
+
+const remote=(await (await fetch(base+'/api/remote-settings',{headers})).json());assert.equal(remote.startPage,'dashboard');assert.equal((await fetch(base+'/api/dashboard?from=2026-02-30',{headers})).status,400);const dashboardData=await (await fetch(base+'/api/dashboard',{headers})).json();assert.equal(dashboardData.credit,500);assert.equal((await fetch(base+'/api/remote-users',{headers})).status,403);assert.equal((await fetch(base+'/api/document-issue',{method:'POST',headers:{...headers,Origin:base,'Content-Type':'application/json'},body:JSON.stringify({kind:'invoice',id:1})})).status,409);assert.equal((await fetch(base+'/remote-settings.json')).status,404);assert.equal((await fetch(base+'/api/remote-settings',{method:'POST',headers:{...headers,Origin:base,'Content-Type':'application/json'},body:JSON.stringify(remote)})).status,409);
+
+for(const kind of ['clients','invoices','receipts']){const response=await fetch(base+'/api/'+kind,{headers});assert.equal(response.status,200);assert.equal((await response.json()).rows.length,1);}
+const statement=await (await fetch(base+'/api/statement?clientId=1',{headers})).json();assert.equal(statement.debit,1000);assert.equal(statement.credit,500);assert.equal(statement.closing,500);
+assert.equal((await fetch(base+'/api/statement?clientId=bad',{headers})).status,400);
+assert.equal((await fetch(base+'/api/statement?from=2026-02-30',{headers})).status,400);
+const items=await (await fetch(base+'/api/invoice-items?invoiceId=1',{headers})).json();assert.equal(items.rows[0].total,'1000');
+assert.equal((await fetch(base+'/api/invoice-items?invoiceId=999',{headers})).status,404);
+assert.equal((await fetch(base+'/api/templates',{headers})).status,200);
+const printData=await (await fetch(base+'/api/invoice-print?invoiceId=1',{headers})).json();assert.equal(printData.invoice.invoice_number,'INV-2026-0001');assert.equal(printData.items.length,1);
+assert.equal((await fetch(base+'/api/invoice-print?invoiceId=999',{headers})).status,404);
+const settings=await (await fetch(base+'/api/print-settings',{headers})).json();assert.equal(settings.configured,true);assert.ok(!('master_password_hash' in settings.settings));
+assert.equal((await fetch(base+'/api/invoices?page=0',{headers})).status,400);
+const absent=await (await fetch(base+'/api/invoices?q=missing',{headers})).json();assert.equal(absent.count,0);assert.equal(absent.rows.length,0);
+const pageTwo=await (await fetch(base+'/api/invoices?page=2&pageSize=1',{headers})).json();assert.equal(pageTwo.count,1);assert.equal(pageTwo.rows.length,0);
+assert.equal((await fetch(base+'/api/invoices',{method:'POST',headers:{...headers,Origin:base}})).status,405);
+assert.equal((await fetch(base+'/.env')).status,404);
+const previewInput={kind:'invoice',syncId:'46fc7e57-0d92-4ca3-9359-50c7cabc22d3',clientId:1,date:'2026-10-06',taxRate:'0',advancePayment:'0',items:[{description:'Test',quantity:'2',unitPrice:'10'}]};
+const preview=await fetch(base+'/api/draft-preview',{method:'POST',headers:{...headers,Origin:base,'Content-Type':'application/json'},body:JSON.stringify(previewInput)});assert.equal(preview.status,200);const previewData=await preview.json();assert.equal(previewData.draft.grossTotal,'20.00');assert.equal(previewData.draft.salesManName,'Demo');assert.equal(previewData.draft.createdBy,1);
+const overpaid=await fetch(base+'/api/draft-preview',{method:'POST',headers:{...headers,Origin:base,'Content-Type':'application/json'},body:JSON.stringify({...previewInput,kind:'receipt',invoiceId:1,amount:'501'})});assert.equal(overpaid.status,409);
+assert.equal((await (await fetch(base+'/api/save-status',{headers})).json()).enabled,false);
+assert.equal((await fetch(base+'/api/draft-save',{method:'POST',headers:{...headers,Origin:base,'Content-Type':'application/json'},body:JSON.stringify(previewInput)})).status,409);
+assert.equal((await (await fetch(base+'/api/invoices',{headers})).json()).count,1);
+assert.equal((await fetch(base+'/api/logout',{method:'POST',headers:{...headers,Origin:base}})).status,200);
+assert.equal((await fetch(base+'/api/clients',{headers})).status,401);
+});

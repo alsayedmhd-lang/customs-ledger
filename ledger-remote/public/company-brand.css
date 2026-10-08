@@ -1,0 +1,82 @@
+.remote-company-logo{width:32px;height:32px;object-fit:contain;background:white;border-radius:7px;padding:2px;margin-inline-end:5px}.brand-symbol.company-brand-symbol{background:white;border-radius:10px;padding:3px;box-shadow:none}.remote-sidebar-logo{width:100%;height:100%;object-fit:contain}.remote-login-logo{display:block;width:100px;height:85px;object-fit:contain;margin:0 auto 18px}@media print{.remote-company-logo,.remote-login-logo{display:none!important}}
+.remote-login-logo{margin-bottom:8px}.remote-login-identity{text-align:center;margin-bottom:22px;line-height:1.5}.remote-login-identity strong,.remote-login-identity span{display:block}.remote-login-identity .company-name{font-size:19px;font-weight:700;color:#172338}.remote-login-identity .company-activity{font-size:13px;color:#42536a;margin-top:2px}.remote-login-identity .company-tagline{font-size:11px;color:#738197;margin-top:2px}
+
+#remote-developer-footer{max-width:440px;margin:14px auto 0;text-align:center;font-size:11px;line-height:1.8;color:#738197}#remote-developer-footer a{color:#52637b;text-decoration:none}#remote-developer-footer a:hover{text-decoration:underline}#login[hidden]+#remote-developer-footer{display:none!important}@media print{#remote-developer-footer{display:none!important}}
+
+/* Desktop login typography and light palette */
+#login,#remote-developer-footer{font-family:'Cairo','Segoe UI',Tahoma,Arial,sans-serif;letter-spacing:normal;-webkit-font-smoothing:antialiased}
+#login{background:#fff;border:1px solid #e2e8f0;border-radius:20px;box-shadow:0 16px 44px rgba(15,23,42,.08);padding:30px;color:#0f172a}
+#login .remote-login-identity{margin-bottom:24px}
+#login .remote-login-identity .company-name{font-size:30px;font-weight:900;line-height:1.5;color:#0f172a;text-wrap:balance}
+#login h1{font-size:18px;font-weight:700;line-height:1.6;color:#0f172a;margin:0 0 20px}
+#login label{font-size:14px;font-weight:600;color:#475569;line-height:1.7;margin:16px 0}
+#login input{font-family:inherit;font-size:14px;font-weight:500;color:#0f172a;background:#fff;border:1px solid #cbd5e1;border-radius:12px;min-height:46px;padding:11px 14px;box-shadow:0 1px 2px #0f172a08}
+#login input::placeholder{color:#94a3b8}
+#login input:focus{outline:2px solid #34d39966;outline-offset:1px;border-color:#10b981}
+#login button{font-family:inherit;font-size:15px;font-weight:700;border-radius:12px;min-height:46px;background:#059669;color:#fff;box-shadow:0 4px 12px #05966926}
+#login button:hover{background:#047857}
+#remote-developer-footer{font-size:12px;color:#64748b;line-height:1.9}
+#remote-developer-footer>div:first-child{font-weight:600;color:#475569}
+#remote-developer-footer a{color:#64748b}
+@media(max-width:480px){#login{padding:24px 20px}#login .remote-login-identity .company-name{font-size:25px}}
+
+body > header .remote-company-logo { display: none !important; }
+
+
+/* Sidebar company and header clock */
+#remote-sidebar .sidebar-brand b{display:block;white-space:normal;overflow-wrap:anywhere;font-size:14px;font-weight:700;line-height:1.65;color:#f8fafc}
+#remote-header-clock{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:4px 12px;font-size:12px;line-height:1.6;text-align:center;order:-1;flex-shrink:0;color:#64748b;margin-inline-end:12px}
+#remote-header-clock time{font-weight:600;font-variant-numeric:tabular-nums}
+@media(min-width:761px){body>header>strong{order:-2;flex:0 0 calc(var(--remote-sidebar-width) - 32px);margin-inline-end:0}body>header #remote-header-clock{margin-inline-start:0;margin-inline-end:auto}}
+@media(max-width:600px){#remote-header-clock{font-size:10px;gap:2px 6px}}
+@media print{#remote-header-clock{display:none!important}}
+/* Items use the same typography and spacing as clients */
+#workspace table.remote-items-table{table-layout:auto;white-space:nowrap;width:100%}
+#workspace table.remote-items-table th{padding:11px 13px;font-size:11px;font-weight:600}
+#workspace table.remote-items-table td{padding:10px 13px;font-size:12px;font-weight:400;line-height:1.5;color:#33445a;vertical-align:middle}
+#workspace table.remote-items-table th:nth-child(1){width:10%}
+#workspace table.remote-items-table th:nth-child(2){width:auto}
+#workspace table.remote-items-table th:nth-child(3){width:18%}
+#workspace table.remote-items-table th:nth-child(4){width:10%}
+#workspace table.remote-items-table td:nth-child(1){direction:ltr;font-variant-numeric:tabular-nums}
+#workspace table.remote-items-table td:nth-child(2){white-space:normal;overflow-wrap:break-word}
+#workspace table.remote-items-table th,#workspace table.remote-items-table td{text-align:left!important}
+@media(max-width:760px){#workspace table.remote-items-table{min-width:650px}}
+
+@media screen{
+#remote-app-brand{position:fixed;inset-inline-start:8px;top:6px;width:calc(var(--remote-sidebar-width,232px) - 16px);height:46px;display:flex;align-items:center;justify-content:center;gap:6px;background:var(--remote-surface,#fff);color:var(--remote-surface-text,#172338);border:1px solid var(--remote-line,#dce4eb);border-radius:10px;box-shadow:0 2px 6px #1723380a;z-index:45;font-size:17px}
+#remote-app-brand span{font-size:12px;font-weight:500;color:inherit;opacity:.8}
+body.remote-dark #remote-app-brand{background:#1c2937;color:#e7edf4;border-color:#394858}
+@media(min-width:761px){body>header{margin-inline-start:var(--remote-sidebar-width,232px);width:calc(100% - var(--remote-sidebar-width,232px))}}
+@media(max-width:760px){#remote-app-brand{position:relative;inset:auto;top:auto;width:fit-content;min-width:160px;height:38px;margin:8px 12px;padding:0 16px;font-size:16px}#remote-sidebar{top:var(--remote-sidebar-top,58px)}body.sidebar-open #sidebar-backdrop{inset-block-start:var(--remote-sidebar-top,58px)}}
+}
+@media print{#remote-app-brand{display:none!important}}
+
+@media screen{#remote-app-brand{border-radius:0!important}}
+
+@media screen and (min-width:761px){
+    #remote-app-brand{
+        inset-inline-start:0;
+        top:0;
+        width:var(--remote-sidebar-width,232px);
+        height:58px;
+        margin:0;
+        border-radius:0!important;
+        box-shadow:none;
+    }
+}
+
+@media screen{
+    #remote-sidebar .brand-symbol.company-brand-symbol{
+        background:transparent!important;
+        border:0!important;
+        border-radius:0!important;
+        padding:0!important;
+        box-shadow:none!important;
+    }
+    #remote-sidebar .remote-sidebar-logo{
+        background:transparent!important;
+        border:0!important;
+        box-shadow:none!important;
+    }
+}

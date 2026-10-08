@@ -1,0 +1,29 @@
+import {assertReceipt,assertRecord,recordWhere,requireRecord} from './record-access.mjs';
+import {createHash} from 'node:crypto';
+import {validateDraft} from './draft.mjs';
+const fail=(status,message)=>Object.assign(Error(message),{status});
+export function canEditReceipt(user){let p={};try{p=typeof user?.permissions==='string'?JSON.parse(user.permissions):user?.permissions||{};}catch{}return user?.role==='admin'||(['manager','user','supervisor'].includes(user?.role)&&p.canEditReceipts===true);}
+const version=row=>createHash('sha256').update(JSON.stringify(row)).digest('hex');
+async function readRow(db,id,lock=false){return (await db.query('SELECT id,created_by,receipt_number,client_id,invoice_id,amount,payment_method,status,notes,receipt_date FROM receipts WHERE id=$1 AND deleted_at IS NULL'+(lock?' FOR UPDATE':''),[id])).rows[0];}
+export async function readReceiptEdit(pool,id,user){id=Number(id);if(!Number.isSafeInteger(id)||id<=0)throw fail(400,'Invalid receipt');if(!canEditReceipt(user))throw fail(403,'Access denied');const record=await readRow(pool,id);if(!record)throw fail(404,'Receipt not found');await assertReceipt(pool,user,record);return {record,version:version(record)};}
+export async function updateReceipt(pool,input,user,enabled){
+ if(!enabled)throw fail(409,'الحفظ غير مفعّل / Saving disabled');if(!canEditReceipt(user))throw fail(403,'Access denied');
+ const id=Number(input.id);if(!Number.isSafeInteger(id)||id<=0||typeof input.version!=='string'||!/^[a-f0-9]{64}$/.test(input.version))throw fail(400,'Invalid edit identity');
+ let d;try{d=validateDraft({...input,kind:'receipt'});}catch(e){throw fail(400,e.message);}
+ const requestedStatus=input.status==null?null:String(input.status);if(requestedStatus!==null&&!['draft','issued','cancelled'].includes(requestedStatus))throw fail(400,'Invalid receipt status');
+ const hash=createHash('sha256').update(JSON.stringify({id,version:input.version,d,requestedStatus,userId:user.id})).digest('hex');const db=await pool.connect();
+ try{
+  await db.query('BEGIN READ WRITE');await db.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))",['ledger-receipt-edit:'+d.syncId]);
+  const account=(await db.query('SELECT role,permissions,is_active,pending_approval,two_factor_email,two_factor_whatsapp FROM users WHERE id=$1 FOR SHARE',[user.id])).rows[0];if(!account?.is_active||account.pending_approval||account.two_factor_email||account.two_factor_whatsapp||!canEditReceipt(account))throw fail(403,'Access denied');
+  await db.query('CREATE TABLE IF NOT EXISTS ledger_remote_master_requests (request_id uuid PRIMARY KEY,created_by integer NOT NULL,request_hash text NOT NULL,kind text NOT NULL,record_id integer NOT NULL,created_at timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP)');
+  const prior=(await db.query('SELECT created_by,request_hash,kind,record_id FROM ledger_remote_master_requests WHERE request_id=$1',[d.syncId])).rows[0];if(prior){if(Number(prior.created_by)!==Number(user.id)||prior.request_hash!==hash||prior.kind!=='receipt-update'||Number(prior.record_id)!==id)throw fail(409,'Request conflict');await db.query('COMMIT');return {id,replayed:true};}
+  const current=await readRow(db,id,true);if(!current)throw fail(404,'Receipt not found');await assertReceipt(db,user,current);if(version(current)!==input.version)throw fail(409,'تم تغيير السند؛ أغلق النموذج وافتحه مجددًا / Receipt changed; reopen editor');const nextStatus=requestedStatus??current.status;
+  if(!(await db.query('SELECT id FROM clients WHERE id=$1 FOR SHARE',[d.clientId])).rows.length)throw fail(400,'Client not found');
+  const invoiceIds=[...new Set([Number(current.invoice_id),Number(d.invoiceId)].filter(n=>n>0))].sort((a,b)=>a-b);
+  const invoices=invoiceIds.length?(await db.query('SELECT id,client_id,status,subtotal,tax_amount,total,advance_payment FROM invoices WHERE id=ANY($1::integer[]) AND deleted_at IS NULL ORDER BY id FOR UPDATE',[invoiceIds])).rows:[];
+  if(d.invoiceId)await requireRecord(db,user,'invoice',d.invoiceId);if(d.invoiceId){const invoice=invoices.find(i=>Number(i.id)===Number(d.invoiceId));if(!invoice||Number(invoice.client_id)!==Number(d.clientId)||!['issued','paid'].includes(invoice.status))throw fail(400,'Invoice not available for this client');const paid=Number((await db.query("SELECT COALESCE(SUM(amount),0) AS paid FROM receipts WHERE invoice_id=$1 AND id<>$2 AND status='issued' AND deleted_at IS NULL",[d.invoiceId,id])).rows[0].paid);const sum=Number(invoice.subtotal||0)+Number(invoice.tax_amount||0);const total=sum>0?sum:Number(invoice.total||0)+Number(invoice.advance_payment||0);const remaining=Math.max(0,total-Number(invoice.advance_payment||0)-paid);if(nextStatus==='issued'&&Number(d.amount)>remaining+0.000001)throw fail(409,'المبلغ يتجاوز المتبقي على الفاتورة / Amount exceeds invoice balance');}
+  await db.query('UPDATE receipts SET client_id=$1,invoice_id=$2,amount=$3,payment_method=$4,notes=$5,receipt_date=$6,status=$8 WHERE id=$7',[d.clientId,d.invoiceId,d.amount,d.paymentMethod,d.notes,d.date,id,nextStatus]);
+  if(current.status==='issued'||nextStatus==='issued'){for(const invoice of invoices){if(!['issued','paid'].includes(invoice.status))continue;await db.query("UPDATE invoices SET status=CASE WHEN COALESCE(advance_payment,0)+COALESCE((SELECT SUM(amount) FROM receipts WHERE invoice_id=invoices.id AND status='issued' AND deleted_at IS NULL),0)>=CASE WHEN COALESCE(subtotal,0)+COALESCE(tax_amount,0)>0 THEN COALESCE(subtotal,0)+COALESCE(tax_amount,0) ELSE COALESCE(total,0)+COALESCE(advance_payment,0) END THEN 'paid' ELSE 'issued' END,updated_at=CURRENT_TIMESTAMP WHERE id=$1",[invoice.id]);}}
+  await db.query('INSERT INTO ledger_remote_master_requests(request_id,created_by,request_hash,kind,record_id) VALUES($1,$2,$3,$4,$5)',[d.syncId,user.id,hash,'receipt-update',id]);await db.query('COMMIT');return {id,replayed:false};
+ }catch(e){await db.query('ROLLBACK').catch(()=>{});throw e;}finally{db.release();}
+}

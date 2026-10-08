@@ -1,0 +1,5 @@
+import test from'node:test';import assert from'node:assert/strict';import{saveSessionPrintSettings,sessionPrintSettings}from'../session-print-settings.mjs';import{createSession,isSessionExpired}from'../session-policy.mjs';
+test('print changes are isolated to admin session and a new session restores Online settings',()=>{
+ const admin={role:'admin'},first=createSession(admin,1000),other=createSession(admin,1000),online={settings:{name_en:'Online'},origin:'Online'};
+ saveSessionPrintSettings(first,admin,{name_en:'Temporary'});assert.equal(sessionPrintSettings(online,first,admin).settings.name_en,'Temporary');assert.equal(sessionPrintSettings(online,other,admin).settings.name_en,'Online');assert.equal(online.settings.name_en,'Online');assert.equal(sessionPrintSettings(online,first,{role:'user'}).settings.name_en,'Online');assert.throws(()=>saveSessionPrintSettings(other,{role:'user'},{}));assert.equal(isSessionExpired(first,301000),true);assert.equal(sessionPrintSettings(online,createSession(admin),admin).settings.name_en,'Online');
+});

@@ -1,0 +1,8 @@
+// Ported from Ledger Desktop routes/invoices.ts: declaration normalization
+// and repeat suffix allocation. Desktop code is not modified.
+export function getShipmentBase(value){return String(value??'').replace(/[^a-zA-Z0-9]/g,'').trim().slice(0,14);}
+export function normalizeShipmentFullNumber(value){return String(value??'').trim().toLowerCase().replace(/\s+/g,'');}
+function escapeRegExp(value){return value.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');}
+export function getDeclarationSuffixNumber(value,base){const normalized=String(value??'').trim().replace(/\s+/g,'');if(normalized===base)return 0;const match=normalized.match(new RegExp(`^${escapeRegExp(base)}(?:[-/]\\d+)?\\((\\d+)\\)$`));if(!match)return null;const suffix=Number.parseInt(match[1],10);return Number.isFinite(suffix)?suffix:null;}
+export function nextDeclarationNumber(requestedValue,existing){const requested=String(requestedValue??'').trim();const base=getShipmentBase(requested);if(!requested||base.length<14)return requested||null;const matches=existing.filter(row=>getShipmentBase(row.shipment_ref)===base);if(!matches.length)return requested;const maxSuffix=matches.reduce((max,row)=>Math.max(max,getDeclarationSuffixNumber(row.shipment_ref,base)??0),0);return `${requested} (${maxSuffix+1})`;}
+export async function allocateDeclarationNumber(db,requested,excludeInvoiceId){const base=getShipmentBase(requested);if(base.length<14)return String(requested??'').trim()||null;await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',['ledger-declaration:'+base]);const rows=(await db.query('SELECT id,shipment_ref FROM invoices WHERE shipment_ref IS NOT NULL')).rows;return nextDeclarationNumber(requested,rows.filter(row=>!excludeInvoiceId||Number(row.id)!==Number(excludeInvoiceId)));}

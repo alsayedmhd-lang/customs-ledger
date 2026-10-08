@@ -1,0 +1,8 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {validateDraft} from '../draft.mjs';
+const base={kind:'invoice',clientId:1,date:'2026-10-06',syncId:'46fc7e57-0d92-4ca3-9359-50c7cabc22d3',items:[{description:'Service',quantity:'1.125',unitPrice:'10.10'}],taxRate:'5',advancePayment:'1.00'};
+test('invoice preview uses decimal rounding and explicit unregistered identity',()=>{const d=validateDraft(base);assert.equal(d.subtotal,'11.36');assert.equal(d.taxAmount,'0.57');assert.equal(d.grossTotal,'11.93');assert.equal(d.remaining,'10.93');assert.equal(d.registered,false);assert.equal(d.number,null);assert.equal(d.source,'web');assert.equal(d.status,'draft');});
+test('invalid amounts, identity and advance rejected',()=>{for(const input of [{...base,advancePayment:99},{...base,taxRate:101},{...base,items:[]},{...base,syncId:'bad'},{...base,items:[{description:'x',quantity:0,unitPrice:10}]},{...base,date:'2026-02-30'}])assert.throws(()=>validateDraft(input));assert.throws(()=>validateDraft({...base,kind:'receipt',amount:'0'}));assert.throws(()=>validateDraft({...base,kind:'receipt',amount:'1.001'}));});
+
+test('shipment fields preserved and malformed count, weight, due date rejected',()=>{const d=validateDraft({...base,portOfEntry:'Hamad Port',packageCount:'12',shipmentWeight:'120.125',importerExporterName:'Importer',dueDate:'2026-10-10'});assert.equal(d.packageCount,12);assert.equal(d.shipmentWeight,'120.125');assert.equal(d.portOfEntry,'Hamad Port');assert.equal(d.importerExporterName,'Importer');for(const input of [{...base,packageCount:'1.5'},{...base,shipmentWeight:'-1'},{...base,dueDate:'2026-10-01'}])assert.throws(()=>validateDraft(input));});

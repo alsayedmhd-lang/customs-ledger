@@ -1,0 +1,13 @@
+node_modules/
+.env
+*.log
+
+.env.*
+print-settings.json
+remote-settings.json
+logs/
+update-backups/
+*.pem
+*.key
+*.pfx
+*.p12

@@ -1,0 +1,12 @@
+let remoteOtpToken='',remoteOtpResendAt=0,remoteOtpBusy=false;
+function otpLanguage(){
+ const pairs={'otp-fallback-label':['تعذر إرسال الرمز. رمز التحقق:','Code could not be sent. Verification code:'],'otp-title':['التحقق من الدخول','Verify sign in'],'otp-description':['أدخل الرمز المرسل إلى البريد أو واتساب المفعّل في حسابك. الرمز صالح لخمس دقائق.','Enter the code sent to your enabled email or WhatsApp. Valid for five minutes.'],'otp-label':['رمز التحقق','Verification code'],'otp-submit':['تحقق ودخول','Verify and sign in'],'otp-resend':['إعادة إرسال الرمز','Resend code'],'otp-back':['العودة لتسجيل الدخول','Back to sign in']};
+ for(const [id,pair]of Object.entries(pairs))document.getElementById(id).textContent=pair[language==='ar'?0:1];
+}
+function displayOtpFallback(result){$('#otp-fallback').hidden=!result.visibleCode;$('#otp-visible-code').textContent=result.visibleCode||'';}
+function showOtp(result){displayOtpFallback(result);remoteOtpToken=result.otpToken;remoteOtpResendAt=Date.now()+60000;$('#login').hidden=true;$('#workspace').hidden=true;$('#otp-login').hidden=false;$('#otp-code').value='';otpLanguage();$('#otp-code').focus();}
+function closeOtp(){displayOtpFallback({});remoteOtpToken='';$('#otp-login').hidden=true;$('#otp-code').value='';$('#login').hidden=false;}
+function otpBusy(value){remoteOtpBusy=value;for(const node of $('#otp-login').querySelectorAll('button,input'))node.disabled=value;}
+$('#otp-form').onsubmit=async event=>{event.preventDefault();if(remoteOtpBusy)return;otpBusy(true);try{await api('otp-verify',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({otpToken:remoteOtpToken,code:$('#otp-code').value.trim()})});closeOtp();await init();}catch(e){showRemoteNotice(e.message,'error');}finally{otpBusy(false);}};
+$('#otp-resend').onclick=async()=>{if(remoteOtpBusy)return;if(Date.now()<remoteOtpResendAt){showRemoteNotice(t('انتظر دقيقة قبل إعادة الإرسال.','Wait one minute before resending.'),'warning');return;}otpBusy(true);try{const result=await api('otp-resend',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({otpToken:remoteOtpToken})});displayOtpFallback(result);remoteOtpResendAt=Date.now()+60000;showRemoteNotice(result.visibleCode?t('تم إنشاء رمز جديد.','A new code was generated.'):t('تم إرسال رمز جديد.','A new code was sent.'));}catch(e){showRemoteNotice(e.message,'error');}finally{otpBusy(false);}};
+$('#otp-back').onclick=closeOtp;
