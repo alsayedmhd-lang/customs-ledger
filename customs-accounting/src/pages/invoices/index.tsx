@@ -1,3 +1,4 @@
+import { lookupReceiptPath } from "@/lib/invoice-receipt-link";
 import { describeDatePeriod } from "@/lib/date-period-description";
 import ResizableScrollArea from "@/components/layout/ResizableScrollArea";
 import { useEffect, useState } from "react";
@@ -6,7 +7,7 @@ import { motion } from "framer-motion";
 import { useListInvoices, useDeleteInvoice, getListInvoicesQueryKey, getGetInvoiceQueryKey, useGetInvoice } from "@workspace/api-client-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { StatusBadge } from "../dashboard";
-import { Plus, Search, Edit2, Trash2, Printer, FileText, Send, CheckCircle2, XCircle, Eye, EyeOff, Filter, ChevronDown, ChevronUp, X } from "lucide-react";
+import { ReceiptText, Plus, Search, Edit2, Trash2, Printer, FileText, Send, CheckCircle2, XCircle, Eye, EyeOff, Filter, ChevronDown, ChevronUp, X } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
@@ -67,6 +68,18 @@ export default function InvoicesList() {
 
   const [deleteId, setDeleteId] = useState<number | null>(null);
   const [, setLocation] = useLocation();
+  const [receiptLookupId, setReceiptLookupId] = useState<number | null>(null);
+  const openReceipt = async (invoiceId: number) => {
+    if (receiptLookupId !== null) return;
+    setReceiptLookupId(invoiceId);
+    try {
+      setLocation(await lookupReceiptPath(invoiceId, import.meta.env.VITE_API_BASE_URL, sessionStorage.getItem("auth_token")));
+    } catch {
+      toast({ title: tr("تعذر فتح سند القبض", "Unable to open receipt"), variant: "destructive" });
+    } finally {
+      setReceiptLookupId(null);
+    }
+  };
   const [copyId, setCopyId] = useState<number | null>(null);
 
   const { data: invoiceToCopy } = useGetInvoice(copyId || 0, {
@@ -210,7 +223,7 @@ export default function InvoicesList() {
   const deleteInvoice = useDeleteInvoice({
     mutation: {
       onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: getListInvoicesQueryKey() });
+        queryClient.invalidateQueries();
         toast({ title: t("invoices") + " - " + t("delete") });
       },
     },
@@ -500,6 +513,15 @@ export default function InvoicesList() {
                           📄
                         </button>
 
+                        {!isClient && can("canEditReceipts") && inv.status !== "cancelled" && (
+                          <button type="button" onClick={() => void openReceipt(inv.id)}
+                            disabled={receiptLookupId !== null}
+                            className="p-1.5 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg transition-colors disabled:opacity-50"
+                            title={tr("سند قبض", "Receipt")} aria-label={tr("سند قبض", "Receipt")}>
+                            <ReceiptText className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+
                         {!isClient && can("canEditInvoices") && (
                           <Link href={`/invoices/${inv.id}/edit`}>
                             <button
@@ -542,7 +564,7 @@ export default function InvoicesList() {
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>{t("confirmDeleteTitle")}</AlertDialogTitle>
-              <AlertDialogDescription>{t("confirmDeleteDesc")}</AlertDialogDescription>
+              <AlertDialogDescription>{lang === "ar" ? "سيتم تحويل سندات القبض المرتبطة بالفاتورة إلى ملغاة ونقلها إلى سلة المحذوفات أولاً، ثم إلغاء الفاتورة ونقلها إلى السلة. هل تريد المتابعة؟" : "Linked receipts will be cancelled and moved to trash first, then the invoice will be cancelled and moved to trash. Continue?"}</AlertDialogDescription>
             </AlertDialogHeader>
 
             <AlertDialogFooter className="flex-row-reverse gap-2">
@@ -565,4 +587,3 @@ export default function InvoicesList() {
     </motion.div>
   );
 }
-

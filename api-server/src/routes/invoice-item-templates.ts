@@ -4,6 +4,7 @@ import { sqlite, invoiceItemTemplatesTable } from "@workspace/db";
 import { eq, asc, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 
+import { ensureLocalTemplateUpdates } from "../utils/template-update-tracking";
 import { ensureLocalTemplateNumbers } from "../utils/template-numbering";
 
 function templateDb() {
@@ -13,7 +14,7 @@ function templateDb() {
 
 const router: IRouter = Router();
 router.use((_req, _res, next) => {
-  try { ensureLocalTemplateNumbers(); next(); } catch (error) { next(error); }
+  try { ensureLocalTemplateUpdates(); ensureLocalTemplateNumbers(); next(); } catch (error) { next(error); }
 });
 
 router.get("/invoice-item-templates", async (req, res) => {
@@ -72,14 +73,15 @@ router.put("/invoice-item-templates/:id", async (req, res) => {
       res.status(400).json({ error: "description is required" });
       return;
     }
-    const [template] = await templateDb()
-      .update(invoiceItemTemplatesTable)
-      .set({
-        description,
-        defaultUnitPrice: Number(parseFloat(defaultUnitPrice ?? "0").toFixed(2)),
-      })
-      .where(eq(invoiceItemTemplatesTable.id, id))
-      .returning();
+    const template = sqlite!.transaction(() => {
+      const [saved] = templateDb()
+        .update(invoiceItemTemplatesTable)
+        .set({ description, defaultUnitPrice: Number(parseFloat(defaultUnitPrice ?? "0").toFixed(2)) })
+        .where(eq(invoiceItemTemplatesTable.id, id))
+        .returning().all();
+      if (saved) sqlite!.prepare("UPDATE invoice_item_templates SET updated_at=? WHERE id=?").run(Date.now(), id);
+      return saved;
+    })();
     if (!template) {
       res.status(404).json({ error: "Template not found" });
       return;

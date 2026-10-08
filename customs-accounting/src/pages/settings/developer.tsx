@@ -539,7 +539,22 @@ export default function DeveloperSettingsPage() {
   const [internalConnectionActive, setInternalConnectionActive] = useState(false);
   const [isChangingInternalConnection, setIsChangingInternalConnection] = useState(false);
   const [connectionHealth, setConnectionHealth] = useState<{ online: boolean; internal: boolean; onlineAutoSync: boolean; internalAutoSync: boolean } | null>(null);
-  const [syncGuards, setSyncGuards] = useState<{ online: { blocked: boolean }; internal: { blocked: boolean } } | null>(null);
+  const [syncGuards, setSyncGuards] = useState<{ serverTime: number; online: { blocked: boolean; manualAvailableAt: number | null; running: boolean }; internal: { blocked: boolean; manualAvailableAt: number | null; running: boolean } } | null>(null);
+  const [syncClock, setSyncClock] = useState(0);
+  const [syncStatusReceivedAt, setSyncStatusReceivedAt] = useState(0);
+  useEffect(() => {
+    if (!unlocked) return;
+    setSyncClock(performance.now());
+    const timer = window.setInterval(() => setSyncClock(performance.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [unlocked]);
+  const syncCountdown = (target: "online" | "internal") => {
+    const status = syncGuards?.[target];
+    if (!status || !syncGuards) return "—";
+    if (status.running) return tr("جارٍ التشغيل...", "Running...");
+    const seconds = Math.max(0, Math.ceil(((status.manualAvailableAt ?? syncGuards.serverTime) - syncGuards.serverTime - Math.max(0, syncClock - syncStatusReceivedAt)) / 1000));
+    return seconds > 0 ? `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}` : tr("متاح الآن", "Ready now");
+  };
   useEffect(() => {
     if (!unlocked) return;
     let disposed = false;
@@ -548,7 +563,7 @@ export default function DeveloperSettingsPage() {
         const response = await fetch(`${API_BASE}/developer/sync/schedule-status`, { headers: authHeaders() });
         if (!response.ok) throw new Error("Sync status unavailable");
         const data = await response.json();
-        if (!disposed) setSyncGuards(data);
+        if (!disposed) { setSyncGuards(data); setSyncStatusReceivedAt(performance.now()); setSyncClock(performance.now()); }
       } catch { if (!disposed) setSyncGuards(null); }
     };
     void refresh();
@@ -2783,6 +2798,7 @@ export default function DeveloperSettingsPage() {
                   <RefreshCw className={cn("h-3.5 w-3.5", isSyncWorkerRunning && "animate-spin")} />
                   {isSyncWorkerRunning ? tr("جارٍ التشغيل...", "Running...") : tr("مزامنة الآن", "Sync now")}
                 </Button>
+                <span dir="ltr" className="text-xs font-semibold tabular-nums text-muted-foreground" title={tr("الوقت المتبقي لإتاحة المزامنة اليدوية", "Time until manual sync is available")}>{syncCountdown("online")}</span>
                 <Button
                   type="button"
                   variant="outline"
@@ -2956,6 +2972,7 @@ export default function DeveloperSettingsPage() {
                     <div className="flex flex-wrap gap-2 [&>button]:max-w-full [&>button]:h-auto [&>button]:min-h-8 [&>button]:whitespace-normal">
                       <Button size="sm" variant="outline" onClick={saveInternalDatabaseSettings} disabled={isSavingInternalDatabase}>{isSavingInternalDatabase ? tr("جارٍ الحفظ...", "Saving...") : tr("حفظ الإعدادات", "Save settings")}</Button>
                       <Button size="sm" onClick={() => internalDatabaseConfig.syncMode === "local-to-internal" ? runInternalPush() : internalDatabaseConfig.syncMode === "internal-to-local" ? runInternalPull() : runInternalBidirectional()} disabled={!internalConnectionActive || isRunningInternalPush || isRunningInternalPull || isRunningInternalBidirectional || !syncGuards || syncGuards.internal.blocked}>{tr("مزامنة الآن", "Sync now")}</Button>
+                      <span dir="ltr" className="text-xs font-semibold tabular-nums text-muted-foreground" title={tr("الوقت المتبقي لإتاحة المزامنة اليدوية", "Time until manual sync is available")}>{syncCountdown("internal")}</span>
                     </div>
                     <details className="min-w-0">
                       <summary className="cursor-pointer text-sm font-semibold">{tr("الفحص والصيانة", "Diagnostics and maintenance")}</summary>

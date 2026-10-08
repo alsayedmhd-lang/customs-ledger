@@ -1,3 +1,4 @@
+import { lookupReceiptPath } from "@/lib/invoice-receipt-link";
 import ResizableScrollArea from "@/components/layout/ResizableScrollArea";
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -470,7 +471,7 @@ function DuplicateInvoiceWarning({ matches, kind, isAR }: {
 }
 
 export default function InvoiceForm() {
-  const { user } = useAuth();
+  const { user, can } = useAuth();
   const [, setLocation] = useLocation();
   const search = useSearch();
   const urlClientId = new URLSearchParams(search).get("clientId");
@@ -1171,26 +1172,7 @@ export default function InvoiceForm() {
     try {
       setReceiptLookupPending(true);
 
-      const token = sessionStorage.getItem("auth_token");
-      const response = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/api/receipts/by-invoice/${invoiceId}`,
-        {
-          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-        },
-      );
-
-      if (!response.ok) {
-        throw new Error(`Receipt lookup failed with status ${response.status}`);
-      }
-
-      const receipt = await response.json();
-
-      if (receipt?.id) {
-        setLocation(`/receipts/${receipt.id}/edit`);
-        return;
-      }
-
-      setLocation(`/receipts/new?invoice=${invoiceId}`);
+      setLocation(await lookupReceiptPath(invoiceId, import.meta.env.VITE_API_BASE_URL, sessionStorage.getItem("auth_token")));
     } catch (error) {
       console.error("Receipt lookup failed:", error);
       toast({
@@ -1422,7 +1404,7 @@ export default function InvoiceForm() {
               {isAR ? "نسخ الفاتورة" : "Copy Invoice"}
             </button>
 
-              {isEdit && invoiceId && (
+              {isEdit && invoiceId && user?.role !== "client" && can("canEditReceipts") && existingInvoice?.status !== "cancelled" && (
                 <Link
                   href={`/receipts/new?invoice=${invoiceId}`}
                 >

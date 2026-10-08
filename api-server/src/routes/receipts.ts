@@ -4,6 +4,8 @@ import { sqlite, receiptsTable, clientsTable, invoicesTable, customerLedgerTable
 import { eq, desc, isNull, and, ne } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth";
 import { enqueueSyncChange } from "../utils/sync-queue";
+import { refreshAndQueueInvoicePaymentStatus } from "../utils/invoice-payment-state";
+import { changeDocumentDeletion } from "../utils/document-deletion-sync";
 
 const router: IRouter = Router();
 
@@ -43,10 +45,10 @@ try {
   sqlite?.exec(`ALTER TABLE receipts ADD COLUMN status TEXT NOT NULL DEFAULT 'issued';`);
 } catch {}
 
-type ReceiptStatus = "draft" | "issued";
+type ReceiptStatus = "draft" | "issued" | "cancelled";
 
 function normalizeReceiptStatus(value: unknown, fallback: ReceiptStatus = "draft"): ReceiptStatus {
-  return value === "issued" ? "issued" : value === "draft" ? "draft" : fallback;
+  return value === "cancelled" ? "cancelled" : value === "issued" ? "issued" : value === "draft" ? "draft" : fallback;
 }
 
 async function deleteReceiptLedgerEntry(receiptId: number) {
@@ -55,10 +57,10 @@ async function deleteReceiptLedgerEntry(receiptId: number) {
     .where(eq(customerLedgerTableSqlite.receiptId, receiptId));
 }
 
-async function syncIssuedReceiptLedgerEntry(receipt: typeof receiptsTable.$inferSelect) {
+export async function syncIssuedReceiptLedgerEntry(receipt: typeof receiptsTable.$inferSelect) {
   await deleteReceiptLedgerEntry(receipt.id);
 
-  if (receipt.status !== "issued" || receipt.clientId === null) return;
+  if (receipt.deletedAt != null || receipt.status !== "issued" || receipt.clientId === null) return;
 
   await getLocalDb().insert(customerLedgerTableSqlite).values({
     clientId: receipt.clientId,
@@ -90,6 +92,7 @@ async function findActiveReceiptByInvoiceId(invoiceId: number) {
         isNull(receiptsTable.deletedAt),
       ),
     )
+    .orderBy(desc(receiptsTable.id))
     .limit(1);
 
   return rows[0] ?? null;
@@ -174,33 +177,8 @@ async function validateReceiptDoesNotExceedRemaining(
   return { ok: true as const };
 }
 
-async function refreshInvoicePaidStatus(invoiceId: number | null | undefined) {
-  if (!invoiceId) return;
-
-  const [invoice] = await getLocalDb()
-    .select()
-    .from(invoicesTable)
-    .where(and(eq(invoicesTable.id, invoiceId), isNull(invoicesTable.deletedAt)))
-    .limit(1);
-
-  if (!invoice) return;
-  if (invoice.status === "cancelled") return;
-
-  const paidAmount =
-    Number(invoice.advancePayment ?? 0) + (await getActiveReceiptTotal(invoice.id));
-  const nextStatus =
-    paidAmount >= getOriginalInvoiceTotal(invoice)
-      ? "paid"
-      : invoice.status === "paid"
-        ? "issued"
-        : invoice.status;
-
-  if (invoice.status !== nextStatus) {
-    await getLocalDb()
-      .update(invoicesTable)
-      .set({ status: nextStatus, updatedAt: new Date() })
-      .where(eq(invoicesTable.id, invoice.id));
-  }
+export async function refreshInvoicePaidStatus(invoiceId: number | null | undefined) {
+  refreshAndQueueInvoicePaymentStatus(invoiceId);
 }
 
 async function enqueueReceiptSyncChangeIfNeeded(input: {
@@ -308,7 +286,7 @@ router.get("/receipts", requireAuth, async (req, res) => {
         .where(buildFilters())
         .orderBy(desc(receiptsTable.id));
     }
-    
+
     //----------------------------------------------
     const data = await Promise.all(
       rows.map(async (row) => {
@@ -316,25 +294,25 @@ router.get("/receipts", requireAuth, async (req, res) => {
           .select()
           .from(clientsTable)
           .where(eq(clientsTable.id, Number(row.receipts.clientId)));
-    
+
         let clientName = client?.name || "";
         let invoiceClient: typeof client | undefined = undefined;
-    
+
         if (!clientName && row.invoices?.clientId) {
           [invoiceClient] = await getLocalDb()
             .select()
             .from(clientsTable)
             .where(eq(clientsTable.id, Number(row.invoices.clientId)));
-    
+
           clientName = invoiceClient?.name || "";
         }
-    
+
         console.log("ROW RECEIPT CLIENT ID:", row.receipts.clientId);
         console.log("ROW INVOICE CLIENT ID:", row.invoices?.clientId);
         console.log("CLIENT OBJECT:", client);
         console.log("INVOICE CLIENT OBJECT:", invoiceClient);
         console.log("FINAL CLIENT NAME:", clientName);
-    
+
         return formatReceipt(
           row.receipts,
           clientName || "لا يوجد",
@@ -358,7 +336,7 @@ router.get("/receipts/by-invoice/:invoiceId", requireAuth, async (req, res) => {
   try {
     const invoiceId = Number(req.params.invoiceId);
 
-    if (Number.isNaN(invoiceId) || invoiceId <= 0) {
+    if (!Number.isSafeInteger(invoiceId) || invoiceId <= 0) {
       return res.status(400).json({ error: "Invalid invoice id" });
     }
 
@@ -372,17 +350,20 @@ router.get("/receipts/by-invoice/:invoiceId", requireAuth, async (req, res) => {
     const invoiceRows = await getLocalDb()
       .select()
       .from(invoicesTable)
-      .where(
+      .where(and(isNull(invoicesTable.deletedAt),
         isAdmin
           ? clientScope
             ? and(eq(invoicesTable.id, invoiceId), eq(invoicesTable.clientId, clientScope.clientId))
             : eq(invoicesTable.id, invoiceId)
           : and(eq(invoicesTable.id, invoiceId), eq(invoicesTable.createdBy, userId)),
-      )
+      ))
       .limit(1);
 
     if (!invoiceRows.length) {
-      return res.json(null);
+      return res.status(404).json({ error: "Invoice not found" });
+    }
+    if (invoiceRows[0].status === "cancelled") {
+      return res.status(409).json({ error: "Restore the invoice before linking a receipt" });
     }
 
     const row = await findActiveReceiptByInvoiceId(invoiceId);
@@ -475,7 +456,7 @@ router.post("/receipts", requireAuth, async (req, res) => {
         status: receiptStatus,
         notes: req.body.notes || null,
         receiptDate: req.body.receiptDate || req.body.receivedAt,
-        createdBy: (req as any).user?.id ?? 1,
+        createdBy: req.user!.userId,
       })
       .returning();
 
@@ -611,7 +592,10 @@ router.put("/receipts/:id", requireAuth, async (req, res) => {
     }
 
       const patchData: any = {};
-      
+
+      if (oldReceipt.receiptNumber.startsWith("REC-W-") && req.body.receiptNumber !== undefined && req.body.receiptNumber !== oldReceipt.receiptNumber) {
+        return res.status(409).json({ error: "لا يمكن تغيير رقم سند الويب", errorEn: "Web receipt numbers cannot be changed" });
+      }
       if (req.body.receiptNumber !== undefined) patchData.receiptNumber = req.body.receiptNumber;
       if (req.body.date !== undefined) patchData.receiptDate = req.body.date;
       if (req.body.receiptDate !== undefined) patchData.receiptDate = req.body.receiptDate;
@@ -619,7 +603,7 @@ router.put("/receipts/:id", requireAuth, async (req, res) => {
       if (req.body.status !== undefined) patchData.status = targetStatus;
       if (req.body.notes !== undefined) patchData.notes = req.body.notes;
       if (req.body.invoiceId !== undefined) patchData.invoiceId = invoiceId;
-      
+
       if (
         req.body.clientId !== undefined ||
         req.body.invoiceId !== undefined
@@ -681,10 +665,10 @@ router.delete("/receipts/:id", requireAuth, async (req, res) => {
       .where(eq(receiptsTable.id, id))
       .limit(1);
 
-    await getLocalDb()
-      .update(receiptsTable)
-      .set({ deletedAt: new Date() })
-      .where(and(eq(receiptsTable.id, id), isNull(receiptsTable.deletedAt)));
+    if (!changeDocumentDeletion("receipt", id, false, req.user?.userId ?? null)) {
+      res.status(404).json({ error: "Receipt not found" });
+      return;
+    }
 
     if (receipt) {
       await deleteReceiptLedgerEntry(receipt.id);
@@ -703,7 +687,7 @@ export function formatReceipt(
   r: typeof receiptsTable.$inferSelect,
   clientName: string,
   invoiceNumber: string | null,
-  receivedByName: string = "", 
+  receivedByName: string = "",
 ) {
   return {
     id: r.id,
@@ -739,6 +723,10 @@ router.post("/receipts/:id/issue", requireAuth, async (req, res) => {
 
     if (!receipt) {
       return res.status(404).json({ error: "Receipt not found" });
+    }
+
+    if (receipt.status === "cancelled") {
+      return res.status(409).json({ error: "حوّل السند الملغى إلى مسودة للمراجعة قبل إصداره", errorEn: "Change the cancelled receipt to draft before issuing" });
     }
 
     if (receipt.status !== "issued") {

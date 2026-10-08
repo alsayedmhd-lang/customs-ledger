@@ -93,9 +93,11 @@ const paymentMethodLabel: Record<string, string> = {
 const receiptStatusLabel: Record<string, string> = {
   draft: tr("مسودة", "Draft"),
   issued: tr("صادر", "Issued"),
+  cancelled: tr("ملغى", "Cancelled"),
 };
 
 const receiptStatusClass: Record<string, string> = {
+  cancelled: "bg-rose-500/10 text-rose-600 border-rose-500/30",
   draft: "bg-muted/30 text-muted-foreground border-border",
   issued: "bg-emerald-500/10 text-emerald-400 border-emerald-500/30",
 };
@@ -385,7 +387,7 @@ const getClientName = (receipt: { clientName?: string | null; clientId?: number 
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>{t("deleteReceiptTitle")}</AlertDialogTitle>
-            <AlertDialogDescription>{t("deleteReceiptDesc")}</AlertDialogDescription>
+            <AlertDialogDescription>{tr("سيتم تحويل سند القبض إلى ملغى ثم نقله إلى سلة المحذوفات وإلغاء أثره في التحصيل. هل تريد المتابعة؟", "This receipt will be cancelled and moved to trash, removing its collection effect. Continue?")}</AlertDialogDescription>
           </AlertDialogHeader>
 
           <AlertDialogFooter className="flex-row-reverse gap-2">
@@ -402,5 +404,3 @@ const getClientName = (receipt: { clientName?: string | null; clientId?: number 
     </div>
   );
 }
-
-

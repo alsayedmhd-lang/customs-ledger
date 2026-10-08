@@ -1,4 +1,5 @@
-import { useEffect } from "react";
+import { invoiceQueryId, invoiceReceiptAmount } from "@/lib/invoice-receipt-link";
+import { useEffect, useRef } from "react";
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes";
 import { useLocation, useParams, Link } from "wouter";
 import { useForm } from "react-hook-form";
@@ -39,7 +40,7 @@ const formSchema = z.object({
   invoiceNumber: z.string().optional().nullable(),
   amount: z.coerce.number().min(0.01, "Amount is required"),
   paymentMethod: z.enum(["cash", "transfer", "check"]),
-  status: z.enum(["draft", "issued"]).default("draft"),
+  status: z.enum(["draft", "issued", "cancelled"]).default("draft"),
   notes: z.string().optional(),
   receiptDate: z.string(),
 });
@@ -52,9 +53,10 @@ const PAYMENT_METHOD_LABELS: Record<string, { ar: string; en: string }> = {
   check: { ar: "شيك", en: "Cheque" },
 };
 
-const RECEIPT_STATUS_LABELS: Record<"draft" | "issued", { ar: string; en: string }> = {
+const RECEIPT_STATUS_LABELS: Record<"draft" | "issued" | "cancelled", { ar: string; en: string }> = {
   draft: { ar: "مسودة", en: "Draft" },
   issued: { ar: "صادر", en: "Issued" },
+  cancelled: { ar: "ملغى", en: "Cancelled" },
 };
 
 export default function ReceiptForm() {
@@ -62,9 +64,8 @@ export default function ReceiptForm() {
   const { id } = useParams<{ id: string }>();
   const isEdit = Boolean(id);
   const receiptId = parseInt(id || "0");
-  const search = new URLSearchParams(window.location.search);
-  const invoiceIdFromUrl = search.get("invoice");
-  const invoiceIdFromUrlNumber = invoiceIdFromUrl ? Number(invoiceIdFromUrl) : 0;
+  const invoiceIdFromUrlNumber = invoiceQueryId(window.location.search, window.location.hash);
+  const initializedInvoiceId = useRef<number | null>(null);
   const { data: clients } = useListClients();
   const { data: invoices } = useListInvoices();
   const { data: linkedInvoice } = useGetInvoice(invoiceIdFromUrlNumber, {
@@ -125,7 +126,8 @@ export default function ReceiptForm() {
   }
 
   useEffect(() => {
-    if (isEdit || !invoiceIdFromUrlNumber || !linkedInvoice) return;
+    if (isEdit || !invoiceIdFromUrlNumber || !linkedInvoice || initializedInvoiceId.current === invoiceIdFromUrlNumber || isDirty) return;
+    initializedInvoiceId.current = invoiceIdFromUrlNumber;
 
     const linkedClient = (clients ?? []).find(
       (c) => Number(c.id) === Number(linkedInvoice.clientId)
@@ -144,8 +146,8 @@ export default function ReceiptForm() {
       "",
       { shouldValidate: true }
     );
-    setValue("amount", Number(linkedInvoice.total ?? 0), { shouldValidate: true });
-  }, [invoiceIdFromUrlNumber, isEdit, linkedInvoice, clients?.length, setValue]);
+    setValue("amount", invoiceReceiptAmount(linkedInvoice), { shouldValidate: true });
+  }, [invoiceIdFromUrlNumber, isEdit, linkedInvoice, clients?.length, setValue, isDirty]);
 
   const selectedClientId = watch("clientId");
 
@@ -179,7 +181,7 @@ export default function ReceiptForm() {
           "",
         amount: Number(existing.amount),
         paymentMethod: existing.paymentMethod as "cash" | "transfer" | "check",
-        status: ((existing as any).status === "issued" ? "issued" : "draft") as "draft" | "issued",
+        status: (["issued", "cancelled"].includes((existing as any).status) ? (existing as any).status : "draft") as "draft" | "issued" | "cancelled",
         notes: existing.notes ?? "",
         receiptDate: existing.receiptDate,
       });
@@ -423,7 +425,7 @@ export default function ReceiptForm() {
                   setValue("clientName", invoice.clientName || watch("clientName") || "", {
                     shouldValidate: true,
                   });
-                  setValue("amount", Number(invoice.total), { shouldValidate: true });
+                  setValue("amount", invoiceReceiptAmount(invoice), { shouldValidate: true });
                 }
               }}
               disabled={!effectiveClientId && !watch("invoiceId")}
@@ -497,7 +499,7 @@ export default function ReceiptForm() {
               <Label>{tr("حالة السند", "Receipt status")} <span className="text-destructive">*</span></Label>
               <Select
                 value={watch("status")}
-                onValueChange={(v) => setValue("status", v as "draft" | "issued", { shouldValidate: true })}
+                onValueChange={(v) => setValue("status", v as "draft" | "issued" | "cancelled", { shouldValidate: true })}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -536,7 +538,7 @@ export default function ReceiptForm() {
             <Save className="w-4 h-4" />
             {isSubmitting ? tr("جارٍ الحفظ...", "Saving...") : isEdit ? tr("تحديث السند", "Update receipt") : tr("حفظ وطباعة", "Save and print")}
           </Button>
-          {isEdit && watch("status") !== "issued" && (
+          {isEdit && watch("status") === "draft" && (
             <Button
               type="button"
               disabled={isSubmitting}
@@ -554,5 +556,3 @@ export default function ReceiptForm() {
     </div>
   );
 }
-
-

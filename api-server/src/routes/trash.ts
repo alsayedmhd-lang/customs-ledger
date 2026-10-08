@@ -9,7 +9,8 @@ import { invoiceAuditLogsTableSqlite } from "../../../lib/db/src/schema/invoices
 import { eq, desc, isNotNull, and } from "drizzle-orm";
 
 import { formatInvoice, formatItem } from "./invoices";
-import { formatReceipt } from "./receipts";
+import { formatReceipt, refreshInvoicePaidStatus, syncIssuedReceiptLedgerEntry } from "./receipts";
+import { changeDocumentDeletion, permanentlyDeleteDocument } from "../utils/document-deletion-sync";
 import { Router } from "express";
 
 const router = Router();
@@ -66,6 +67,10 @@ router.get("/trash/invoices", async (req, res) => {
 
     res.json(invoicesWithItems);
   } catch (err) {
+    if (err instanceof Error && err.message === "RESTORE_INVOICE_FIRST") {
+      res.status(409).json({ error: "استعد الفاتورة المرتبطة أولاً", errorEn: "Restore the linked invoice first" });
+      return;
+    }
     console.error(err);
     res.status(500).json({ error: "Internal server error" });
   }
@@ -75,11 +80,11 @@ router.get("/trash/invoices", async (req, res) => {
 router.post("/trash/invoices/:id/restore", async (req, res) => {
   try {
     const id = parseInt(String(req.params.id), 10);
-    const [invoice] = await getLocalDb()
-      .update(invoicesTable)
-      .set({ deletedAt: null })
-      .where(and(eq(invoicesTable.id, id), isNotNull(invoicesTable.deletedAt)))
-      .returning();
+    if (!changeDocumentDeletion("invoice", id, true, (req as any).user?.userId ?? null)) {
+      res.status(404).json({ error: "Document not found in trash" });
+      return;
+    }
+    const [invoice] = await getLocalDb().select().from(invoicesTable).where(eq(invoicesTable.id, id));
 
     if (!invoice) {
       res.status(404).json({ error: "Invoice not found in trash" });
@@ -95,7 +100,7 @@ router.post("/trash/invoices/:id/restore", async (req, res) => {
     userPhone: null,
     changesJson: JSON.stringify({
       before: { deletedAt: "not_null" },
-      after: { deletedAt: null },
+      after: { deletedAt: null, status: "draft" },
     }),
     createdAt: new Date(),
   });
@@ -111,6 +116,10 @@ router.post("/trash/invoices/:id/restore", async (req, res) => {
       items: items.map(formatItem),
     });
   } catch (err) {
+    if (err instanceof Error && err.message === "RESTORE_INVOICE_FIRST") {
+      res.status(409).json({ error: "استعد الفاتورة المرتبطة أولاً", errorEn: "Restore the linked invoice first" });
+      return;
+    }
     console.error(err);
     res.status(500).json({ error: "Internal server error" });
   }
@@ -120,10 +129,13 @@ router.post("/trash/invoices/:id/restore", async (req, res) => {
 router.delete("/trash/invoices/:id", async (req, res) => {
   try {
     const id = parseInt(String(req.params.id), 10);
-    await getLocalDb().delete(invoiceItemsTable).where(eq(invoiceItemsTable.invoiceId, id));
-    await getLocalDb().delete(invoicesTable).where(eq(invoicesTable.id, id));
+    permanentlyDeleteDocument("invoice", id, (req as any).user?.userId ?? null);
     res.status(204).send();
   } catch (err) {
+    if (err instanceof Error && err.message === "RESTORE_INVOICE_FIRST") {
+      res.status(409).json({ error: "استعد الفاتورة المرتبطة أولاً", errorEn: "Restore the linked invoice first" });
+      return;
+    }
     console.error(err);
     res.status(500).json({ error: "Internal server error" });
   }
@@ -143,6 +155,10 @@ router.get("/trash/receipts", async (req, res) => {
 
     res.json(rows.map(r => formatReceipt(r.receipts, r.clients?.name ?? "", null)));
   } catch (err) {
+    if (err instanceof Error && err.message === "RESTORE_INVOICE_FIRST") {
+      res.status(409).json({ error: "استعد الفاتورة المرتبطة أولاً", errorEn: "Restore the linked invoice first" });
+      return;
+    }
     console.error(err);
     res.status(500).json({ error: "Internal server error" });
   }
@@ -152,20 +168,26 @@ router.get("/trash/receipts", async (req, res) => {
 router.post("/trash/receipts/:id/restore", async (req, res) => {
   try {
     const id = parseInt(String(req.params.id), 10);
-    const [receipt] = await getLocalDb()
-      .update(receiptsTable)
-      .set({ deletedAt: null })
-      .where(and(eq(receiptsTable.id, id), isNotNull(receiptsTable.deletedAt)))
-      .returning();
+    if (!changeDocumentDeletion("receipt", id, true, (req as any).user?.userId ?? null)) {
+      res.status(404).json({ error: "Document not found in trash" });
+      return;
+    }
+    const [receipt] = await getLocalDb().select().from(receiptsTable).where(eq(receiptsTable.id, id));
 
     if (!receipt) {
       res.status(404).json({ error: "Receipt not found in trash" });
       return;
     }
 
+    await refreshInvoicePaidStatus(receipt.invoiceId);
+    await syncIssuedReceiptLedgerEntry(receipt);
     const [client] = await getLocalDb().select().from(clientsTable).where(eq(clientsTable.id, receipt.clientId));
     res.json(formatReceipt(receipt, client?.name ?? "", null));
   } catch (err) {
+    if (err instanceof Error && err.message === "RESTORE_INVOICE_FIRST") {
+      res.status(409).json({ error: "استعد الفاتورة المرتبطة أولاً", errorEn: "Restore the linked invoice first" });
+      return;
+    }
     console.error(err);
     res.status(500).json({ error: "Internal server error" });
   }
@@ -175,9 +197,13 @@ router.post("/trash/receipts/:id/restore", async (req, res) => {
 router.delete("/trash/receipts/:id", async (req, res) => {
   try {
     const id = parseInt(String(req.params.id), 10);
-    await getLocalDb().delete(receiptsTable).where(eq(receiptsTable.id, id));
+    permanentlyDeleteDocument("receipt", id, (req as any).user?.userId ?? null);
     res.status(204).send();
   } catch (err) {
+    if (err instanceof Error && err.message === "RESTORE_INVOICE_FIRST") {
+      res.status(409).json({ error: "استعد الفاتورة المرتبطة أولاً", errorEn: "Restore the linked invoice first" });
+      return;
+    }
     console.error(err);
     res.status(500).json({ error: "Internal server error" });
   }

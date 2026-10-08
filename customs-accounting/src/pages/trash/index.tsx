@@ -49,6 +49,7 @@ type TrashReceipt = {
   receivedAt: string;
   amount: number;
   paymentMethod: string;
+  status: string;
   deletedAt: string;
 };
 
@@ -117,53 +118,64 @@ export default function TrashPage() {
   const restoreInvoice = useMutation({
     mutationFn: async (id: number) => {
       const res = await authFetch(`${API_BASE}/api/trash/invoices/${id}/restore`, { method: "POST" });
-      if (!res.ok) throw new Error();
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error((lang === "ar" ? body.error : body.errorEn) || body.error || t("errorTitle"));
+      }
       return res.json();
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["trash-invoices"] });
-      qc.invalidateQueries({ queryKey: ["invoices"] });
-      toast({ title: t("restoredTitle"), description: t("restoredInvoiceDesc") });
+      qc.invalidateQueries();
+      toast({ title: t("restoredTitle"), description: lang === "ar" ? "استُعيدت الفاتورة كمسودة. تبقى السندات المرتبطة في السلة." : "Invoice restored as draft. Linked receipts remain in trash." });
     },
-    onError: () => toast({ title: t("errorTitle"), variant: "destructive" }),
+    onError: (error: Error) => toast({ title: t("errorTitle"), description: error.message, variant: "destructive" }),
   });
 
   const restoreReceipt = useMutation({
     mutationFn: async (id: number) => {
       const res = await authFetch(`${API_BASE}/api/trash/receipts/${id}/restore`, { method: "POST" });
-      if (!res.ok) throw new Error();
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error((lang === "ar" ? body.error : body.errorEn) || body.error || t("errorTitle"));
+      }
       return res.json();
     },
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["trash-receipts"] });
-      qc.invalidateQueries({ queryKey: ["receipts"] });
-      toast({ title: t("restoredTitle"), description: t("restoredReceiptDesc") });
+      qc.invalidateQueries();
+      toast({ title: t("restoredTitle"), description: lang === "ar" ? "استُعيد السند كمسودة دون احتسابه ضمن التحصيل." : "Receipt restored as draft without collection effects." });
     },
-    onError: () => toast({ title: t("errorTitle"), variant: "destructive" }),
+    onError: (error: Error) => toast({ title: t("errorTitle"), description: error.message, variant: "destructive" }),
   });
 
   const deleteInvoicePermanently = useMutation({
     mutationFn: async (id: number) => {
       const res = await authFetch(`${API_BASE}/api/trash/invoices/${id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error();
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error((lang === "ar" ? body.error : body.errorEn) || body.error || t("errorTitle"));
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["trash-invoices"] });
+      qc.invalidateQueries({ queryKey: ["trash-receipts"] });
       toast({ title: t("permanentDeletedTitle"), description: t("permanentDeletedInvoiceDesc") });
     },
-    onError: () => toast({ title: t("errorTitle"), variant: "destructive" }),
+    onError: (error: Error) => toast({ title: t("errorTitle"), description: error.message, variant: "destructive" }),
   });
 
   const deleteReceiptPermanently = useMutation({
     mutationFn: async (id: number) => {
       const res = await authFetch(`${API_BASE}/api/trash/receipts/${id}`, { method: "DELETE" });
-      if (!res.ok) throw new Error();
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error((lang === "ar" ? body.error : body.errorEn) || body.error || t("errorTitle"));
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["trash-receipts"] });
       toast({ title: t("permanentDeletedTitle"), description: t("permanentDeletedReceiptDesc") });
     },
-    onError: () => toast({ title: t("errorTitle"), variant: "destructive" }),
+    onError: (error: Error) => toast({ title: t("errorTitle"), description: error.message, variant: "destructive" }),
   });
 
   const emptyTrash = useMutation({
@@ -178,7 +190,7 @@ export default function TrashPage() {
       qc.invalidateQueries({ queryKey: ["trash-receipts"] });
       toast({ title: t("emptiedTrashTitle"), description: t("emptiedTrashDesc") });
     },
-    onError: () => toast({ title: t("errorTitle"), variant: "destructive" }),
+    onError: (error: Error) => toast({ title: t("errorTitle"), description: error.message, variant: "destructive" }),
   });
 
   const totalItems = trashedInvoices.length + trashedReceipts.length;
@@ -350,6 +362,7 @@ export default function TrashPage() {
                     <th className={thCls}>{t("date")}</th>
                     <th className={thCls}>{t("amount")}</th>
                     <th className={thCls}>{t("paymentMethod")}</th>
+                    <th className={thCls}>{lang === "ar" ? "الحالة" : "Status"}</th>
                     <th className={thCls}>{t("deletedAt")}</th>
                     <th className={`${thCls} text-center`}>{t("actions")}</th>
                   </tr>
@@ -362,6 +375,7 @@ export default function TrashPage() {
                       <td className={`${tdCls} text-muted-foreground`}>{formatDate(rec.receivedAt, lang)}</td>
                       <td className={`${tdCls} font-semibold`}>{formatCurrency(rec.amount, undefined, lang)}</td>
                       <td className={`${tdCls} text-muted-foreground`}>{methodLabels[rec.paymentMethod] ?? rec.paymentMethod}</td>
+                      <td className={tdCls}>{rec.status === "cancelled" ? (lang === "ar" ? "ملغى" : "Cancelled") : rec.status === "issued" ? (lang === "ar" ? "صادر" : "Issued") : (lang === "ar" ? "مسودة" : "Draft")}</td>
                       <td className={`${tdCls} text-muted-foreground text-xs`}>{timeSince(rec.deletedAt)}</td>
                       <td className={tdCls}>
                         <div className="flex items-center justify-center gap-2">
@@ -403,8 +417,8 @@ export default function TrashPage() {
             <AlertDialogDescription>
               {t("confirmDeleteDesc")}{" "}
               {lang === "ar"
-                ? `سيتم حذف ${confirmDelete?.type === "invoice" ? t("invoiceWord") : t("receiptWord")} نهائياً من قاعدة البيانات.`
-                : `The ${confirmDelete?.type === "invoice" ? t("invoiceWord") : t("receiptWord")} will be permanently deleted from the database.`}
+                ? (confirmDelete?.type === "invoice" ? "سيتم حذف الفاتورة وجميع سندات القبض المرتبطة بها نهائياً دون إمكانية الاسترداد." : "سيتم حذف سند القبض نهائياً دون إمكانية الاسترداد.")
+                : (confirmDelete?.type === "invoice" ? "The invoice and all linked receipts will be permanently deleted and cannot be recovered." : "The receipt will be permanently deleted and cannot be recovered.")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="flex-row-reverse gap-2">

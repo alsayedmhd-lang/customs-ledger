@@ -6,6 +6,7 @@ import { invoiceAuditLogsTableSqlite } from "../../../lib/db/src/schema/invoices
 import { eq, desc, isNull, and, like, isNotNull, sql } from "drizzle-orm";
 import { requireAuth } from "../middleware/auth";
 import { enqueueSyncChange } from "../utils/sync-queue";
+import { changeDocumentDeletion } from "../utils/document-deletion-sync";
 
 const router: IRouter = Router();
 
@@ -516,7 +517,7 @@ router.post("/invoices", requireAuth, async (req, res) => {
       res.status(400).json({ error: "clientId, issueDate, and items are required" });
       return;
     }
-    
+
     const [client] = await getLocalDb().select().from(clientsTable).where(eq(clientsTable.id, clientId));
 
     if (!client) {
@@ -624,7 +625,7 @@ router.post("/invoices", requireAuth, async (req, res) => {
             createdBy: req.user?.userId ?? null,
           });
         }
-                  
+
       await getLocalDb().insert(invoiceAuditLogsTableSqlite).values({
         invoiceId: inserted.id,
         action:
@@ -640,7 +641,7 @@ router.post("/invoices", requireAuth, async (req, res) => {
         createdAt: new Date(),
       });
 
-      break;    
+      break;
       } catch (insertErr: any) {
         // 23505 = unique_violation in PostgreSQL
         if (insertErr?.cause?.code === "23505" || insertErr?.code === "23505") {
@@ -688,7 +689,7 @@ router.post("/invoices", requireAuth, async (req, res) => {
       },
       userId: req.user?.userId,
     });
-    
+
 
     res.status(201).json({
       ...formatInvoice(invoice, client.name),
@@ -1097,11 +1098,11 @@ router.delete("/invoices/:id", async (req, res) => {
      const [oldInvoice] = await getLocalDb()
       .select()
       .from(invoicesTable)
-      .where(eq(invoicesTable.id, id)); 
-    await getLocalDb()
-      .update(invoicesTable)
-      .set({ deletedAt: new Date() })
-      .where(and(eq(invoicesTable.id, id), isNull(invoicesTable.deletedAt)));
+      .where(eq(invoicesTable.id, id));
+    if (!changeDocumentDeletion("invoice", id, false, req.user?.userId ?? null)) {
+      res.status(404).json({ error: "Invoice not found" });
+      return;
+    }
 
     await getLocalDb().insert(invoiceAuditLogsTableSqlite).values({
         invoiceId: id,
@@ -1112,7 +1113,7 @@ router.delete("/invoices/:id", async (req, res) => {
         userPhone: req.user?.phone ?? null,
         changesJson: JSON.stringify({
           before: oldInvoice,
-          after: { deletedAt: new Date() },
+          after: { status: "cancelled", deletedAt: new Date(), linkedReceipts: "cancelled and moved to trash" },
         }),
         createdAt: new Date(),
       });
@@ -1334,7 +1335,7 @@ router.post("/invoices/import", requireAuth, async (req, res) => {
       let invoiceId: number;
 
       if (existing && shipmentRef) {
-      
+
         await getLocalDb()
           .update(invoicesTable)
           .set(values)

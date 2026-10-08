@@ -1788,8 +1788,9 @@ router.get("/developer/sync/schedule-status", (_req, res) => {
   try {
     const busy = isSyncOperationRunning() || isOnlineSyncRunning() || getInternalAutoSyncStatus().running;
     return res.json({
-      online: { blocked: busy || Date.now() < manualSyncAvailableAt("online") },
-      internal: { blocked: busy || Date.now() < manualSyncAvailableAt("internal") },
+      serverTime: Date.now(),
+      online: { blocked: busy || Date.now() < manualSyncAvailableAt("online"), manualAvailableAt: manualSyncAvailableAt("online") || null, running: busy },
+      internal: { blocked: busy || Date.now() < manualSyncAvailableAt("internal"), manualAvailableAt: manualSyncAvailableAt("internal") || null, running: busy },
     });
   } catch { return res.status(503).json({ error: "Sync status is unavailable" }); }
 });

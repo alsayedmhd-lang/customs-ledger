@@ -1,9 +1,13 @@
+import { syncOnlineAccounting } from "./online-accounting-sync";
+import { ensureLocalTemplateUpdates, ensurePgTemplateUpdates } from "./template-update-tracking";
+import { pullWebInvoices, pullWebReceipts } from "./web-draft-sync";
 import { withSyncLock, guardSyncClient } from "./sync-operation-lock";
 import { ensureLocalTemplateNumbers, ensurePgTemplateNumbers, pullAllocatedTemplateNumbers } from "./template-numbering";
 import { reconcileInvoiceItems } from "./reconcile-invoice-items";
 import { sqlite } from "@workspace/db";
 import { createRequire } from "module";
 import { ensureSyncQueueTable } from "./ensure-sync-queue-table";
+import { queueUntrackedDocumentDeletions, currentDocumentDeletion, pushDocumentDeletion, blocksDocumentPull, acceptOnlineDocumentDeletion, readDocumentRestoreMarkers } from "./document-deletion-sync";
 import { pushOnlineAttachmentMetadata, pullOnlineAttachmentMetadata } from "./online-attachment-metadata-sync";
 
 const require = createRequire(process.cwd() + "/package.json");
@@ -134,6 +138,7 @@ type LocalTemplateRow = {
   itemCode: string | null;
   description: string;
   defaultUnitPrice: number | null;
+  updatedAt?: number | null;
   createdAt: number | null;
 };
 
@@ -265,7 +270,7 @@ function findLocalInvoiceIdByShipmentRef(
     .prepare(`
       SELECT id
       FROM invoices
-      WHERE trim(COALESCE(shipment_ref, '')) = ?
+      WHERE trim(COALESCE(shipment_ref, '')) = ? AND created_source <> 'web'
       LIMIT 2
     `)
     .all(normalizedShipmentRef) as Array<{ id: number }>;
@@ -380,7 +385,7 @@ function findLocalReceiptIdForOnlineReceipt(
     .prepare(`
       SELECT id
       FROM receipts
-      WHERE client_id = ?
+      WHERE created_source <> 'web' AND client_id = ?
         AND invoice_id IS ?
         AND amount = ?
       ORDER BY id
@@ -600,22 +605,25 @@ async function pullUsersFromOnline(client: any, clientIdMap: Map<number, number>
 }
 
 async function pullTemplatesFromOnline(client: any) {
+  ensureLocalTemplateUpdates();
+  await ensurePgTemplateUpdates(client);
   ensureLocalTemplateNumbers();
   await ensurePgTemplateNumbers(client, true);
   if (!sqlite) throw new Error("SQLite database is not available");
   const result = await client.query(
-    "SELECT item_code, description, default_unit_price, created_at FROM invoice_item_templates ORDER BY item_code ASC"
+    "SELECT item_code, description, default_unit_price, created_at, updated_at FROM invoice_item_templates ORDER BY item_code ASC"
   ) as { rows?: Array<{
     item_code: string | null;
     description: string;
     default_unit_price: number | string | null;
+    updated_at: string | Date | null;
     created_at: string | Date | null;
   }> };
   const rows = result.rows || [];
   let inserted = 0;
   const local = sqlite.prepare(
-    "SELECT id, item_code AS itemCode, description FROM invoice_item_templates"
-  ).all() as Array<{ id: number; itemCode: string | null; description: string }>;
+    "SELECT id, item_code AS itemCode, description, updated_at AS updatedAt FROM invoice_item_templates"
+  ).all() as Array<{ id: number; itemCode: string | null; description: string; updatedAt?: number | null }>;
 
   for (const template of rows) {
     const code = String(template.item_code || "").trim();
@@ -623,7 +631,19 @@ async function pullTemplatesFromOnline(client: any) {
     if (!code || !description) throw new Error("Online template has no code or description");
 
     const byCode = local.find((row) => row.itemCode === code);
-    if (byCode) continue;
+    if (byCode) {
+      const localTime = Number(byCode.updatedAt ?? 0);
+      const onlineTime = toSqliteTimestamp(template.updated_at) ?? 0;
+      if (localTime === 0 || onlineTime > localTime) {
+        sqlite.prepare(`UPDATE invoice_item_templates
+          SET description=?, default_unit_price=?, updated_at=?
+          WHERE id=? AND COALESCE(updated_at,0)=?`).run(
+          description, Number(template.default_unit_price ?? 0),
+          onlineTime || null, byCode.id, localTime
+        );
+      }
+      continue;
+    }
 
     const byDescription = local.find(
       (row) => normalizeText(row.description) === normalizeText(description)
@@ -646,7 +666,8 @@ async function pullTemplatesFromOnline(client: any) {
       code, description, Number(template.default_unit_price ?? 0),
       toSqliteTimestamp(template.created_at) ?? Date.now()
     );
-    local.push({ id: Number(insertedRow.lastInsertRowid), itemCode: code, description });
+    sqlite.prepare("UPDATE invoice_item_templates SET updated_at=? WHERE id=?").run(toSqliteTimestamp(template.updated_at), Number(insertedRow.lastInsertRowid));
+    local.push({ id: Number(insertedRow.lastInsertRowid), itemCode: code, description, updatedAt: toSqliteTimestamp(template.updated_at) });
     inserted += 1;
   }
   await pullAllocatedTemplateNumbers(client);
@@ -685,7 +706,7 @@ function getLocalClients() {
 function getLocalTemplates() {
   return sqlite?.prepare(`
     SELECT id, item_code AS itemCode, description,
-           default_unit_price AS defaultUnitPrice, created_at AS createdAt
+           default_unit_price AS defaultUnitPrice, created_at AS createdAt, updated_at AS updatedAt
     FROM invoice_item_templates ORDER BY item_code ASC
   `).all() as LocalTemplateRow[] | undefined;
 }
@@ -728,44 +749,22 @@ function hasDeletedAt(row: { deleted_at?: unknown } | null | undefined) {
   return row?.deleted_at !== null && row?.deleted_at !== undefined;
 }
 
-async function autoRestoreOnlineInvoiceIfNeeded(
-  client: any,
-  row: { id: number; invoice_number?: string; deleted_at?: unknown } | null | undefined,
-  invoice: LocalInvoiceRow,
-  stats: SyncRunStats
-) {
-  if (!row || !hasDeletedAt(row)) return;
-
-  await client.query("UPDATE invoices SET deleted_at = NULL WHERE id = $1", [Number(row.id)]);
-  stats.autoRestoredCount += 1;
-  console.log("[SYNC][AUTO_RESTORE][INVOICE]", {
-    onlineInvoiceId: Number(row.id),
-    invoiceId: invoice.id,
-    invoiceNumber: invoice.invoiceNumber || row.invoice_number || null,
-  });
+function keepOnlineInvoiceDeletion(row: { deleted_at?: unknown } | null | undefined, invoice: LocalInvoiceRow) {
+  if (!row || !hasDeletedAt(row)) return false;
+  acceptOnlineDocumentDeletion("invoice", invoice.id, row.deleted_at);
+  return true;
 }
-
-async function autoRestoreOnlineReceiptIfNeeded(
-  client: any,
-  row: { id: number; receipt_number?: string; deleted_at?: unknown } | null | undefined,
-  receipt: LocalReceiptRow,
-  stats: SyncRunStats
-) {
-  if (!row || !hasDeletedAt(row)) return;
-
-  await client.query("UPDATE receipts SET deleted_at = NULL WHERE id = $1", [Number(row.id)]);
-  stats.autoRestoredCount += 1;
-  console.log("[SYNC][AUTO_RESTORE][RECEIPT]", {
-    onlineReceiptId: Number(row.id),
-    receiptId: receipt.id,
-    receiptNumber: receipt.receiptNumber || row.receipt_number || null,
-  });
+function keepOnlineReceiptDeletion(row: { deleted_at?: unknown } | null | undefined, receipt: LocalReceiptRow) {
+  if (!row || !hasDeletedAt(row)) return false;
+  acceptOnlineDocumentDeletion("receipt", receipt.id, row.deleted_at);
+  return true;
 }
 
 function isSupportedSyncRow(row: SyncQueueRow) {
   return (
     (row.entityType === "invoice" || row.entityType === "receipt" || row.entityType === "accounting" || row.entityType === "customer_ledger") &&
-    (row.operation === "create" || row.operation === "update")
+    (row.operation === "create" || row.operation === "update" ||
+      ((row.entityType === "invoice" || row.entityType === "receipt") && (row.operation === "delete" || row.operation === "restore")))
   );
 }
 
@@ -1260,11 +1259,13 @@ async function pullInvoicesFromOnline(
       deleted_at,
       created_at,
       updated_at
-    FROM invoices
+    FROM invoices i
+    WHERE COALESCE(to_jsonb(i)->>'created_source','desktop') <> 'web'
     ORDER BY id ASC
   `) as { rows?: OnlineInvoiceRow[] };
 
   const onlineInvoices = result.rows || [];
+  const restoreMarkers = await readDocumentRestoreMarkers(client, "invoice");
   const invoiceIdMap = new Map<number, number>();
   const invoiceIdsAllowedForItemPull = new Set<number>();
 
@@ -1290,8 +1291,15 @@ async function pullInvoicesFromOnline(
     const shipmentRef =
       String(onlineInvoice.shipment_ref ?? "").trim() || null;
 
-    const existingLocalId =
-      findLocalInvoiceIdByShipmentRef(shipmentRef);
+    const numberMatches = sqlite.prepare("SELECT id FROM invoices WHERE invoice_number=? AND client_id=? AND created_source<>'web' LIMIT 2")
+      .all(String(onlineInvoice.invoice_number), localClientId) as Array<{id:number}>;
+    if (numberMatches.length > 1) throw new Error("Ambiguous local invoice number during pull");
+    const existingLocalId = numberMatches[0]?.id ?? findLocalInvoiceIdByShipmentRef(shipmentRef);
+    if (blocksDocumentPull("invoice", onlineInvoice, existingLocalId, localClientId, null, restoreMarkers.get(Number(onlineInvoice.id)))) {
+      if (existingLocalId) invoiceIdMap.set(Number(onlineInvoice.id), existingLocalId);
+      skipped += 1;
+      continue;
+    }
 
     if (existingLocalId) {
       const localInvoice = getLocalInvoice(String(existingLocalId));
@@ -1304,7 +1312,7 @@ async function pullInvoicesFromOnline(
         ? new Date(onlineInvoice.updated_at).getTime()
         : 0;
 
-      if (localUpdatedAt > onlineUpdatedAt) {
+      if (!hasDeletedAt(onlineInvoice) && localUpdatedAt > onlineUpdatedAt) {
         console.log("[SYNC][PULL][INVOICE][SKIP_OLDER_ONLINE]", {
           onlineInvoiceId: onlineInvoice.id,
           localInvoiceId: existingLocalId,
@@ -1323,6 +1331,7 @@ async function pullInvoicesFromOnline(
       }
 
       if (
+        !hasDeletedAt(onlineInvoice) &&
         localUpdatedAt > 0 &&
         onlineUpdatedAt > 0 &&
         localUpdatedAt === onlineUpdatedAt
@@ -1661,11 +1670,13 @@ async function pullReceiptsFromOnline(
       created_by,
       deleted_at,
       created_at
-    FROM receipts
+    FROM receipts r
+    WHERE COALESCE(to_jsonb(r)->>'created_source','desktop') <> 'web'
     ORDER BY id ASC
   `) as { rows?: OnlineReceiptRow[] };
 
   const onlineReceipts = result.rows || [];
+  const restoreMarkers = await readDocumentRestoreMarkers(client, "receipt");
 
   let inserted = 0;
   let updated = 0;
@@ -1716,6 +1727,10 @@ async function pullReceiptsFromOnline(
         amount
       );
 
+    if (blocksDocumentPull("receipt", onlineReceipt, existingLocalId, localClientId, localInvoiceId, restoreMarkers.get(Number(onlineReceipt.id)))) {
+      skipped += 1;
+      continue;
+    }
     if (existingLocalId) {
       sqlite
         .prepare(`
@@ -1892,11 +1907,21 @@ async function unlockedOnlineToLocalSyncOnce(): Promise<{
     const templatesResult = await pullTemplatesFromOnline(client);
     const usersResult = await pullUsersFromOnline(client, clientsResult.clientIdMap);
 
+    ensureSyncQueueTable();
+    queueUntrackedDocumentDeletions();
+    const webInvoices = await pullWebInvoices(client, clientsResult.clientIdMap, resolveLocalUserIdFromOnline);
+
     const invoicesResult =
       await pullInvoicesFromOnline(
         client,
         clientsResult.clientIdMap
       );
+
+    for (const [onlineId, localId] of webInvoices.map) invoicesResult.invoiceIdMap.set(onlineId, localId);
+    invoicesResult.total += webInvoices.total;
+    invoicesResult.inserted += webInvoices.inserted;
+    invoicesResult.updated += webInvoices.updated;
+    invoicesResult.skipped += webInvoices.skipped;
 
     const invoiceItemsResult =
       await pullInvoiceItemsFromOnline(
@@ -1911,6 +1936,12 @@ async function unlockedOnlineToLocalSyncOnce(): Promise<{
         clientsResult.clientIdMap,
         invoicesResult.invoiceIdMap
       );
+
+    const webReceipts = await pullWebReceipts(client, clientsResult.clientIdMap, invoicesResult.invoiceIdMap, resolveLocalUserIdFromOnline);
+    receiptsResult.total += webReceipts.total;
+    receiptsResult.inserted += webReceipts.inserted;
+    receiptsResult.updated += webReceipts.updated;
+    receiptsResult.skipped += webReceipts.skipped;
 
     const attachmentsResult = await pullOnlineAttachmentMetadata(client);
 
@@ -1972,11 +2003,13 @@ async function unlockedOnlineToLocalSyncOnce(): Promise<{
 // A template has no invoice dependency. Copy missing templates before clients.
 // Match templates by their shared code; local numeric IDs differ across devices.
 async function syncTemplatesBeforeQueue(client: any) {
+  ensureLocalTemplateUpdates();
+  await ensurePgTemplateUpdates(client);
   ensureLocalTemplateNumbers();
   await ensurePgTemplateNumbers(client, true);
   const online = await client.query(
-    "SELECT item_code, description FROM invoice_item_templates"
-  ) as { rows?: Array<{ item_code: string | null; description: string }> };
+    "SELECT item_code, description, updated_at FROM invoice_item_templates"
+  ) as { rows?: Array<{ item_code: string | null; description: string; updated_at?: string | Date | null }> };
   const onlineRows = online.rows || [];
 
   for (const template of getLocalTemplates() || []) {
@@ -1987,7 +2020,18 @@ async function syncTemplatesBeforeQueue(client: any) {
     }
 
     const byCode = onlineRows.find((row) => row.item_code === code);
-    if (byCode) continue;
+    if (byCode) {
+      const modifiedAt = toPgTimestamp(template.updatedAt);
+      const onlineTime = toSqliteTimestamp(byCode.updated_at) ?? 0;
+      if (modifiedAt && Number.isFinite(modifiedAt.getTime()) && modifiedAt.getTime() > onlineTime) {
+        await client.query(
+          `UPDATE invoice_item_templates SET description=$1, default_unit_price=$2, updated_at=$3
+           WHERE item_code=$4 AND (updated_at IS NULL OR updated_at < $3)`,
+          [description, Number(template.defaultUnitPrice ?? 0), modifiedAt, code]
+        );
+      }
+      continue;
+    }
 
     const byDescription = onlineRows.find(
       (row) => normalizeText(row.description) === normalizeText(description)
@@ -2010,6 +2054,7 @@ async function syncTemplatesBeforeQueue(client: any) {
       [code, description, Number(template.defaultUnitPrice ?? 0),
        toPgTimestamp(template.createdAt) ?? new Date()]
     );
+    await client.query("UPDATE invoice_item_templates SET updated_at=$1 WHERE item_code=$2 AND updated_at IS NULL", [toPgTimestamp(template.updatedAt), code]);
     onlineRows.push({ item_code: code, description });
   }
   await ensurePgTemplateNumbers(client, true);
@@ -2023,7 +2068,29 @@ async function syncClientsBeforeQueue(client: any) {
   for (const localClient of getLocalClients() || []) {
     const name = String(localClient.name || "").trim();
     if (!name) throw new Error(`Local client ${localClient.id} has no name`);
-    if (await findOnlineClientId(client, localClient)) continue;
+    const existingOnlineId = await findOnlineClientId(client, localClient);
+    if (existingOnlineId) {
+      const modifiedAt = toPgTimestamp(localClient.updatedAt);
+      if (modifiedAt && Number.isFinite(modifiedAt.getTime())) {
+        const result = await client.query(
+          `UPDATE clients
+           SET name=$1, email=$2, phone=$3, address=$4, tax_id=$5,
+               notes=$6, updated_at=$7
+           WHERE id=$8
+             AND (updated_at IS NULL OR updated_at < $7)
+           RETURNING id`,
+          [name, localClient.email, localClient.phone, localClient.address,
+           localClient.taxId, localClient.notes, modifiedAt, existingOnlineId]
+        );
+        if (result.rows?.length) {
+          console.log("[SYNC][PUSH][CLIENT][UPDATE]", {
+            localClientId: localClient.id,
+            onlineClientId: existingOnlineId,
+          });
+        }
+      }
+      continue;
+    }
     await client.query(
       `INSERT INTO clients (name, email, phone, address, tax_id, notes, created_at, updated_at)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
@@ -2069,7 +2136,7 @@ async function pushInvoiceCreate(client: any, invoice: LocalInvoiceRow, onlineCl
     `
       SELECT id, invoice_number, deleted_at
       FROM invoices
-      WHERE invoice_number = $1 OR id = $2
+      WHERE invoice_number = $1 OR (id = $2 AND $1 NOT LIKE 'INV-W-%' AND COALESCE(to_jsonb(invoices)->>'created_source','desktop') <> 'web')
       ORDER BY CASE WHEN invoice_number = $1 THEN 0 ELSE 1 END
       LIMIT 1
     `,
@@ -2077,8 +2144,12 @@ async function pushInvoiceCreate(client: any, invoice: LocalInvoiceRow, onlineCl
   ) as { rowCount?: number; rows?: Array<{ id: number; invoice_number: string; deleted_at: unknown }> };
   console.log("[SYNC][INVOICE][FOUND]", existing.rows?.[0] || null);
 
+  if (invoice.invoiceNumber.startsWith("INV-W-") && !existing.rows?.[0]) {
+    throw new Error("WEB_INVOICE_MISSING_ONLINE: refusing to recreate without Web identity");
+  }
+
   if (existing.rowCount && existing.rows?.[0]) {
-    await autoRestoreOnlineInvoiceIfNeeded(client, existing.rows[0], invoice, stats);
+    if (keepOnlineInvoiceDeletion(existing.rows[0], invoice)) return false;
     await client.query(
       `
         UPDATE invoices
@@ -2187,7 +2258,7 @@ async function pushInvoiceUpdate(client: any, invoice: LocalInvoiceRow, onlineCl
     [String(invoice.invoiceNumber || "")]
   ) as { rowCount?: number; rows?: Array<{ id: number; invoice_number: string; deleted_at: unknown }> };
   console.log("[SYNC][INVOICE][FOUND]", existing.rows?.[0] || null);
-  await autoRestoreOnlineInvoiceIfNeeded(client, existing.rows?.[0], invoice, stats);
+  if (keepOnlineInvoiceDeletion(existing.rows?.[0], invoice)) return false;
 
   const result = await client.query(
     `
@@ -2263,7 +2334,7 @@ async function hasOnlineInvoice(client: any, invoiceNumber: string) {
 
 async function getOnlineReceiptId(client: any, receiptNumber: string, localReceipt?: LocalReceiptRow | null) {
   let result: { rows?: Array<{ id: number }> };
-  if (localReceipt) {
+  if (localReceipt && !receiptNumber.startsWith("REC-W-")) {
     const mapping = await resolveReceiptOnlineMapping(client, localReceipt);
     result = await client.query(
       `SELECT id FROM receipts WHERE client_id = $1
@@ -2451,17 +2522,22 @@ async function pushReceipt(client: any, receipt: LocalReceiptRow, operation: str
   // client + invoice (including a null invoice) + amount.
   const existing = await client.query(
     `SELECT id, receipt_number, deleted_at FROM receipts
-     WHERE client_id = $1 AND invoice_id IS NOT DISTINCT FROM $2
-       AND amount = $3
+     WHERE ($4 LIKE 'REC-W-%' AND receipt_number = $4)
+       OR ($4 NOT LIKE 'REC-W-%' AND COALESCE(to_jsonb(receipts)->>'created_source','desktop') <> 'web'
+         AND client_id = $1 AND invoice_id IS NOT DISTINCT FROM $2 AND amount = $3)
      ORDER BY id LIMIT 2`,
-    [mapping.onlineClientId, mapping.onlineInvoiceId, amount]
+    [mapping.onlineClientId, mapping.onlineInvoiceId, amount, String(receipt.receiptNumber || "")]
   ) as { rows?: Array<{ id: number; receipt_number: string; deleted_at: unknown }> };
   if ((existing.rows?.length ?? 0) > 1) {
     throw new Error(`Ambiguous online receipt match for local receiptId: ${receipt.id}`);
   }
   const row = existing.rows?.[0];
+  if (receipt.receiptNumber.startsWith("REC-W-") && !row) {
+    throw new Error("WEB_RECEIPT_MISSING_ONLINE: refusing to recreate without Web identity");
+  }
+
   if (row) {
-    await autoRestoreOnlineReceiptIfNeeded(client, row, receipt, stats);
+    if (keepOnlineReceiptDeletion(row, receipt)) return false;
     await client.query(
       `UPDATE receipts SET receipt_number = $1, client_id = $2,
         invoice_id = $3, amount = $4, payment_method = $5,
@@ -2683,6 +2759,7 @@ async function unlockedSyncWorkerOnce(): Promise<{
       return { pendingCount: 0, processedCount: 0, onlineConnected: false, lastError: "SQLite database is unavailable", autoRestoredCount: 0 };
     }
 
+    queueUntrackedDocumentDeletions();
     const pending = sqlite
       .prepare(`
         SELECT
@@ -2753,6 +2830,22 @@ async function unlockedSyncWorkerOnce(): Promise<{
         try {
           markRetrying(row);
 
+          if (row.entityType === "invoice" || row.entityType === "receipt") {
+            const change = currentDocumentDeletion(row.entityType, Number(row.entityId));
+            if (change) {
+              const result = await pushDocumentDeletion(client, change, resolveOnlineClientIdForLocalClientId);
+              if (result.restored) stats.autoRestoredCount += 1;
+              markSynced(row.id);
+              processedCount += 1;
+              continue;
+            }
+            if (row.operation === "delete" || row.operation === "restore") {
+              // A newer completed explicit restore supersedes this old queue event.
+              markSynced(row.id);
+              processedCount += 1;
+              continue;
+            }
+          }
           if (row.entityType === "invoice") {
             const invoice = getLocalInvoice(row.entityId);
             if (!invoice) {
@@ -2766,19 +2859,20 @@ async function unlockedSyncWorkerOnce(): Promise<{
 
             const onlineClientId = await resolveOnlineClientId(client, invoice);
 
+            let pushed: boolean | void;
             if (row.operation === "create") {
-              await pushInvoiceCreate(client, invoice, onlineClientId, stats);
+              pushed = await pushInvoiceCreate(client, invoice, onlineClientId, stats);
             } else if (await hasOnlineInvoice(client, invoice.invoiceNumber)) {
-              await pushInvoiceUpdate(client, invoice, onlineClientId, stats);
+              pushed = await pushInvoiceUpdate(client, invoice, onlineClientId, stats);
             } else {
               console.log("[SYNC][INVOICE][FALLBACK_CREATE]", {
                 invoiceId: invoice.id,
                 invoiceNumber: invoice.invoiceNumber,
               });
-              await pushInvoiceCreate(client, invoice, onlineClientId, stats);
+              pushed = await pushInvoiceCreate(client, invoice, onlineClientId, stats);
             }
 
-            await syncInvoiceItems(client, invoice);
+            if (pushed !== false) await syncInvoiceItems(client, invoice);
           } else if (row.entityType === "receipt") {
             const receipt = getLocalReceipt(row.entityId);
             if (!receipt) {
@@ -2828,6 +2922,7 @@ export type ConfiguredSyncResult = {
   lastError: string | null;
   autoRestoredCount: number;
   pullResult?: Awaited<ReturnType<typeof runOnlineToLocalSyncOnce>>;
+  accountingResult?: Awaited<ReturnType<typeof syncOnlineAccounting>>;
 };
 
 let configuredSyncInFlight: Promise<ConfiguredSyncResult> | null = null;
@@ -2848,6 +2943,15 @@ export function runConfiguredSyncOnce(mode: string): Promise<ConfiguredSyncResul
     configuredSyncInFlight = null;
   });
   return configuredSyncInFlight;
+}
+
+async function runAccountingSync(mode: string) {
+  const client = await createOnlineClient(getOnlineConnectionString());
+  try {
+    const result = await syncOnlineAccounting(sqlite, client, mode, getOnlineConnectionString());
+    console.log("[SYNC][INVOICE_ACCOUNTING]", result);
+    return result;
+  } finally { await client.end().catch(() => {}); }
 }
 
 async function performConfiguredSync(mode: string): Promise<ConfiguredSyncResult> {
@@ -2884,7 +2988,13 @@ async function performConfiguredSync(mode: string): Promise<ConfiguredSyncResult
       }
     }
     if (syncMode === "local-to-online" || lastError || pendingCount) {
-      return { syncMode, pendingCount, processedCount, onlineConnected, lastError, autoRestoredCount };
+      let accountingResult;
+      if (syncMode === "local-to-online" && onlineConnected && !lastError) {
+        accountingResult = await runAccountingSync(syncMode);
+        processedCount += accountingResult.pushed;
+        if (accountingResult.conflicts.length) lastError = "Accounting conflict; existing values preserved: " + accountingResult.conflicts.join(", ");
+      }
+      return { syncMode, pendingCount, processedCount, onlineConnected, lastError, autoRestoredCount, accountingResult };
     }
   }
 
@@ -2897,7 +3007,13 @@ async function performConfiguredSync(mode: string): Promise<ConfiguredSyncResult
     pullResult.invoices.inserted + pullResult.invoices.updated +
     pullResult.invoiceItems.inserted +
     pullResult.receipts.inserted + pullResult.receipts.updated;
-  return { syncMode, pendingCount, processedCount, onlineConnected, lastError, autoRestoredCount, pullResult };
+  let accountingResult;
+  if (onlineConnected && !lastError) {
+    accountingResult = await runAccountingSync(syncMode);
+    processedCount += accountingResult.pushed + accountingResult.pulled;
+    if (accountingResult.conflicts.length) lastError = "Accounting conflict; existing values preserved: " + accountingResult.conflicts.join(", ");
+  }
+  return { syncMode, pendingCount, processedCount, onlineConnected, lastError, autoRestoredCount, pullResult, accountingResult };
 }
 
 export function runSyncWorkerOnce() {

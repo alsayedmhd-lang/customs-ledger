@@ -206,6 +206,62 @@ function TxtInput({
 
 export default function AccountingPage() {
   const { t, lang, currencySymbol } = useLanguage();
+
+  const defaultColumnWidths = [10, 8, 16, 8, 7, 7, 2, 8, 8, 5, 2, 5, 2, 7, 2, 3];
+  const columnStorageKey = "ledger-accounting-column-widths-v1";
+  const [columnWidths, setColumnWidths] = useState<number[]>(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(columnStorageKey) || "null");
+      if (Array.isArray(saved) && saved.length === 16 && saved.every((n) => typeof n === "number" && Number.isFinite(n) && n >= 1) && Math.abs(saved.reduce((a, b) => a + b, 0) - 100) < 0.1) return saved;
+    } catch { /* Use default widths when storage is unavailable. */ }
+    return defaultColumnWidths;
+  });
+  const tableRef = useRef<HTMLTableElement>(null);
+  const columnDrag = useRef<{ index: number; x: number; width: number; widths: number[]; rtl: boolean } | null>(null);
+  useEffect(() => {
+    try { localStorage.setItem(columnStorageKey, JSON.stringify(columnWidths)); } catch { /* Layout remains usable without storage. */ }
+  }, [columnWidths]);
+  const columnHandle = (index: number) => index < 15 ? (
+    <span
+      role="separator" aria-orientation="vertical" tabIndex={0}
+      aria-label={lang === "ar" ? "تغيير عرض العمود" : "Resize column"}
+      title={lang === "ar" ? "اسحب لتغيير العرض — انقر مرتين لاستعادة المقاسات" : "Drag to resize — double-click to reset widths"}
+      className="absolute inset-y-0 end-0 w-2 cursor-col-resize touch-none select-none hover:bg-primary/10 focus:bg-primary/10 z-40"
+      onDoubleClick={() => setColumnWidths(defaultColumnWidths)}
+      onPointerDown={(event) => {
+        if (event.button !== 0 || !tableRef.current) return;
+        event.preventDefault(); event.stopPropagation();
+        columnDrag.current = { index, x: event.clientX, width: tableRef.current.getBoundingClientRect().width, widths: [...columnWidths], rtl: getComputedStyle(tableRef.current).direction === "rtl" };
+        event.currentTarget.setPointerCapture(event.pointerId);
+      }}
+      onPointerMove={(event) => {
+        const drag = columnDrag.current;
+        if (!drag || drag.index !== index || drag.width <= 0) return;
+        const delta = (event.clientX - drag.x) * (drag.rtl ? -1 : 1) / drag.width * 100;
+        const pair = drag.widths[index] + drag.widths[index + 1];
+        const minimum = Math.min(28 / drag.width * 100, pair / 2);
+        const next = [...drag.widths];
+        next[index] = Math.max(minimum, Math.min(pair - minimum, drag.widths[index] + delta));
+        next[index + 1] = pair - next[index];
+        setColumnWidths(next);
+      }}
+      onPointerUp={() => { columnDrag.current = null; }}
+      onPointerCancel={() => { columnDrag.current = null; }}
+      onLostPointerCapture={() => { columnDrag.current = null; }}
+      onKeyDown={(event) => {
+        if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+        event.preventDefault();
+        const rtl = tableRef.current && getComputedStyle(tableRef.current).direction === "rtl";
+        const delta = (event.key === "ArrowRight" ? 0.5 : -0.5) * (rtl ? -1 : 1);
+        setColumnWidths((current) => {
+          const next = [...current]; const pair = current[index] + current[index + 1];
+          next[index] = Math.max(1, Math.min(pair - 1, current[index] + delta));
+          next[index + 1] = pair - next[index]; return next;
+        });
+      }}
+    />
+  ) : null;
+
   const { toast } = useToast();
   const { user, can } = useAuth();
   const queryClient = useQueryClient();
@@ -813,72 +869,111 @@ export default function AccountingPage() {
             {t("noData")}
           </div>
         ) : (
-          <ResizableScrollArea storageKey="accounting-index" maxHeight={440}>
-            <table className="w-full text-xs">
+          <ResizableScrollArea storageKey="accounting-index" maxHeight={440} className="overflow-x-hidden">
+            <style>{`
+              .ledger-accounting-table { width: calc(100% - 12px); margin-inline-start: 12px; table-layout: fixed; }
+              .ledger-accounting-table th, .ledger-accounting-table td {
+                padding-inline: 2px; white-space: normal; overflow-wrap: anywhere; text-align: center; vertical-align: middle;
+              }
+              .ledger-accounting-table th { position: relative; padding-inline: 8px; font-size: 10px; line-height: 1.3; }
+              .ledger-accounting-table thead tr { background: hsl(var(--muted) / 0.92); }
+              .ledger-accounting-table thead th {
+                background: hsl(var(--muted) / 0.92);
+                border-inline: 0; border-inline-end: 1px solid hsl(var(--border) / 0.12);
+                box-shadow: none;
+              }
+              .ledger-accounting-table thead td { border-color: transparent; }
+              .ledger-accounting-table input { width: 100%; min-width: 0; padding-inline: 2px; text-align: center; }
+              .ledger-accounting-table td > span { max-width: 100%; width: auto; padding-inline: 0; text-align: center; }
+              .ledger-accounting-table td button { width: 20px; height: 22px; }
+              .ledger-accounting-table td button[role="checkbox"] { width: 18px; height: 18px; }
+            `}</style>
+            <table ref={tableRef} className="ledger-accounting-table w-full text-xs">
+              <colgroup>
+                {columnWidths.map((width, index) => (
+                  <col key={index} style={{ width: `${width}%` }} />
+                ))}
+              </colgroup>
               <thead className="sticky top-0 z-20">
                 <tr className="border-b-2 border-border bg-muted/50 text-[11px]">
                   {/* ─ static cols ─ */}
                   <th className="px-3 py-2.5 text-right font-semibold text-muted-foreground whitespace-nowrap sticky right-0 top-0 bg-muted/50 z-30 shadow-[inset_-1px_0_0_0_hsl(var(--border))]">
                     {t("invoiceNumber")}
+                    {columnHandle(0)}
                   </th>
                   <th className="px-3 py-2.5 text-right font-semibold text-muted-foreground whitespace-nowrap">
                     {t("invoiceAmount")}
+                    {columnHandle(1)}
                   </th>
                   <th className="px-3 py-2.5 text-right font-semibold text-muted-foreground whitespace-nowrap">
                     {t("client")}
+                    {columnHandle(2)}
                   </th>
                   <th className="px-3 py-2.5 text-right font-semibold text-muted-foreground whitespace-nowrap">
                     {t("date")}
+                    {columnHandle(3)}
                   </th>
                   {/* ─ payments ─ */}
                   <th className="px-2 py-2.5 text-right font-semibold text-blue-500 whitespace-nowrap border-r border-border/40">
                     {t("payments")}
+                    {columnHandle(4)}
                   </th>
                   {/* ─ transport group ─ */}
                   <th className="px-2 py-2.5 text-right font-semibold text-orange-500 whitespace-nowrap border-r border-border/40">
                     {t("transportation")}
+                    {columnHandle(5)}
                   </th>
                   <th
                     className="px-2 py-2.5 text-center font-semibold text-orange-400 whitespace-nowrap"
                     title={t("markTransportationPaid")}
                   >
                     ✓
+                    {columnHandle(6)}
                   </th>
                   <th className="px-2 py-2.5 text-right font-semibold text-sky-500 whitespace-nowrap">
                     {t("driverName")}
+                    {columnHandle(7)}
                   </th>
                   <th className="px-2 py-2.5 text-right font-semibold text-teal-500 whitespace-nowrap">
                     {t("unloadLocation")}
+                    {columnHandle(8)}
                   </th>
                   {/* ─ labor group ─ */}
                   <th className="px-2 py-2.5 text-right font-semibold text-purple-500 whitespace-nowrap border-r border-border/40">
                     {t("labor")}
+                    {columnHandle(9)}
                   </th>
                   <th
                     className="px-2 py-2.5 text-center font-semibold text-purple-400 whitespace-nowrap"
                     title={t("markLaborPaid")}
                   >
                     ✓
+                    {columnHandle(10)}
                   </th>
                   {/* ─ other group ─ */}
                   <th className="px-2 py-2.5 text-right font-semibold text-red-500 whitespace-nowrap border-r border-border/40">
                     {t("otherExpenses")}
+                    {columnHandle(11)}
                   </th>
                   <th
                     className="px-2 py-2.5 text-center font-semibold text-red-400 whitespace-nowrap"
                     title={t("markOtherExpensesPaid")}
                   >
                     ✓
+                    {columnHandle(12)}
                   </th>
                   {/* ─ income + save ─ */}
                   <th className="px-3 py-2.5 text-right font-semibold text-green-600 whitespace-nowrap bg-green-50/40 dark:bg-green-900/10 border-r border-border/40">
                     {t("income")}
+                    {columnHandle(13)}
                   </th>
                   <th className="px-2 py-2.5 text-center font-semibold text-muted-foreground whitespace-nowrap">
                     💾
+                    {columnHandle(14)}
                   </th>
                   <th className="px-2 py-2.5 text-center text-muted-foreground whitespace-nowrap">
                     {lang === "ar" ? "المبالغ" : "Amounts"}
+                    {columnHandle(15)}
                   </th>
                 </tr>
                 {/* ─ column group labels ─ */}
@@ -887,8 +982,9 @@ export default function AccountingPage() {
                   <td className="px-2 py-1 text-blue-400 text-center border-r border-border/40">
                     {t("myPayments")}
                   </td>
+                  <td colSpan={2} />
                   <td
-                    colSpan={4}
+                    colSpan={2}
                     className="px-2 py-1 text-orange-400 text-center border-r border-border/40"
                   >
                     {t("transportationGroup")}
@@ -944,9 +1040,8 @@ export default function AccountingPage() {
                       </td>
                       <td className="px-3 py-1.5">
                         <div
-                          className="w-[120px] overflow-x-auto whitespace-nowrap [scrollbar-width:thin]"
+                          className="w-full min-w-0 whitespace-normal [overflow-wrap:anywhere] leading-relaxed"
                           dir="auto"
-                          tabIndex={0}
                           title={row.clientName}
                           aria-label={row.clientName}
                         >
