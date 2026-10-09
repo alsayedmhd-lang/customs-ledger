@@ -1,4 +1,6 @@
+import { ensureInternalSchemaCompatibility } from "./internal-schema-compatibility";
 import { ensureLocalTemplateNumbers, ensurePgTemplateNumbers } from "./template-numbering";
+import { ensureLocalTemplateUpdates, ensurePgTemplateUpdates } from "./template-update-tracking";
 import { sqlite } from "@workspace/db";
 import { createRequire } from "module";
 
@@ -18,7 +20,7 @@ const COPY_TABLES = [
 const ALL_TABLES = [...COPY_TABLES, "invoice_attachments", "otp_codes", "sync_queue", "company_settings"] as const;
 const TIMESTAMPS = new Set([
   "clients.created_at", "clients.updated_at", "users.created_at",
-  "invoice_item_templates.created_at", "invoices.created_at", "invoices.updated_at",
+  "invoice_item_templates.created_at", "invoice_item_templates.updated_at", "invoices.created_at", "invoices.updated_at",
   "invoices.deleted_at", "receipts.created_at", "receipts.deleted_at",
 ]);
 const BOOLEANS = new Set([
@@ -47,6 +49,7 @@ export function convertInternalValue(table: string, column: string, value: unkno
 }
 
 export async function bootstrapInternalDatabase(connectionString: string) {
+  ensureLocalTemplateUpdates();
   ensureLocalTemplateNumbers();
   if (!sqlite) throw new Error("SQLite database is unavailable");
   // Freeze the source in memory before the first write to PostgreSQL.
@@ -58,6 +61,8 @@ export async function bootstrapInternalDatabase(connectionString: string) {
   let inTransaction = false;
   try {
     await client.connect();
+    await ensurePgTemplateUpdates(client);
+    await ensureInternalSchemaCompatibility(client);
     await ensurePgTemplateNumbers(client, false);
     await client.query("BEGIN");
     inTransaction = true;
@@ -121,6 +126,8 @@ export async function completeInternalAccounting(connectionString: string) {
   let inTransaction = false;
   try {
     await client.connect();
+    await ensurePgTemplateUpdates(client);
+    await ensureInternalSchemaCompatibility(client);
     await ensurePgTemplateNumbers(client, false);
     await client.query("BEGIN");
     inTransaction = true;

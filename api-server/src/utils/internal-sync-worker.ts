@@ -1,5 +1,7 @@
+import { ensureInternalSchemaCompatibility } from "./internal-schema-compatibility";
 import { withSyncLock, guardSyncClient } from "./sync-operation-lock";
 import { ensureLocalTemplateNumbers, ensurePgTemplateNumbers } from "./template-numbering";
+import { ensureLocalTemplateUpdates, ensurePgTemplateUpdates } from "./template-update-tracking";
 import { sqlite } from "@workspace/db";
 import { createRequire } from "module";
 import { convertInternalValue } from "./internal-bootstrap";
@@ -18,7 +20,7 @@ const TABLES = [
 ] as const;
 const TIMESTAMP_COLUMNS = new Set([
   "clients.created_at", "clients.updated_at", "users.created_at",
-  "invoice_item_templates.created_at", "invoices.created_at", "invoices.updated_at",
+  "invoice_item_templates.created_at", "invoice_item_templates.updated_at", "invoices.created_at", "invoices.updated_at",
   "invoices.deleted_at", "receipts.created_at", "receipts.deleted_at",
 ]);
 const quote = (value: string) => `"${value}"`;
@@ -107,6 +109,7 @@ function canonicalJson(value: unknown): string {
 }
 
 async function performInternalPull(connectionString: string) {
+  ensureLocalTemplateUpdates();
   ensureLocalTemplateNumbers();
   ensureInternalSyncJournal();
   if (!sqlite) throw new Error("SQLite database is unavailable");
@@ -118,6 +121,8 @@ async function performInternalPull(connectionString: string) {
   try {
     await client.connect();
     guardSyncClient(client);
+    await ensurePgTemplateUpdates(client);
+    await ensureInternalSchemaCompatibility(client);
     await ensurePgTemplateNumbers(client, false);
     await client.query("BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY");
     inPgTransaction = true;
@@ -266,6 +271,7 @@ function applyInternalSource(source: Array<{
 }
 
 async function performInternalJournalPull(connectionString: string) {
+  ensureLocalTemplateUpdates();
   ensureLocalTemplateNumbers();
   ensureInternalSyncJournal();
   if (!sqlite) throw new Error("SQLite database is unavailable");
@@ -278,6 +284,8 @@ async function performInternalJournalPull(connectionString: string) {
   try {
     await client.connect();
     guardSyncClient(client);
+    await ensurePgTemplateUpdates(client);
+    await ensureInternalSchemaCompatibility(client);
     await ensurePgTemplateNumbers(client, false);
     await client.query("BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY");
     transaction = true;
@@ -327,6 +335,7 @@ async function performInternalJournalPull(connectionString: string) {
 }
 
 async function performInternalPush(connectionString: string, bidirectional = false) {
+  ensureLocalTemplateUpdates();
   ensureLocalTemplateNumbers();
   ensureInternalSyncJournal();
   if (!sqlite) throw new Error("SQLite database is unavailable");
@@ -359,6 +368,8 @@ async function performInternalPush(connectionString: string, bidirectional = fal
   try {
     await client.connect();
     guardSyncClient(client);
+    await ensurePgTemplateUpdates(client);
+    await ensureInternalSchemaCompatibility(client);
     await ensurePgTemplateNumbers(client, false);
     await client.query("BEGIN");
     inTransaction = true;
