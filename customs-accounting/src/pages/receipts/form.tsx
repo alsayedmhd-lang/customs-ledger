@@ -498,11 +498,15 @@ export default function ReceiptForm() {
             <div className="space-y-2">
               <Label>{tr("حالة السند", "Receipt status")} <span className="text-destructive">*</span></Label>
               <Select
-                value={watch("status")}
+                value={watch("status") || "draft"}
                 onValueChange={(v) => setValue("status", v as "draft" | "issued" | "cancelled", { shouldValidate: true })}
               >
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue>
+                    {isAR
+                      ? RECEIPT_STATUS_LABELS[watch("status") || "draft"].ar
+                      : RECEIPT_STATUS_LABELS[watch("status") || "draft"].en}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent
                     position="popper"

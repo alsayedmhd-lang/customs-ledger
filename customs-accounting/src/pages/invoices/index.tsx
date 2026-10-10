@@ -1,14 +1,13 @@
 import { lookupReceiptPath } from "@/lib/invoice-receipt-link";
 import { describeDatePeriod } from "@/lib/date-period-description";
 import ResizableScrollArea from "@/components/layout/ResizableScrollArea";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { motion } from "framer-motion";
-import { useListInvoices, useDeleteInvoice, getListInvoicesQueryKey, getGetInvoiceQueryKey, useGetInvoice } from "@workspace/api-client-react";
+import { useListInvoices, useDeleteInvoice, getListReceiptsQueryKey, getListInvoicesQueryKey, getGetInvoiceQueryKey, useGetInvoice } from "@workspace/api-client-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { StatusBadge } from "../dashboard";
 import { ReceiptText, Plus, Search, Edit2, Trash2, Printer, FileText, Send, CheckCircle2, XCircle, Eye, EyeOff, Filter, ChevronDown, ChevronUp, X } from "lucide-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
 import { useLanguage } from "@/lib/language-context";
@@ -30,6 +29,51 @@ export default function InvoicesList() {
   const isAR = lang === "ar";
   const tr = (ar: string, en: string) => (isAR ? ar : en);
   const { data: invoices = [], isLoading } = useListInvoices();
+  const { data: linkedReceipts = [] } = useQuery<Array<{ id: number; invoiceId?: number | null; status?: string; deletedAt?: string | null }>>({
+    queryKey: getListReceiptsQueryKey(),
+    enabled: !isClient && can("canEditReceipts"),
+    queryFn: async () => {
+      const token = sessionStorage.getItem("auth_token");
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/api/receipts`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      });
+      if (!response.ok) throw new Error("Unable to load receipt statuses");
+      const data = await response.json();
+      if (!Array.isArray(data)) throw new Error("Invalid receipts response");
+      return data;
+    },
+  });
+  const receiptsByInvoice = useMemo(() => {
+    const result = new Map<number, (typeof linkedReceipts)[number]>();
+    for (const receipt of linkedReceipts) {
+      const invoiceId = Number(receipt.invoiceId);
+      if (!Number.isSafeInteger(invoiceId) || invoiceId <= 0 || receipt.deletedAt != null) continue;
+      const previous = result.get(invoiceId);
+      if (!previous || Number(receipt.id) > Number(previous.id)) result.set(invoiceId, receipt);
+    }
+    return result;
+  }, [linkedReceipts]);
+  const receiptActionLabel = (invoiceId: number) => {
+    const status = receiptsByInvoice.get(invoiceId)?.status;
+    return status === "issued" ? tr("فتح سند القبض — صادر", "Open receipt — Issued")
+      : status === "cancelled" ? tr("فتح سند القبض — ملغى", "Open receipt — Cancelled")
+      : status === "draft" ? tr("فتح سند القبض — مسودة", "Open receipt — Draft")
+      : tr("سند قبض", "Receipt");
+  };
+
+
+  const invoiceStatusLabel: Record<string, string> = {
+    draft: tr("مسودة", "Draft"),
+    issued: tr("صادرة", "Issued"),
+    paid: tr("مدفوعة", "Paid"),
+    cancelled: tr("ملغاة", "Cancelled"),
+  };
+  const invoiceStatusClass: Record<string, string> = {
+    draft: "bg-amber-500/10 text-amber-600 border-amber-500/30",
+    issued: "bg-blue-500/10 text-blue-600 border-blue-500/30",
+    paid: "bg-emerald-500/10 text-emerald-400 border-emerald-500/30",
+    cancelled: "bg-rose-500/10 text-rose-600 border-rose-500/30",
+  };
 
   const formatLocalDate = (date: Date) => {
     const year = date.getFullYear();
@@ -483,7 +527,9 @@ export default function InvoicesList() {
                     </td>
 
                     <td className="px-4 py-3">
-                      <StatusBadge status={inv.status} />
+                      <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${invoiceStatusClass[inv.status] || "bg-muted/30 text-muted-foreground border-border"}`}>
+                        {invoiceStatusLabel[inv.status] || inv.status}
+                      </span>
                     </td>
 
                     <td className="px-4 py-3 text-end">
@@ -498,11 +544,12 @@ export default function InvoicesList() {
                               `#/invoices/${inv.id}/receipt`
                             );
                           }}
-                          className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-muted-foreground bg-muted/30 border border-border hover:bg-muted/50 hover:text-foreground rounded-lg transition-colors"
+                          className="p-1.5 text-muted-foreground hover:bg-muted/50 hover:text-foreground rounded-lg transition-colors"
                           title={t("print")}
+                          aria-label={t("print")}
+                          type="button"
                         >
                           <Printer className="w-3.5 h-3.5" />
-                          {t("print")}
                         </button>
 
                         <button
@@ -513,12 +560,27 @@ export default function InvoicesList() {
                           📄
                         </button>
 
+                        {!isClient && can("canEditInvoices") && inv.status === "draft" && (
+                          <button type="button"
+                            onClick={() => setLocation(`/invoices/${inv.id}/edit`)}
+                            className="p-1.5 text-blue-600 hover:bg-blue-500/10 rounded-lg transition-colors"
+                            title={tr("مراجعة وإصدار الفاتورة", "Review and issue invoice")}
+                            aria-label={tr("مراجعة وإصدار الفاتورة", "Review and issue invoice")}>
+                            <Send className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+
                         {!isClient && can("canEditReceipts") && inv.status !== "cancelled" && (
                           <button type="button" onClick={() => void openReceipt(inv.id)}
                             disabled={receiptLookupId !== null}
-                            className="p-1.5 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg transition-colors disabled:opacity-50"
-                            title={tr("سند قبض", "Receipt")} aria-label={tr("سند قبض", "Receipt")}>
-                            <ReceiptText className="w-3.5 h-3.5" />
+                            className={`p-1.5 rounded-lg transition-colors disabled:opacity-50 ${receiptsByInvoice.get(inv.id)?.status === "issued" ? "text-emerald-500 hover:bg-emerald-500/10" : receiptsByInvoice.get(inv.id)?.status === "cancelled" ? "text-rose-600 hover:bg-rose-500/10" : "text-muted-foreground hover:bg-muted/50"}`}
+                            title={receiptActionLabel(inv.id)}
+                            aria-label={receiptActionLabel(inv.id)}>
+                            {receiptsByInvoice.get(inv.id)?.status === "issued"
+                              ? <CheckCircle2 className="w-3.5 h-3.5" />
+                              : receiptsByInvoice.get(inv.id)?.status === "cancelled"
+                                ? <XCircle className="w-3.5 h-3.5" />
+                                : <ReceiptText className="w-3.5 h-3.5" /> }
                           </button>
                         )}
 
