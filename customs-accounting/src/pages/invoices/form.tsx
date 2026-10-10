@@ -1,3 +1,4 @@
+import { attachmentDeclarationBase, persistPendingInvoiceAttachments, type PendingInvoiceAttachment, type AttachmentSaveContext } from "@/lib/pending-invoice-attachments";
 import { lookupReceiptPath } from "@/lib/invoice-receipt-link";
 import ResizableScrollArea from "@/components/layout/ResizableScrollArea";
 import { useUnsavedChanges } from "@/hooks/use-unsaved-changes";
@@ -53,6 +54,7 @@ import {
   Printer,
   GripVertical,
   ReceiptText,
+  ChevronDown,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 
@@ -166,10 +168,7 @@ type AttachmentSelectResult = {
 };
 
 function getDeclarationBaseNumber(value: string | null | undefined) {
-  return String(value ?? "")
-    .replace(/[^a-zA-Z0-9]/g, "")
-    .trim()
-    .slice(0, 14);
+  return attachmentDeclarationBase(String(value ?? ""));
 }
 
 function sanitizeStoredFileName(fileName: string) {
@@ -488,6 +487,15 @@ export default function InvoiceForm() {
   const [attachments, setAttachments] = useState<InvoiceAttachment[]>([]);
   const [attachmentsLoading, setAttachmentsLoading] = useState(false);
   const [attachmentBusy, setAttachmentBusy] = useState(false);
+  const [pendingAttachments, setPendingAttachments] = useState<PendingInvoiceAttachment[]>([]);
+  const pendingAttachmentsRef = useRef<PendingInvoiceAttachment[]>([]);
+  const [savedAttachmentContext, setSavedAttachmentContext] = useState<AttachmentSaveContext | null>(null);
+  const savedAttachmentContextRef = useRef<AttachmentSaveContext | null>(null);
+  const uploadLockRef = useRef(false);
+  const updatePendingAttachments = (next: PendingInvoiceAttachment[]) => {
+    pendingAttachmentsRef.current = next;
+    setPendingAttachments(next);
+  };
   const openingAttachmentIdsRef = useRef(new Set<number>());
   const [openingAttachmentIds, setOpeningAttachmentIds] = useState<Set<number>>(new Set());
   const [selectedAttachmentIds, setSelectedAttachmentIds] = useState<Record<string, number>>({});
@@ -534,7 +542,7 @@ export default function InvoiceForm() {
   const { toast } = useToast();
   const createMut = useCreateInvoice({
     mutation: {
-      onSuccess: (data) => {
+      onSuccess: async (data) => {
         rememberSuggestion(
           IMPORTER_EXPORTER_SUGGESTIONS_KEY,
           pendingSuggestionsRef.current.importerExporterName
@@ -559,9 +567,13 @@ export default function InvoiceForm() {
             ? "تم إنشاء الفاتورة بنجاح"
             : "Invoice created",
         });
-        markChangesSaved();
-        reset(getValues());
-        setLocation("/invoices");
+        const context = rememberSavedAttachmentContext(data);
+        const complete = await savePendingAttachments(context);
+        if (JSON.stringify(getValues()) === submittedValuesRef.current) reset({ ...getValues(), shipmentRef: context.declarationNumber });
+        if (complete) {
+          markChangesSaved();
+          setLocation("/invoices");
+        }
       },
       onError: (err: any) => {
         const msg =
@@ -580,7 +592,16 @@ export default function InvoiceForm() {
   const updateMut = useUpdateInvoice({
     mutation: {
       onSuccess: async (data) => {
-        if (JSON.stringify(getValues()) === submittedValuesRef.current) { markChangesSaved(); reset(getValues()); }
+        const context = rememberSavedAttachmentContext(data);
+        const complete = await savePendingAttachments(context);
+        if (JSON.stringify(getValues()) === submittedValuesRef.current) {
+          if (complete) markChangesSaved();
+          reset({ ...getValues(), shipmentRef: context.declarationNumber });
+        }
+        if (complete && !isEdit && savedAttachmentContextRef.current) {
+          markChangesSaved();
+          setLocation("/invoices");
+        }
         rememberSuggestion(
           IMPORTER_EXPORTER_SUGGESTIONS_KEY,
           pendingSuggestionsRef.current.importerExporterName
@@ -590,7 +611,7 @@ export default function InvoiceForm() {
           pendingSuggestionsRef.current.portOfEntry
         );
         await queryClient.invalidateQueries({ queryKey: getListInvoicesQueryKey() });
-        await queryClient.invalidateQueries({ queryKey: ["/api/invoices", invoiceId] });
+        await queryClient.invalidateQueries({ queryKey: getGetInvoiceQueryKey(Number((data as any)?.id || invoiceId)) });
         await fetchAuditLogs();
         const savedShipmentRef = String((data as any)?.shipmentRef ?? "").trim();
         const requestedShipmentRef = pendingShipmentRefRef.current;
@@ -655,7 +676,7 @@ export default function InvoiceForm() {
   });
 
   const submittedValuesRef = useRef("");
-  const { markChangesSaved } = useUnsavedChanges(isDirty, isAR);
+  const { markChangesSaved } = useUnsavedChanges(isDirty || pendingAttachments.length > 0 || attachmentBusy, isAR);
 
   const { fields, append, remove, move } = useFieldArray({
     control,
@@ -872,7 +893,7 @@ export default function InvoiceForm() {
   // Hide results immediately when the typed references change.
   const currentDuplicateCheck = duplicateCheck?.key === duplicateKey ? duplicateCheck : null;
 
-  const attachmentsEnabled = Boolean(isEdit && invoiceId && declarationBaseNumber);
+  const attachmentsEnabled = attachmentDeclarationBase(String(shipmentRefWatch || "")).length === 14;
   const attachmentsByCategory = new Map<string, InvoiceAttachment[]>();
   for (const attachment of attachments) {
     const category = String(attachment.category || "other");
@@ -882,7 +903,6 @@ export default function InvoiceForm() {
       attachment,
     ]);
   }
-  const otherAttachments = attachmentsByCategory.get("other") || [];
   const attachmentCountLabel = (count: number) =>
     isAR ? `${count} ${count === 1 ? "ملف" : "ملفات"}` : `${count} ${count === 1 ? "file" : "files"}`;
   const canViewInvoiceAuditLog =
@@ -914,6 +934,19 @@ export default function InvoiceForm() {
   }
 
   const onSubmit = async (data: InvoiceFormValues) => {
+    if (createMut.isPending || updateMut.isPending || attachmentBusy || uploadLockRef.current) return;
+    if (pendingAttachmentsRef.current.length > 0) {
+      const base = attachmentDeclarationBase(String(data.shipmentRef || ""));
+      if (base.length !== 14) {
+        toast({ title: isAR ? "أدخل رقم بيان صحيحًا من 14 حرفًا أو رقمًا أولًا" : "Enter a valid 14-character declaration number first", variant: "destructive" });
+        setFocus("shipmentRef");
+        return;
+      }
+      if (pendingAttachmentsRef.current.some((entry) => entry.selectedBase !== base)) {
+        if (!window.confirm(isAR ? "تغيّر رقم البيان. هل تريد ربط المرفقات المختارة بالرقم الجديد؟" : "Declaration number changed. Link selected attachments to the new number?")) return;
+        updatePendingAttachments(pendingAttachmentsRef.current.map((entry) => ({ ...entry, selectedBase: base })));
+      }
+    }
     submittedValuesRef.current = JSON.stringify(getValues());
     pendingShipmentRefRef.current = String(data.shipmentRef ?? "").trim();
     pendingSuggestionsRef.current = {
@@ -921,9 +954,9 @@ export default function InvoiceForm() {
       portOfEntry: data.portOfEntry ?? "",
     };
 
-    if (isEdit) {
+    if (isEdit || savedAttachmentContextRef.current) {
         updateMut.mutate({
-          id: invoiceId,
+          id: isEdit ? invoiceId : savedAttachmentContextRef.current!.invoiceId,
           data: {
             ...data,
             createdBy: Number(data.createdBy),
@@ -949,7 +982,7 @@ export default function InvoiceForm() {
   };
 
   const fetchAttachments = async (baseNumber = declarationBaseNumber) => {
-    if (!isEdit || !invoiceId || !baseNumber) {
+    if (((!isEdit || !invoiceId) && !savedAttachmentContextRef.current) || !baseNumber) {
       setAttachments([]);
       return;
     }
@@ -999,101 +1032,112 @@ export default function InvoiceForm() {
     });
   }, [attachments]);
 
-  const handleAddAttachmentClick = async (category = "other") => {
-    if (!attachmentsEnabled) {
-      toast({
-        title: isAR ? "احفظ الفاتورة أولًا لتفعيل المرفقات" : "Save invoice first to enable attachments",
-        variant: "destructive",
-      });
+  function rememberSavedAttachmentContext(data: any): AttachmentSaveContext {
+    const declarationNumber = String(data?.shipmentRef ?? pendingShipmentRefRef.current).trim();
+    const context = {
+      invoiceId: Number(data?.id || invoiceId || savedAttachmentContextRef.current?.invoiceId),
+      declarationNumber,
+      declarationBaseNumber: attachmentDeclarationBase(declarationNumber),
+    };
+    savedAttachmentContextRef.current = context;
+    setSavedAttachmentContext(context);
+    if (pendingAttachmentsRef.current.length > 0) updatePendingAttachments(pendingAttachmentsRef.current.map((entry) => ({ ...entry, selectedBase: context.declarationBaseNumber })));
+    return context;
+  }
+
+  const savePendingAttachments = async (context: AttachmentSaveContext): Promise<boolean> => {
+    if (pendingAttachmentsRef.current.length === 0) return true;
+    if (uploadLockRef.current) return false;
+    uploadLockRef.current = true;
+    setAttachmentBusy(true);
+    try {
+      const api = (window as any).electronAPI;
+      if (!api?.saveAttachmentFile) throw new Error(isAR ? "واجهة المرفقات غير متاحة" : "Attachment bridge is unavailable");
+      const token = sessionStorage.getItem("auth_token");
+      const complete = await persistPendingInvoiceAttachments(
+        [...pendingAttachmentsRef.current], context,
+        {
+          saveFile: (input) => api.saveAttachmentFile(input),
+          registerFile: async (body) => {
+            const response = await fetch(getAttachmentApiBase(), {
+              method: "POST",
+              headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+              body: JSON.stringify(body),
+            });
+            if (!response.ok) {
+              const result = await response.json().catch(() => ({}));
+              throw new Error(result?.error || (isAR ? "تعذر تسجيل المرفق" : "Unable to register attachment"));
+            }
+          },
+        },
+        (key, entry) => updatePendingAttachments(entry
+          ? pendingAttachmentsRef.current.map((item) => item.key === key ? entry : item)
+          : pendingAttachmentsRef.current.filter((item) => item.key !== key)),
+      );
+      await fetchAttachments(context.declarationBaseNumber);
+      if (!complete) {
+        toast({ title: isAR ? "الفاتورة محفوظة، بعض المرفقات لم تُحفظ" : "Invoice saved; some attachments failed", description: isAR ? "استخدم إعادة محاولة المرفقات، ولن تُنشأ فاتورة أخرى." : "Retry attachments without creating another invoice.", variant: "destructive" });
+      }
+      return complete;
+    } catch (error) {
+      toast({ title: isAR ? "الفاتورة محفوظة، تعذر حفظ المرفقات" : "Invoice saved; attachments failed", description: error instanceof Error ? error.message : String(error), variant: "destructive" });
+      return false;
+    } finally {
+      uploadLockRef.current = false;
+      setAttachmentBusy(false);
+    }
+  };
+
+  const retryPendingAttachments = async () => {
+    const context = savedAttachmentContextRef.current;
+    if (!context || createMut.isPending || updateMut.isPending || uploadLockRef.current) return;
+    if (attachmentDeclarationBase(String(getValues("shipmentRef") || "")) !== context.declarationBaseNumber || pendingAttachmentsRef.current.some((entry) => entry.selectedBase !== context.declarationBaseNumber)) {
+      toast({ title: isAR ? "احفظ تغيير رقم البيان أولًا" : "Save the declaration number change first", variant: "destructive" });
       return;
     }
+    const complete = await savePendingAttachments(context);
+    if (complete) {
+      toast({ title: isAR ? "تم حفظ المرفقات" : "Attachments saved" });
+      if (!isDirty) {
+        markChangesSaved();
+        if (!isEdit) setLocation("/invoices");
+      }
+    }
+  };
 
+  const handleAddAttachmentClick = async (category = "other") => {
+    if (attachmentBusy || createMut.isPending || updateMut.isPending || user?.role === "client") return;
+    const base = attachmentDeclarationBase(String(getValues("shipmentRef") || ""));
+    if (base.length !== 14) {
+      toast({ title: isAR ? "أدخل رقم البيان أولًا" : "Enter the declaration number first", description: isAR ? "يجب أن يكون الرقم الأساسي 14 حرفًا أو رقمًا." : "The base number must contain 14 letters or digits.", variant: "destructive" });
+      setFocus("shipmentRef");
+      return;
+    }
     const api = (window as any).electronAPI;
     if (!api?.selectAttachmentFile || !api?.saveAttachmentFile) {
-      toast({
-        title: isAR ? "واجهة المرفقات غير متاحة" : "Attachment bridge is not available",
-        variant: "destructive",
-      });
+      toast({ title: isAR ? "واجهة المرفقات غير متاحة" : "Attachment bridge is unavailable", variant: "destructive" });
       return;
     }
-
     try {
       setAttachmentBusy(true);
       const selected: AttachmentSelectResult = await api.selectAttachmentFile();
-
       if (selected.canceled) return;
-      if (!selected.filePath || !selected.fileName) {
-        throw new Error(selected.error || "No file was selected");
-      }
-
-      const extension = selected.ext || getFileExtension(selected.fileName);
-      if (!ALLOWED_ATTACHMENT_EXTENSIONS.has(extension)) {
-        toast({
-          title: isAR ? "نوع الملف غير مسموح" : "Unsupported file type",
-          variant: "destructive",
-        });
+      if (!selected.filePath || !selected.fileName) throw new Error(selected.error || "No file selected");
+      const extension = (selected.ext || getFileExtension(selected.fileName)).toLowerCase();
+      if (!ALLOWED_ATTACHMENT_EXTENSIONS.has(extension)) throw new Error(isAR ? "نوع الملف غير مسموح" : "Unsupported file type");
+      if (!Number.isFinite(selected.size) || Number(selected.size) <= 0 || Number(selected.size) > ATTACHMENT_MAX_SIZE_BYTES) throw new Error(isAR ? "يجب أن يكون الملف غير فارغ وألا يتجاوز 5MB" : "File must be nonempty and no larger than 5MB");
+      if (pendingAttachmentsRef.current.some((entry) => entry.filePath === selected.filePath)) {
+        toast({ title: isAR ? "الملف مختار بالفعل" : "File already selected" });
         return;
       }
-
-      if (Number(selected.size || 0) > ATTACHMENT_MAX_SIZE_BYTES) {
-        toast({
-          title: isAR ? "الملف أكبر من الحد المسموح 5MB" : "File exceeds 5MB limit",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      const storedName = `${Date.now()}-${sanitizeStoredFileName(selected.fileName)}`;
-      const saveResult: AttachmentSaveResult = await api.saveAttachmentFile({
-        sourcePath: selected.filePath,
-        declarationBaseNumber,
-        storedName,
-      });
-
-      if (!saveResult.ok || !saveResult.relativePath) {
-        throw new Error(saveResult.error || "Failed to save attachment file");
-      }
-
-      if (saveResult.duplicate) {
-        await fetchAttachments(declarationBaseNumber);
-        toast({ title: isAR ? "المرفق موجود بالفعل لهذا البيان" : "Attachment already exists for this declaration" });
-        return;
-      }
-      const token = sessionStorage.getItem("auth_token");
-      const response = await fetch(getAttachmentApiBase(), {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({
-          invoiceId,
-          declarationNumber: shipmentRefWatch || declarationBaseNumber,
-          declarationBaseNumber,
-          fileName: selected.fileName,
-          storedName: saveResult.storedName || storedName,
-          relativePath: saveResult.relativePath,
-          fileHash: saveResult.fileHash,
-          mimeType: extension || null,
-          fileSize: selected.size ?? null,
-          category,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => null);
-        throw new Error(errorData?.error || `Metadata request failed with status ${response.status}`);
-      }
-
-      await fetchAttachments(declarationBaseNumber);
-      toast({ title: isAR ? "تمت إضافة المرفق" : "Attachment added" });
+      const key = crypto.randomUUID();
+      updatePendingAttachments([...pendingAttachmentsRef.current, {
+        key, filePath: selected.filePath, fileName: selected.fileName, size: Number(selected.size),
+        extension, category, selectedBase: base, storedName: `${key}-${sanitizeStoredFileName(selected.fileName)}`,
+      }]);
+      toast({ title: isAR ? "تم اختيار المرفق — سيُحفظ مع الفاتورة" : "Attachment selected — saves with invoice" });
     } catch (error) {
-      console.error("Failed to add attachment:", error);
-      toast({
-        title: isAR ? "خطأ" : "Error",
-        description: error instanceof Error ? error.message : String(error),
-        variant: "destructive",
-      });
+      toast({ title: isAR ? "تعذر اختيار المرفق" : "Unable to select attachment", description: error instanceof Error ? error.message : String(error), variant: "destructive" });
     } finally {
       setAttachmentBusy(false);
     }
@@ -1377,7 +1421,9 @@ export default function InvoiceForm() {
             </div>
           
         {isEdit && invoiceId ? (
-          <div className={`flex items-center gap-5 -mt-2 min-w-[420px] ${isAR ? "order-1"  :  "order-3"}`}>
+          <details className={`rounded-xl border border-border bg-card shadow-sm ${isAR ? "order-1" : "order-3"}`}>
+            <summary className="cursor-pointer px-4 py-2 text-sm font-semibold">{isAR ? "الإجراءات" : "Actions"}</summary>
+            <div className="flex flex-wrap items-center gap-2 border-t border-border/40 p-3">
 
             <button
               type="button"
@@ -1442,7 +1488,8 @@ export default function InvoiceForm() {
               {isAR ? "طباعة" : "Print"}
             </button>
 
-          </div>
+            </div>
+          </details>
         ) : null}
         </div>
       <form
@@ -1457,6 +1504,7 @@ export default function InvoiceForm() {
         }}
         className="space-y-4"
       >
+        <fieldset disabled={createMut.isPending || updateMut.isPending || attachmentBusy} className="space-y-4 min-w-0 border-0 p-0 m-0">
         <div className="bg-card rounded-2xl border border-border/50 shadow-sm overflow-visible">
           <div className="flex items-center gap-2 px-4 py-3 border-b border-border/40 bg-muted/30">
             <FileText className="w-4 h-4 text-muted-foreground" />
@@ -1843,21 +1891,22 @@ export default function InvoiceForm() {
         </div>
 
         <div className={showInvoiceAuditLog ? "grid grid-cols-1 lg:grid-cols-2 gap-4 items-start" : ""}>
-        <div className="bg-card rounded-2xl border border-border/50 shadow-sm overflow-hidden min-w-0">
-          <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-border/40 bg-slate-500/5">
-            <div className="flex items-center gap-2">
+        <details className="group bg-card rounded-2xl border border-border/50 shadow-sm overflow-hidden min-w-0">
+          <summary className="cursor-pointer list-none px-4 py-3 bg-slate-500/5 [&::-webkit-details-marker]:hidden">
+          <span className="inline-flex items-center justify-between gap-3 w-full">
+            <span className="inline-flex items-center gap-2">
               <FileText className="w-4 h-4 text-slate-600" />
-              <h3 className="text-sm font-bold">
+              <span className="text-sm font-bold">
                 {isAR ? "المرفقات" : "Attachments"}
-              </h3>
-            </div>
-
-            {attachmentsEnabled && (
-              <span className="rounded-full border border-border bg-background px-2.5 py-1 text-xs font-semibold text-muted-foreground">
-                {attachments.length}
               </span>
-            )}
-          </div>
+            </span>
+
+            <span className="rounded-full border border-border bg-background px-2.5 py-1 text-xs font-semibold text-muted-foreground">
+              {attachments.length + pendingAttachments.length}
+            </span>
+            <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
+          </span>
+          </summary>
 
           <div className="p-4">
             {openingAttachmentIds.size > 0 && (
@@ -1866,13 +1915,33 @@ export default function InvoiceForm() {
                 {isAR ? "جارٍ تجهيز المرفق وجلبه إن لم يكن محليًا، يرجى الانتظار…" : "Opening attachment; fetching if needed. Please wait…"}
               </p>
             )}
-            {!attachmentsEnabled ? (
-              <p className="text-sm text-muted-foreground">
-                {isAR
-                  ? "احفظ الفاتورة أولًا لتفعيل المرفقات"
-                  : "Save invoice first to enable attachments"}
+            {!attachmentsEnabled && (
+              <p className="mb-3 text-sm text-muted-foreground">
+                {isAR ? "أدخل رقم البيان أولًا لاختيار المرفقات." : "Enter the declaration number first to select attachments."}
               </p>
-            ) : (
+            )}
+            <p className="mb-3 text-xs text-muted-foreground">{isAR ? "اختر الملفات الآن، ثم احفظ الفاتورة والمرفقات معًا. الملفات المختارة لا تُحفظ قبل حفظ الفاتورة." : "Select files now, then save the invoice and attachments together. Selected files are not saved until the invoice is saved."}</p>
+            {savedAttachmentContext && pendingAttachments.length > 0 && (
+              <div role="status" className="mb-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm">
+                <p>{isAR ? "الفاتورة محفوظة. بقيت مرفقات تحتاج إلى إعادة محاولة؛ لا يلزم إنشاء فاتورة أخرى." : "Invoice saved. Remaining attachments need a retry; no new invoice is needed."}</p>
+                <button type="button" onClick={() => void retryPendingAttachments()} disabled={attachmentBusy || createMut.isPending || updateMut.isPending} className="mt-2 rounded-lg border border-border px-3 py-1.5 font-semibold disabled:opacity-50">{isAR ? "إعادة محاولة المرفقات" : "Retry attachments"}</button>
+              </div>
+            )}
+            {pendingAttachments.length > 0 && (
+              <div className="mb-4 space-y-2 rounded-xl border border-amber-500/30 bg-amber-500/5 p-3">
+                <h4 className="text-sm font-semibold">{isAR ? "بانتظار الحفظ" : "Pending save"} ({pendingAttachments.length})</h4>
+                {pendingAttachments.map((entry) => (
+                  <div key={entry.key} className="flex items-center justify-between gap-3 rounded-lg border border-border/40 bg-card p-2">
+                    <div className="min-w-0 text-xs">
+                      <p className="break-all font-semibold">{entry.fileName}</p>
+                      <p className="text-muted-foreground">{(() => { const category = PRESET_ATTACHMENT_CATEGORIES.find((item) => item.key === entry.category); return category ? (isAR ? category.ar : category.en) : (isAR ? "أخرى" : "Other"); })()} · {(entry.size / 1024).toFixed(0)} KB</p>
+                      {entry.error && <p className="mt-1 break-words text-destructive">{entry.error}</p>}
+                    </div>
+                    <button type="button" disabled={attachmentBusy || createMut.isPending || updateMut.isPending} onClick={() => updatePendingAttachments(pendingAttachmentsRef.current.filter((item) => item.key !== entry.key))} title={isAR ? "إزالة من القائمة" : "Remove from queue"} aria-label={isAR ? "إزالة من القائمة" : "Remove from queue"} className={attachmentDeleteButtonCls}><Trash2 className="h-4 w-4" /></button>
+                  </div>
+                ))}
+              </div>
+            )}
               <div className="space-y-5">
                 {attachmentsLoading ? (
                   <p className="text-sm text-muted-foreground">
@@ -1892,9 +1961,13 @@ export default function InvoiceForm() {
                       </div>
 
                       <div className="divide-y divide-border/50 rounded-lg border border-border/60">
-                        {PRESET_ATTACHMENT_CATEGORIES.map((category) => {
+                        {[...PRESET_ATTACHMENT_CATEGORIES, { key: "other", ar: "أخرى", en: "Other" }].map((category) => {
                           const categoryAttachments = attachmentsByCategory.get(category.key) || [];
                           const uploaded = categoryAttachments.length > 0;
+                          const categoryPendingAttachments = pendingAttachments.filter((entry) =>
+                            (PRESET_ATTACHMENT_CATEGORY_KEYS.has(entry.category as any) ? entry.category : "other") === category.key
+                          );
+                          const pendingCount = categoryPendingAttachments.length;
                           const selectedAttachment = getSelectedAttachment(category.key);
 
                           return (
@@ -1907,12 +1980,12 @@ export default function InvoiceForm() {
                                   </span>
                                   <span
                                     className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${
-                                      uploaded
+                                      pendingCount > 0 ? "border-amber-500/30 bg-amber-500/10 text-amber-600" : uploaded
                                         ? "border-border bg-muted/30 text-foreground"
                                         : "border-border bg-muted/40 text-muted-foreground"
                                     }`}
                                   >
-                                    {uploaded
+                                    {pendingCount > 0 ? (isAR ? `${pendingCount} بانتظار الحفظ` : `${pendingCount} pending save`) : uploaded
                                       ? attachmentCountLabel(categoryAttachments.length)
                                       : isAR ? "غير مرفوع" : "Missing"}
                                   </span>
@@ -1924,8 +1997,8 @@ export default function InvoiceForm() {
                                   type="button"
                                   onClick={() => void handleAddAttachmentClick(category.key)}
                                   disabled={attachmentBusy}
-                                  title={isAR ? "رفع" : "Upload"}
-                                  aria-label={isAR ? "رفع" : "Upload"}
+                                  title={isAR ? "اختيار ملف" : "Select file"}
+                                  aria-label={isAR ? "اختيار ملف" : "Select file"}
                                   className={attachmentButtonCls}
                                 >
                                   <Upload className="w-4 h-4" />
@@ -1959,6 +2032,20 @@ export default function InvoiceForm() {
                               </div>
                               </div>
 
+                              {categoryPendingAttachments.length > 0 && (
+                                <div className="space-y-2">
+                                  {categoryPendingAttachments.map((entry) => (
+                                    <div key={entry.key} className="flex items-center justify-between gap-3 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2">
+                                      <div className="min-w-0 flex-1">
+                                        <p className="truncate text-sm text-foreground" title={entry.fileName}>{entry.fileName}</p>
+                                        <p className="text-xs text-amber-600">{isAR ? "بانتظار الحفظ" : "Pending save"}</p>
+                                        {entry.error && <p className="mt-1 break-words text-xs text-destructive">{entry.error}</p>}
+                                      </div>
+                                      <button type="button" disabled={attachmentBusy || createMut.isPending || updateMut.isPending} onClick={() => updatePendingAttachments(pendingAttachmentsRef.current.filter((item) => item.key !== entry.key))} title={isAR ? "إزالة من القائمة" : "Remove from queue"} aria-label={isAR ? "إزالة من القائمة" : "Remove from queue"} className={attachmentDeleteButtonCls}><Trash2 className="h-4 w-4" /></button>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
                               {categoryAttachments.length > 0 && (
                                 <div className="space-y-2">
                                   {categoryAttachments.map((attachment) => (
@@ -1991,132 +2078,24 @@ export default function InvoiceForm() {
                       </div>
                     </section>
 
-                    <section className="space-y-2">
-                      {(() => {
-                        const selectedOtherAttachment = getSelectedAttachment("other");
-                        return (
-                          <>
-                      <div className="flex flex-nowrap items-center justify-between gap-3">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h4 className="text-sm font-bold text-foreground">
-                            {isAR ? "أخرى" : "Other"}
-                          </h4>
-                          <span
-                            className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${
-                              otherAttachments.length > 0
-                                ? "border-border bg-muted/30 text-foreground"
-                                : "border-border bg-muted/40 text-muted-foreground"
-                            }`}
-                          >
-                            {otherAttachments.length > 0
-                              ? attachmentCountLabel(otherAttachments.length)
-                              : isAR ? "غير مرفوع" : "Missing"}
-                          </span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => void handleAddAttachmentClick("other")}
-                          disabled={attachmentBusy}
-                          title={isAR ? "رفع" : "Upload"}
-                          aria-label={isAR ? "رفع" : "Upload"}
-                          className={attachmentButtonCls}
-                        >
-                          <Upload className="w-4 h-4" />
-                        </button>
-                        {otherAttachments[0] && (
-                          <>
-                            <button
-                              type="button"
-                              onClick={() => selectedOtherAttachment && void handleOpenAttachment(selectedOtherAttachment)}
-                              disabled={!selectedOtherAttachment || openingAttachmentIds.has(selectedOtherAttachment.id)}
-                                  aria-busy={selectedOtherAttachment ? openingAttachmentIds.has(selectedOtherAttachment.id) : false}
-                              title={isAR ? "فتح" : "Open"}
-                              aria-label={isAR ? "فتح" : "Open"}
-                              className={attachmentButtonCls}
-                            >
-                              {selectedOtherAttachment && openingAttachmentIds.has(selectedOtherAttachment.id) ? (
-                                    <>
-                                      <Loader2 className="w-4 h-4 animate-spin" />
-                                      <span role="status" className="text-xs">{isAR ? "جارٍ الفتح…" : "Opening…"}</span>
-                                    </>
-                                  ) : <ExternalLink className="w-4 h-4" />}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => selectedOtherAttachment && void handleDeleteAttachment(selectedOtherAttachment.id)}
-                              disabled={attachmentBusy || !selectedOtherAttachment || openingAttachmentIds.has(selectedOtherAttachment.id)}
-                              title={isAR ? "حذف" : "Delete"}
-                              aria-label={isAR ? "حذف" : "Delete"}
-                              className={attachmentDeleteButtonCls}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </>
-                        )}
-                      </div>
 
-                      {otherAttachments.length === 0 ? (
-                        <p className="rounded-lg border border-dashed border-border px-3 py-3 text-sm text-muted-foreground">
-                          {isAR ? "لا توجد مرفقات أخرى حتى الآن" : "No other attachments yet"}
-                        </p>
-                      ) : (
-                        <div className="divide-y divide-border/50 rounded-lg border border-border/60">
-                          {otherAttachments.map((attachment) => (
-                            <div
-                              key={attachment.id}
-                              className="flex flex-nowrap items-center justify-between gap-3 px-3 py-3"
-                            >
-                              <input
-                                type="radio"
-                                name="attachment-other"
-                                checked={selectedAttachmentIds.other === attachment.id}
-                                onChange={() =>
-                                  setSelectedAttachmentIds((current) => ({
-                                    ...current,
-                                    other: attachment.id,
-                                  }))
-                                }
-                                className="h-4 w-4 shrink-0 accent-primary"
-                              />
-                              <div className="min-w-0 flex-1">
-                                <div className="truncate text-sm font-semibold text-foreground">
-                                  {attachment.fileName}
-                                </div>
-                                <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                                  <span>{attachment.category || "other"}</span>
-                                  <span>•</span>
-                                  <span>
-                                    {attachment.createdAt
-                                      ? new Date(attachment.createdAt).toLocaleString(isAR ? "ar" : "en-US")
-                                      : "-"}
-                                  </span>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                          </>
-                        );
-                      })()}
-                    </section>
                   </>
                 )}
               </div>
-            )}
           </div>
-        </div>
+        </details>
 
         {showInvoiceAuditLog && (
-          <div className="rounded-2xl border border-border/50 bg-card shadow-sm overflow-hidden min-w-0">
-            <div className="px-5 py-3 border-b border-border/40 flex items-center justify-between gap-3">
+          <details className="group rounded-2xl border border-border/50 bg-card shadow-sm overflow-hidden min-w-0">
+            <summary className="cursor-pointer list-none px-4 py-3 bg-muted/30 flex items-center justify-between gap-3 [&::-webkit-details-marker]:hidden">
               <h3 className="text-sm font-bold">
                 {isAR ? "سجل تغييرات الفاتورة" : "Invoice Audit Log"}
               </h3>
               <span className="text-xs text-muted-foreground">
                 {auditLogs.length} {isAR ? "عملية" : "events"}
               </span>
-            </div>
+              <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180" />
+            </summary>
 
             <ResizableScrollArea storageKey="invoices-form" maxHeight={520} className="divide-y divide-border/40">
               {auditLogs.map((log, i) => {
@@ -2164,10 +2143,11 @@ export default function InvoiceForm() {
                 );
               })}
             </ResizableScrollArea>
-          </div>
+          </details>
         )}
         </div>
 
+        </fieldset>
         <div className="fixed bottom-4 left-1/2 -translate-x-1/2 w-[calc(100%-2rem)] max-w-md bg-card/90 backdrop-blur-md border border-border/60 px-4 py-3 rounded-2xl shadow-2xl flex items-center justify-between gap-3 z-40">
           <p className="text-xs text-muted-foreground hidden sm:block truncate">
             {isAR
@@ -2186,13 +2166,13 @@ export default function InvoiceForm() {
 
             <button
               type="submit"
-              disabled={createMut.isPending || updateMut.isPending}
+              disabled={createMut.isPending || updateMut.isPending || attachmentBusy}
               className="px-5 py-2 bg-primary text-primary-foreground text-sm font-semibold rounded-xl shadow-lg shadow-primary/20 hover:-translate-y-0.5 transition-all flex items-center gap-1.5 disabled:opacity-60"
             >
               <Save className="w-4 h-4" />
-              {createMut.isPending || updateMut.isPending
+              {createMut.isPending || updateMut.isPending || attachmentBusy
                 ? (isAR ? "جارٍ الحفظ..." : "Saving...")
-                : isEdit
+                : isEdit || Boolean(savedAttachmentContext)
                 ? isAR
                   ? "حفظ التغييرات"
                   : "Save Changes"
