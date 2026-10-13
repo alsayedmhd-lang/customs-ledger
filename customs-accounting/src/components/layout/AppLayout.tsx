@@ -382,7 +382,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
   return (
     <div
-      className={cn("h-screen overflow-hidden bg-background flex flex-col md:flex-row")}
+      className={cn("h-screen overflow-hidden bg-background flex flex-col md:flex-row", !isPrintRoute && "ledger-desktop-ui")}
       dir={isRTL ? "rtl" : "ltr"}
     >
       {/* Desktop Sidebar */}
@@ -553,7 +553,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                 "min-h-full",
                 isPrintRoute
                   ? "mx-auto max-w-7xl p-4 sm:p-6 lg:p-8"
-                  : "w-full max-w-none px-4 py-4 sm:px-6 sm:py-6 lg:px-6"
+                  : "ledger-page-content w-full max-w-none px-3 py-3 sm:px-4 sm:py-4 lg:px-4"
               )}
             >
               {children}

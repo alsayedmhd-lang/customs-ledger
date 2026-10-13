@@ -832,7 +832,7 @@ export default function InvoiceForm() {
   useEffect(() => {
     fetchAuditLogs();
   }, [invoiceId, isEdit]);
-  
+
 
   const itemsWatch = watch("items") || [];
   const taxRateWatch = watch("taxRate") || 0;
@@ -1127,7 +1127,7 @@ export default function InvoiceForm() {
       if (!ALLOWED_ATTACHMENT_EXTENSIONS.has(extension)) throw new Error(isAR ? "نوع الملف غير مسموح" : "Unsupported file type");
       if (!Number.isFinite(selected.size) || Number(selected.size) <= 0 || Number(selected.size) > ATTACHMENT_MAX_SIZE_BYTES) throw new Error(isAR ? "يجب أن يكون الملف غير فارغ وألا يتجاوز 5MB" : "File must be nonempty and no larger than 5MB");
       if (pendingAttachmentsRef.current.some((entry) => entry.filePath === selected.filePath)) {
-        toast({ title: isAR ? "الملف مختار بالفعل" : "File already selected" });
+        // Already listed: keep one copy without another notification.
         return;
       }
       const key = crypto.randomUUID();
@@ -1135,7 +1135,7 @@ export default function InvoiceForm() {
         key, filePath: selected.filePath, fileName: selected.fileName, size: Number(selected.size),
         extension, category, selectedBase: base, storedName: `${key}-${sanitizeStoredFileName(selected.fileName)}`,
       }]);
-      toast({ title: isAR ? "تم اختيار المرفق — سيُحفظ مع الفاتورة" : "Attachment selected — saves with invoice" });
+      // The pending list shows the selected file; no notification is needed.
     } catch (error) {
       toast({ title: isAR ? "تعذر اختيار المرفق" : "Unable to select attachment", description: error instanceof Error ? error.message : String(error), variant: "destructive" });
     } finally {
@@ -1415,11 +1415,11 @@ export default function InvoiceForm() {
               {isAR
                 ? "أدخل بيانات الفاتورة ثم احفظ"
                 : "Fill in the details and save"}
-              
+
             </p>
             </div>
             </div>
-          
+
         {isEdit && invoiceId ? (
           <details className={`rounded-xl border border-border bg-card shadow-sm ${isAR ? "order-1" : "order-3"}`}>
             <summary className="cursor-pointer px-4 py-2 text-sm font-semibold">{isAR ? "الإجراءات" : "Actions"}</summary>
@@ -1512,7 +1512,7 @@ export default function InvoiceForm() {
               {isAR ? "البيانات الأساسية" : "Basic Details"}
             </h2>
           </div>
-        
+
           <div className="p-4 grid grid-cols-2 md:grid-cols-4 gap-3">
             <div className="col-span-2 md:col-span-2">
               <label className={labelCls}>{isAR ? "العميل" : "Client"}</label>
@@ -1651,7 +1651,7 @@ export default function InvoiceForm() {
               <label className={labelCls}>
                 {isAR ? "رقم البوليصة B/L" : "Bill of Lading"}
               </label>
-           
+
               <input
                 {...register("billOfLading")}
                 onFocus={() => setDuplicateField("bill")}
@@ -1920,7 +1920,7 @@ export default function InvoiceForm() {
                 {isAR ? "أدخل رقم البيان أولًا لاختيار المرفقات." : "Enter the declaration number first to select attachments."}
               </p>
             )}
-            <p className="mb-3 text-xs text-muted-foreground">{isAR ? "اختر الملفات الآن، ثم احفظ الفاتورة والمرفقات معًا. الملفات المختارة لا تُحفظ قبل حفظ الفاتورة." : "Select files now, then save the invoice and attachments together. Selected files are not saved until the invoice is saved."}</p>
+            <p className="mb-3 text-xs text-muted-foreground">{isAR ? "تُحفظ المرفقات مع الفاتورة." : "Attachments save with the invoice."}</p>
             {savedAttachmentContext && pendingAttachments.length > 0 && (
               <div role="status" className="mb-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm">
                 <p>{isAR ? "الفاتورة محفوظة. بقيت مرفقات تحتاج إلى إعادة محاولة؛ لا يلزم إنشاء فاتورة أخرى." : "Invoice saved. Remaining attachments need a retry; no new invoice is needed."}</p>
@@ -1928,7 +1928,7 @@ export default function InvoiceForm() {
               </div>
             )}
             {pendingAttachments.length > 0 && (
-              <div className="mb-4 space-y-2 rounded-xl border border-amber-500/30 bg-amber-500/5 p-3">
+              <div className="mb-4 space-y-2 rounded-xl border border-border/50 bg-muted/20 p-3">
                 <h4 className="text-sm font-semibold">{isAR ? "بانتظار الحفظ" : "Pending save"} ({pendingAttachments.length})</h4>
                 {pendingAttachments.map((entry) => (
                   <div key={entry.key} className="flex items-center justify-between gap-3 rounded-lg border border-border/40 bg-card p-2">
