@@ -1,6 +1,6 @@
 import { describeDatePeriod } from "@/lib/date-period-description";
 import ResizableScrollArea from "@/components/layout/ResizableScrollArea";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
 import { useListReceipts, useDeleteReceipt, getListReceiptsQueryKey, useListClients } from "@workspace/api-client-react";
@@ -51,6 +51,62 @@ export default function ReceiptsList() {
   const { user, can } = useAuth();
   const isClient = user?.role === "client";
   const { t, lang } = useLanguage();
+  const defaultColumnWidths = [12, 18, 12, 10, 11, 8, 8, 9, 12];
+  const columnStorageKey = "ledger-receipts-column-widths-v1";
+  const [columnWidths, setColumnWidths] = useState<number[]>(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(columnStorageKey) || "null");
+      if (Array.isArray(saved) && saved.length === 9 && saved.every((n) => typeof n === "number" && Number.isFinite(n) && n >= 1) && Math.abs(saved.reduce((a, b) => a + b, 0) - 100) < 0.1) return saved;
+    } catch { /* Use default widths when storage is unavailable. */ }
+    return defaultColumnWidths;
+  });
+  const tableRef = useRef<HTMLTableElement>(null);
+  const columnDrag = useRef<{ index: number; x: number; width: number; widths: number[]; rtl: boolean } | null>(null);
+  useEffect(() => {
+    try { localStorage.setItem(columnStorageKey, JSON.stringify(columnWidths)); } catch { /* Layout remains usable without storage. */ }
+  }, [columnWidths]);
+  const columnHandle = (index: number) => index < 8 ? (
+    <span
+      role="separator" aria-orientation="vertical" tabIndex={0}
+      aria-label={lang === "ar" ? "تغيير عرض العمود" : "Resize column"}
+      title={lang === "ar" ? "اسحب لتغيير العرض — انقر مرتين لاستعادة المقاسات" : "Drag to resize — double-click to reset widths"}
+      className="absolute inset-y-0 end-0 w-2 cursor-col-resize touch-none select-none hover:bg-primary/10 focus:bg-primary/10 z-40"
+      onDoubleClick={() => setColumnWidths(defaultColumnWidths)}
+      onPointerDown={(event) => {
+        if (event.button !== 0 || !tableRef.current) return;
+        event.preventDefault(); event.stopPropagation();
+        columnDrag.current = { index, x: event.clientX, width: tableRef.current.getBoundingClientRect().width, widths: [...columnWidths], rtl: getComputedStyle(tableRef.current).direction === "rtl" };
+        event.currentTarget.setPointerCapture(event.pointerId);
+      }}
+      onPointerMove={(event) => {
+        const drag = columnDrag.current;
+        if (!drag || drag.index !== index || drag.width <= 0) return;
+        const delta = (event.clientX - drag.x) * (drag.rtl ? -1 : 1) / drag.width * 100;
+        const pair = drag.widths[index] + drag.widths[index + 1];
+        const minimum = Math.min(28 / drag.width * 100, pair / 2);
+        const next = [...drag.widths];
+        next[index] = Math.max(minimum, Math.min(pair - minimum, drag.widths[index] + delta));
+        next[index + 1] = pair - next[index];
+        setColumnWidths(next);
+      }}
+      onPointerUp={() => { columnDrag.current = null; }}
+      onPointerCancel={() => { columnDrag.current = null; }}
+      onLostPointerCapture={() => { columnDrag.current = null; }}
+      onKeyDown={(event) => {
+        if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+        event.preventDefault();
+        const rtl = tableRef.current && getComputedStyle(tableRef.current).direction === "rtl";
+        const delta = (event.key === "ArrowRight" ? 0.5 : -0.5) * (rtl ? -1 : 1);
+        setColumnWidths((current) => {
+          const next = [...current]; const pair = current[index] + current[index + 1];
+          next[index] = Math.max(1, Math.min(pair - 1, current[index] + delta));
+          next[index + 1] = pair - next[index]; return next;
+        });
+      }}
+    />
+  ) : null;
+
+
   const isAR = lang === "ar";
   const tr = (ar: string, en: string) => (isAR ? ar : en);
   const [search, setSearch] = useState("");
@@ -201,17 +257,17 @@ const getClientName = (receipt: { clientName?: string | null; clientId?: number 
           <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
           <Input
             placeholder={t("searchReceiptPlaceholder")}
-            className="pr-9"
+            className="h-10 pr-9"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <Input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
-        <Input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
+        <Input className="h-10" type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
+        <Input className="h-10" type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
         <select
           value={paymentMethodFilter}
           onChange={(e) => setPaymentMethodFilter(e.target.value)}
-          className="h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
+          className="h-10 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
         >
           <option value="">{t("paymentMethod")}</option>
           <option value="cash">{t("cash")}</option>
@@ -235,36 +291,41 @@ const getClientName = (receipt: { clientName?: string | null; clientId?: number 
       ) : (
         <div className="bg-card rounded-2xl border border-border overflow-hidden">
           <ResizableScrollArea storageKey="receipts-index" maxHeight={490}>
-            <table className="w-full text-sm">
+            <table ref={tableRef} className="w-full table-fixed text-sm [&_th]:text-center [&_td]:text-center [&_th]:align-middle [&_td]:align-middle [&_th]:whitespace-nowrap [&_th]:px-3 [&_td]:px-3 [&_td]:overflow-hidden [&_td]:text-ellipsis [&_tr>td:nth-child(2)]:text-left">
+              <colgroup>
+                {columnWidths.map((width, index) => (
+                  <col key={index} style={{ width: `${width}%` }} />
+                ))}
+              </colgroup>
               <thead className="sticky top-0 z-10">
                 <tr className="border-b border-border bg-muted/40">
-                  <th className="text-start px-4 py-3 font-semibold text-muted-foreground">
+                  <th className="relative text-start px-4 py-3 font-semibold text-muted-foreground">
                     {tr("رقم السند", "Receipt No")}
-                  </th>
-                  <th className="text-start px-4 py-3 font-semibold text-muted-foreground">
+                  {columnHandle(0)}</th>
+                  <th className="relative text-start px-4 py-3 font-semibold text-muted-foreground">
                     {tr("العميل", "Client")}
-                  </th>
-                  <th className="text-start px-4 py-3 font-semibold text-muted-foreground">
+                  {columnHandle(1)}</th>
+                  <th className="relative text-start px-4 py-3 font-semibold text-muted-foreground">
                     {tr("الفاتورة", "Invoice")}
-                  </th>
-                  <th className="text-start px-4 py-3 font-semibold text-muted-foreground">
+                  {columnHandle(2)}</th>
+                  <th className="relative text-start px-4 py-3 font-semibold text-muted-foreground">
                     {tr("المبلغ", "Amount")}
-                  </th>
-                  <th className="text-start px-4 py-3 font-semibold text-muted-foreground">
+                  {columnHandle(3)}</th>
+                  <th className="relative text-start px-4 py-3 font-semibold text-muted-foreground">
                     {tr("طريقة الدفع", "Payment Method")}
-                  </th>
-                  <th className="text-start px-4 py-3 font-semibold text-muted-foreground">
+                  {columnHandle(4)}</th>
+                  <th className="relative text-start px-4 py-3 font-semibold text-muted-foreground">
                     {tr("الحالة", "Status")}
-                  </th>
-                  <th className="text-start px-4 py-3 font-semibold text-muted-foreground">
+                  {columnHandle(5)}</th>
+                  <th className="relative text-start px-4 py-3 font-semibold text-muted-foreground">
                     {tr("المستلم", "Received By")}
-                  </th>
-                  <th className="text-start px-4 py-3 font-semibold text-muted-foreground">
+                  {columnHandle(6)}</th>
+                  <th className="relative text-start px-4 py-3 font-semibold text-muted-foreground">
                     {tr("التاريخ", "Date")}
-                  </th>
-                  <th className="text-end px-4 py-3 font-semibold text-muted-foreground">
+                  {columnHandle(7)}</th>
+                  <th className="relative text-end px-4 py-3 font-semibold text-muted-foreground">
                     {tr("الإجراءات", "Actions")}
-                  </th>
+                  {columnHandle(8)}</th>
                 </tr>
               </thead>
 
@@ -333,7 +394,7 @@ const getClientName = (receipt: { clientName?: string | null; clientId?: number 
                     </td>
 
                     <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center justify-center gap-2 whitespace-nowrap">
                         <Button
                           type="button"
                           onClick={() => {
@@ -343,8 +404,9 @@ const getClientName = (receipt: { clientName?: string | null; clientId?: number 
                           }}
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                          className="h-8 w-8 shrink-0 text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-950/30 hover:bg-violet-100 dark:hover:bg-violet-900/40 hover:text-violet-700 dark:hover:text-violet-300"
                           title={t("print")}
+                          aria-label={t("print")}
                         >
                           <Printer className="w-4 h-4" />
                         </Button>
@@ -354,8 +416,9 @@ const getClientName = (receipt: { clientName?: string | null; clientId?: number 
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                              className="h-8 w-8 shrink-0 text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/30 hover:bg-blue-100 dark:hover:bg-blue-900/40 hover:text-blue-700 dark:hover:text-blue-300"
                               title={t("edit")}
+                              aria-label={t("edit")}
                             >
                               <Pencil className="w-4 h-4" />
                             </Button>
@@ -366,7 +429,7 @@ const getClientName = (receipt: { clientName?: string | null; clientId?: number 
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                            aria-label={t("delete")} className="h-8 w-8 shrink-0 text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/30 hover:bg-rose-100 dark:hover:bg-rose-900/40 hover:text-rose-700 dark:hover:text-rose-300"
                             onClick={() => setDeleteId(receipt.id)}
                             title={t("delete")}
                           >

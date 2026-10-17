@@ -473,6 +473,9 @@ export default function InvoiceForm() {
   const { user, can } = useAuth();
   const [, setLocation] = useLocation();
   const search = useSearch();
+  const invoiceStartRef = useRef<HTMLDivElement>(null);
+  const attachmentsSectionRef = useRef<HTMLDetailsElement>(null);
+  const attachmentNavigationRef = useRef<string | null>(null);
   const urlClientId = new URLSearchParams(search).get("clientId");
   const { id } = useParams<{ id: string }>();
   const isCopyMode = window.location.href.includes("edit-copy");
@@ -812,6 +815,33 @@ export default function InvoiceForm() {
 }
 
   }, [hasInvoiceId, isEdit, existingInvoice, isCopyMode, reset, setLocation, setValue, user?.id]);
+
+  // Apply the requested destination once per invoice navigation.
+  useEffect(() => {
+    if (!isEdit || !existingInvoice) return;
+    const navigationKey = `${invoiceId}:${search}`;
+    if (attachmentNavigationRef.current === navigationKey) return;
+    const showAttachments = new URLSearchParams(search).get("section") === "attachments";
+    let secondFrame = 0;
+    const frame = window.requestAnimationFrame(() => {
+      const section = attachmentsSectionRef.current;
+      if (!section) return;
+      section.open = showAttachments;
+      secondFrame = window.requestAnimationFrame(() => {
+        if (showAttachments) {
+          section.focus({ preventScroll: true });
+          section.scrollIntoView({ behavior: "smooth", block: "start" });
+        } else {
+          invoiceStartRef.current?.scrollIntoView({ behavior: "instant", block: "start" });
+        }
+        attachmentNavigationRef.current = navigationKey;
+      });
+    });
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.cancelAnimationFrame(secondFrame);
+    };
+  }, [search, isEdit, invoiceId, existingInvoice]);
 
   // Focus once, after copied values and input refs have been rendered.
   useEffect(() => {
@@ -1382,6 +1412,7 @@ export default function InvoiceForm() {
 
  return (
     <motion.div
+      ref={invoiceStartRef}
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25 }}
@@ -1891,7 +1922,7 @@ export default function InvoiceForm() {
         </div>
 
         <div className={showInvoiceAuditLog ? "grid grid-cols-1 lg:grid-cols-2 gap-4 items-start" : ""}>
-        <details className="group bg-card rounded-2xl border border-border/50 shadow-sm overflow-hidden min-w-0">
+        <details id="invoice-attachments" ref={attachmentsSectionRef} tabIndex={-1} className="group scroll-mt-4 bg-card rounded-2xl border border-border/50 shadow-sm overflow-hidden min-w-0">
           <summary className="cursor-pointer list-none px-4 py-3 bg-slate-500/5 [&::-webkit-details-marker]:hidden">
           <span className="inline-flex items-center justify-between gap-3 w-full">
             <span className="inline-flex items-center gap-2">

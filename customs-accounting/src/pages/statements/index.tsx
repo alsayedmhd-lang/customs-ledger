@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import { Link } from "wouter";
 import { useListClients, useListInvoices, useListReceipts } from "@workspace/api-client-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { BookOpen, FileText, TrendingDown, TrendingUp, User, Printer, Eye, EyeOff } from "lucide-react";
+import { BookOpen, FileText, TrendingDown, TrendingUp, User, Printer, Eye, EyeOff, Search } from "lucide-react";
 import { useLanguage } from "@/lib/language-context";
 
 import type { Client, Invoice } from "@workspace/api-client-react";
@@ -24,6 +24,14 @@ export default function StatementsIndex() {
   const { t, lang, currencySymbol } = useLanguage();
   const isAR = lang === "ar";
   const [showAmounts, setShowAmounts] = useState(false);
+  const [rowAmountVisibility, setRowAmountVisibility] = useState<Record<number, boolean>>({});
+  const rowAmountsVisible = (id: number) => rowAmountVisibility[id] ?? showAmounts;
+  const toggleRowAmounts = (id: number) => {
+    setRowAmountVisibility(prev => ({
+      ...prev,
+      [id]: !(prev[id] ?? showAmounts),
+    }));
+  };
   const [searchTerm, setSearchTerm] = useState("");
   const [fromDate, setFromDate] = useState(() => {
     const today = new Date();
@@ -109,14 +117,14 @@ export default function StatementsIndex() {
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
 
-      
+
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-foreground">{t("statements")}</h1>
           <p className="text-muted-foreground text-sm mt-0.5">{lang === "ar" ? "ملخص أرصدة جميع العملاء" : "Summary of all client balances"} {describeDatePeriod(fromDate, toDate, lang)}</p>
         </div>
         <button
-          onClick={() => setShowAmounts(v => !v)}
+          onClick={() => { setShowAmounts(v => !v); setRowAmountVisibility({}); }}
           className={`self-start sm:self-auto flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-medium transition-all ${
             showAmounts
               ? "bg-card border-border text-muted-foreground hover:bg-muted/40"
@@ -158,38 +166,39 @@ export default function StatementsIndex() {
           </div>
         </div>
       </div>
-      
-      {/* Unified Search and Date Range */}
-      <div className="grid grid-cols-1 md:grid-cols-[1.8fr_140px_140px] gap-3">
-        <div className="relative">
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder={
-              isAR
-                ? "بحث برقم البيان أو البوليصة أو اسم العميل أو رقم الفاتورة..."
-                : "Search declaration, B/L, client or invoice number..."
-            }
-            className="h-10 w-full rounded-xl border border-border bg-background px-3 pr-9 text-sm"
-          />
+
+      {/* Search and date range stay visible together. */}
+      <div dir={isAR ? "rtl" : "ltr"} className="bg-card rounded-lg border border-border shadow-sm px-3 py-2">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+          <div className="flex shrink-0 items-center gap-2 text-sm font-semibold text-foreground">
+            <Search className="h-4 w-4 text-primary" />
+            <span>{isAR ? "البحث" : "Search"}</span>
+          </div>
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+            <div className="relative min-w-[220px] flex-1 sm:min-w-[280px]">
+              <Search className="pointer-events-none absolute end-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <input type="text" autoComplete="off" name="ledger-statement-search"
+                value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
+                aria-label={isAR ? "رقم البيان أو البوليصة أو اسم العميل أو رقم الفاتورة" : "Declaration, bill of lading, client or invoice number"}
+                placeholder={isAR ? "رقم البيان / البوليصة / اسم العميل / رقم الفاتورة" : "Declaration / B/L / client / invoice number"}
+                className="h-8 w-full ps-3 pe-9 rounded-lg border border-border bg-muted/40 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20" />
+            </div>
+            <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <span>{isAR ? "من" : "From"}</span>
+              <input type="date" dir="ltr" aria-label={isAR ? "من" : "From"}
+                value={fromDate} onChange={(e) => setFromDate(e.target.value)}
+                className="h-8 w-[140px] px-2 rounded-lg border border-border bg-muted/40 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20" />
+            </label>
+            <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <span>{isAR ? "إلى" : "To"}</span>
+              <input type="date" dir="ltr" aria-label={isAR ? "إلى" : "To"}
+                value={toDate} onChange={(e) => setToDate(e.target.value)}
+                className="h-8 w-[140px] px-2 rounded-lg border border-border bg-muted/40 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20" />
+            </label>
+          </div>
         </div>
-
-        <input
-          type="date"
-          value={fromDate}
-          onChange={(e) => setFromDate(e.target.value)}
-          className="h-10 rounded-xl border border-border bg-background px-3 text-sm"
-        />
-
-        <input
-          type="date"
-          value={toDate}
-          onChange={(e) => setToDate(e.target.value)}
-          className="h-10 rounded-xl border border-border bg-background px-3 text-sm"
-        />
       </div>
-  
+
       {/* Clients Table */}
       <div className="bg-card border border-border/50 shadow-sm rounded-2xl overflow-hidden">
         <div className="p-5 border-b border-border/50 flex items-center gap-2">
@@ -197,7 +206,7 @@ export default function StatementsIndex() {
           <h2 className="font-bold text-base">{t("allClientsStatement")}</h2>
         </div>
         <ResizableScrollArea storageKey="statements-index" maxHeight={360}>
-          <table className="w-full text-sm">
+          <table className="w-full text-sm [&_th]:text-center [&_td]:text-center [&_th]:align-middle [&_td]:align-middle [&_th]:whitespace-nowrap [&_th]:px-3 [&_td]:px-3">
             <thead className="bg-muted/40 text-muted-foreground font-semibold border-b border-border/50 text-xs uppercase tracking-wider sticky top-0 z-10">
               <tr>
                 <th className="px-5 py-3.5 text-start">{t("clientName")}</th>
@@ -254,11 +263,11 @@ export default function StatementsIndex() {
                     <td className="px-5 py-4 text-muted-foreground text-xs">
                       {lastInvoice ? formatDate(lastInvoice.issueDate, lang) : "—"}
                     </td>
-                    <td className="px-5 py-4 font-mono font-semibold">{showAmounts ? formatCurrency(totalInvoiced, currencySymbol, lang) : hidden}</td>
-                    <td className="px-5 py-4 font-mono font-semibold text-emerald-600 dark:text-emerald-400">{showAmounts ? formatCurrency(totalPaid, currencySymbol, lang) : hidden}</td>
+                    <td className="px-5 py-4 font-mono font-semibold">{rowAmountsVisible(client.id) ? formatCurrency(totalInvoiced, currencySymbol, lang) : hidden}</td>
+                    <td className="px-5 py-4 font-mono font-semibold text-emerald-600 dark:text-emerald-400">{rowAmountsVisible(client.id) ? formatCurrency(totalPaid, currencySymbol, lang) : hidden}</td>
                     <td className="px-5 py-4">
                       <span className={`font-mono font-bold text-base ${balance > 0 ? "text-destructive" : "text-emerald-600 dark:text-emerald-400"}`}>
-                        {showAmounts ? formatCurrency(balance, currencySymbol, lang) : hidden}
+                        {rowAmountsVisible(client.id) ? formatCurrency(balance, currencySymbol, lang) : hidden}
                       </span>
                       {balance > 0 && (
                         <p className="text-xs text-destructive/70 mt-0.5">{t("outstandingLabel")}</p>
@@ -268,11 +277,21 @@ export default function StatementsIndex() {
                       )}
                     </td>
                     <td className="px-5 py-4">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center justify-center gap-2 whitespace-nowrap">
+                        <button
+                          type="button"
+                          onClick={() => toggleRowAmounts(client.id)}
+                          aria-pressed={rowAmountsVisible(client.id)}
+                          aria-label={`${rowAmountsVisible(client.id) ? (isAR ? "إخفاء الأرقام" : "Hide Numbers") : (isAR ? "إظهار الأرقام" : "Show Numbers")} — ${client.name}`}
+                          title={rowAmountsVisible(client.id) ? (isAR ? "إخفاء أرقام السطر" : "Hide row amounts") : (isAR ? "إظهار أرقام السطر" : "Show row amounts")}
+                          className="inline-flex items-center justify-center w-8 h-8 shrink-0 rounded-lg text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 hover:bg-amber-100 dark:hover:bg-amber-900/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+                        >
+                          {rowAmountsVisible(client.id) ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
                         <Link href={`/clients/${client.id}`}>
-                          <button className="flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 text-primary hover:bg-primary hover:text-primary-foreground rounded-lg font-semibold text-xs transition-all">
+                          <button type="button" title={t("viewStatement")} aria-label={`${t("viewStatement")} — ${client.name}`} className="inline-flex items-center justify-center w-8 h-8 shrink-0 rounded-lg bg-blue-50 dark:bg-blue-950/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500">
                             <BookOpen className="w-3.5 h-3.5" />
-                            {t("viewStatement")}
+
                           </button>
                         </Link>
                       <button
@@ -281,10 +300,10 @@ export default function StatementsIndex() {
                             `#/clients/${client.id}/statement?from=${fromDate}&to=${toDate}`
                           );
                         }}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-muted text-muted-foreground hover:bg-foreground hover:text-background rounded-lg font-semibold text-xs transition-all"
+                      type="button" title={t("print")} aria-label={`${t("print")} — ${client.name}`} className="inline-flex items-center justify-center w-8 h-8 shrink-0 rounded-lg bg-violet-50 dark:bg-violet-950/30 text-violet-600 dark:text-violet-400 hover:bg-violet-100 dark:hover:bg-violet-900/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
                     >
                       <Printer className="w-3.5 h-3.5" />
-                      {t("print")}
+
                     </button>
                       </div>
                     </td>

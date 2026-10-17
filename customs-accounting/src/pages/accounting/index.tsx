@@ -1,3 +1,4 @@
+import { useListInvoices } from "@workspace/api-client-react";
 import { describeDatePeriod } from "@/lib/date-period-description";
 import ResizableScrollArea from "@/components/layout/ResizableScrollArea";
 import { useState, useRef, useMemo, useEffect, useCallback } from "react";
@@ -15,7 +16,6 @@ import {
   Users,
   Truck,
   MapPin,
-  CalendarRange,
   ChevronDown,
   ChevronUp,
   Eye,
@@ -273,6 +273,11 @@ export default function AccountingPage() {
     enabled: !isClient && (user?.role === "admin" || can("canViewAccounting")),
   });
 
+  const { data: searchInvoices = [] } = useListInvoices();
+  const invoiceSearchFields = useMemo(() => new Map(
+    searchInvoices.map((invoice) => [invoice.id, invoice]),
+  ), [searchInvoices]);
+
   const searchString = useSearch();
   const initialInvoice = useMemo(
     () => new URLSearchParams(searchString).get("invoice") ?? "",
@@ -448,7 +453,12 @@ export default function AccountingPage() {
 
         const invoiceNumber = String(r.invoiceNumber ?? "").toLowerCase();
         const clientName = String(r.clientName ?? "").toLowerCase();
-        const searchValue = String(search ?? "").toLowerCase();
+        const searchValue = String(search ?? "").trim().toLowerCase();
+        const invoice = invoiceSearchFields.get(r.id);
+        const shipmentRef = String(invoice?.shipmentRef ?? "").toLowerCase();
+        const billOfLading = String(invoice?.billOfLading ?? "").toLowerCase();
+        const declarationBase = shipmentRef.replace(/[^a-z0-9]/g, "").slice(0, 14);
+        const searchBase = searchValue.replace(/[^a-z0-9]/g, "").slice(0, 14);
 
         const driverName = String(e.driverName ?? "");
         const unloadLocation = String(e.unloadLocation ?? "");
@@ -457,7 +467,10 @@ export default function AccountingPage() {
         if (
           search &&
           !invoiceNumber.includes(searchValue) &&
-          !clientName.includes(searchValue)
+          !clientName.includes(searchValue) &&
+          !shipmentRef.includes(searchValue) &&
+          !billOfLading.includes(searchValue) &&
+          !(searchBase && declarationBase.startsWith(searchBase))
         )
           return false;
         if (clientFilter && String(r.clientName ?? "") !== clientFilter)
@@ -471,6 +484,7 @@ export default function AccountingPage() {
       }),
     [
       rows,
+      invoiceSearchFields,
       search,
       clientFilter,
       driverFilter,
@@ -696,7 +710,7 @@ export default function AccountingPage() {
 
       {/* ── Filters ── */}
       <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
-        <div dir={lang === "ar" ? "rtl" : "ltr"} className="flex items-center justify-between gap-3 px-5 py-3 border-b border-border/50">
+        <div dir={lang === "ar" ? "rtl" : "ltr"} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-3 py-2 border-b border-border/50">
           <button
             type="button"
             onClick={() => setFiltersOpen(value => !value)}
@@ -705,9 +719,29 @@ export default function AccountingPage() {
             className="flex items-center gap-2 text-sm font-semibold text-foreground hover:text-primary transition-colors"
           >
             <Filter className="h-4 w-4 text-primary" />
-            <span>{lang === "ar" ? "البحث والفلاتر" : "Search and filters"}</span>
+            <span>{lang === "ar" ? "البحث" : "Search"}</span>
             {hasFilters && <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">{[search, clientFilter, driverFilter, locationFilter, dateFrom, dateTo].filter(Boolean).length}</span>}
           </button>
+<div className="flex min-w-0 flex-1 flex-wrap items-center gap-2"><div className="relative min-w-[220px] flex-1 sm:min-w-[280px]">
+              <Search className="pointer-events-none absolute end-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <input autoComplete="off" name="ledger-accounting-search"
+                aria-label={lang === "ar" ? "رقم البيان أو البوليصة أو اسم العميل أوالفاتورة" : "Declaration, bill of lading or client or invoice"}
+                placeholder={lang === "ar" ? "رقم البيان / البوليصة / اسم العميل/ الفاتورة" : "Declaration / bill of lading / client /invoice"}
+                value={search} onChange={(e) => setSearch(e.target.value)}
+                className="h-8 w-full ps-3 pe-9 rounded-lg border border-border bg-muted/40 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20" />
+            </div><label className="flex items-center gap-1.5 text-xs text-muted-foreground"><span>{lang === "ar" ? "من" : "From"}</span><input
+                      type="date" dir="ltr" aria-label={lang === "ar" ? "من" : "From"}
+                      value={dateFrom}
+                      onChange={(e) => setDateFrom(e.target.value)}
+                      className="h-8 w-[140px] px-2 rounded-lg border border-border bg-muted/40 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    /></label>
+<label className="flex items-center gap-1.5 text-xs text-muted-foreground"><span>{lang === "ar" ? "إلى" : "To"}</span><input
+                      type="date" dir="ltr" aria-label={lang === "ar" ? "إلى" : "To"}
+                      value={dateTo}
+                      onChange={(e) => setDateTo(e.target.value)}
+                      className="h-8 w-[140px] px-2 rounded-lg border border-border bg-muted/40 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    /></label>
+</div>
           <div className="flex items-center gap-2">
             <button type="button" onClick={clearFilters} className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/10 transition-colors">
               <X className="h-3.5 w-3.5" />
@@ -737,33 +771,7 @@ export default function AccountingPage() {
               transition={{ duration: 0.2 }}
               className="overflow-hidden border-t border-border/60"
             >
-              <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {/* Search  بحث نصي */}
-                <div className="lg:col-span-1 space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                    <Search className="w-3 h-3" /> {t("quickSearch")}
-                  </label>
-                  <div className="relative">
-                    <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-                    <input
-                      autoComplete="off"
-                      name="ledger-accounting-search"
-                      value={search}
-                      onChange={(e) => setSearch(e.target.value)}
-                      placeholder={t("searchInvoiceOrClient")}
-                      className="w-full pr-9 pl-4 py-2 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
-                    />
-                    {search && (
-                      <button
-                        onClick={() => setSearch("")}
-                        className="absolute left-3 top-1/2 -translate-y-1/2"
-                      >
-                        <X className="w-3.5 h-3.5 text-muted-foreground hover:text-foreground" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-
+              <div className="p-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                 {/* العملاء */}
                 <div className="space-y-1.5">
                   <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
@@ -783,27 +791,6 @@ export default function AccountingPage() {
                       ))}
                     </select>
                     <ChevronDown className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-                  </div>
-                </div>
-
-                {/* date التاريخ */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                    <CalendarRange className="w-3 h-3" /> {t("dateRange")}
-                  </label>
-                  <div className="flex gap-2">
-                    <input
-                      type="date"
-                      value={dateFrom}
-                      onChange={(e) => setDateFrom(e.target.value)}
-                      className="flex-1 px-3 py-2 rounded-xl border border-border bg-background text-xs focus:outline-none focus:ring-2 focus:ring-primary/30"
-                    />
-                    <input
-                      type="date"
-                      value={dateTo}
-                      onChange={(e) => setDateTo(e.target.value)}
-                      className="flex-1 px-3 py-2 rounded-xl border border-border bg-background text-xs focus:outline-none focus:ring-2 focus:ring-primary/30"
-                    />
                   </div>
                 </div>
 

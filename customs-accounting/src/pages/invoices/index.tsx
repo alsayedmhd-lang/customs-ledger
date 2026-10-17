@@ -1,12 +1,12 @@
 import { lookupReceiptPath } from "@/lib/invoice-receipt-link";
 import { describeDatePeriod } from "@/lib/date-period-description";
 import ResizableScrollArea from "@/components/layout/ResizableScrollArea";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { motion } from "framer-motion";
 import { useListInvoices, useDeleteInvoice, getListReceiptsQueryKey, getListInvoicesQueryKey, getGetInvoiceQueryKey, useGetInvoice } from "@workspace/api-client-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { ReceiptText, Plus, Search, Edit2, Trash2, Printer, FileText, Send, CheckCircle2, XCircle, Eye, EyeOff, Filter, ChevronDown, ChevronUp, X } from "lucide-react";
+import { ReceiptText, Plus, Search, Copy, Trash2, Printer, FileText, Send, CheckCircle2, XCircle, Eye, EyeOff, Filter, ChevronDown, ChevronUp, X } from "lucide-react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
@@ -26,6 +26,62 @@ export default function InvoicesList() {
   const { user, can } = useAuth();
   const isClient = user?.role === "client";
   const { t, lang } = useLanguage();
+  const defaultColumnWidths = [14, 19, 20, 11, 9, 9, 18];
+  const columnStorageKey = "ledger-invoices-column-widths-v1";
+  const [columnWidths, setColumnWidths] = useState<number[]>(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(columnStorageKey) || "null");
+      if (Array.isArray(saved) && saved.length === 7 && saved.every((n) => typeof n === "number" && Number.isFinite(n) && n >= 1) && Math.abs(saved.reduce((a, b) => a + b, 0) - 100) < 0.1) return saved;
+    } catch { /* Use default widths when storage is unavailable. */ }
+    return defaultColumnWidths;
+  });
+  const tableRef = useRef<HTMLTableElement>(null);
+  const columnDrag = useRef<{ index: number; x: number; width: number; widths: number[]; rtl: boolean } | null>(null);
+  useEffect(() => {
+    try { localStorage.setItem(columnStorageKey, JSON.stringify(columnWidths)); } catch { /* Layout remains usable without storage. */ }
+  }, [columnWidths]);
+  const columnHandle = (index: number) => index < 6 ? (
+    <span
+      role="separator" aria-orientation="vertical" tabIndex={0}
+      aria-label={lang === "ar" ? "تغيير عرض العمود" : "Resize column"}
+      title={lang === "ar" ? "اسحب لتغيير العرض — انقر مرتين لاستعادة المقاسات" : "Drag to resize — double-click to reset widths"}
+      className="absolute inset-y-0 end-0 w-2 cursor-col-resize touch-none select-none hover:bg-primary/10 focus:bg-primary/10 z-40"
+      onDoubleClick={() => setColumnWidths(defaultColumnWidths)}
+      onPointerDown={(event) => {
+        if (event.button !== 0 || !tableRef.current) return;
+        event.preventDefault(); event.stopPropagation();
+        columnDrag.current = { index, x: event.clientX, width: tableRef.current.getBoundingClientRect().width, widths: [...columnWidths], rtl: getComputedStyle(tableRef.current).direction === "rtl" };
+        event.currentTarget.setPointerCapture(event.pointerId);
+      }}
+      onPointerMove={(event) => {
+        const drag = columnDrag.current;
+        if (!drag || drag.index !== index || drag.width <= 0) return;
+        const delta = (event.clientX - drag.x) * (drag.rtl ? -1 : 1) / drag.width * 100;
+        const pair = drag.widths[index] + drag.widths[index + 1];
+        const minimum = Math.min(28 / drag.width * 100, pair / 2);
+        const next = [...drag.widths];
+        next[index] = Math.max(minimum, Math.min(pair - minimum, drag.widths[index] + delta));
+        next[index + 1] = pair - next[index];
+        setColumnWidths(next);
+      }}
+      onPointerUp={() => { columnDrag.current = null; }}
+      onPointerCancel={() => { columnDrag.current = null; }}
+      onLostPointerCapture={() => { columnDrag.current = null; }}
+      onKeyDown={(event) => {
+        if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+        event.preventDefault();
+        const rtl = tableRef.current && getComputedStyle(tableRef.current).direction === "rtl";
+        const delta = (event.key === "ArrowRight" ? 0.5 : -0.5) * (rtl ? -1 : 1);
+        setColumnWidths((current) => {
+          const next = [...current]; const pair = current[index] + current[index + 1];
+          next[index] = Math.max(1, Math.min(pair - 1, current[index] + delta));
+          next[index + 1] = pair - next[index]; return next;
+        });
+      }}
+    />
+  ) : null;
+
+
   const isAR = lang === "ar";
   const tr = (ar: string, en: string) => (isAR ? ar : en);
   const { data: invoices = [], isLoading } = useListInvoices();
@@ -336,8 +392,8 @@ export default function InvoicesList() {
         })}
       </div>
 
-      <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
-        <div dir={lang === "ar" ? "rtl" : "ltr"} className="flex items-center justify-between gap-3 px-5 py-3 border-b border-border/50">
+      <div className="bg-card rounded-lg border border-border shadow-sm overflow-hidden">
+        <div dir={lang === "ar" ? "rtl" : "ltr"} data-ledger-compact-invoice-filters className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 px-3 py-2 border-b border-border/50">
           <button
             type="button"
             onClick={() => setFiltersOpen(value => !value)}
@@ -346,9 +402,28 @@ export default function InvoicesList() {
             className="flex items-center gap-2 text-sm font-semibold text-foreground hover:text-primary transition-colors"
           >
             <Filter className="h-4 w-4 text-primary" />
-            <span>{tr("البحث والفلاتر", "Search and filters")}</span>
+            <span>{tr("البحث", "Search")}</span>
             {activeFilterCount > 0 && <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">{activeFilterCount}</span>}
           </button>
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2"><div className="relative min-w-[220px] flex-1 sm:min-w-[280px]">
+              <Search className="pointer-events-none absolute end-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <input autoComplete="off" name="ledger-invoices-search"
+                aria-label={lang === "ar" ? "رقم البيان أو البوليصة أو اسم العميل أوالفاتورة" : "Declaration, bill of lading or client or invoice"}
+                placeholder={lang === "ar" ? "رقم البيان / البوليصة / اسم العميل/ الفاتورة" : "Declaration / bill of lading / client /invoice"}
+                value={search} onChange={(e) => setSearch(e.target.value)}
+                className="h-8 w-full ps-3 pe-9 rounded-lg border border-border bg-muted/40 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20" />
+            </div><label className="flex items-center gap-1.5 text-xs text-muted-foreground"><span>{tr("من", "From")}</span><span className="w-[140px]"><input
+              type="date" aria-label={tr("من", "From")} dir="ltr"
+              value={fromDate}
+              onChange={(e) => setFromDate(e.target.value)}
+              className="w-full px-2 py-1 bg-muted/40 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm"
+            /></span></label>
+<label className="flex items-center gap-1.5 text-xs text-muted-foreground"><span>{tr("إلى", "To")}</span><span className="w-[140px]"><input
+              type="date" aria-label={tr("إلى", "To")} dir="ltr"
+              value={toDate}
+              onChange={(e) => setToDate(e.target.value)}
+              className="w-full px-2 py-1 bg-muted/40 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm"
+            /></span></label></div>
           <div className="flex items-center gap-2">
             <button type="button" onClick={clearFilters} className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-xs font-medium text-destructive hover:bg-destructive/10 transition-colors">
               <X className="h-3.5 w-3.5" />
@@ -369,49 +444,19 @@ export default function InvoicesList() {
         <div
           id="invoice-search-filters"
           hidden={!filtersOpen}
-          className="px-5 py-4 space-y-4"
+          className="px-3 py-2 space-y-2"
         >
-          {/* Search row */}
-          <div className="flex flex-col gap-2">
-            <span className="text-sm font-medium text-muted-foreground">
-              {tr("البحث", "Search")}
-            </span>
-
-            <div className="relative w-full xl:w-[72%]">
-              <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-
-              <input
-                autoComplete="off"
-                name="ledger-invoice-search"
-                placeholder={t("searchInvoicePlaceholder")}
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full pr-10 pl-4 py-2.5 bg-muted/40 border border-border rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm"
-              />
-            </div>
-          </div>
-
           {/* Filters row */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-[150px_150px_220px_220px_160px_70px] gap-3 items-center">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-[220px_220px_160px_70px] gap-2 items-center">
 
-            <input
-              type="date"
-              value={fromDate}
-              onChange={(e) => setFromDate(e.target.value)}
-              className="w-full px-4 py-2.5 bg-muted/40 border border-border rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm"
-            />
 
-            <input
-              type="date"
-              value={toDate}
-              onChange={(e) => setToDate(e.target.value)}
-              className="w-full px-4 py-2.5 bg-muted/40 border border-border rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm"
-            />
+
+
 
             <select
               value={salesmanFilter}
               onChange={(e) => setSalesmanFilter(e.target.value)}
-              className="w-full px-4 py-2.5 bg-muted/40 border border-border rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm"
+              className="w-full px-4 py-1.5 bg-muted/40 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm"
             >
               <option value="">{tr("المندوب", "Salesman")}</option>
 
@@ -425,7 +470,7 @@ export default function InvoicesList() {
             <select
               value={portFilter}
               onChange={(e) => setPortFilter(e.target.value)}
-              className="w-full px-4 py-2.5 bg-muted/40 border border-border rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm"
+              className="w-full px-4 py-1.5 bg-muted/40 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm"
             >
               <option value="">{tr("منفذ الدخول", "Port of Entry")}</option>
 
@@ -439,7 +484,7 @@ export default function InvoicesList() {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="w-full px-4 py-2.5 bg-muted/40 border border-border rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm"
+              className="w-full px-4 py-1.5 bg-muted/40 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-sm"
             >
               <option value="">{t("status")}</option>
               <option value="draft">{t("draft")}</option>
@@ -463,16 +508,21 @@ export default function InvoicesList() {
 
       <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
         <ResizableScrollArea storageKey="invoices-index" maxHeight={580} restoreScrollKey={`${filtersStorageKey}:scroll`} scrollReady={!isLoading}>
-          <table className="w-full text-sm">
+          <table ref={tableRef} className="w-full table-fixed text-sm [&_th]:text-center [&_td]:text-center [&_th]:align-middle [&_td]:align-middle [&_th]:whitespace-nowrap [&_th]:px-3 [&_td]:px-3 [&_td]:overflow-hidden [&_td]:text-ellipsis [&_tr>td:nth-child(2)]:text-left [&_tr>td:nth-child(3)]:text-left">
+              <colgroup>
+                {columnWidths.map((width, index) => (
+                  <col key={index} style={{ width: `${width}%` }} />
+                ))}
+              </colgroup>
             <thead className="bg-muted/40 text-muted-foreground font-medium border-b border-border/60 sticky top-0 z-10">
               <tr>
-                <th className="px-4 py-3 text-start text-xs font-semibold tracking-wide uppercase">{t("invoiceNumber")}</th>
-                <th className="px-4 py-3 text-start text-xs font-semibold tracking-wide uppercase">{t("shipmentRef")}</th>
-                <th className="px-4 py-3 text-start text-xs font-semibold tracking-wide uppercase">{t("client")}</th>
-                <th className="px-4 py-3 text-start text-xs font-semibold tracking-wide uppercase">{t("date")}</th>
-                <th className="px-4 py-3 text-start text-xs font-semibold tracking-wide uppercase">{t("status")}</th>
-                <th className="px-4 py-3 text-medium text-xs font-semibold tracking-wide uppercase">{t("total")}</th>
-                <th className="px-4 py-3 text-medium text-xs font-semibold tracking-wide uppercase">{t("actions")}</th>
+                <th className="relative px-4 py-3 text-start text-xs font-semibold tracking-wide uppercase">{t("invoiceNumber")}{columnHandle(0)}</th>
+                <th className="relative px-4 py-3 text-start text-xs font-semibold tracking-wide uppercase">{t("shipmentRef")}{columnHandle(1)}</th>
+                <th className="relative px-4 py-3 text-start text-xs font-semibold tracking-wide uppercase">{t("client")}{columnHandle(2)}</th>
+                <th className="relative px-4 py-3 text-start text-xs font-semibold tracking-wide uppercase">{t("date")}{columnHandle(3)}</th>
+                <th className="relative px-4 py-3 text-start text-xs font-semibold tracking-wide uppercase">{t("status")}{columnHandle(4)}</th>
+                <th className="relative px-4 py-3 text-medium text-xs font-semibold tracking-wide uppercase">{t("total")}{columnHandle(5)}</th>
+                <th className="relative px-4 py-3 text-medium text-xs font-semibold tracking-wide uppercase">{t("actions")}{columnHandle(6)}</th>
               </tr>
             </thead>
 
@@ -496,7 +546,7 @@ export default function InvoicesList() {
                       {isClient ? (
                         <span className="font-mono font-bold text-primary text-sm">{inv.invoiceNumber}</span>
                       ) : (
-                        <Link href={`/invoices/${inv.id}/edit`} className="font-mono font-bold text-primary text-sm hover:underline">
+                        <Link href={`/invoices/${inv.id}/edit?section=invoice`} className="font-mono font-bold text-primary text-sm hover:underline">
                           {inv.invoiceNumber}
                         </Link>
                       )}
@@ -504,7 +554,8 @@ export default function InvoicesList() {
                       <td className="px-4 py-3">
                         {inv.shipmentRef ? (
                           <Link
-                            href={`/invoices/${inv.id}/edit`}
+                            href={`/invoices/${inv.id}/edit?section=attachments`}
+                            title={tr("فتح المرفقات", "Open attachments")}
                             className="font-mono text-primary hover:underline"
                           >
                             {inv.shipmentRef}
@@ -537,14 +588,14 @@ export default function InvoicesList() {
                     </td>
 
                     <td className="px-4 py-3 text-end">
-                      <div className="flex items-center justify-end gap-1">
+                      <div className="flex items-center justify-center gap-2 whitespace-nowrap">
                         <button
                           onClick={() => {
                             (window as any).electronAPI?.openExternalPrintWindow?.(
                               `#/invoices/${inv.id}/receipt`
                             );
                           }}
-                          className="p-1.5 text-muted-foreground hover:bg-muted/50 hover:text-foreground rounded-lg transition-colors"
+                          className="p-1.5 text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-950/30 hover:bg-violet-100 dark:hover:bg-violet-900/40 rounded-lg transition-colors"
                           title={t("print")}
                           aria-label={t("print")}
                           type="button"
@@ -554,16 +605,16 @@ export default function InvoicesList() {
 
                         <button
                           onClick={() => setCopyId(inv.id)}
-                          className={`${isClient ? "hidden" : ""} p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-lg transition-colors`}
+                          className={`${isClient ? "hidden" : ""} p-1.5 text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 hover:bg-amber-100 dark:hover:bg-amber-900/40 rounded-lg transition-colors`}
                           title={t("copy")}
                         >
-                          📄
+                          <Copy className="w-3.5 h-3.5" />
                         </button>
 
                         {!isClient && can("canEditInvoices") && inv.status === "draft" && (
                           <button type="button"
                             onClick={() => setLocation(`/invoices/${inv.id}/edit`)}
-                            className="p-1.5 text-blue-600 hover:bg-blue-500/10 rounded-lg transition-colors"
+                            className="p-1.5 text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/30 hover:bg-blue-100 dark:hover:bg-blue-900/40 rounded-lg transition-colors"
                             title={tr("مراجعة وإصدار الفاتورة", "Review and issue invoice")}
                             aria-label={tr("مراجعة وإصدار الفاتورة", "Review and issue invoice")}>
                             <Send className="w-3.5 h-3.5" />
@@ -584,21 +635,12 @@ export default function InvoicesList() {
                           </button>
                         )}
 
-                        {!isClient && can("canEditInvoices") && (
-                          <Link href={`/invoices/${inv.id}/edit`}>
-                            <button
-                              className="p-1.5 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg transition-colors"
-                              title={t("edit")}
-                            >
-                              <Edit2 className="w-3.5 h-3.5" />
-                            </button>
-                          </Link>
-                        )}
+
 
                         {!isClient && can("canDeleteInvoices") && (
                           <button
                             onClick={() => setDeleteId(inv.id)}
-                            className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg transition-colors"
+                            title={t("delete")} aria-label={t("delete")} type="button" className="p-1.5 text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/30 hover:bg-rose-100 dark:hover:bg-rose-900/40 rounded-lg transition-colors"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
