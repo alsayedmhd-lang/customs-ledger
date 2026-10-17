@@ -220,7 +220,7 @@ export default function Dashboard() {
       const match = /^(\d{4})-(0[1-9]|1[0-2])(?:-\d{2})?/.exec(inv.issueDate ?? "");
       if (!match) return months;
       const key = `${match[1]}-${match[2]}`;
-      months.set(key, (months.get(key) ?? 0) + Number(inv.total ?? 0));
+      months.set(key, (months.get(key) ?? 0) + 1);
       return months;
     }, new Map<string, number>()),
     ([key, total]) => {
@@ -521,7 +521,7 @@ export default function Dashboard() {
         >
           <div className="flex items-center justify-between mb-3">
             <div>
-              <h2 className="text-base font-bold text-foreground">{t("monthlyRevenue")}</h2>
+              <h2 className="text-base font-bold text-foreground">{isAR ? "عدد الفواتير شهريًا" : "Monthly Invoice Count"}</h2>
               <p className="text-xs text-muted-foreground mt-0.5">{lang === "ar" ? "آخر 6 أشهر" : "Last 6 months"}</p>
             </div>
             <div className="p-2 rounded-xl bg-primary/10">
@@ -540,7 +540,7 @@ export default function Dashboard() {
                     dy={8}
                   />
                   <YAxis
-                    tickFormatter={(val) => `${(val / 1000).toFixed(0)}k`}
+                    allowDecimals={false} tickFormatter={(val) => showAmounts ? String(val) : "••••"}
                     axisLine={false} tickLine={false}
                     tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }}
                     width={40}
@@ -553,7 +553,7 @@ export default function Dashboard() {
                       background: "hsl(var(--card))", color: "hsl(var(--foreground))",
                       fontSize: "13px", fontFamily: "Cairo", direction: lang === "ar" ? "rtl" : "ltr",
                     }}
-                    formatter={(value: number) => [formatCurrency(value, currencySymbol, lang), lang === "ar" ? "الإيرادات" : "Revenue"]}
+                    formatter={(value: number) => [showAmounts ? String(value) : "••••••", isAR ? "عدد الفواتير" : "Invoice Count"]}
                   />
                   <Bar dataKey="total" radius={[8, 8, 0, 0]} maxBarSize={48}>
                     {chartData.map((_, index) => (
@@ -565,7 +565,7 @@ export default function Dashboard() {
             ) : (
               <div className="h-full flex flex-col items-center justify-center text-muted-foreground gap-2">
                 <TrendingUp className="w-10 h-10 opacity-20" />
-                <p className="text-sm">{lang === "ar" ? "لا توجد بيانات إيرادات بعد" : "No revenue data yet"}</p>
+                <p className="text-sm">{isAR ? "لا توجد فواتير بعد" : "No invoices yet"}</p>
               </div>
             )}
           </div>

@@ -1,4 +1,4 @@
-﻿import { printFromPreview } from "@/lib/print-from-preview";
+import { printFromPreview } from "@/lib/print-from-preview";
 import { useAuth } from "@/lib/auth-context";
 import { useState, useEffect } from "react";
 import { useParams, Link } from "wouter";
@@ -81,12 +81,11 @@ export default function ClientStatement() {
     queryFn: () => fetchClientStatement(clientId, fromDate, toDate),
     enabled: Number.isFinite(clientId) && clientId > 0,
   });
-  const { lang } = useLanguage();
+  const { lang, currencySymbol } = useLanguage();
   const { user } = useAuth();
   const isAR = lang === "ar";
   const isClient = user?.role === "client";
   const { settings, logoSrc, stampSrc, watermarkSrc } = useCompanySettings();
-  const currencySymbol = lang === "en" ? "QAR" : "ر.ق";
   const canCustomize = user?.permissions?.canCustomizePrintContact;
   const printPhone = canCustomize && user?.phone ? user.phone : settings.phone;
   const printEmail = canCustomize && user?.email ? user.email : settings.email;
