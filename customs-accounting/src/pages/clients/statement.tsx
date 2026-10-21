@@ -430,7 +430,7 @@ export default function ClientStatement() {
                 <th className="text-right py-2 px-3 font-bold text-gray-700">رقم الفاتورة / Invoice No</th>
                 <th className="text-right py-2 px-3 font-bold text-gray-700">التاريخ / Date</th>
                 <th className="text-center py-2 px-2 font-bold text-gray-700">الحالة / Status</th>
-                <th className="text-right py-2 px-3 font-bold text-gray-700">ملاحظات / Notes</th>
+                <th className="text-right py-2 px-3 font-bold text-gray-700">المستورد/المصدر / Importer / Exporter</th>
                 <th className="text-left py-2 px-2 font-bold text-gray-700 w-24">مدين / Debit</th>
                 <th className="text-left py-2 px-2 font-bold text-gray-700 w-24 text-green-700">دفعة مقدمة / Advance</th>
                 <th className="text-left py-2 px-2 font-bold text-gray-700 w-24">الرصيد / Balance</th>
@@ -461,8 +461,8 @@ export default function ClientStatement() {
                       </span>
                     </td>
                     <td className="py-2 px-3 text-gray-600 text-xs max-w-[140px]">
-                      <span className="line-clamp-2 leading-snug">
-                        {(inv as any).notes || <span className="text-gray-300">—</span>}
+                      <span className="block break-words leading-snug">
+                        {(inv as any).importerExporterName || <span className="text-gray-300">—</span>}
                       </span>
                     </td>
                     <td className="py-2 px-2 text-left font-mono font-bold text-gray-800">

@@ -1,3 +1,4 @@
+import InvoiceClientSelect from "@/components/InvoiceClientSelect";
 import { attachmentDeclarationBase, persistPendingInvoiceAttachments, type PendingInvoiceAttachment, type AttachmentSaveContext } from "@/lib/pending-invoice-attachments";
 import { lookupReceiptPath } from "@/lib/invoice-receipt-link";
 import ResizableScrollArea from "@/components/layout/ResizableScrollArea";
@@ -230,6 +231,7 @@ function SuggestionInput({
   placeholder,
   className,
   dir,
+  resizable = false,
 }: {
   storageKey: string;
   value?: string | null;
@@ -237,15 +239,40 @@ function SuggestionInput({
   placeholder?: string;
   className?: string;
   dir?: "rtl" | "ltr";
+  resizable?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [suggestions, setSuggestions] = useState<string[]>([]);
 
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [listHeight, setListHeight] = useState(180);
+  const [maximumHeight, setMaximumHeight] = useState(480);
+  useEffect(() => {
+    if (!resizable || !open) return;
+    const closeOutside = (event: PointerEvent) => {
+      if (!containerRef.current?.contains(event.target as Node)) setOpen(false);
+    };
+    const fit = () => {
+      const bottom = containerRef.current?.getBoundingClientRect().bottom ?? 0;
+      setMaximumHeight(Math.max(36, Math.min(480, window.innerHeight - bottom - 40)));
+    };
+    fit();
+    document.addEventListener("pointerdown", closeOutside);
+    window.addEventListener("resize", fit);
+    return () => {
+      document.removeEventListener("pointerdown", closeOutside);
+      window.removeEventListener("resize", fit);
+    };
+  }, [open, resizable]);
+  const dragRef = useRef<{ y: number; height: number } | null>(null);
   const refreshSuggestions = () => setSuggestions(readSuggestions(storageKey));
-  const visibleSuggestions = suggestions.slice(0, 5);
+  const visibleSuggestions = resizable ? suggestions : suggestions.slice(0, 5);
 
   return (
-    <div className="relative">
+    <div className="relative" ref={containerRef}
+      onBlur={(event) => {
+        if (resizable && !event.currentTarget.contains(event.relatedTarget as Node | null)) setOpen(false);
+      }}>
       <input
         value={value ?? ""}
         onFocus={() => {
@@ -257,7 +284,8 @@ function SuggestionInput({
           refreshSuggestions();
           setOpen(true);
         }}
-        onBlur={() => setTimeout(() => setOpen(false), 100)}
+        onBlur={resizable ? undefined : () => setTimeout(() => setOpen(false), 100)}
+        onKeyDown={(event) => { if (event.key === "Escape") setOpen(false); }}
         placeholder={placeholder}
         className={className}
         dir={dir}
@@ -266,12 +294,23 @@ function SuggestionInput({
       {open && visibleSuggestions.length > 0 && (
         <div
           className="absolute left-0 right-0 top-full z-[9999] mt-1 max-h-56 overflow-auto rounded-lg border border-border bg-popover text-popover-foreground shadow-xl"
+          style={resizable ? {
+            backgroundColor: "hsl(var(--card, 0 0% 100%))",
+            color: "hsl(var(--card-foreground, 222 47% 11%))",
+            maxHeight: "none", overflow: "hidden", opacity: 1,
+          } : undefined}
           dir={dir}
+          onMouseDown={resizable ? (event) => event.preventDefault() : undefined}
         >
+          <div style={resizable ? {
+            height: Math.min(listHeight, maximumHeight, visibleSuggestions.length * 36),
+            overflowY: "scroll", overscrollBehavior: "contain", scrollbarGutter: "stable",
+          } : undefined}>
           {visibleSuggestions.map((suggestion) => (
             <div
               key={suggestion}
-              className="flex items-center gap-2 border-b border-border/50 last:border-b-0"
+              style={resizable ? { height: 36, boxSizing: "border-box" } : undefined}
+              className="flex items-center gap-2 border-b border-border/50 last:border-b-0 hover:bg-muted"
             >
               <button
                 type="button"
@@ -299,6 +338,37 @@ function SuggestionInput({
               </button>
             </div>
           ))}
+          </div>
+          {resizable && (
+            <div
+              role="separator" aria-orientation="horizontal" tabIndex={0}
+              aria-label={dir === "rtl" ? "اسحب لتغيير ارتفاع القائمة" : "Drag to resize list"}
+              aria-valuemin={36} aria-valuemax={maximumHeight}
+              aria-valuenow={Math.min(listHeight, maximumHeight, visibleSuggestions.length * 36)}
+              className="flex h-5 items-center justify-center border-t border-border bg-muted"
+              style={{ cursor: "ns-resize", touchAction: "none", userSelect: "none" }}
+              onKeyDown={(event) => {
+                if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+                  event.preventDefault();
+                  setListHeight(h => Math.max(36, Math.min(maximumHeight, h + (event.key === "ArrowDown" ? 36 : -36))));
+                }
+              }}
+              onPointerDown={(event) => {
+                event.preventDefault();
+                event.currentTarget.setPointerCapture(event.pointerId);
+                dragRef.current = { y: event.clientY, height: Math.min(listHeight, maximumHeight, visibleSuggestions.length * 36) };
+              }}
+              onPointerMove={(event) => {
+                const drag = dragRef.current;
+                if (drag) setListHeight(Math.max(36, Math.min(maximumHeight, drag.height + event.clientY - drag.y)));
+              }}
+              onPointerUp={() => { dragRef.current = null; }}
+              onPointerCancel={() => { dragRef.current = null; }}
+              onLostPointerCapture={() => { dragRef.current = null; }}
+            >
+              <span className="h-1 w-10 rounded-full bg-muted-foreground/50" />
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -1547,16 +1617,12 @@ export default function InvoiceForm() {
           <div className="p-4 grid grid-cols-2 md:grid-cols-4 gap-3">
             <div className="col-span-2 md:col-span-2">
               <label className={labelCls}>{isAR ? "العميل" : "Client"}</label>
-              <select {...register("clientId")} className={inputCls}>
-                <option value={0}>
-                  {isAR ? "اختر العميل..." : "Select client..."}
-                </option>
-                {clients?.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
+              <>
+              <input type="hidden" {...register("clientId")} />
+              <InvoiceClientSelect clients={clients ?? []} value={String(watch("clientId") ?? "")}
+                onChange={(value) => setValue("clientId", value, { shouldDirty: true, shouldValidate: true, shouldTouch: true })}
+                placeholder={isAR ? "اختر العميل..." : "Select client..."} className={inputCls} dir={isRTL ? "rtl" : "ltr"}  />
+              </>
               {errors.clientId && (
                 <p className="text-xs text-destructive mt-0.5">
                   {errors.clientId.message}
@@ -1596,6 +1662,7 @@ export default function InvoiceForm() {
               {isAR ? "اسم المستورد / المصدر" : "Importer / Exporter Name"}
             </label>
             <SuggestionInput
+              resizable
               storageKey={IMPORTER_EXPORTER_SUGGESTIONS_KEY}
               value={watch("importerExporterName") ?? ""}
               onChange={(value) =>
@@ -1612,44 +1679,24 @@ export default function InvoiceForm() {
 
             <div>
               <label className={labelCls}>{isAR ? "الحالة" : "Status"}</label>
-              <select {...register("status")} className={inputCls}>
-                {Object.values(CreateInvoiceRequestStatus).map((s) => {
-                  const status = String(s) as keyof typeof STATUS_LABELS;
-
-                  return (
-                    <option key={status} value={status}>
-                      {STATUS_LABELS[status]?.[lang] || status}
-                    </option>
-                  );
-                })}
-            </select>
+              <>
+              <input type="hidden" {...register("status")} />
+              <InvoiceClientSelect clients={Object.values(CreateInvoiceRequestStatus).map((s) => ({ id: String(s), name: STATUS_LABELS[String(s)]?.[lang] || String(s) }))} value={String(watch("status") ?? "")}
+                onChange={(value) => setValue("status", value, { shouldDirty: true, shouldValidate: true, shouldTouch: true })}
+                placeholder={isAR ? "الحالة" : "Status"} className={inputCls} dir={isRTL ? "rtl" : "ltr"}  />
+              </>
             </div>
 
             <div>
               <label className={labelCls}>
                 {isAR ? "المندوب" : "Salesman"}
               </label>
-              <select
-                {...register("createdBy")}
-                value={watch("createdBy") || (user?.id ? String(user.id) : "")}
-                className={inputCls}
-                disabled={
-                  !isEdit ||
-                  (user?.role !== "admin" && user?.role !== "supervisor")
-                }
-              >
-                {user && !users.some((u) => String(u.id) === String(user.id)) && (
-                  <option value={String(user.id)}>
-                    {user.displayName || user.username}
-                  </option>
-                )}
-
-                {users.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.displayName || u.username}
-                  </option>
-                ))}
-              </select>
+              <>
+              <input type="hidden" {...register("createdBy")} />
+              <InvoiceClientSelect clients={[...(user && !users.some((u) => String(u.id) === String(user.id)) ? [{ id: user.id, name: user.displayName || user.username }] : []), ...users.map((u) => ({ id: u.id, name: u.displayName || u.username }))]} value={String(watch("createdBy") || (user?.id ? String(user.id) : ""))}
+                onChange={(value) => setValue("createdBy", value, { shouldDirty: true, shouldValidate: true, shouldTouch: true })}
+                placeholder={isAR ? "المندوب" : "Salesman"} className={inputCls} dir={isRTL ? "rtl" : "ltr"} disabled={!isEdit || (user?.role !== "admin" && user?.role !== "supervisor")} />
+              </>
             </div>
           </div>
         </div>
@@ -1665,7 +1712,7 @@ export default function InvoiceForm() {
           <div className="relative p-4 grid grid-cols-2 md:grid-cols-4 gap-3">
             <div>
               <label className={labelCls}>
-                {isAR ? "رقم البيان" : "Shipment Ref"}
+                {isAR ? "رقم البيان" : "Declaration Number"}
               </label>
               <input
                 {...register("shipmentRef")}
@@ -1674,13 +1721,13 @@ export default function InvoiceForm() {
                   void register("shipmentRef").onBlur(event);
                   setDuplicateField(null);
                 }}
-                placeholder={isAR ? "مثال: 123456" : "e.g. 123456"}
+                placeholder={isAR ? "رقم البيان " : "Declaration Number"}
                 className={inputCls}
               />
           </div>
              <div>
               <label className={labelCls}>
-                {isAR ? "رقم البوليصة B/L" : "Bill of Lading"}
+                {isAR ? "رقم البوليصة " : "AWB or B/L Number"}
               </label>
 
               <input
@@ -1690,7 +1737,7 @@ export default function InvoiceForm() {
                   void register("billOfLading").onBlur(event);
                   setDuplicateField(null);
                 }}
-                placeholder="MSKU1234567"
+                placeholder={isAR ? "رقم البوليصة " : "AWB or B/L Number"}
                 className={inputCls}
               />
             </div>
@@ -1716,7 +1763,7 @@ export default function InvoiceForm() {
                     shouldValidate: true,
                   })
                 }
-                placeholder={isAR ? "مثال: ميناء حمد" : "e.g. Hamad Port"}
+                placeholder={isAR ? "ميناء الدخول" : "Port of Entry"}
                 className={inputCls}
                 dir={isRTL ? "rtl" : "ltr"}
               />
@@ -1731,7 +1778,7 @@ export default function InvoiceForm() {
                 min="0"
                 step="1"
                 {...register("packageCount")}
-                placeholder="50"
+                placeholder={isAR ? "عدد الطرود" : "Packages"}
                 className={inputCls}
               />
             </div>
@@ -1745,7 +1792,7 @@ export default function InvoiceForm() {
                 min="0"
                 step="0.001"
                 {...register("shipmentWeight")}
-                placeholder="1250.000"
+                placeholder={isAR ? "الوزن (كجم)" : "Weight (kg)"}
                 className={inputCls}
               />
             </div>

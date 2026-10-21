@@ -374,6 +374,7 @@ function formatInvoice(inv: typeof invoicesTable.$inferSelect, clientName: strin
     advancePayment: parseFloat(String((inv as any).advancePayment ?? "0")),
     total: parseFloat(String(inv.total ?? "0")),
     notes: inv.notes ?? null,
+    importerExporterName: inv.importerExporterName ?? null,
     shipmentRef: inv.shipmentRef ?? null,
     portOfEntry: inv.portOfEntry ?? null,
     createdAt: inv.createdAt ? inv.createdAt.toISOString() : null,

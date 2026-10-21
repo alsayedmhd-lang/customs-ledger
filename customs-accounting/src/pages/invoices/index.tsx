@@ -26,12 +26,12 @@ export default function InvoicesList() {
   const { user, can } = useAuth();
   const isClient = user?.role === "client";
   const { t, lang } = useLanguage();
-  const defaultColumnWidths = [14, 19, 20, 11, 9, 9, 18];
-  const columnStorageKey = "ledger-invoices-column-widths-v1";
+  const defaultColumnWidths = [12, 16, 17, 17, 10, 8, 8, 12];
+  const columnStorageKey = "ledger-invoices-column-widths-v2";
   const [columnWidths, setColumnWidths] = useState<number[]>(() => {
     try {
       const saved = JSON.parse(localStorage.getItem(columnStorageKey) || "null");
-      if (Array.isArray(saved) && saved.length === 7 && saved.every((n) => typeof n === "number" && Number.isFinite(n) && n >= 1) && Math.abs(saved.reduce((a, b) => a + b, 0) - 100) < 0.1) return saved;
+      if (Array.isArray(saved) && saved.length === 8 && saved.every((n) => typeof n === "number" && Number.isFinite(n) && n >= 1) && Math.abs(saved.reduce((a, b) => a + b, 0) - 100) < 0.1) return saved;
     } catch { /* Use default widths when storage is unavailable. */ }
     return defaultColumnWidths;
   });
@@ -40,7 +40,7 @@ export default function InvoicesList() {
   useEffect(() => {
     try { localStorage.setItem(columnStorageKey, JSON.stringify(columnWidths)); } catch { /* Layout remains usable without storage. */ }
   }, [columnWidths]);
-  const columnHandle = (index: number) => index < 6 ? (
+  const columnHandle = (index: number) => index < 7 ? (
     <span
       role="separator" aria-orientation="vertical" tabIndex={0}
       aria-label={lang === "ar" ? "تغيير عرض العمود" : "Resize column"}
@@ -257,7 +257,7 @@ export default function InvoicesList() {
       .slice(0, 14);
   }
 
-  const q = search.toLowerCase();
+  const q = search.trim().toLowerCase();
 
   const filtered = invoices?.filter((i: any) => {
     const issueDate = String(i.issueDate || "").slice(0, 10);
@@ -268,6 +268,7 @@ export default function InvoicesList() {
     const matchesSearch =
       i.invoiceNumber?.toLowerCase().includes(q) ||
       i.clientName?.toLowerCase().includes(q) ||
+      String(i.importerExporterName ?? "").toLowerCase().includes(q) ||
       (i.shipmentRef && i.shipmentRef.toLowerCase().includes(q)) ||
       (searchBase && shipmentBase && shipmentBase.startsWith(searchBase)) ||
       (i.billOfLading && i.billOfLading.toLowerCase().includes(q));
@@ -408,8 +409,8 @@ export default function InvoicesList() {
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2"><div className="relative min-w-[220px] flex-1 sm:min-w-[280px]">
               <Search className="pointer-events-none absolute end-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <input autoComplete="off" name="ledger-invoices-search"
-                aria-label={lang === "ar" ? "رقم البيان أو البوليصة أو اسم العميل أوالفاتورة" : "Declaration, bill of lading or client or invoice"}
-                placeholder={lang === "ar" ? "رقم البيان / البوليصة / اسم العميل/ الفاتورة" : "Declaration / bill of lading / client /invoice"}
+                aria-label={lang === "ar" ? "رقم البيان أو البوليصة أو العميل أو المستورد/المصدر أو الفاتورة" : "Declaration, bill of lading, client, importer/exporter or invoice"}
+                placeholder={lang === "ar" ? "البيان / البوليصة / العميل / المستورد أو المصدر / الفاتورة" : "Declaration / B/L / client / importer or exporter / invoice"}
                 value={search} onChange={(e) => setSearch(e.target.value)}
                 className="h-8 w-full ps-3 pe-9 rounded-lg border border-border bg-muted/40 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20" />
             </div><label className="flex items-center gap-1.5 text-xs text-muted-foreground"><span>{tr("من", "From")}</span><span className="w-[140px]"><input
@@ -519,23 +520,24 @@ export default function InvoicesList() {
                 <th className="relative px-4 py-3 text-start text-xs font-semibold tracking-wide uppercase">{t("invoiceNumber")}{columnHandle(0)}</th>
                 <th className="relative px-4 py-3 text-start text-xs font-semibold tracking-wide uppercase">{t("shipmentRef")}{columnHandle(1)}</th>
                 <th className="relative px-4 py-3 text-start text-xs font-semibold tracking-wide uppercase">{t("client")}{columnHandle(2)}</th>
-                <th className="relative px-4 py-3 text-start text-xs font-semibold tracking-wide uppercase">{t("date")}{columnHandle(3)}</th>
-                <th className="relative px-4 py-3 text-start text-xs font-semibold tracking-wide uppercase">{t("status")}{columnHandle(4)}</th>
-                <th className="relative px-4 py-3 text-medium text-xs font-semibold tracking-wide uppercase">{t("total")}{columnHandle(5)}</th>
-                <th className="relative px-4 py-3 text-medium text-xs font-semibold tracking-wide uppercase">{t("actions")}{columnHandle(6)}</th>
+                <th className="relative px-4 py-3 text-start text-xs font-semibold tracking-wide uppercase">{tr("المستورد/المصدر", "Importer / Exporter")}{columnHandle(3)}</th>
+                <th className="relative px-4 py-3 text-start text-xs font-semibold tracking-wide uppercase">{t("date")}{columnHandle(4)}</th>
+                <th className="relative px-4 py-3 text-start text-xs font-semibold tracking-wide uppercase">{t("status")}{columnHandle(5)}</th>
+                <th className="relative px-4 py-3 text-medium text-xs font-semibold tracking-wide uppercase">{t("total")}{columnHandle(6)}</th>
+                <th className="relative px-4 py-3 text-medium text-xs font-semibold tracking-wide uppercase">{t("actions")}{columnHandle(7)}</th>
               </tr>
             </thead>
 
             <tbody className="divide-y divide-border/40">
               {isLoading ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-12 text-muted-foreground animate-pulse">
+                  <td colSpan={8} className="text-center py-12 text-muted-foreground animate-pulse">
                     {t("loadingInvoices")}
                   </td>
                 </tr>
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-12 text-muted-foreground">
+                  <td colSpan={8} className="text-center py-12 text-muted-foreground">
                     {t("noInvoices")}
                   </td>
                 </tr>
@@ -566,6 +568,9 @@ export default function InvoicesList() {
                       </td>
                     <td className="px-4 py-3">
                       <span className="font-medium text-sm">{inv.clientName}</span>
+                    </td>
+                    <td className="px-4 py-3 break-words">
+                      <span className="text-sm">{(inv as typeof inv & { importerExporterName?: string | null }).importerExporterName || "—"}</span>
                     </td>
 
                     <td className="px-4 py-3">

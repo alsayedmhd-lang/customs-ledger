@@ -457,6 +457,7 @@ export default function AccountingPage() {
         const invoice = invoiceSearchFields.get(r.id);
         const shipmentRef = String(invoice?.shipmentRef ?? "").toLowerCase();
         const billOfLading = String(invoice?.billOfLading ?? "").toLowerCase();
+        const importerExporterName = String((invoice as { importerExporterName?: string | null } | undefined)?.importerExporterName ?? "").toLowerCase();
         const declarationBase = shipmentRef.replace(/[^a-z0-9]/g, "").slice(0, 14);
         const searchBase = searchValue.replace(/[^a-z0-9]/g, "").slice(0, 14);
 
@@ -468,6 +469,7 @@ export default function AccountingPage() {
           search &&
           !invoiceNumber.includes(searchValue) &&
           !clientName.includes(searchValue) &&
+          !importerExporterName.includes(searchValue) &&
           !shipmentRef.includes(searchValue) &&
           !billOfLading.includes(searchValue) &&
           !(searchBase && declarationBase.startsWith(searchBase))
@@ -725,8 +727,8 @@ export default function AccountingPage() {
 <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2"><div className="relative min-w-[220px] flex-1 sm:min-w-[280px]">
               <Search className="pointer-events-none absolute end-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <input autoComplete="off" name="ledger-accounting-search"
-                aria-label={lang === "ar" ? "رقم البيان أو البوليصة أو اسم العميل أوالفاتورة" : "Declaration, bill of lading or client or invoice"}
-                placeholder={lang === "ar" ? "رقم البيان / البوليصة / اسم العميل/ الفاتورة" : "Declaration / bill of lading / client /invoice"}
+                aria-label={lang === "ar" ? "رقم البيان أو البوليصة أو العميل أو المستورد/المصدر أو الفاتورة" : "Declaration, bill of lading, client, importer/exporter or invoice"}
+                placeholder={lang === "ar" ? "البيان / البوليصة / العميل / المستورد أو المصدر / الفاتورة" : "Declaration / B/L / client / importer or exporter / invoice"}
                 value={search} onChange={(e) => setSearch(e.target.value)}
                 className="h-8 w-full ps-3 pe-9 rounded-lg border border-border bg-muted/40 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20" />
             </div><label className="flex items-center gap-1.5 text-xs text-muted-foreground"><span>{lang === "ar" ? "من" : "From"}</span><input
