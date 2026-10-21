@@ -68,3 +68,4 @@ build/*
 # logs
 electron-stdout.log
 electron-stderr.log
+/update-backups/
